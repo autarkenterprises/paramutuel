@@ -79,3 +79,76 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 - oracle adapters
 - validity/ambiguity resolution paths
 
+### Deploying the MVP with Foundry
+
+- **Prerequisites**:
+  - `forge` installed and configured.
+  - Deployer EOA with gas funds on your target network.
+  - RPC URL for the target network (e.g. Sepolia, mainnet, or an L2).
+
+- **1. Configure environment**
+  - Create a `.env` in the repo root (already ignored by `.gitignore`):
+
+    ```bash
+    RPC_URL_SEPOLIA="https://sepolia.infura.io/v3/YOUR_KEY"
+    PRIVATE_KEY="0x..."              # deployer private key
+    ETHERSCAN_API_KEY="..."          # optional, for verification
+    ```
+
+  - Optionally, add RPC endpoints to `foundry.toml`:
+
+    ```toml
+    [rpc_endpoints]
+    sepolia = "${RPC_URL_SEPOLIA}"
+    ```
+
+- **2. Deploy `ParamutuelFactory`**
+
+  - Constructor parameters:
+    - `treasury_`: address to receive protocol fees (e.g. DAO multisig).
+    - `protocolFeeBps_`: protocol fee in basis points (e.g. `200` = 2%).
+    - `minBettingWindow_`: minimum seconds between creation and `bettingCloseTime`.
+    - `minResolutionWindow_`: minimum resolution window length in seconds.
+
+  - Using the provided script:
+
+    ```bash
+    forge script script/DeployFactory.s.sol \
+      --rpc-url $RPC_URL_SEPOLIA \
+      --private-key $PRIVATE_KEY \
+      --broadcast
+    ```
+
+  - The script logs the deployed `ParamutuelFactory` address; record this as the protocol entrypoint.
+
+- **3. Creating markets**
+
+  Once the factory is deployed, markets are created via `createMarket`:
+
+  - Inputs:
+    - `collateralToken`: ERC20 address used for bets (e.g. USDC).
+    - `question`: human-readable prop question.
+    - `outcomes[]`: text labels for possible outcomes.
+    - `bettingCloseTime`: unix timestamp \(>\) `block.timestamp + minBettingWindow`.
+    - `resolutionWindow`: seconds \(>= minResolutionWindow\).
+    - `extraFeeRecipients[]`, `extraFeeBps[]`: optional, additional beneficiaries.
+
+  - You can call `createMarket`:
+    - From a frontend using ethers.js / viem.
+    - From a Foundry script (to be added later).
+
+- **4. Using a deployed market**
+
+  - **Bettors**:
+    - `IERC20(collateralToken).approve(market, amount)`
+    - `ParamutuelMarket(market).placeBet(outcomeIndex, amount)`
+  - **Proposer / resolver**:
+    - After `bettingCloseTime` and before `resolutionDeadline`:
+      - `resolve(winningOutcomeIndex)` or `retract()`.
+  - **Anyone**:
+    - After `resolutionDeadline` if still open: `expire()` to unlock refunds.
+  - **Claims**:
+    - Bettors call `claim()` after finalization.
+    - Fee recipients call `withdrawFees()` to pull accrued fees.
+
+
