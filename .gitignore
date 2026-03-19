@@ -1,0 +1,23 @@
+.env
+.env.*
+*.env
+
+# Foundry
+out/
+cache/
+broadcast/
+
+# Node (if used later)
+node_modules/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets / keys
+*.pem
+*.key
+*secret*
+*token*
+
