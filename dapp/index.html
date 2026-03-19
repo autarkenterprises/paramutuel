@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel MVP dApp</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Paramutuel MVP</h1>
+
+    <section class="card">
+      <h2>Wallet</h2>
+      <div class="row">
+        <button id="connectBtn">Connect Wallet</button>
+        <div id="walletAddr" class="muted">Not connected</div>
+      </div>
+      <div id="walletStatus" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Create Market</h2>
+
+      <div class="grid">
+        <label>
+          Factory address
+          <input id="factoryAddress" placeholder="0x..." />
+        </label>
+
+        <label>
+          Collateral token (ERC20) address
+          <input id="collateralToken" placeholder="0x..." />
+        </label>
+
+        <label>
+          Outcomes (comma-separated)
+          <input id="outcomes" placeholder="YES,NO" />
+        </label>
+
+        <label>
+          Question text
+          <input id="question" placeholder="Will team A win?" />
+        </label>
+
+        <label>
+          Bet close (seconds from now)
+          <input id="bettingCloseIn" type="number" value="7200" />
+        </label>
+
+        <label>
+          Resolution window (seconds after close)
+          <input id="resolutionWindow" type="number" value="7200" />
+        </label>
+
+        <label>
+          Optional fee recipients (comma-separated)
+          <input id="extraFeeRecipients" placeholder="0x...,0x..." />
+        </label>
+
+        <label>
+          Optional fee bps (comma-separated)
+          <input id="extraFeeBps" placeholder="300,100" />
+        </label>
+
+        <label>
+          Collateral decimals (for amount inputs)
+          <input id="decimals" type="number" value="18" />
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="createMarketBtn">Create Market</button>
+      </div>
+
+      <div id="factoryConstraints" class="muted"></div>
+
+      <div class="row">
+        <div class="muted">Created market:</div>
+        <div id="marketAddress" class="mono muted">Not created</div>
+      </div>
+      <div id="createStatus" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Betting</h2>
+      <div class="row muted">Market address is the latest created market.</div>
+      <div class="grid">
+        <label>
+          Outcome index (uint256)
+          <input id="betOutcomeIndex" type="number" value="0" />
+        </label>
+        <label>
+          Bet amount
+          <input id="betAmount" type="number" value="10" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="placeBetBtn">Place Bet</button>
+      </div>
+      <div id="betStatus" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Resolution</h2>
+      <div class="grid">
+        <label>
+          Winning outcome index
+          <input id="winningOutcomeIndex" type="number" value="0" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="resolveBtn">Resolve</button>
+        <button id="retractBtn">Retract</button>
+        <button id="expireBtn">Expire (anyone)</button>
+      </div>
+      <div id="resolutionStatus" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Claims & Fees</h2>
+      <div class="row">
+        <button id="claimBtn">Claim Payout (bettor)</button>
+        <button id="withdrawFeesBtn">Withdraw Fees (fee recipient)</button>
+      </div>
+      <div id="claimStatus" class="muted"></div>
+    </section>
+  </main>
+
+  <!-- Ethers loaded as a plain script so app.js can be syntax-checked easily -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+

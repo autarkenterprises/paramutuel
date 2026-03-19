@@ -151,4 +151,24 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
     - Bettors call `claim()` after finalization.
     - Fee recipients call `withdrawFees()` to pull accrued fees.
 
+### Minimal dApp
+
+A minimal no-build dApp is available in `dapp/`. It can:
+- create markets through the deployed `ParamutuelFactory`
+- place bets (`placeBet`)
+- resolve / retract / expire
+- claim payouts and withdraw fees
+
+Run an HTTP server from the repo root (do not use `file://`):
+
+```bash
+python3 -m http.server 8080
+```
+
+Then open:
+
+`http://localhost:8080/dapp/`
+
+See `dapp/README.md` for UI details and deployment assumptions.
+
 
