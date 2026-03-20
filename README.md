@@ -2,6 +2,8 @@
 
 Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is intentionally structured to later support more decentralized resolution mechanisms.
 
+**Market research & thesis:** see [`research/competitive-landscape-and-thesis.md`](research/competitive-landscape-and-thesis.md).
+
 ### Recorded long-term design considerations
 
 Smart contracts cannot observe real-world truth directly. A fully decentralized version of this protocol ultimately requires an oracle / resolution mechanism such as:
