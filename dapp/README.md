@@ -42,7 +42,7 @@ In the dApp UI, paste:
 
 ### Notes
 
-- Amounts are parsed using the `decimals` input (defaults to `18`).
+- **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - This MVP resolver is centralized-per-market (the market `resolver` is whoever calls `createMarket`).
 

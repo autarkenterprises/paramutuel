@@ -73,3 +73,19 @@ button:disabled {
 .muted { color: #97a6c4; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
+/* Full-width row inside the 2-col grid */
+.span-2 {
+  grid-column: 1 / -1;
+}
+
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+

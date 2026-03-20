@@ -32,6 +32,7 @@
           Collateral token (ERC20) address
           <input id="collateralToken" placeholder="0x..." />
         </label>
+        <div id="tokenMeta" class="muted span-2">Connect wallet, then tab out of the token field to auto-detect <code>decimals()</code>.</div>
 
         <label>
           Outcomes (comma-separated)
@@ -63,9 +64,13 @@
           <input id="extraFeeBps" placeholder="300,100" />
         </label>
 
+        <label class="checkbox-label">
+          <input type="checkbox" id="decimalsManual" />
+          Manual decimals override (only if auto-detect fails)
+        </label>
         <label>
-          Collateral decimals (for amount inputs)
-          <input id="decimals" type="number" value="18" />
+          Decimals (auto-filled from token, or override)
+          <input id="decimals" type="number" value="18" min="0" max="77" readonly />
         </label>
       </div>
 

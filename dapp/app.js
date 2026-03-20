@@ -36,6 +36,73 @@ function parseAmount(amountNumber, decimals) {
   return ethers.parseUnits(amountStr, decimals);
 }
 
+const ERC20_DECIMALS_ABI = ["function decimals() view returns (uint8)"];
+
+/**
+ * Read ERC-20 decimals() from chain (standard safeguard vs manual entry).
+ * Some tokens return uint256; ethers normalizes to number.
+ */
+async function fetchTokenDecimals(tokenAddress) {
+  if (!tokenAddress || !ethers.isAddress(tokenAddress)) {
+    throw new Error("Invalid token address");
+  }
+  if (!provider) {
+    throw new Error("Connect wallet first so the app can read decimals() from the token.");
+  }
+  const c = new ethers.Contract(tokenAddress, ERC20_DECIMALS_ABI, provider);
+  const d = await c.decimals();
+  const n = Number(d);
+  if (!Number.isFinite(n) || n < 0 || n > 77) {
+    throw new Error(`Unusual decimals() value: ${d}. Use manual override.`);
+  }
+  return n;
+}
+
+function syncDecimalsInputReadOnly() {
+  const manual = $("decimalsManual").checked;
+  $("decimals").readOnly = !manual;
+  $("decimals").title = manual
+    ? "Manual override active"
+    : "Filled automatically from token decimals(); check Manual override to edit.";
+}
+
+/**
+ * Decimals used when parsing bet amounts: chain by default, manual if checked.
+ */
+async function resolveBettingDecimals(tokenAddress) {
+  if ($("decimalsManual").checked) {
+    const d = Number($("decimals").value);
+    if (!Number.isFinite(d) || d < 0 || d > 77) {
+      throw new Error("Invalid manual decimals (use 0–77).");
+    }
+    return d;
+  }
+  const d = await fetchTokenDecimals(tokenAddress);
+  $("decimals").value = String(d);
+  $("tokenMeta").textContent = `Token decimals: ${d} (read from token contract).`;
+  return d;
+}
+
+async function tryDetectDecimalsFromCollateralField() {
+  if ($("decimalsManual").checked) return;
+  const addr = $("collateralToken").value.trim();
+  if (!addr || !ethers.isAddress(addr)) {
+    $("tokenMeta").textContent = "Enter a valid token address, then tab away to detect decimals.";
+    return;
+  }
+  if (!provider) {
+    $("tokenMeta").textContent = "Connect wallet to read decimals() from the token.";
+    return;
+  }
+  try {
+    const d = await fetchTokenDecimals(addr);
+    $("decimals").value = String(d);
+    $("tokenMeta").textContent = `Token decimals: ${d} (read from token contract).`;
+  } catch (e) {
+    $("tokenMeta").textContent = `Could not read decimals(): ${e.message} — enable Manual decimals override.`;
+  }
+}
+
 async function loadAbi() {
   const [factoryJson, marketJson] = await Promise.all([
     fetch(FACTORY_ABI_URL).then((r) => r.json()),
@@ -55,6 +122,7 @@ async function connectWallet() {
 
   $("walletAddr").textContent = userAddress;
   $("walletStatus").textContent = "Connected.";
+  await tryDetectDecimalsFromCollateralField();
 }
 
 async function getFactoryConstraints(factoryAddress) {
@@ -74,7 +142,6 @@ async function createMarket() {
   const resolutionWindow = Number($("resolutionWindow").value);
   const extraFeeRecipientsCsv = $("extraFeeRecipients").value.trim();
   const extraFeeBpsCsv = $("extraFeeBps").value.trim();
-  const decimals = Number($("decimals").value);
 
   if (!factoryAddress) throw new Error("Factory address is required.");
   if (!collateralToken) throw new Error("Collateral token is required.");
@@ -144,9 +211,9 @@ async function placeBet() {
 
   const outcomeIndex = Number($("betOutcomeIndex").value);
   const amountNumber = Number($("betAmount").value);
-  const decimals = Number($("decimals").value);
 
   const collateralTokenAddress = await marketContract.collateralToken();
+  const decimals = await resolveBettingDecimals(collateralTokenAddress);
   const erc20Abi = [
     "function approve(address spender,uint256 amount) external returns (bool)",
     "function transfer(address to,uint256 amount) external returns (bool)",
@@ -208,6 +275,20 @@ async function withdrawFees() {
 }
 
 async function main() {
+  syncDecimalsInputReadOnly();
+  $("decimalsManual").addEventListener("change", () => {
+    syncDecimalsInputReadOnly();
+    if (!$("decimalsManual").checked) {
+      tryDetectDecimalsFromCollateralField();
+    }
+  });
+
+  $("collateralToken").addEventListener("blur", () => {
+    tryDetectDecimalsFromCollateralField().catch((e) => {
+      $("tokenMeta").textContent = `Could not read decimals(): ${e.message}`;
+    });
+  });
+
   $("connectBtn").addEventListener("click", async () => {
     try {
       await connectWallet();
