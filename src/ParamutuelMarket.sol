@@ -33,6 +33,9 @@ contract ParamutuelMarket is ReentrancyGuard {
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
     address public immutable factory;
+    /// @notice Address that created the market via the factory (may differ from `resolver`).
+    address public immutable proposer;
+    /// @notice Address authorized to `resolve` and `retract` before the deadline.
     address public immutable resolver;
     IERC20 public immutable collateralToken;
 
@@ -65,6 +68,7 @@ contract ParamutuelMarket is ReentrancyGuard {
 
     constructor(
         address factory_,
+        address proposer_,
         address resolver_,
         address collateralToken_,
         string memory question_,
@@ -75,6 +79,7 @@ contract ParamutuelMarket is ReentrancyGuard {
         uint16[] memory feeBps_
     ) {
         factory = factory_;
+        proposer = proposer_;
         resolver = resolver_;
         collateralToken = IERC20(collateralToken_);
         question = question_;
@@ -122,6 +127,10 @@ contract ParamutuelMarket is ReentrancyGuard {
         emit BetPlaced(msg.sender, outcomeIndex, amount);
     }
 
+    /// @notice Finalize the market to a winning outcome.
+    /// @dev Callable only by `resolver`, after betting closes and before `resolutionDeadline`.
+    ///      Fees are charged once at finalization.
+    /// @param outcomeIndex The winning outcome index in `outcomes`.
     function resolve(uint256 outcomeIndex) external nonReentrant {
         if (msg.sender != resolver) revert NotResolver();
         if (state != State.Open) revert AlreadyFinalized();
@@ -137,6 +146,9 @@ contract ParamutuelMarket is ReentrancyGuard {
         emit Resolved(outcomeIndex);
     }
 
+    /// @notice Invalidate the market during the resolver window.
+    /// @dev Callable only by `resolver`, after betting closes and before `resolutionDeadline`.
+    ///      Retracted markets allow bettors to claim stake minus fee share.
     function retract() external nonReentrant {
         if (msg.sender != resolver) revert NotResolver();
         if (state != State.Open) revert AlreadyFinalized();
@@ -148,6 +160,10 @@ contract ParamutuelMarket is ReentrancyGuard {
         emit Retracted();
     }
 
+    /// @notice Liveness fallback if resolver does not finalize in time.
+    /// @dev Callable by anyone strictly after `resolutionDeadline` while market is still open.
+    ///      This prevents funds from being stuck indefinitely by moving to `Retracted`,
+    ///      which enables refunds (minus fees) via `claim`.
     function expire() external nonReentrant {
         if (state != State.Open) revert AlreadyFinalized();
         if (block.timestamp <= resolutionDeadline) revert ResolutionWindowOver();

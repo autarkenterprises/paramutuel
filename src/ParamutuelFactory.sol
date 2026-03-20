@@ -4,10 +4,12 @@ pragma solidity ^0.8.24;
 import {ParamutuelMarket} from "./ParamutuelMarket.sol";
 
 contract ParamutuelFactory {
+    /// @param resolver The address that may `resolve` / `retract` (same as proposer if `resolver == address(0)` at creation).
     event MarketCreated(
         address indexed market,
         address indexed proposer,
-        address indexed collateralToken,
+        address indexed resolver,
+        address collateralToken,
         uint64 bettingCloseTime,
         uint64 resolutionDeadline
     );
@@ -42,12 +44,14 @@ contract ParamutuelFactory {
         return markets.length;
     }
 
+    /// @param resolver If `address(0)`, the resolver is the caller (`msg.sender`). Otherwise must be non-zero.
     function createMarket(
         address collateralToken,
         string memory question,
         string[] memory outcomes,
         uint64 bettingCloseTime,
         uint64 resolutionWindow,
+        address resolver,
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps
     ) external returns (address market) {
@@ -66,9 +70,12 @@ contract ParamutuelFactory {
 
         uint64 resolutionDeadline = bettingCloseTime + resolutionWindow;
 
+        address resolvedResolver = resolver == address(0) ? msg.sender : resolver;
+
         ParamutuelMarket m = new ParamutuelMarket(
             address(this),
             msg.sender,
+            resolvedResolver,
             collateralToken,
             question,
             outcomes,
@@ -80,7 +87,7 @@ contract ParamutuelFactory {
 
         market = address(m);
         markets.push(market);
-        emit MarketCreated(market, msg.sender, collateralToken, bettingCloseTime, resolutionDeadline);
+        emit MarketCreated(market, msg.sender, resolvedResolver, collateralToken, bettingCloseTime, resolutionDeadline);
     }
 
     function _buildFeeConfig(address[] memory extraRecipients, uint16[] memory extraBps)

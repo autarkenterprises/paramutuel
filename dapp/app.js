@@ -36,6 +36,100 @@ function parseAmount(amountNumber, decimals) {
   return ethers.parseUnits(amountStr, decimals);
 }
 
+function formatRatio(numerator, denominator, precision) {
+  if (denominator === 0n) return "N/A";
+  const p = BigInt(precision);
+  const scale = 10n ** p;
+  const scaled = (numerator * scale) / denominator;
+  const whole = scaled / scale;
+  const frac = (scaled % scale).toString().padStart(precision, "0");
+  return `${whole}.${frac}`;
+}
+
+function formatTokenAmount(amount, decimals, maxFractionDigits = 6) {
+  const s = ethers.formatUnits(amount, decimals);
+  const n = Number(s);
+  if (Number.isFinite(n)) {
+    return n.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
+  }
+  return s;
+}
+
+function clearOddsPreview(message) {
+  $("oddsCurrentMultiple").value = "";
+  $("oddsAfterMultiple").value = "";
+  $("oddsExpectedPayout").value = "";
+  $("oddsExpectedProfit").value = "";
+  $("oddsStatus").textContent = message || "";
+}
+
+function netPot(totalPot, totalFeeBps) {
+  return totalPot - ((totalPot * totalFeeBps) / 10000n);
+}
+
+async function updateOddsPreview() {
+  if (!marketContract) {
+    clearOddsPreview("Create a market first to preview odds.");
+    return;
+  }
+
+  try {
+    const outcomeIndex = Number($("betOutcomeIndex").value);
+    const amountNumber = Number($("betAmount").value);
+    if (!Number.isFinite(outcomeIndex) || outcomeIndex < 0) {
+      clearOddsPreview("Enter a valid outcome index.");
+      return;
+    }
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      clearOddsPreview("Enter a positive bet amount to preview payout.");
+      return;
+    }
+
+    const state = Number(await marketContract.state());
+    if (state !== 0) {
+      clearOddsPreview("Market is not open. Odds preview is only shown for open markets.");
+      return;
+    }
+
+    const outcomesCount = Number(await marketContract.outcomesCount());
+    if (outcomeIndex >= outcomesCount) {
+      clearOddsPreview(`Outcome index out of range (0-${outcomesCount - 1}).`);
+      return;
+    }
+
+    const collateralTokenAddress = await marketContract.collateralToken();
+    const decimals = await resolveBettingDecimals(collateralTokenAddress);
+    const betAmount = parseAmount(amountNumber, decimals);
+
+    const [totalPot, totalFeeBps, outcomeTotal] = await Promise.all([
+      marketContract.totalPot(),
+      marketContract.totalFeeBps(),
+      marketContract.outcomeTotals(outcomeIndex),
+    ]);
+
+    const netBefore = netPot(totalPot, totalFeeBps);
+    const currentMultiple =
+      outcomeTotal > 0n ? `${formatRatio(netBefore, outcomeTotal, 4)}x` : "N/A (no stake yet)";
+
+    const totalPotAfter = totalPot + betAmount;
+    const netAfter = netPot(totalPotAfter, totalFeeBps);
+    const outcomeTotalAfter = outcomeTotal + betAmount;
+
+    const payoutPreview = (betAmount * netAfter) / outcomeTotalAfter;
+    const profitPreview = payoutPreview - betAmount;
+    const afterMultiple = `${formatRatio(netAfter, outcomeTotalAfter, 4)}x`;
+
+    $("oddsCurrentMultiple").value = currentMultiple;
+    $("oddsAfterMultiple").value = afterMultiple;
+    $("oddsExpectedPayout").value = formatTokenAmount(payoutPreview, decimals);
+    $("oddsExpectedProfit").value = formatTokenAmount(profitPreview, decimals);
+    $("oddsStatus").textContent =
+      "Preview uses on-chain integer rounding and may change if other bets arrive first.";
+  } catch (e) {
+    clearOddsPreview(`Could not compute odds preview: ${e.message}`);
+  }
+}
+
 const ERC20_DECIMALS_ABI = ["function decimals() view returns (uint8)"];
 
 /**
@@ -142,6 +236,7 @@ async function createMarket() {
   const resolutionWindow = Number($("resolutionWindow").value);
   const extraFeeRecipientsCsv = $("extraFeeRecipients").value.trim();
   const extraFeeBpsCsv = $("extraFeeBps").value.trim();
+  const resolverInput = $("resolverAddress").value.trim();
 
   if (!factoryAddress) throw new Error("Factory address is required.");
   if (!collateralToken) throw new Error("Collateral token is required.");
@@ -176,6 +271,12 @@ async function createMarket() {
 
   const factory = new ethers.Contract(factoryAddress, factoryAbi, signer);
 
+  let resolverArg = ethers.ZeroAddress;
+  if (resolverInput.length > 0) {
+    if (!ethers.isAddress(resolverInput)) throw new Error("Invalid resolver address.");
+    resolverArg = resolverInput;
+  }
+
   $("createStatus").textContent = "Submitting createMarket transaction...";
   const tx = await factory.createMarket(
     collateralToken,
@@ -183,6 +284,7 @@ async function createMarket() {
     outcomes,
     BigInt(closeTime),
     BigInt(resolutionWindow),
+    resolverArg,
     extraFeeRecipients,
     extraFeeBps
   );
@@ -204,6 +306,7 @@ async function createMarket() {
   marketContract = new ethers.Contract(marketAddress, marketAbi, signer);
   $("marketAddress").textContent = marketAddress;
   $("createStatus").textContent = "Market created.";
+  await updateOddsPreview();
 }
 
 async function placeBet() {
@@ -230,6 +333,7 @@ async function placeBet() {
   const tx = await marketContract.placeBet(outcomeIndex, amount);
   await tx.wait();
   $("betStatus").textContent = "Bet placed.";
+  await updateOddsPreview();
 }
 
 async function resolveMarket() {
@@ -240,6 +344,7 @@ async function resolveMarket() {
   const tx = await marketContract.resolve(winningOutcomeIndex);
   await tx.wait();
   $("resolutionStatus").textContent = "Resolved.";
+  await updateOddsPreview();
 }
 
 async function retractMarket() {
@@ -248,6 +353,7 @@ async function retractMarket() {
   const tx = await marketContract.retract();
   await tx.wait();
   $("resolutionStatus").textContent = "Retracted.";
+  await updateOddsPreview();
 }
 
 async function expireMarket() {
@@ -256,6 +362,7 @@ async function expireMarket() {
   const tx = await marketContract.expire();
   await tx.wait();
   $("resolutionStatus").textContent = "Expired.";
+  await updateOddsPreview();
 }
 
 async function claim() {
@@ -287,6 +394,13 @@ async function main() {
     tryDetectDecimalsFromCollateralField().catch((e) => {
       $("tokenMeta").textContent = `Could not read decimals(): ${e.message}`;
     });
+  });
+
+  $("betOutcomeIndex").addEventListener("input", () => {
+    updateOddsPreview();
+  });
+  $("betAmount").addEventListener("input", () => {
+    updateOddsPreview();
   });
 
   $("connectBtn").addEventListener("click", async () => {
@@ -362,6 +476,7 @@ async function main() {
 
   // Load ABIs for factory/market
   await loadAbi();
+  clearOddsPreview("Create a market first to preview odds.");
   $("walletStatus").textContent = "Ready.";
 }
 

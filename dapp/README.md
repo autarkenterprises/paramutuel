@@ -5,6 +5,7 @@ This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) 
 It supports:
 - Creating markets via `ParamutuelFactory`
 - Placing bets (`placeBet`)
+- Odds/payout preview for the selected outcome and bet size
 - Resolving / retracting / expiring markets
 - Claiming payouts
 - Withdrawing fees (`withdrawFees`)
@@ -36,6 +37,7 @@ In the dApp UI, paste:
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)
 - Question text
+- Optional **Resolver address** (empty = your connected wallet resolves; or set an oracle / sponsored resolver)
 - `Bet close` (seconds from now)
 - `Resolution window` (seconds after close)
 - Optional extra fee recipients + bps (comma-separated)

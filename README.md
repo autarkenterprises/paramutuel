@@ -32,9 +32,12 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
   - Enforces global constraints (min windows, caps on outcomes/fees).
   - Deploys new markets.
 
-- **Proposer / Resolver (per-market)**:
-  - Creates the market by providing outcome strings, time windows, and optional fee recipients.
-  - Only address that can **resolve** (choose winning outcome) or **retract** (invalidate).
+- **Proposer (per-market)**:
+  - The address that calls `createMarket` on the factory; stored on-chain as `proposer` for transparency.
+
+- **Resolver (per-market)**:
+  - Address authorized to **resolve** (choose winning outcome) or **retract** (invalidate).
+  - Defaults to the proposer when `resolver == address(0)` is passed at creation; may be set to any other address (oracle, sponsored resolver, multisig, etc.).
 
 - **Bettors (per-market)**:
   - Deposit collateral during the betting window and allocate it to exactly one outcome per bet.
@@ -54,6 +57,7 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
      - `outcomes[]` (strings)
      - `bettingCloseTime`
      - `resolutionWindow` (deadline = close + window)
+     - `resolver` (`address(0)` means the proposer is also the resolver)
      - `feeRecipients[]`, `feeBps[]` (optional)
    - Factory enforces sane constraints (min betting window, min resolution window, caps).
 
@@ -63,8 +67,8 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 
 3. **Finalization**
    - After close and before deadline:
-     - Proposer may **resolve(outcomeIndex)**.
-     - Proposer may **retract()**.
+     - Resolver may **resolve(outcomeIndex)**.
+     - Resolver may **retract()**.
    - After deadline (if not resolved/retracted):
      - Anyone may **expire()**, which invalidates and enables refunds (minus fees) to avoid stuck funds.
 
@@ -133,6 +137,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
     - `outcomes[]`: text labels for possible outcomes.
     - `bettingCloseTime`: unix timestamp \(>\) `block.timestamp + minBettingWindow`.
     - `resolutionWindow`: seconds \(>= minResolutionWindow\).
+    - `resolver`: `address(0)` to use the proposer; otherwise the delegated resolver address.
     - `extraFeeRecipients[]`, `extraFeeBps[]`: optional, additional beneficiaries.
 
   - You can call `createMarket`:
@@ -144,7 +149,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
   - **Bettors**:
     - `IERC20(collateralToken).approve(market, amount)`
     - `ParamutuelMarket(market).placeBet(outcomeIndex, amount)`
-  - **Proposer / resolver**:
+  - **Resolver** (often the proposer):
     - After `bettingCloseTime` and before `resolutionDeadline`:
       - `resolve(winningOutcomeIndex)` or `retract()`.
   - **Anyone**:

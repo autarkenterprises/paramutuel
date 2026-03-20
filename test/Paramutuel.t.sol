@@ -22,18 +22,18 @@ contract MockERC20 {
         emit Transfer(address(0), to, amount);
     }
 
-    function approve(address spender, uint256 amount) external returns (bool) {
+    function approve(address spender, uint256 amount) external virtual returns (bool) {
         allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
-    function transfer(address to, uint256 amount) external returns (bool) {
+    function transfer(address to, uint256 amount) external virtual returns (bool) {
         _transfer(msg.sender, to, amount);
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
         uint256 allowed = allowance[from][msg.sender];
         require(allowed >= amount, "ALLOWANCE");
         allowance[from][msg.sender] = allowed - amount;
@@ -49,6 +49,34 @@ contract MockERC20 {
     }
 }
 
+contract FalseReturnERC20 is MockERC20 {
+    bool public failTransferFrom;
+    bool public failTransfer;
+
+    function setFailTransferFrom(bool v) external {
+        failTransferFrom = v;
+    }
+
+    function setFailTransfer(bool v) external {
+        failTransfer = v;
+    }
+
+    function transfer(address to, uint256 amount) external override returns (bool) {
+        if (failTransfer) return false;
+        _transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
+        if (failTransferFrom) return false;
+        uint256 allowed = allowance[from][msg.sender];
+        require(allowed >= amount, "ALLOWANCE");
+        allowance[from][msg.sender] = allowed - amount;
+        _transfer(from, to, amount);
+        return true;
+    }
+}
+
 contract ParamutuelTest is Test {
     ParamutuelFactory factory;
     MockERC20 token;
@@ -60,6 +88,7 @@ contract ParamutuelTest is Test {
     address bettor3 = address(0x6000);
     address bettor4 = address(0x7000);
     address extraFeeRecipient = address(0x5000);
+    address delegatedResolver = address(0x8888);
 
     uint16 protocolFeeBps = 200; // 2%
     uint64 minBettingWindow = 1 hours;
@@ -98,6 +127,7 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0), // resolver defaults to proposer
             extraRecipients,
             extraBps
         );
@@ -108,10 +138,89 @@ contract ParamutuelTest is Test {
     function testCreateMarketStoresParameters() public {
         ParamutuelMarket market = _createBasicMarket();
 
+        assertEq(market.proposer(), proposer, "proposer");
         assertEq(market.resolver(), proposer, "resolver");
         assertEq(address(market.collateralToken()), address(token), "collateral");
         assertEq(market.outcomesCount(), 2, "outcomes");
         assertEq(market.bettingCloseTime(), block.timestamp + 2 hours, "bet close");
+    }
+
+    function testFactoryConstructorValidation() public {
+        vm.expectRevert(bytes("TREASURY"));
+        new ParamutuelFactory(address(0), protocolFeeBps, minBettingWindow, minResolutionWindow);
+
+        vm.expectRevert(bytes("FEE"));
+        new ParamutuelFactory(treasury, 1_001, minBettingWindow, minResolutionWindow);
+    }
+
+    function testMarketsCountIncrements() public {
+        assertEq(factory.marketsCount(), 0);
+        _createBasicMarket();
+        assertEq(factory.marketsCount(), 1);
+        _createBasicMarket();
+        assertEq(factory.marketsCount(), 2);
+    }
+
+    function testBadOutcomesRevert() public {
+        string[] memory outcomes = new string[](1);
+        outcomes[0] = "ONLY";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.expectRevert(ParamutuelFactory.BadOutcomes.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "bad outcomes",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+    }
+
+    function testBadFeeConfigForZeroRecipientOrZeroBpsReverts() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+
+        address[] memory recipients = new address[](1);
+        recipients[0] = address(0);
+        uint16[] memory bps = new uint16[](1);
+        bps[0] = 100;
+
+        vm.expectRevert(ParamutuelFactory.BadFeeConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "bad recipient",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            recipients,
+            bps
+        );
+
+        recipients[0] = extraFeeRecipient;
+        bps[0] = 0;
+        vm.expectRevert(ParamutuelFactory.BadFeeConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "bad bps",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            recipients,
+            bps
+        );
     }
 
     function testBetResolveAndClaimPayouts() public {
@@ -270,6 +379,46 @@ contract ParamutuelTest is Test {
         market.retract();
     }
 
+    function testOutcomeTextAndInvalidIndex() public {
+        ParamutuelMarket market = _createBasicMarket();
+        assertEq(market.outcomeText(0), "YES");
+        assertEq(market.outcomeText(1), "NO");
+
+        vm.expectRevert(ParamutuelMarket.InvalidOutcome.selector);
+        market.outcomeText(2);
+    }
+
+    function testPlaceBetZeroAmountReverts() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 1 ether);
+        vm.expectRevert("AMOUNT");
+        market.placeBet(0, 0);
+        vm.stopPrank();
+    }
+
+    function testPlaceBetWhenClosedRevertsNotOpen() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.retract();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 1 ether);
+        vm.expectRevert(ParamutuelMarket.NotOpen.selector);
+        market.placeBet(0, 1 ether);
+        vm.stopPrank();
+    }
+
+    function testClaimWhileOpenRevertsNotOpen() public {
+        ParamutuelMarket market = _createBasicMarket();
+        vm.expectRevert(ParamutuelMarket.NotOpen.selector);
+        vm.prank(bettor1);
+        market.claim();
+    }
+
     function testMultiOutcomeMultiBettorParimutuelPayouts() public {
         // Create a 3-outcome market
         string[] memory outcomes = new string[](3);
@@ -292,6 +441,7 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -399,6 +549,7 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -540,6 +691,7 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -566,6 +718,7 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -593,6 +746,7 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -617,6 +771,7 @@ contract ParamutuelTest is Test {
             outcomes,
             nowTs + minBettingWindow - 1,
             minResolutionWindow,
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -630,9 +785,289 @@ contract ParamutuelTest is Test {
             outcomes,
             nowTs + minBettingWindow,
             minResolutionWindow - 1,
+            address(0),
             extraRecipients,
             extraBps
         );
+    }
+
+    function testDelegatedResolverSeparateFromProposer() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "Delegated resolver market",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            delegatedResolver,
+            extraRecipients,
+            extraBps
+        );
+
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+        assertEq(market.proposer(), proposer);
+        assertEq(market.resolver(), delegatedResolver);
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 50 ether);
+        market.placeBet(0, 50 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 3 hours);
+
+        vm.expectRevert(ParamutuelMarket.NotResolver.selector);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        vm.prank(delegatedResolver);
+        market.resolve(0);
+
+        vm.startPrank(bettor1);
+        uint256 paid = market.claim();
+        vm.stopPrank();
+        // Protocol fee 2% on factory => net pot 49 ether to sole winner
+        assertEq(paid, 49 ether);
+    }
+
+    function testAlreadyFinalizedRevertsForResolveRetractExpire() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        vm.expectRevert(ParamutuelMarket.AlreadyFinalized.selector);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        vm.expectRevert(ParamutuelMarket.AlreadyFinalized.selector);
+        vm.prank(proposer);
+        market.retract();
+
+        vm.expectRevert(ParamutuelMarket.AlreadyFinalized.selector);
+        vm.prank(bettor2);
+        market.expire();
+    }
+
+    function testResolvedWithoutWinningBetsCausesNoClaims() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 20 ether);
+        market.placeBet(0, 20 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.resolve(1); // no one bet outcome 1
+
+        vm.expectRevert(ParamutuelMarket.NothingToClaim.selector);
+        vm.prank(bettor1);
+        market.claim();
+    }
+
+    function testWithdrawFeesHappyPathAndDoubleWithdrawRevert() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 100 ether);
+        market.placeBet(0, 100 ether);
+        vm.stopPrank();
+
+        vm.startPrank(bettor2);
+        token.approve(address(market), 100 ether);
+        market.placeBet(1, 100 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.resolve(1);
+
+        assertEq(market.feeBalances(treasury), 4 ether);
+
+        vm.startPrank(treasury);
+        uint256 before = token.balanceOf(treasury);
+        uint256 withdrawn = market.withdrawFees();
+        uint256 afterBal = token.balanceOf(treasury);
+        assertEq(withdrawn, 4 ether);
+        assertEq(afterBal - before, 4 ether);
+
+        vm.expectRevert(ParamutuelMarket.NothingToClaim.selector);
+        market.withdrawFees();
+        vm.stopPrank();
+    }
+
+    function testWithdrawFeesWithoutAccrualReverts() public {
+        ParamutuelMarket market = _createBasicMarket();
+        vm.expectRevert(ParamutuelMarket.NothingToClaim.selector);
+        vm.prank(extraFeeRecipient);
+        market.withdrawFees();
+    }
+
+    function testMarketConstructorFeeConfigReverts() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "A";
+        outcomes[1] = "B";
+
+        address[] memory recipients = new address[](1);
+        recipients[0] = treasury;
+        uint16[] memory bpsMismatch = new uint16[](0);
+
+        vm.expectRevert(ParamutuelMarket.FeeConfigMismatch.selector);
+        new ParamutuelMarket(
+            address(factory),
+            proposer,
+            proposer,
+            address(token),
+            "q",
+            outcomes,
+            uint64(block.timestamp + 10),
+            uint64(block.timestamp + 20),
+            recipients,
+            bpsMismatch
+        );
+
+        uint16[] memory bpsTooHigh = new uint16[](1);
+        bpsTooHigh[0] = 10_001;
+
+        vm.expectRevert(ParamutuelMarket.FeeTooHigh.selector);
+        new ParamutuelMarket(
+            address(factory),
+            proposer,
+            proposer,
+            address(token),
+            "q",
+            outcomes,
+            uint64(block.timestamp + 10),
+            uint64(block.timestamp + 20),
+            recipients,
+            bpsTooHigh
+        );
+    }
+
+    function testPlaceBetRevertsIfTokenTransferFromReturnsFalse() public {
+        FalseReturnERC20 badToken = new FalseReturnERC20();
+        badToken.mint(bettor1, 100 ether);
+
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "A";
+        outcomes[1] = "B";
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(badToken),
+            "bad transferFrom",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+
+        badToken.setFailTransferFrom(true);
+        vm.startPrank(bettor1);
+        badToken.approve(address(market), 10 ether);
+        vm.expectRevert("TRANSFER_FROM");
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+    }
+
+    function testClaimRevertsIfTokenTransferReturnsFalse() public {
+        FalseReturnERC20 badToken = new FalseReturnERC20();
+        badToken.mint(bettor1, 100 ether);
+
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "A";
+        outcomes[1] = "B";
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(badToken),
+            "bad transfer claim",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+
+        vm.startPrank(bettor1);
+        badToken.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        badToken.setFailTransfer(true);
+        vm.expectRevert("TRANSFER");
+        vm.prank(bettor1);
+        market.claim();
+    }
+
+    function testWithdrawFeesRevertsIfTokenTransferReturnsFalse() public {
+        FalseReturnERC20 badToken = new FalseReturnERC20();
+        badToken.mint(bettor1, 100 ether);
+
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "A";
+        outcomes[1] = "B";
+
+        address[] memory extraRecipients = new address[](1);
+        extraRecipients[0] = extraFeeRecipient;
+        uint16[] memory extraBps = new uint16[](1);
+        extraBps[0] = 300;
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(badToken),
+            "bad transfer withdraw",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+
+        vm.startPrank(bettor1);
+        badToken.approve(address(market), 100 ether);
+        market.placeBet(0, 100 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        badToken.setFailTransfer(true);
+        vm.expectRevert("TRANSFER");
+        vm.prank(treasury);
+        market.withdrawFees();
     }
 }
 

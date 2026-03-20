@@ -45,6 +45,14 @@
         </label>
 
         <label>
+          Resolver address (optional)
+          <input id="resolverAddress" placeholder="Leave empty = you (proposer) resolve" />
+        </label>
+        <div id="resolverHint" class="muted span-2">
+          If set, only that address may <code>resolve</code> / <code>retract</code>. You remain the on-chain <strong>proposer</strong>. Use <code>0x0000…0000</code> explicitly if your tooling requires it; empty field defaults resolver to your wallet.
+        </div>
+
+        <label>
           Bet close (seconds from now)
           <input id="bettingCloseIn" type="number" value="7200" />
         </label>
@@ -100,6 +108,25 @@
           <input id="betAmount" type="number" value="10" />
         </label>
       </div>
+      <div class="grid">
+        <label>
+          Current implied payout multiple (selected outcome)
+          <input id="oddsCurrentMultiple" readonly />
+        </label>
+        <label>
+          Post-bet implied payout multiple
+          <input id="oddsAfterMultiple" readonly />
+        </label>
+        <label>
+          Expected payout for this bet (if selected outcome wins)
+          <input id="oddsExpectedPayout" readonly />
+        </label>
+        <label>
+          Expected profit for this bet
+          <input id="oddsExpectedProfit" readonly />
+        </label>
+      </div>
+      <div id="oddsStatus" class="muted"></div>
       <div class="row">
         <button id="placeBetBtn">Place Bet</button>
       </div>
