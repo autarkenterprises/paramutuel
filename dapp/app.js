@@ -226,6 +226,20 @@ async function getFactoryConstraints(factoryAddress) {
   return { minBettingWindow, minResolutionWindow };
 }
 
+function getRunner() {
+  if (signer) return signer;
+  if (provider) return provider;
+  throw new Error("Connect wallet first.");
+}
+
+async function setActiveMarket(marketAddress) {
+  if (!ethers.isAddress(marketAddress)) throw new Error("Invalid market address.");
+  marketContract = new ethers.Contract(marketAddress, marketAbi, getRunner());
+  $("marketAddress").textContent = marketAddress;
+  $("activeMarketAddress").value = marketAddress;
+  await updateOddsPreview();
+}
+
 async function createMarket() {
   const factoryAddress = $("factoryAddress").value.trim();
   const collateralToken = $("collateralToken").value.trim();
@@ -303,10 +317,8 @@ async function createMarket() {
   }
   if (!marketAddress) throw new Error("MarketCreated event not found in tx receipt.");
 
-  marketContract = new ethers.Contract(marketAddress, marketAbi, signer);
-  $("marketAddress").textContent = marketAddress;
+  await setActiveMarket(marketAddress);
   $("createStatus").textContent = "Market created.";
-  await updateOddsPreview();
 }
 
 async function placeBet() {
@@ -401,6 +413,17 @@ async function main() {
   });
   $("betAmount").addEventListener("input", () => {
     updateOddsPreview();
+  });
+
+  $("loadMarketBtn").addEventListener("click", async () => {
+    try {
+      if (!signer) await connectWallet();
+      const address = $("activeMarketAddress").value.trim();
+      await setActiveMarket(address);
+      $("betStatus").textContent = "Active market loaded.";
+    } catch (e) {
+      $("betStatus").textContent = `Error: ${e.message}`;
+    }
   });
 
   $("connectBtn").addEventListener("click", async () => {

@@ -97,7 +97,11 @@
 
     <section class="card">
       <h2>Betting</h2>
-      <div class="row muted">Market address is the latest created market.</div>
+      <div class="row muted">Load any existing market address to bet/resolve/claim against it.</div>
+      <div class="row">
+        <input id="activeMarketAddress" placeholder="Active market address (0x...)" />
+        <button id="loadMarketBtn">Load Market</button>
+      </div>
       <div class="grid">
         <label>
           Outcome index (uint256)
