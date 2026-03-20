@@ -166,6 +166,8 @@ A likely growth strategy is to target:
 
 These users often want to instantiate a bet quickly in the same spirit as a real-world "let's bet" interaction. Heavy resolution procedures or protocol-wide dispute bureaucracy can hinder this mode of use.
 
+**Positioning note (Polymarket):** the **international** Polymarket-style stack is often discussed as having heavier, protocol-level resolution machinery than a lightweight creator-resolved line. Separately, **US-facing** or app-store-constrained offerings sometimes introduce **platform-level** controls (e.g. veto or moderation) that are a different axis from on-chain resolution design. This project’s contrast is with tying **permissionless creation** and **resolution authority** to a **single platform operator**—not a legal classification of any specific product.
+
 This makes creator-resolved markets attractive as a **fast, socially native primitive**, even if a more decentralized resolution path later exists in parallel.
 
 #### 3. Reputation moat

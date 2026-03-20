@@ -2,7 +2,7 @@
 
 Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is intentionally structured to later support more decentralized resolution mechanisms.
 
-**Market research & thesis:** see [`research/competitive-landscape-and-thesis.md`](research/competitive-landscape-and-thesis.md).
+**Market research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
 
 ### Recorded long-term design considerations
 
