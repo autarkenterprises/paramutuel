@@ -4,6 +4,11 @@ Status: In progress
 Owner: Data/Indexer track  
 Linked roadmap: `research/execution-roadmap.md` (Checkpoint 4)
 
+Implementation progress note (2026-03-20):
+
+- Initial Python+SQLite v1 scaffold created under `service/indexer/` with schema, ingestion engine, API skeleton, and unit tests.
+- Current v1 keeps `total_fee_bps` in indexed totals at default `0` pending optional on-chain reads for richer metadata.
+
 ## Objective
 
 Deliver a minimal, deterministic, reorg-safe indexer with low dependency footprint to power:
