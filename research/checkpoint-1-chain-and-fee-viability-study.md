@@ -1,6 +1,6 @@
 # Checkpoint 1 Implementation: Chain and Fee Viability Study
 
-Status: In progress  
+Status: In progress (chain + fee evidence recorded in `chain-and-fee-review.md`)  
 Owner: Governance + Protocol + Data tracks  
 Linked roadmap: `research/execution-roadmap.md` (Checkpoint 1)
 
@@ -10,9 +10,9 @@ Pick launch chain(s) and initial fee policy with evidence, early enough to influ
 
 ## Required outputs
 
-1. Chain selection memo
-2. Initial fee recommendation memo
-3. TAM/throughput viability assumptions table
+1. Chain selection memo → **`research/chain-and-fee-review.md`** (sections 1, 3–5)
+2. Initial fee recommendation memo → **`research/chain-and-fee-review.md`** (sections 6–7)
+3. TAM/throughput viability assumptions table → scoring table below still **TBD**; revenue sensitivity started in review doc §7.4
 
 ## A) Chain selection framework
 
