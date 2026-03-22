@@ -2,6 +2,7 @@
 
 **Status:** Recorded for Checkpoint 1 (`research/execution-roadmap.md`)  
 **Date:** 2026-03-20  
+**Revised:** 2026-03-22 (adjacent bookmaker / infra fee note)  
 **Scope:** Target EVM chains for the current Solidity MVP, measured gas for core flows, approximate live costs, competitive fee benchmarks, and recommended launch defaults.
 
 ---
@@ -123,7 +124,12 @@ At **10 gwei** and **ETH ~$2,137**, `createMarket` at **1.5M gas** ≈ **$32** p
 
 - **Augur (historical framing):** permissionless markets with **creator fees** often discussed in the **~1–2%** range plus reporter economics; not a parimutuel comparator but relevant for “permissionless creation” fee culture.
 
-### 6.3 Oracle-style resolution (future modular resolver)
+### 6.3 Azuro / bookmaker-style apps (adjacent infrastructure)
+
+- **Azuro** and frontends such as **Bookmaker.XYZ** are closer to **on-chain sportsbook / odds infrastructure** than parimutuel pools. Public docs emphasize mechanics like **relayer fees** for live betting (paid from betting collateral in some flows) rather than a single headline **“X% of pool”** comparable to this protocol’s `totalFeeBps`.
+- **Takeaway:** treat as **indirect** fee competition and distribution channels; benchmark headline **take rates** against **Paradox / Polymarket fee-enabled bands** unless pulling a specific pool’s on-chain parameters.
+
+### 6.4 Oracle-style resolution (future modular resolver)
 
 - **UMA / optimistic oracle:** economics are typically **bonds and final fees**, not a flat % of betting handle — different UX and accounting.
 
@@ -181,4 +187,4 @@ Example **$1,000** conceptual pot:
 ## 9. References
 
 - Internal: `research/execution-roadmap.md` (Checkpoint 1), `research/checkpoint-1-chain-and-fee-viability-study.md`, `research/market-viability.md`
-- External: [Base gas tracker](https://basescan.org/gastracker), [Arbitrum gas tracker](https://arbiscan.io/gastracker), [Paradox GitBook](https://paradox-3.gitbook.io/paradox/), [OpenTote](https://opentote.org/), [Polymarket fees](https://docs.polymarket.com/polymarket-learn/trading/fees)
+- External: [Base gas tracker](https://basescan.org/gastracker), [Arbitrum gas tracker](https://arbiscan.io/gastracker), [Paradox GitBook](https://paradox-3.gitbook.io/paradox/), [OpenTote](https://opentote.org/), [Polymarket fees](https://docs.polymarket.com/polymarket-learn/trading/fees), [Azuro Gem — prepare wallet / relayer fee](https://gem.azuro.org/hub/apps/guides/advanced/live/prepare-for-betting), [Bookmaker.XYZ docs](https://docs.bookmaker.xyz/)
