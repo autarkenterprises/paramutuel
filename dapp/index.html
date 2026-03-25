@@ -9,6 +9,14 @@
 <body>
   <main class="container">
     <h1>Paramutuel MVP</h1>
+    <section class="card">
+      <h2>Service Tools</h2>
+      <div class="muted">
+        Optional modular views:
+        Explorer at <code>/service/explorer/</code> (or standalone server),
+        Resolver control panel at <code>/service/control_panel/</code>.
+      </div>
+    </section>
 
     <section class="card">
       <h2>Wallet</h2>
@@ -43,6 +51,17 @@
           Question text
           <input id="question" placeholder="Will team A win?" />
         </label>
+        <label>
+          Market template
+          <select id="marketTemplate">
+            <option value="custom">Custom</option>
+            <option value="sports">Sports event (2h betting, 24h resolution)</option>
+            <option value="election">Election cycle (30d betting, 14d resolution)</option>
+            <option value="long">Long-horizon forecast (365d betting, 180d resolution)</option>
+            <option value="closer-only">Closer-managed (no max windows)</option>
+          </select>
+        </label>
+        <div class="muted span-2">Templates set sane defaults. You can still edit fields afterwards.</div>
 
         <label>
           Resolver address (optional)
@@ -53,13 +72,33 @@
         </div>
 
         <label>
+          Betting closer (optional)
+          <input id="bettingCloserAddress" placeholder="Leave empty = you may call closeBetting" />
+        </label>
+        <label>
+          Resolution closer (optional)
+          <input id="resolutionCloserAddress" placeholder="Leave empty = you may call closeResolutionWindow" />
+        </label>
+        <div id="closersHint" class="muted span-2">
+          <code>closeBetting()</code> stops new bets before the scheduled close time; <code>closeResolutionWindow()</code> (after betting has ended) ends the resolver window early so anyone can <code>expire()</code>. Defaults match the proposer, like the resolver field.
+        </div>
+
+        <label>
           Bet close (seconds from now)
           <input id="bettingCloseIn" type="number" value="7200" />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="bettingNoMax" />
+          No max betting window (closer-only end)
         </label>
 
         <label>
           Resolution window (seconds after close)
           <input id="resolutionWindow" type="number" value="7200" />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="resolutionNoMax" />
+          No max resolution window (closer-only end)
         </label>
 
         <label>
@@ -146,6 +185,10 @@
         </label>
       </div>
       <div class="row">
+        <button id="closeBettingBtn">Close betting (closer)</button>
+        <button id="closeResolutionBtn">Close resolution window (closer)</button>
+      </div>
+      <div class="row">
         <button id="resolveBtn">Resolve</button>
         <button id="retractBtn">Retract</button>
         <button id="expireBtn">Expire (anyone)</button>
@@ -165,6 +208,7 @@
 
   <!-- Ethers loaded as a plain script so app.js can be syntax-checked easily -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="logic.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

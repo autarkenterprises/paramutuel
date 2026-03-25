@@ -8,7 +8,9 @@ from typing import Any, Dict, List, Optional
 from urllib import request
 
 TOPICS = {
-    "MarketCreated": "0x0b06de28e0cef23609da21ed7181147a64cf825d2216f6600ab5ec2e4d921290",
+    "MarketCreated": "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
+    "BettingClosedByAuthority": "0xee66a0cc21397ffefe70cadd94333bb96aa93548aaf0d7680d09ee50a5112898",
+    "ResolutionWindowClosedByAuthority": "0x3a016249126bba7044eec394afa8eba111d1ea6bda5a42b663f7d86944fd1f87",
     "BetPlaced": "0x001ecf1d0c4d22f324b3ecb9cdf0e5f772bc74ac104e6626f4b3845433d03105",
     "Resolved": "0x148a25ee2a7671350ab878ff183447de8ae5afa2ee0ae7d5ee1ad6b25c4868c2",
     "Retracted": "0x6c8d8af1eb7d9e8ea2f489b8d39cc78f924042413d0e15ce70f8cdb53afab46a",
@@ -125,7 +127,10 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
         resolver = topic_to_address(topics[3])
         collateral_token = topic_to_address(data_word(log["data"], 0))
         betting_close_time = to_int(data_word(log["data"], 1))
-        resolution_deadline = to_int(data_word(log["data"], 2))
+        resolution_window = to_int(data_word(log["data"], 2))
+        resolution_deadline = to_int(data_word(log["data"], 3))
+        betting_closer = topic_to_address(data_word(log["data"], 4))
+        resolution_closer = topic_to_address(data_word(log["data"], 5))
 
         inserted = insert_event_log(
             conn,
@@ -141,7 +146,10 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
                 "resolver": resolver,
                 "collateralToken": collateral_token,
                 "bettingCloseTime": betting_close_time,
+                "resolutionWindow": resolution_window,
                 "resolutionDeadline": resolution_deadline,
+                "bettingCloser": betting_closer,
+                "resolutionCloser": resolution_closer,
             },
         )
         if not inserted:
@@ -150,18 +158,21 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
         conn.execute(
             """
             INSERT OR IGNORE INTO markets(
-              market_address, factory_address, proposer, resolver, collateral_token,
-              betting_close_time, resolution_deadline, state, created_block, created_tx_hash
+              market_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+              collateral_token, betting_close_time, resolution_window, resolution_deadline, state, created_block, created_tx_hash
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
             """,
             (
                 market,
                 factory_address,
                 proposer,
                 resolver,
+                betting_closer,
+                resolution_closer,
                 collateral_token,
                 betting_close_time,
+                resolution_window,
                 resolution_deadline,
                 block_number,
                 tx_hash.lower(),
@@ -177,6 +188,32 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
     market = address
     if not conn.execute("SELECT 1 FROM markets WHERE market_address = ?", (market,)).fetchone():
         # Skip orphan logs; indexer expects MarketCreated first.
+        return
+
+    if event_name == "BettingClosedByAuthority":
+        closed_at = to_int(data_word(log["data"], 0))
+        inserted = insert_event_log(
+            conn, eid, market, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "UPDATE markets SET betting_closed_by_authority = 1, betting_closed_at = ? WHERE market_address = ?",
+            (closed_at, market),
+        )
+        return
+
+    if event_name == "ResolutionWindowClosedByAuthority":
+        closed_at = to_int(data_word(log["data"], 0))
+        inserted = insert_event_log(
+            conn, eid, market, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "UPDATE markets SET resolution_window_closed = 1, resolution_window_closed_at = ? WHERE market_address = ?",
+            (closed_at, market),
+        )
         return
 
     if event_name == "BetPlaced":
@@ -272,12 +309,21 @@ def get_expire_candidates(conn: sqlite3.Connection, now_ts: Optional[int] = None
         now_ts = int(time.time())
     return conn.execute(
         """
-        SELECT market_address, resolver, resolution_deadline
+        SELECT market_address, resolver, resolution_window, resolution_deadline, betting_closed_at, resolution_window_closed
         FROM markets
-        WHERE state = 'OPEN' AND resolution_deadline < ?
+        WHERE state = 'OPEN' AND (
+          resolution_window_closed = 1
+          OR (
+            resolution_window > 0
+            AND (
+              (betting_closed_at IS NOT NULL AND betting_closed_at + resolution_window < ?)
+              OR (betting_closed_at IS NULL AND betting_close_time > 0 AND betting_close_time + resolution_window < ?)
+            )
+          )
+        )
         ORDER BY resolution_deadline ASC
         """,
-        (now_ts,),
+        (now_ts, now_ts),
     ).fetchall()
 
 

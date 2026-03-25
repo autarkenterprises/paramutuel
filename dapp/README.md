@@ -4,9 +4,11 @@ This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) 
 
 It supports:
 - Creating markets via `ParamutuelFactory`
+- Configuring delegated lifecycle roles (`resolver`, `bettingCloser`, `resolutionCloser`)
+- Finite windows or closer-managed no-max windows (`bettingCloseTime = 0`, `resolutionWindow = 0`)
 - Placing bets (`placeBet`)
 - Odds/payout preview for the selected outcome and bet size
-- Resolving / retracting / expiring markets
+- Closing betting / resolution windows + resolving / retracting / expiring markets
 - Claiming payouts
 - Withdrawing fees (`withdrawFees`)
 
@@ -38,13 +40,16 @@ In the dApp UI, paste:
 - Outcomes (comma-separated strings)
 - Question text
 - Optional **Resolver address** (empty = your connected wallet resolves; or set an oracle / sponsored resolver)
+- Optional **Betting closer** and **Resolution closer** addresses
 - `Bet close` (seconds from now)
 - `Resolution window` (seconds after close)
+- Optional no-max checkboxes for both windows (closer-managed mode)
+- Market template selection (sports, election, long-horizon, closer-managed)
 - Optional extra fee recipients + bps (comma-separated)
 
 ### Notes
 
 - **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
-- This MVP resolver is centralized-per-market (the market `resolver` is whoever calls `createMarket`).
+- Shared logic used by the UI is in `dapp/logic.js` with independent tests in `dapp/tests/logic.test.js`.
 

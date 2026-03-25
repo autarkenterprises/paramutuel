@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel Explorer</title>
+</head>
+<body>
+  <h1>Paramutuel Explorer</h1>
+  <p>Reads market state from the indexer API.</p>
+  <button id="refresh">Refresh</button>
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        <th>Market</th>
+        <th>State</th>
+        <th>Proposer</th>
+        <th>Resolver</th>
+        <th>Bet Close</th>
+        <th>Resolution Window</th>
+      </tr>
+    </thead>
+    <tbody id="markets"></tbody>
+  </table>
+  <script src="/app.js"></script>
+</body>
+</html>

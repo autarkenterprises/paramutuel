@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel Control Panel</title>
+</head>
+<body>
+  <h1>Paramutuel Control Panel</h1>
+  <p>Builds operator commands for market lifecycle actions.</p>
+
+  <section>
+    <h2>Preview market action command</h2>
+    <label>Market <input id="market" placeholder="0x..." /></label>
+    <label>Action
+      <select id="action">
+        <option value="close-betting">close-betting</option>
+        <option value="close-resolution-window">close-resolution-window</option>
+        <option value="resolve">resolve</option>
+        <option value="retract">retract</option>
+        <option value="expire">expire</option>
+      </select>
+    </label>
+    <label>Outcome index (resolve only) <input id="outcomeIndex" type="number" /></label>
+    <button id="preview">Preview</button>
+    <pre id="out"></pre>
+  </section>
+  <script src="/app.js"></script>
+</body>
+</html>

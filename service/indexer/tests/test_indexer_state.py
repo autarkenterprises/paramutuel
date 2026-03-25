@@ -23,6 +23,8 @@ class IndexerStateTests(unittest.TestCase):
     RESOLVER = "0xabc3000000000000000000000000000000000003"
     TOKEN = "0xabc4000000000000000000000000000000000004"
     BETTOR = "0xabc5000000000000000000000000000000000005"
+    BETTING_CLOSER = "0xabc6000000000000000000000000000000000006"
+    RESOLUTION_CLOSER = "0xabc7000000000000000000000000000000000007"
 
     def setUp(self) -> None:
         self.conn = sqlite3.connect(":memory:")
@@ -30,11 +32,19 @@ class IndexerStateTests(unittest.TestCase):
         init_db(self.conn)
 
     def _market_created_log(self):
-        data = "0x" + word_addr(self.TOKEN) + word_u256(2_000) + word_u256(5_000)
+        data = (
+            "0x"
+            + word_addr(self.TOKEN)
+            + word_u256(2_000)
+            + word_u256(3_000)
+            + word_u256(5_000)
+            + word_addr(self.BETTING_CLOSER)
+            + word_addr(self.RESOLUTION_CLOSER)
+        )
         return {
             "address": self.FACTORY,
             "topics": [
-                "0x0b06de28e0cef23609da21ed7181147a64cf825d2216f6600ab5ec2e4d921290",
+                "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
                 topic_addr(self.MARKET),
                 topic_addr(self.PROPOSER),
                 topic_addr(self.RESOLVER),
@@ -49,9 +59,13 @@ class IndexerStateTests(unittest.TestCase):
         apply_log(self.conn, self.FACTORY, self._market_created_log())
         self.conn.commit()
 
-        row = self.conn.execute("SELECT * FROM markets WHERE market_address = ?", (self.MARKET,)).fetchone()
+        maddr = self.MARKET.lower()
+        row = self.conn.execute("SELECT * FROM markets WHERE market_address = ?", (maddr,)).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row["state"], "OPEN")
+        self.assertEqual(row["betting_closer"].lower(), self.BETTING_CLOSER.lower())
+        self.assertEqual(row["resolution_closer"].lower(), self.RESOLUTION_CLOSER.lower())
+        self.assertEqual(int(row["resolution_window"]), 3000)
 
         # BetPlaced: bettor, outcomeIndex=1, amount=100
         bet_log = {
@@ -69,7 +83,7 @@ class IndexerStateTests(unittest.TestCase):
         apply_log(self.conn, self.FACTORY, bet_log)
         self.conn.commit()
 
-        totals = self.conn.execute("SELECT total_pot FROM market_totals WHERE market_address = ?", (self.MARKET,)).fetchone()
+        totals = self.conn.execute("SELECT total_pot FROM market_totals WHERE market_address = ?", (maddr,)).fetchone()
         self.assertEqual(int(totals["total_pot"]), 100)
 
         # Resolve outcome 1
@@ -87,7 +101,7 @@ class IndexerStateTests(unittest.TestCase):
         apply_log(self.conn, self.FACTORY, resolve_log)
         self.conn.commit()
 
-        row2 = self.conn.execute("SELECT state FROM markets WHERE market_address = ?", (self.MARKET,)).fetchone()
+        row2 = self.conn.execute("SELECT state FROM markets WHERE market_address = ?", (maddr,)).fetchone()
         self.assertEqual(row2["state"], "RESOLVED")
 
     def test_expire_candidates(self):
@@ -97,7 +111,7 @@ class IndexerStateTests(unittest.TestCase):
         # now_ts beyond resolution deadline (5000)
         cands = get_expire_candidates(self.conn, now_ts=6000)
         self.assertEqual(len(cands), 1)
-        self.assertEqual(cands[0]["market_address"], self.MARKET)
+        self.assertEqual(cands[0]["market_address"], self.MARKET.lower())
 
         # Retract event should remove candidate
         retract_log = {
@@ -112,6 +126,69 @@ class IndexerStateTests(unittest.TestCase):
         self.conn.commit()
         cands2 = get_expire_candidates(self.conn, now_ts=6000)
         self.assertEqual(len(cands2), 0)
+
+    def test_expire_candidates_when_resolution_window_closed_early(self):
+        apply_log(self.conn, self.FACTORY, self._market_created_log())
+        self.conn.commit()
+        maddr = self.MARKET.lower()
+
+        # Before on-chain deadline (5000), but resolution window closed by authority
+        close_log = {
+            "address": self.MARKET,
+            "topics": ["0x3a016249126bba7044eec394afa8eba111d1ea6bda5a42b663f7d86944fd1f87"],
+            "data": "0x" + word_u256(2500),
+            "blockNumber": hex(11),
+            "transactionHash": "0xaae",
+            "logIndex": hex(0),
+        }
+        apply_log(self.conn, self.FACTORY, close_log)
+        self.conn.commit()
+
+        cands = get_expire_candidates(self.conn, now_ts=3000)
+        self.assertEqual(len(cands), 1)
+        self.assertEqual(cands[0]["market_address"], maddr)
+
+    def test_no_max_resolution_window_needs_authority_close(self):
+        # Create market with no max windows: close_time=0, resolution_window=0, resolution_deadline=0
+        data = (
+            "0x"
+            + word_addr(self.TOKEN)
+            + word_u256(0)
+            + word_u256(0)
+            + word_u256(0)
+            + word_addr(self.BETTING_CLOSER)
+            + word_addr(self.RESOLUTION_CLOSER)
+        )
+        create_log = {
+            "address": self.FACTORY,
+            "topics": [
+                "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
+                topic_addr(self.MARKET),
+                topic_addr(self.PROPOSER),
+                topic_addr(self.RESOLVER),
+            ],
+            "data": data,
+            "blockNumber": hex(10),
+            "transactionHash": "0xbbb",
+            "logIndex": hex(0),
+        }
+        apply_log(self.conn, self.FACTORY, create_log)
+        self.conn.commit()
+
+        self.assertEqual(len(get_expire_candidates(self.conn, now_ts=999999)), 0)
+
+        # Once resolution window is closed by authority, it becomes expire-eligible immediately.
+        close_log = {
+            "address": self.MARKET,
+            "topics": ["0x3a016249126bba7044eec394afa8eba111d1ea6bda5a42b663f7d86944fd1f87"],
+            "data": "0x" + word_u256(999000),
+            "blockNumber": hex(11),
+            "transactionHash": "0xbbc",
+            "logIndex": hex(0),
+        }
+        apply_log(self.conn, self.FACTORY, close_log)
+        self.conn.commit()
+        self.assertEqual(len(get_expire_candidates(self.conn, now_ts=999999)), 1)
 
 
 if __name__ == "__main__":

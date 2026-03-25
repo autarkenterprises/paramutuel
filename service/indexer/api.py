@@ -103,7 +103,10 @@ class Handler(BaseHTTPRequestHandler):
                         {
                             "market_address": r["market_address"],
                             "resolver": r["resolver"],
+                            "resolution_window": r["resolution_window"],
                             "resolution_deadline": r["resolution_deadline"],
+                            "betting_closed_at": r["betting_closed_at"],
+                            "resolution_window_closed": bool(r["resolution_window_closed"]),
                         }
                         for r in candidates
                     ],

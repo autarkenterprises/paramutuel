@@ -5,6 +5,7 @@ const ethers = globalThis.ethers;
 
 const FACTORY_ABI_URL = "../out/ParamutuelFactory.sol/ParamutuelFactory.json";
 const MARKET_ABI_URL = "../out/ParamutuelMarket.sol/ParamutuelMarket.json";
+const Logic = globalThis.ParamutuelLogic;
 
 let provider;
 let signer;
@@ -160,6 +161,11 @@ function syncDecimalsInputReadOnly() {
     : "Filled automatically from token decimals(); check Manual override to edit.";
 }
 
+function syncWindowInputState() {
+  $("bettingCloseIn").readOnly = $("bettingNoMax").checked;
+  $("resolutionWindow").readOnly = $("resolutionNoMax").checked;
+}
+
 /**
  * Decimals used when parsing bet amounts: chain by default, manual if checked.
  */
@@ -248,9 +254,13 @@ async function createMarket() {
 
   const bettingCloseIn = Number($("bettingCloseIn").value);
   const resolutionWindow = Number($("resolutionWindow").value);
+  const bettingNoMax = $("bettingNoMax").checked;
+  const resolutionNoMax = $("resolutionNoMax").checked;
   const extraFeeRecipientsCsv = $("extraFeeRecipients").value.trim();
   const extraFeeBpsCsv = $("extraFeeBps").value.trim();
   const resolverInput = $("resolverAddress").value.trim();
+  const bettingCloserInput = $("bettingCloserAddress").value.trim();
+  const resolutionCloserInput = $("resolutionCloserAddress").value.trim();
 
   if (!factoryAddress) throw new Error("Factory address is required.");
   if (!collateralToken) throw new Error("Collateral token is required.");
@@ -270,18 +280,29 @@ async function createMarket() {
     throw new Error("extraFeeRecipients and extraFeeBps length mismatch.");
   }
 
-  const closeTime = toUnixSeconds(bettingCloseIn);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const { closeTime, resolutionWindowArg } = Logic.computeWindowArgs(
+    nowSec,
+    bettingCloseIn,
+    resolutionWindow,
+    bettingNoMax,
+    resolutionNoMax
+  );
 
   // Optional UI-side validation with factory constraints (still will revert if wrong).
   const { minBettingWindow, minResolutionWindow } = await getFactoryConstraints(factoryAddress);
-  if (BigInt(bettingCloseIn) < BigInt(minBettingWindow)) {
-    $("factoryConstraints").textContent = `Warning: bettingCloseIn < factory minBettingWindow (${minBettingWindow}).`;
-  } else {
-    $("factoryConstraints").textContent = `Factory constraints: minBettingWindow=${minBettingWindow}, minResolutionWindow=${minResolutionWindow}`;
-  }
-  if (BigInt(resolutionWindow) < BigInt(minResolutionWindow)) {
-    throw new Error(`resolutionWindow < factory minResolutionWindow (${minResolutionWindow})`);
-  }
+  const warnings = Logic.validateWindowMins(
+    minBettingWindow,
+    minResolutionWindow,
+    bettingCloseIn,
+    resolutionWindow,
+    bettingNoMax,
+    resolutionNoMax
+  );
+  $("factoryConstraints").textContent =
+    `Factory constraints: minBettingWindow=${minBettingWindow}, minResolutionWindow=${minResolutionWindow}` +
+    " (window values of 0 enable no-max mode)" +
+    (warnings.length ? `; Warning: ${warnings.join("; ")}` : "");
 
   const factory = new ethers.Contract(factoryAddress, factoryAbi, signer);
 
@@ -291,14 +312,28 @@ async function createMarket() {
     resolverArg = resolverInput;
   }
 
+  let bettingCloserArg = ethers.ZeroAddress;
+  if (bettingCloserInput.length > 0) {
+    if (!ethers.isAddress(bettingCloserInput)) throw new Error("Invalid betting closer address.");
+    bettingCloserArg = bettingCloserInput;
+  }
+
+  let resolutionCloserArg = ethers.ZeroAddress;
+  if (resolutionCloserInput.length > 0) {
+    if (!ethers.isAddress(resolutionCloserInput)) throw new Error("Invalid resolution closer address.");
+    resolutionCloserArg = resolutionCloserInput;
+  }
+
   $("createStatus").textContent = "Submitting createMarket transaction...";
   const tx = await factory.createMarket(
     collateralToken,
     question,
     outcomes,
     BigInt(closeTime),
-    BigInt(resolutionWindow),
+    BigInt(resolutionWindowArg),
     resolverArg,
+    bettingCloserArg,
+    resolutionCloserArg,
     extraFeeRecipients,
     extraFeeBps
   );
@@ -377,6 +412,24 @@ async function expireMarket() {
   await updateOddsPreview();
 }
 
+async function closeBettingOnMarket() {
+  if (!marketContract) throw new Error("Create a market first.");
+  $("resolutionStatus").textContent = "Closing betting...";
+  const tx = await marketContract.closeBetting();
+  await tx.wait();
+  $("resolutionStatus").textContent = "Betting closed (authority).";
+  await updateOddsPreview();
+}
+
+async function closeResolutionWindowOnMarket() {
+  if (!marketContract) throw new Error("Create a market first.");
+  $("resolutionStatus").textContent = "Closing resolution window...";
+  const tx = await marketContract.closeResolutionWindow();
+  await tx.wait();
+  $("resolutionStatus").textContent = "Resolution window closed (authority).";
+  await updateOddsPreview();
+}
+
 async function claim() {
   if (!marketContract) throw new Error("Create a market first.");
   $("claimStatus").textContent = "Claiming payout...";
@@ -394,6 +447,22 @@ async function withdrawFees() {
 }
 
 async function main() {
+  syncWindowInputState();
+
+  $("marketTemplate").addEventListener("change", () => {
+    const template = Logic.getTemplate($("marketTemplate").value);
+    $("bettingCloseIn").value = String(template.bettingCloseIn);
+    $("resolutionWindow").value = String(template.resolutionWindow);
+    $("bettingNoMax").checked = template.bettingNoMax;
+    $("resolutionNoMax").checked = template.resolutionNoMax;
+    syncWindowInputState();
+  });
+  $("bettingNoMax").addEventListener("change", syncWindowInputState);
+  $("resolutionNoMax").addEventListener("change", syncWindowInputState);
+
+  // Initialize UI with custom defaults.
+  $("marketTemplate").value = "custom";
+
   syncDecimalsInputReadOnly();
   $("decimalsManual").addEventListener("change", () => {
     syncDecimalsInputReadOnly();
@@ -474,6 +543,24 @@ async function main() {
     try {
       if (!signer) await connectWallet();
       await expireMarket();
+    } catch (e) {
+      $("resolutionStatus").textContent = `Error: ${e.message}`;
+    }
+  });
+
+  $("closeBettingBtn").addEventListener("click", async () => {
+    try {
+      if (!signer) await connectWallet();
+      await closeBettingOnMarket();
+    } catch (e) {
+      $("resolutionStatus").textContent = `Error: ${e.message}`;
+    }
+  });
+
+  $("closeResolutionBtn").addEventListener("click", async () => {
+    try {
+      if (!signer) await connectWallet();
+      await closeResolutionWindowOnMarket();
     } catch (e) {
       $("resolutionStatus").textContent = `Error: ${e.message}`;
     }

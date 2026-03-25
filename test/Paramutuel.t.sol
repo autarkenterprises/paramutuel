@@ -128,6 +128,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0), // resolver defaults to proposer
+            address(0), // bettingCloser defaults to proposer
+            address(0), // resolutionCloser defaults to proposer
             extraRecipients,
             extraBps
         );
@@ -140,9 +142,12 @@ contract ParamutuelTest is Test {
 
         assertEq(market.proposer(), proposer, "proposer");
         assertEq(market.resolver(), proposer, "resolver");
+        assertEq(market.bettingCloser(), proposer, "bettingCloser");
+        assertEq(market.resolutionCloser(), proposer, "resolutionCloser");
         assertEq(address(market.collateralToken()), address(token), "collateral");
         assertEq(market.outcomesCount(), 2, "outcomes");
         assertEq(market.bettingCloseTime(), block.timestamp + 2 hours, "bet close");
+        assertEq(market.resolutionWindow(), 2 hours, "resolution window");
     }
 
     function testFactoryConstructorValidation() public {
@@ -177,6 +182,8 @@ contract ParamutuelTest is Test {
             uint64(block.timestamp + 2 hours),
             2 hours,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -203,6 +210,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0),
+            address(0),
+            address(0),
             recipients,
             bps
         );
@@ -217,6 +226,8 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
+            address(0),
             address(0),
             recipients,
             bps
@@ -321,7 +332,6 @@ contract ParamutuelTest is Test {
         vm.stopPrank();
 
         // Jump beyond resolution deadline
-        uint64 bettingCloseTime = market.bettingCloseTime();
         uint64 resolutionDeadline = market.resolutionDeadline();
         vm.warp(resolutionDeadline + 1);
 
@@ -442,6 +452,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -550,6 +562,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -647,8 +661,8 @@ contract ParamutuelTest is Test {
     function testCannotExpireBeforeDeadline() public {
         ParamutuelMarket market = _createBasicMarket();
 
-        // Before deadline, expire should revert
-        vm.expectRevert(ParamutuelMarket.ResolutionWindowOver.selector);
+        // Before betting close, expire should revert.
+        vm.expectRevert(ParamutuelMarket.BettingNotClosed.selector);
         vm.prank(bettor1);
         market.expire();
     }
@@ -692,6 +706,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -718,6 +734,8 @@ contract ParamutuelTest is Test {
             outcomes,
             bettingCloseTime,
             resolutionWindow,
+            address(0),
+            address(0),
             address(0),
             extraRecipients,
             extraBps
@@ -747,6 +765,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -772,6 +792,8 @@ contract ParamutuelTest is Test {
             nowTs + minBettingWindow - 1,
             minResolutionWindow,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -785,6 +807,8 @@ contract ParamutuelTest is Test {
             outcomes,
             nowTs + minBettingWindow,
             minResolutionWindow - 1,
+            address(0),
+            address(0),
             address(0),
             extraRecipients,
             extraBps
@@ -810,6 +834,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             delegatedResolver,
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -933,10 +959,13 @@ contract ParamutuelTest is Test {
             address(factory),
             proposer,
             proposer,
+            proposer,
+            proposer,
             address(token),
             "q",
             outcomes,
             uint64(block.timestamp + 10),
+            uint64(10),
             uint64(block.timestamp + 20),
             recipients,
             bpsMismatch
@@ -950,10 +979,13 @@ contract ParamutuelTest is Test {
             address(factory),
             proposer,
             proposer,
+            proposer,
+            proposer,
             address(token),
             "q",
             outcomes,
             uint64(block.timestamp + 10),
+            uint64(10),
             uint64(block.timestamp + 20),
             recipients,
             bpsTooHigh
@@ -977,6 +1009,8 @@ contract ParamutuelTest is Test {
             outcomes,
             uint64(block.timestamp + 2 hours),
             2 hours,
+            address(0),
+            address(0),
             address(0),
             extraRecipients,
             extraBps
@@ -1008,6 +1042,8 @@ contract ParamutuelTest is Test {
             outcomes,
             uint64(block.timestamp + 2 hours),
             2 hours,
+            address(0),
+            address(0),
             address(0),
             extraRecipients,
             extraBps
@@ -1050,6 +1086,8 @@ contract ParamutuelTest is Test {
             uint64(block.timestamp + 2 hours),
             2 hours,
             address(0),
+            address(0),
+            address(0),
             extraRecipients,
             extraBps
         );
@@ -1068,6 +1106,307 @@ contract ParamutuelTest is Test {
         vm.expectRevert("TRANSFER");
         vm.prank(treasury);
         market.withdrawFees();
+    }
+
+    function testCloseBettingEarlyStopsPlaceBet() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.prank(proposer);
+        market.closeBetting();
+        assertTrue(market.bettingClosedByAuthority());
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 1 ether);
+        vm.expectRevert(ParamutuelMarket.BettingClosed.selector);
+        market.placeBet(0, 1 ether);
+        vm.stopPrank();
+    }
+
+    function testOnlyBettingCloserCanCloseBetting() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.expectRevert(ParamutuelMarket.NotBettingCloser.selector);
+        vm.prank(bettor1);
+        market.closeBetting();
+    }
+
+    function testCloseResolutionWindowAllowsEarlyExpire() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.prank(proposer);
+        market.closeResolutionWindow();
+        assertTrue(market.resolutionWindowClosedByAuthority());
+
+        vm.expectRevert(ParamutuelMarket.ResolutionWindowOver.selector);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        vm.prank(bettor2);
+        market.expire();
+
+        assertEq(uint256(market.state()), uint256(ParamutuelMarket.State.Retracted));
+    }
+
+    function testCloseResolutionWindowBeforeBettingClosedReverts() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        vm.expectRevert(ParamutuelMarket.BettingNotClosed.selector);
+        vm.prank(proposer);
+        market.closeResolutionWindow();
+    }
+
+    function testDelegatedBettingAndResolutionClosers() public {
+        address bettingOracle = address(0xA11);
+        address resolutionOracle = address(0xA12);
+
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "Delegated closers",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            bettingOracle,
+            resolutionOracle,
+            extraRecipients,
+            extraBps
+        );
+
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+        assertEq(market.bettingCloser(), bettingOracle);
+        assertEq(market.resolutionCloser(), resolutionOracle);
+
+        vm.expectRevert(ParamutuelMarket.BettingNotClosed.selector);
+        vm.prank(resolutionOracle);
+        market.closeResolutionWindow();
+
+        vm.prank(bettingOracle);
+        market.closeBetting();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 1 ether);
+        vm.expectRevert(ParamutuelMarket.BettingClosed.selector);
+        market.placeBet(0, 1 ether);
+        vm.stopPrank();
+
+        vm.prank(resolutionOracle);
+        market.closeResolutionWindow();
+
+        vm.prank(bettor2);
+        market.expire();
+        assertEq(uint256(market.state()), uint256(ParamutuelMarket.State.Retracted));
+    }
+
+    function testNoMaxBettingAndResolutionRequireClosers() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "No max windows",
+            outcomes,
+            0, // no betting time cap
+            0, // no resolution time cap
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+        assertEq(market.bettingCloseTime(), 0);
+        assertEq(market.resolutionWindow(), 0);
+        assertEq(market.resolutionDeadline(), 0);
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 365 days);
+        vm.startPrank(bettor2);
+        token.approve(address(market), 1 ether);
+        market.placeBet(1, 1 ether); // still open after one year
+        vm.stopPrank();
+
+        vm.expectRevert(ParamutuelMarket.BettingNotClosed.selector);
+        vm.prank(proposer);
+        market.resolve(0);
+
+        vm.prank(proposer);
+        market.closeBetting();
+
+        vm.warp(block.timestamp + 365 days);
+        vm.prank(proposer);
+        market.resolve(0); // still resolvable after another year (no resolution max)
+    }
+
+    function testNoMaxBettingWithFiniteResolutionWindowStartsAtAuthorityClose() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "Closer starts resolution timer",
+            outcomes,
+            0, // no betting cap
+            1 hours, // finite resolution window
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+        assertEq(market.resolutionWindow(), 1 hours);
+        assertEq(market.resolutionDeadline(), 0); // no scheduled deadline at creation
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 30 days);
+        vm.prank(proposer);
+        market.closeBetting();
+        uint64 closedAt = market.bettingClosedAtByAuthority();
+        assertEq(closedAt, block.timestamp);
+
+        vm.warp(closedAt + 30 minutes);
+        vm.prank(proposer);
+        market.resolve(0);
+    }
+
+    function testNoMaxResolutionCannotExpireUntilResolutionCloserCloses() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "No max resolution requires closer",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            0, // no resolution time cap
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 100 days);
+        vm.expectRevert(ParamutuelMarket.ResolutionWindowOver.selector);
+        vm.prank(bettor2);
+        market.expire();
+
+        vm.prank(proposer);
+        market.closeResolutionWindow();
+        vm.prank(bettor2);
+        market.expire();
+
+        assertEq(uint256(market.state()), uint256(ParamutuelMarket.State.Retracted));
+    }
+
+    function testCloseBettingAfterTimestampIsNoopWithoutAuthorityFlag() public {
+        ParamutuelMarket market = _createBasicMarket();
+        vm.warp(market.bettingCloseTime() + 1);
+
+        vm.prank(proposer);
+        market.closeBetting(); // should no-op because already closed by time
+
+        assertFalse(market.bettingClosedByAuthority(), "authority flag unchanged");
+        assertEq(market.bettingClosedAtByAuthority(), 0, "no authority close timestamp");
+    }
+
+    function testOnlyResolutionCloserCanCloseResolutionWindow() public {
+        ParamutuelMarket market = _createBasicMarket();
+        vm.warp(market.bettingCloseTime() + 1);
+
+        vm.expectRevert(ParamutuelMarket.NotResolutionCloser.selector);
+        vm.prank(bettor1);
+        market.closeResolutionWindow();
+    }
+
+    function testCloseResolutionWindowIdempotent() public {
+        ParamutuelMarket market = _createBasicMarket();
+        vm.warp(market.bettingCloseTime() + 1);
+
+        vm.prank(proposer);
+        market.closeResolutionWindow();
+        assertTrue(market.resolutionWindowClosedByAuthority());
+
+        vm.prank(proposer);
+        market.closeResolutionWindow(); // idempotent
+        assertTrue(market.resolutionWindowClosedByAuthority());
+    }
+
+    function testNoMaxCreationStillAssignsNonZeroLifecycleAuthorities() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "No max default authorities",
+            outcomes,
+            0,
+            0,
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+
+        assertEq(market.resolver(), proposer);
+        assertEq(market.bettingCloser(), proposer);
+        assertEq(market.resolutionCloser(), proposer);
+        assertTrue(market.resolver() != address(0), "resolver non-zero");
+        assertTrue(market.bettingCloser() != address(0), "betting closer non-zero");
+        assertTrue(market.resolutionCloser() != address(0), "resolution closer non-zero");
     }
 }
 

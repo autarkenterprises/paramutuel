@@ -3,6 +3,9 @@
 Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is intentionally structured to later support more decentralized resolution mechanisms.
 
 **Market research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
+**Operator workflows (CLI/API):** see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md).
+**Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
+**Service layer modules:** see [`service/README.md`](service/README.md).
 
 ### Recorded long-term design considerations
 
@@ -25,6 +28,8 @@ This MVP intentionally centralizes resolution **per-market** (not per-protocol):
 
 The purpose of this MVP is to clarify **actors**, their **permissions**, and the **accounting model**, while keeping the contract modular so resolution can be swapped later.
 
+**Agents & automation:** see [`docs/MACHINE.md`](docs/MACHINE.md) for JSON HTTP API shapes, ABI locations, and a concise on-chain state machine for bots.
+
 ### Actors and relationships (MVP)
 
 - **Protocol (Factory)**:
@@ -38,6 +43,16 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 - **Resolver (per-market)**:
   - Address authorized to **resolve** (choose winning outcome) or **retract** (invalidate).
   - Defaults to the proposer when `resolver == address(0)` is passed at creation; may be set to any other address (oracle, sponsored resolver, multisig, etc.).
+
+- **Betting closer (per-market)**:
+  - May call **`closeBetting()`** to stop new bets.
+  - `bettingCloseTime = 0` enables **no max betting window**, so only `bettingCloser` can end betting.
+  - Defaults to the proposer when `bettingCloser == address(0)` at creation.
+
+- **Resolution closer (per-market)**:
+  - After betting has ended, may call **`closeResolutionWindow()`** to end the resolver window.
+  - `resolutionWindow = 0` enables **no max resolution window**, so only `resolutionCloser` can end it.
+  - Defaults to the proposer when `resolutionCloser == address(0)` at creation.
 
 - **Bettors (per-market)**:
   - Deposit collateral during the betting window and allocate it to exactly one outcome per bet.
@@ -55,21 +70,24 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
    - Proposer supplies:
      - `collateralToken` (ERC20)
      - `outcomes[]` (strings)
-     - `bettingCloseTime`
-     - `resolutionWindow` (deadline = close + window)
-     - `resolver` (`address(0)` means the proposer is also the resolver)
+    - `bettingCloseTime` (absolute time, or `0` for no max betting window)
+    - `resolutionWindow` (duration after effective betting close, or `0` for no max resolution window)
+     - `resolver` (`address(0)` → proposer)
+     - `bettingCloser` (`address(0)` → proposer)
+     - `resolutionCloser` (`address(0)` → proposer)
      - `feeRecipients[]`, `feeBps[]` (optional)
    - Factory enforces sane constraints (min betting window, min resolution window, caps).
 
 2. **Betting**
    - Any address deposits collateral and chooses an outcome index.
-   - Bets close at `bettingCloseTime`.
+  - Bets stop when **`bettingCloseTime`** is reached **or** **`closeBetting()`** is called by `bettingCloser`.
+  - If `bettingCloseTime = 0`, betting remains open until `closeBetting()`.
 
 3. **Finalization**
-   - After close and before deadline:
+  - After betting has closed and while the resolution window is open (not timed out and **`closeResolutionWindow()`** not yet called):
      - Resolver may **resolve(outcomeIndex)**.
      - Resolver may **retract()**.
-   - After deadline (if not resolved/retracted):
+  - After the resolution window ends by **timestamp** (if configured) or **authority** (if not resolved/retracted):
      - Anyone may **expire()**, which invalidates and enables refunds (minus fees) to avoid stuck funds.
 
 4. **Claims**

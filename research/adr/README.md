@@ -8,4 +8,6 @@
   - Mandatory testnet certification matrix across multiple markets and lifecycle states.
 - `ADR-0004-indexer-and-odds-calculator.md`
   - Minimal custom indexer scope and odds/payout preview requirements.
+- `ADR-0005-delegated-betting-and-resolution-window-closure.md`
+  - Optional `bettingCloser` / `resolutionCloser` roles, early `closeBetting` / `closeResolutionWindow`, and indexer/sweeper implications.
 

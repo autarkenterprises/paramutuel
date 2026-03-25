@@ -4,14 +4,20 @@ pragma solidity ^0.8.24;
 import {ParamutuelMarket} from "./ParamutuelMarket.sol";
 
 contract ParamutuelFactory {
-    /// @param resolver The address that may `resolve` / `retract` (same as proposer if `resolver == address(0)` at creation).
+    /// @param resolver The address that may `resolve` / `retract` (proposer if `resolver == address(0)`).
+    /// @param bettingCloser May `closeBetting` on the market (proposer if `address(0)`).
+    /// @param resolutionWindow Resolution window duration after effective betting close. `0` means no timeout.
+    /// @param resolutionCloser May `closeResolutionWindow` after betting ends (proposer if `address(0)`).
     event MarketCreated(
         address indexed market,
         address indexed proposer,
         address indexed resolver,
         address collateralToken,
         uint64 bettingCloseTime,
-        uint64 resolutionDeadline
+        uint64 resolutionWindow,
+        uint64 resolutionDeadline,
+        address bettingCloser,
+        address resolutionCloser
     );
 
     error BadFeeConfig();
@@ -44,7 +50,11 @@ contract ParamutuelFactory {
         return markets.length;
     }
 
-    /// @param resolver If `address(0)`, the resolver is the caller (`msg.sender`). Otherwise must be non-zero.
+    /// @param bettingCloseTime Absolute betting close timestamp. Use `0` for no time cap (closer-only).
+    /// @param resolutionWindow Resolution window duration after effective betting close. Use `0` for no time cap.
+    /// @param resolver If `address(0)`, the resolver is the proposer (`msg.sender`).
+    /// @param bettingCloser If `address(0)`, the betting closer is the proposer.
+    /// @param resolutionCloser If `address(0)`, the resolution closer is the proposer.
     function createMarket(
         address collateralToken,
         string memory question,
@@ -52,6 +62,8 @@ contract ParamutuelFactory {
         uint64 bettingCloseTime,
         uint64 resolutionWindow,
         address resolver,
+        address bettingCloser,
+        address resolutionCloser,
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps
     ) external returns (address market) {
@@ -59,8 +71,8 @@ contract ParamutuelFactory {
         if (outcomes.length > MAX_OUTCOMES) revert TooManyOutcomes();
 
         uint64 nowTs = uint64(block.timestamp);
-        if (bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
-        if (resolutionWindow < minResolutionWindow) revert WindowTooShort();
+        if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
+        if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
 
         (address[] memory feeRecipients, uint16[] memory feeBps, uint256 totalFeeBps) = _buildFeeConfig(
             extraFeeRecipients,
@@ -68,18 +80,24 @@ contract ParamutuelFactory {
         );
         if (totalFeeBps > MAX_TOTAL_FEE_BPS) revert BadFeeConfig();
 
-        uint64 resolutionDeadline = bettingCloseTime + resolutionWindow;
+        uint64 resolutionDeadline =
+            (bettingCloseTime == 0 || resolutionWindow == 0) ? uint64(0) : bettingCloseTime + resolutionWindow;
 
         address resolvedResolver = resolver == address(0) ? msg.sender : resolver;
+        address resolvedBettingCloser = bettingCloser == address(0) ? msg.sender : bettingCloser;
+        address resolvedResolutionCloser = resolutionCloser == address(0) ? msg.sender : resolutionCloser;
 
         ParamutuelMarket m = new ParamutuelMarket(
             address(this),
             msg.sender,
             resolvedResolver,
+            resolvedBettingCloser,
+            resolvedResolutionCloser,
             collateralToken,
             question,
             outcomes,
             bettingCloseTime,
+            resolutionWindow,
             resolutionDeadline,
             feeRecipients,
             feeBps
@@ -87,7 +105,17 @@ contract ParamutuelFactory {
 
         market = address(m);
         markets.push(market);
-        emit MarketCreated(market, msg.sender, resolvedResolver, collateralToken, bettingCloseTime, resolutionDeadline);
+        emit MarketCreated(
+            market,
+            msg.sender,
+            resolvedResolver,
+            collateralToken,
+            bettingCloseTime,
+            resolutionWindow,
+            resolutionDeadline,
+            resolvedBettingCloser,
+            resolvedResolutionCloser
+        );
     }
 
     function _buildFeeConfig(address[] memory extraRecipients, uint16[] memory extraBps)
