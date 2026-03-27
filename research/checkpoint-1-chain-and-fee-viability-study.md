@@ -1,6 +1,6 @@
 # Checkpoint 1 Implementation: Chain and Fee Viability Study
 
-Status: In progress  
+Status: Completed  
 Owner: Governance + Protocol + Data tracks  
 Linked roadmap: `research/execution-roadmap.md` (Checkpoint 1)
 
@@ -13,6 +13,18 @@ Pick launch chain(s) and initial fee policy with evidence, early enough to influ
 1. Chain selection memo
 2. Initial fee recommendation memo
 3. TAM/throughput viability assumptions table
+
+## Finalized outcome (recorded)
+
+Source memo: `research/chain-and-fee-review.md`
+
+- **Primary launch chain:** **Base**
+- **Secondary expansion chain:** **Arbitrum**
+- **Avoid for MVP (current deploy-per-market design):** Ethereum mainnet
+- **Initial protocol fee default:** **100 bps (1%)**
+- **Fee review cadence:** quarterly, or when monthly handle exceeds $1M / material competitive shift
+
+Checkpoint 1 exit criteria are therefore satisfied and this document is retained as the original scoring template plus the finalized decision record above.
 
 ## A) Chain selection framework
 

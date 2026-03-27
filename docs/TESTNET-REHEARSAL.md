@@ -2,6 +2,13 @@
 
 This checklist is the concrete execution path for ADR-0003 and the roadmap checkpoints.
 
+Execution helpers:
+
+- `script/testnet/launch_testnet.sh` (preflight + tests + deployment + service startup commands)
+- `script/testnet/rehearsal_matrix.md` (operator scorecard for run tracking)
+
+Recommended MVP chain order from Checkpoint 1: **Base first**, **Arbitrum second**.
+
 ## 1) Infrastructure and access
 
 - Chain RPC endpoint selected and funded operator keys ready.

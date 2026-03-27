@@ -42,6 +42,9 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 **Goal:** Select target chain and initial protocol fee based on viability evidence.
 
+**Status:** Completed  
+**Recorded decision:** Base (primary launch), Arbitrum (secondary expansion), initial protocol fee 100 bps.
+
 **Deliverables**
 - Chain comparison memo (L2s + candidate chains):
   - tx cost profile for `createMarket`, `placeBet`, `resolve`, `claim`, `expire`

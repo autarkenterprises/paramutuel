@@ -90,6 +90,15 @@ python3 -m service.indexer.sweeper \
   --interval-seconds 60
 ```
 
+## Launch shortcut
+
+Use the full launch helper from repo root:
+
+```bash
+chmod +x script/testnet/launch_testnet.sh
+RPC_URL_BASE_SEPOLIA=... PRIVATE_KEY=... TREASURY_ADDRESS=... ./script/testnet/launch_testnet.sh
+```
+
 ## Tests
 
 Run service-layer tests independently:

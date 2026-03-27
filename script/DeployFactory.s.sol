@@ -7,7 +7,7 @@ import {ParamutuelFactory} from "../src/ParamutuelFactory.sol";
 /// @notice Simple deployment script for ParamutuelFactory.
 /// Run with:
 /// forge script script/DeployFactory.s.sol \
-///   --rpc-url $RPC_URL_SEPOLIA \
+///   --rpc-url $RPC_URL_BASE_SEPOLIA \
 ///   --private-key $PRIVATE_KEY \
 ///   --broadcast
 contract DeployFactory is Script {

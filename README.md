@@ -3,6 +3,7 @@
 Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is intentionally structured to later support more decentralized resolution mechanisms.
 
 **Market research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
+**Chain/fee decision memo:** see [`research/chain-and-fee-review.md`](research/chain-and-fee-review.md) (Base primary, Arbitrum secondary).
 **Operator workflows (CLI/API):** see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md).
 **Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
@@ -108,13 +109,13 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 - **Prerequisites**:
   - `forge` installed and configured.
   - Deployer EOA with gas funds on your target network.
-  - RPC URL for the target network (e.g. Sepolia, mainnet, or an L2).
+  - RPC URL for the target network (for MVP recommendation: **Base Sepolia** testnet first).
 
 - **1. Configure environment**
   - Create a `.env` in the repo root (already ignored by `.gitignore`):
 
     ```bash
-    RPC_URL_SEPOLIA="https://sepolia.infura.io/v3/YOUR_KEY"
+    RPC_URL_BASE_SEPOLIA="https://sepolia.base.org"
     PRIVATE_KEY="0x..."              # deployer private key
     ETHERSCAN_API_KEY="..."          # optional, for verification
     ```
@@ -123,7 +124,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 
     ```toml
     [rpc_endpoints]
-    sepolia = "${RPC_URL_SEPOLIA}"
+    base_sepolia = "${RPC_URL_BASE_SEPOLIA}"
     ```
 
 - **2. Deploy `ParamutuelFactory`**
@@ -138,7 +139,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 
     ```bash
     forge script script/DeployFactory.s.sol \
-      --rpc-url $RPC_URL_SEPOLIA \
+      --rpc-url $RPC_URL_BASE_SEPOLIA \
       --private-key $PRIVATE_KEY \
       --broadcast
     ```
