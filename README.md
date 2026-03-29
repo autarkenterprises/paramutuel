@@ -6,6 +6,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Chain/fee decision memo:** see [`research/chain-and-fee-review.md`](research/chain-and-fee-review.md) (Base primary, Arbitrum secondary).
 **Operator workflows (CLI/API):** see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md).
 **Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
+**Live testnet integration suite:** see [`docs/TESTNET-LIVE-SUITE.md`](docs/TESTNET-LIVE-SUITE.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
 
 ## Clone and Use on Base Sepolia (dApp + CLI)
