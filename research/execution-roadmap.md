@@ -220,6 +220,10 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ---
 
+## Product and protocol backlog
+
+Miscellaneous follow-ups (fee documentation, browser extension concept, etc.) live in [`docs/TASKS.md`](../docs/TASKS.md) so they stay tracked outside checkpoint deliverables.
+
 ## Ongoing Quality Requirements
 
 - Every new feature includes tests.
