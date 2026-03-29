@@ -51,6 +51,8 @@ PRIVATE_KEY=0x... \
 ./script/testnet/run_live_suite.sh
 ```
 
+For multi-market and multi-actor stress testing, see [`TESTNET-STRESS-SUITE.md`](TESTNET-STRESS-SUITE.md).
+
 ## Alchemy dashboard fit
 
 This suite works well with Alchemy:

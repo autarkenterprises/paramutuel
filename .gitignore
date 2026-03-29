@@ -28,3 +28,7 @@ service/indexer/indexer.db-wal
 *secret*
 *token*
 
+# Stress-test wallet pools (private keys)
+test/testnet/stress_wallet_pool.json
+**/stress_wallet_pool.json
+
