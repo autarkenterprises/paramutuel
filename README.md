@@ -8,6 +8,221 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
 
+## Clone and Use on Base Sepolia (dApp + CLI)
+
+This section is for an arbitrary user who clones the repo and wants to interact end-to-end in pre-production.
+
+### 1) Prerequisites
+
+- `forge` + `cast` installed (Foundry)
+- `python3` and `node`
+- MetaMask (or other EVM wallet)
+- Base Sepolia test ETH
+
+### 2) Clone and build
+
+```bash
+git clone https://github.com/autarkenterprises/paramutuel.git
+cd paramutuel
+forge build
+```
+
+`forge build` is required because the dApp reads ABIs from `out/`, which is not committed.
+
+### 3) Configure wallet/network
+
+In MetaMask, use **Base Sepolia**:
+
+- RPC URL: `https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU` (or your own provider)
+- Chain ID: `84532`
+- Currency: `ETH`
+- Explorer: `https://sepolia.basescan.org`
+
+### 4) Start the dApp locally
+
+```bash
+python3 -m http.server 8080
+```
+
+Open:
+
+- `http://localhost:8080/dapp/`
+
+In the dApp UI:
+
+- connect wallet
+- set factory address:
+  - `0xb288575730Eff094d21d13f1705eB671e8799E70`
+- create/load markets and run lifecycle actions
+
+### 5) CLI interaction (cast)
+
+Export required env vars:
+
+```bash
+export RPC_URL_BASE_SEPOLIA="https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU"
+export PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
+```
+
+#### Create market
+
+```bash
+cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
+  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
+  "0xCOLLATERAL_TOKEN" \
+  "Will X happen?" \
+  "[\"YES\",\"NO\"]" \
+  0 \
+  0 \
+  0x0000000000000000000000000000000000000000 \
+  0x0000000000000000000000000000000000000000 \
+  0x0000000000000000000000000000000000000000 \
+  "[]" \
+  "[]" \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
+  --private-key "$PRIVATE_KEY"
+```
+
+Notes:
+
+- `bettingCloseTime = 0` and `resolutionWindow = 0` create no-max (closer-managed) windows.
+- zero addresses for resolver/closers default those roles to proposer.
+
+#### Place bet
+
+```bash
+cast send "0xTOKEN" "approve(address,uint256)" "0xMARKET" 1000000000000000000 \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+
+cast send "0xMARKET" "placeBet(uint256,uint256)" 0 1000000000000000000 \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+```
+
+#### Lifecycle actions
+
+```bash
+cast send "0xMARKET" "closeBetting()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xMARKET" "resolve(uint256)" 0 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+# or retract / expire
+cast send "0xMARKET" "retract()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xMARKET" "expire()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+```
+
+#### Claim and fee withdrawal
+
+```bash
+cast send "0xMARKET" "claim()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xMARKET" "withdrawFees()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+```
+
+### 6) Optional: full local service stack (explorer + control panel + sweeper)
+
+Create `.env` from template and run:
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a
+./script/testnet/launch_testnet.sh
+```
+
+Then use:
+
+- indexer API: `http://127.0.0.1:8090`
+- explorer: `http://127.0.0.1:8091`
+- control panel: `http://127.0.0.1:8092`
+
+## Clone and Use on Base Sepolia (dApp + CLI)
+
+Any user can clone this repo and exercise the protocol end-to-end in a pre-production setup.
+
+### Prerequisites
+
+- Foundry (`forge`, `cast`)
+- `python3`
+- Wallet (MetaMask recommended)
+- Base Sepolia ETH
+
+### 1. Clone and build
+
+```bash
+git clone https://github.com/autarkenterprises/paramutuel.git
+cd paramutuel
+forge build
+```
+
+The dApp reads ABIs from `out/`, so this build step is required.
+
+### 2. Configure wallet for Base Sepolia
+
+In MetaMask, add/select Base Sepolia:
+
+- RPC URL: `https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU`
+- Chain ID: `84532`
+- Currency symbol: `ETH`
+- Block explorer: `https://sepolia.basescan.org`
+
+### 3. Run dApp locally
+
+From repo root:
+
+```bash
+python3 -m http.server 8080
+```
+
+Open `http://localhost:8080/dapp/`, connect your wallet, and set the deployed factory address:
+
+- `0xb288575730Eff094d21d13f1705eB671e8799E70`
+
+### 4. Interact via CLI (`cast`)
+
+Set environment:
+
+```bash
+export RPC_URL_BASE_SEPOLIA="https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU"
+export PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
+```
+
+Create market (example):
+
+```bash
+cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
+  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
+  "0xCOLLATERAL_TOKEN" \
+  "Will X happen?" \
+  "[\"YES\",\"NO\"]" \
+  0 \
+  0 \
+  0x0000000000000000000000000000000000000000 \
+  0x0000000000000000000000000000000000000000 \
+  0x0000000000000000000000000000000000000000 \
+  "[]" \
+  "[]" \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
+  --private-key "$PRIVATE_KEY"
+```
+
+Then use market actions as needed:
+
+```bash
+cast send "0xMARKET" "closeBetting()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xMARKET" "resolve(uint256)" 0 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xMARKET" "claim()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+```
+
+### 5. Optional service stack
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a
+./script/testnet/launch_testnet.sh
+```
+
+Service endpoints:
+
+- Indexer API: `http://127.0.0.1:8090`
+- Explorer: `http://127.0.0.1:8091`
+- Control panel: `http://127.0.0.1:8092`
+
 ### Recorded long-term design considerations
 
 Smart contracts cannot observe real-world truth directly. A fully decentralized version of this protocol ultimately requires an oracle / resolution mechanism such as:
