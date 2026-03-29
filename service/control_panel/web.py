@@ -21,6 +21,14 @@ class Handler(BaseHTTPRequestHandler):
     allow_execute: bool = False
     auth_token: str | None = None
 
+    @staticmethod
+    def _redact_command(cmd: list[str]) -> list[str]:
+        out = list(cmd)
+        for i, token in enumerate(out[:-1]):
+            if token == "--private-key":
+                out[i + 1] = "<redacted>"
+        return out
+
     def _send_json(self, code: int, body: dict) -> None:
         data = json.dumps(body).encode()
         self.send_response(code)
@@ -98,9 +106,14 @@ class Handler(BaseHTTPRequestHandler):
             proc = subprocess.run(cmd.command, check=False, capture_output=True, text=True)
             return self._send_json(
                 200,
-                {"command": cmd.command, "exit_code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr},
+                {
+                    "command": self._redact_command(cmd.command),
+                    "exit_code": proc.returncode,
+                    "stdout": proc.stdout,
+                    "stderr": proc.stderr,
+                },
             )
-        return self._send_json(200, {"command": cmd.command})
+        return self._send_json(200, {"command": self._redact_command(cmd.command)})
 
 
 def main() -> None:

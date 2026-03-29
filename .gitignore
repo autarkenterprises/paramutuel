@@ -10,6 +10,13 @@ broadcast/
 # Node (if used later)
 node_modules/
 
+# Python
+__pycache__/
+*.pyc
+service/indexer/indexer.db
+service/indexer/indexer.db-shm
+service/indexer/indexer.db-wal
+
 # OS / editor
 .DS_Store
 .vscode/

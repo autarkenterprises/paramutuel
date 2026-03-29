@@ -24,7 +24,8 @@ TOPIC_TO_EVENT = {v: k for k, v in TOPICS.items()}
 
 
 def db_connect(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+    # API server uses ThreadingHTTPServer; allow sqlite connection across handler threads.
+    conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
