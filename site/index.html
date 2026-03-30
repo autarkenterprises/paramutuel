@@ -51,7 +51,7 @@
         </div>
         <div>
           <dt>Factory</dt>
-          <dd>0xb288575730Eff094d21d13f1705eB671e8799E70</dd>
+          <dd id="factoryAddressDisplay">Configured in deployments.json</dd>
         </div>
         <div>
           <dt>Collateral</dt>
@@ -78,5 +78,21 @@
   <footer>
     Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
   </footer>
+  <script>
+    (async () => {
+      try {
+        const response = await fetch("config/deployments.json");
+        if (!response.ok) return;
+        const data = await response.json();
+        const addr = (data?.baseSepolia?.factoryAddress || "").trim();
+        if (!addr) return;
+        const node = document.getElementById("factoryAddressDisplay");
+        if (!node) return;
+        node.textContent = addr;
+      } catch (_) {
+        // Keep the fallback address if config is unavailable.
+      }
+    })();
+  </script>
 </body>
 </html>

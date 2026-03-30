@@ -3,6 +3,7 @@ import os
 import subprocess
 import time
 import unittest
+from pathlib import Path
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -14,6 +15,17 @@ def _env(name: str, default: str = "") -> str:
 
 def _rpc_url() -> str:
     return _env("RPC_URL_BASE_SEPOLIA") or _env("RPC_URL_SEPOLIA")
+
+
+def _default_factory_address() -> str:
+    config_path = Path(__file__).resolve().parents[2] / "config" / "deployments.json"
+    if not config_path.exists():
+        return ""
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    return str((data.get("baseSepolia") or {}).get("factoryAddress") or "").strip()
 
 
 def _run_cast(args: list[str]) -> str:
@@ -136,7 +148,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.rpc = _rpc_url()
-        cls.factory = _env("FACTORY_ADDRESS")
+        cls.factory = _env("FACTORY_ADDRESS") or _default_factory_address()
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
         cls.market_address = _env("TESTNET_MARKET_ADDRESS")
         cls.private_key = _env("PRIVATE_KEY")
@@ -148,7 +160,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         if not cls.rpc:
             raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
         if not cls.factory:
-            raise unittest.SkipTest("Set FACTORY_ADDRESS to run live suite")
+            raise unittest.SkipTest("Set FACTORY_ADDRESS or config/deployments.json baseSepolia.factoryAddress")
 
         cls.sender = ""
         if cls.private_key:

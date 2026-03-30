@@ -17,7 +17,9 @@ It has three modes:
 ## Required environment
 
 - `RPC_URL_BASE_SEPOLIA` (or legacy `RPC_URL_SEPOLIA`)
-- `FACTORY_ADDRESS`
+- Factory address source:
+  - default: `config/deployments.json` -> `baseSepolia.factoryAddress`
+  - override: `FACTORY_ADDRESS`
 
 Optional:
 
@@ -33,7 +35,6 @@ Optional:
 ## Run
 
 ```bash
-FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 ./script/testnet/run_live_suite.sh
 ```
@@ -41,7 +42,6 @@ RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 Read-only + existing market checks:
 
 ```bash
-FACTORY_ADDRESS=0x... \
 TESTNET_MARKET_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 ./script/testnet/run_live_suite.sh
@@ -50,7 +50,6 @@ RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 Minimal tx mode:
 
 ```bash
-FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 TESTNET_MODE=minimal-tx \
 PRIVATE_KEY=0x... \
@@ -60,7 +59,6 @@ PRIVATE_KEY=0x... \
 Funded tx mode:
 
 ```bash
-FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 TESTNET_MODE=funded-tx \
 PRIVATE_KEY=0x... \

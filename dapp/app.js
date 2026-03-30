@@ -7,6 +7,7 @@ const FACTORY_ABI_URL = "abi/ParamutuelFactory.json";
 const FACTORY_ABI_FALLBACK = "../out/ParamutuelFactory.sol/ParamutuelFactory.json";
 const MARKET_ABI_URL = "abi/ParamutuelMarket.json";
 const MARKET_ABI_FALLBACK = "../out/ParamutuelMarket.sol/ParamutuelMarket.json";
+const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
 const Logic = globalThis.ParamutuelLogic;
 
 let provider;
@@ -19,10 +20,15 @@ let marketAbi;
 let marketContract; // last-created market
 let currentChainId = null;
 let walletListenersAttached = false;
+let deploymentsConfig = null;
 
 const CHAIN_INFO = {
   8453: { name: "Base Mainnet" },
   84532: { name: "Base Sepolia" },
+};
+const DEPLOYMENTS_KEY_BY_CHAIN_ID = {
+  8453: "baseMainnet",
+  84532: "baseSepolia",
 };
 
 const TOKEN_PRESETS = {
@@ -49,6 +55,27 @@ function $(id) {
 function chainName(chainId) {
   const info = CHAIN_INFO[chainId];
   return info ? info.name : `Unknown chain (${chainId})`;
+}
+
+function deploymentConfigKeyForChain(chainId) {
+  if (chainId !== null && DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId]) {
+    return DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId];
+  }
+  return "baseSepolia";
+}
+
+function deploymentFactoryAddressForChain(chainId) {
+  if (!deploymentsConfig) return "";
+  const key = deploymentConfigKeyForChain(chainId);
+  return String((deploymentsConfig[key] || {}).factoryAddress || "").trim();
+}
+
+function applyDefaultFactoryAddress() {
+  const current = $("factoryAddress").value.trim();
+  if (current) return;
+  const configured = deploymentFactoryAddressForChain(currentChainId);
+  if (!configured || !ethers.isAddress(configured)) return;
+  $("factoryAddress").value = configured;
 }
 
 function tokenPresetValue(chainId, token) {
@@ -290,6 +317,7 @@ async function refreshConnectedNetwork() {
     currentChainId = null;
     $("networkStatus").textContent = "Network: connect wallet to detect chain.";
     populateCollateralPresets();
+    applyDefaultFactoryAddress();
     return;
   }
 
@@ -297,6 +325,7 @@ async function refreshConnectedNetwork() {
   currentChainId = Number(network.chainId);
   $("networkStatus").textContent = `Network: ${chainName(currentChainId)} (chainId ${currentChainId})`;
   populateCollateralPresets();
+  applyDefaultFactoryAddress();
 }
 
 async function ensureContractExistsOnCurrentNetwork(address, label) {
@@ -355,6 +384,16 @@ async function fetchAbiWithFallback(primary, fallback) {
     const r2 = await fetch(fallback);
     if (!r2.ok) throw new Error("ABI not found at " + primary + " or " + fallback);
     return (await r2.json()).abi;
+  }
+}
+
+async function loadDeploymentsConfig() {
+  try {
+    const response = await fetch(DEPLOYMENTS_CONFIG_URL);
+    if (!response.ok) return;
+    deploymentsConfig = await response.json();
+  } catch (_) {
+    // Optional for local/dev runs; manual factory entry still works.
   }
 }
 
@@ -707,6 +746,8 @@ async function withdrawFees() {
 async function main() {
   syncWindowInputState();
   populateCollateralPresets();
+  await loadDeploymentsConfig();
+  applyDefaultFactoryAddress();
   $("networkStatus").textContent = "Network: connect wallet to detect chain.";
 
   $("marketTemplate").addEventListener("change", () => {

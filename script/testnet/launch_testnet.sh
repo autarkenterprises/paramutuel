@@ -30,6 +30,7 @@ PROTOCOL_FEE_BPS="${PROTOCOL_FEE_BPS:-200}"
 MIN_BETTING_WINDOW="${MIN_BETTING_WINDOW:-3600}"
 MIN_RESOLUTION_WINDOW="${MIN_RESOLUTION_WINDOW:-3600}"
 INDEXER_DB_PATH="${INDEXER_DB_PATH:-service/indexer/indexer.db}"
+DEPLOYMENTS_CONFIG_PATH="${DEPLOYMENTS_CONFIG_PATH:-config/deployments.json}"
 
 echo "==> Preflight checks"
 forge --version >/dev/null
@@ -51,12 +52,42 @@ forge script script/DeployFactory.s.sol \
   --rpc-url "$RPC_URL" \
   --broadcast
 
+DEPLOYED_FACTORY="$(
+  python3 - <<'PY'
+import glob
+import json
+from pathlib import Path
+
+paths = glob.glob("broadcast/DeployFactory.s.sol/*/run-latest.json")
+if not paths:
+    raise SystemExit(1)
+paths.sort(key=lambda p: Path(p).stat().st_mtime, reverse=True)
+for path in paths:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        continue
+    for tx in reversed(data.get("transactions", [])):
+        if tx.get("contractName") == "ParamutuelFactory" and tx.get("contractAddress"):
+            print(tx["contractAddress"])
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+)" || true
+
+if [[ -n "${DEPLOYED_FACTORY:-}" ]]; then
+  ./script/testnet/set_factory_address.sh "$DEPLOYED_FACTORY" base-sepolia >/dev/null
+  echo "==> Updated single source of truth: $DEPLOYMENTS_CONFIG_PATH (baseSepolia.factoryAddress=$DEPLOYED_FACTORY)"
+fi
+
+FACTORY_FOR_NEXT="${DEPLOYED_FACTORY:-<FACTORY>}"
+
 echo
 echo "Factory deployment broadcasted."
 echo "Next:"
-echo "  1) record the deployed factory address from script output"
+echo "  1) factory address is stored in $DEPLOYMENTS_CONFIG_PATH"
 echo "  2) start indexer sync:"
-echo "     python3 service/indexer/indexer.py --rpc-url \"$RPC_URL\" --factory-address <FACTORY> --db-path \"$INDEXER_DB_PATH\""
+echo "     python3 service/indexer/indexer.py --rpc-url \"$RPC_URL\" --factory-address \"$FACTORY_FOR_NEXT\" --db-path \"$INDEXER_DB_PATH\""
 echo "  3) start indexer API:"
 echo "     python3 -m service.indexer.api --db-path \"$INDEXER_DB_PATH\" --host 127.0.0.1 --port 8090"
 echo "  4) start explorer:"

@@ -1,0 +1,10 @@
+{
+  "baseSepolia": {
+    "chainId": 84532,
+    "factoryAddress": "0xb288575730Eff094d21d13f1705eB671e8799E70"
+  },
+  "baseMainnet": {
+    "chainId": 8453,
+    "factoryAddress": ""
+  }
+}

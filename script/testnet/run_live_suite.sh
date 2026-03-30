@@ -4,7 +4,8 @@ set -euo pipefail
 # Live Base Sepolia integration suite (against deployed contracts).
 #
 # Defaults to read-only mode (no transactions, no gas):
-#   FACTORY_ADDRESS=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
+#   RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
+#   # optional override: FACTORY_ADDRESS=0x...
 #
 # Optional existing market checks:
 #   TESTNET_MARKET_ADDRESS=0x...
@@ -18,8 +19,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+source "$ROOT_DIR/script/lib/deployments.sh"
 if [[ -z "${FACTORY_ADDRESS:-}" ]]; then
-  echo "error: FACTORY_ADDRESS is required" >&2
+  ensure_factory_address "base-sepolia" "$ROOT_DIR/config/deployments.json" || true
+fi
+if [[ -z "${FACTORY_ADDRESS:-}" ]]; then
+  echo "error: FACTORY_ADDRESS is required (or set config/deployments.json baseSepolia.factoryAddress)" >&2
   exit 1
 fi
 

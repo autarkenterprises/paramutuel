@@ -8,6 +8,7 @@ on:
       - 'dapp/**'
       - 'service/explorer/static/**'
       - 'site/**'
+      - 'config/deployments.json'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
@@ -36,7 +37,7 @@ jobs:
 
       - name: Assemble site
         run: |
-          mkdir -p _site/dapp/abi _site/explorer
+          mkdir -p _site/dapp/abi _site/explorer _site/config
 
           # Extract ABIs from build output
           python3 -c "
@@ -50,6 +51,7 @@ jobs:
 
           # Copy website shell
           cp site/index.html site/app.html site/explorer.html site/style.css _site/
+          cp config/deployments.json _site/config/deployments.json
 
           # Copy dApp files
           cp dapp/index.html dapp/app.js dapp/logic.js dapp/style.css _site/dapp/

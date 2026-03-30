@@ -4,7 +4,8 @@ set -euo pipefail
 # Multi-market, multi-actor stress suite against deployed Base Sepolia contracts.
 #
 # Read-only (no gas): samples latest markets from the factory.
-#   FACTORY_ADDRESS=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_stress_suite.sh
+#   RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_stress_suite.sh
+#   # optional override: FACTORY_ADDRESS=0x...
 #
 # Transaction mode: creates markets with distinct roles from a wallet pool JSON.
 #   FACTORY_ADDRESS=... RPC_URL_BASE_SEPOLIA=... \
@@ -26,8 +27,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+source "$ROOT_DIR/script/lib/deployments.sh"
 if [[ -z "${FACTORY_ADDRESS:-}" ]]; then
-  echo "error: FACTORY_ADDRESS is required" >&2
+  ensure_factory_address "base-sepolia" "$ROOT_DIR/config/deployments.json" || true
+fi
+if [[ -z "${FACTORY_ADDRESS:-}" ]]; then
+  echo "error: FACTORY_ADDRESS is required (or set config/deployments.json baseSepolia.factoryAddress)" >&2
   exit 1
 fi
 

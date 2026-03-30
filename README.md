@@ -61,8 +61,7 @@ python3 -m http.server 8080
 In the dApp UI:
 
 - connect wallet
-- set factory address:
-  - `0xb288575730Eff094d21d13f1705eB671e8799E70`
+- factory address auto-fills from `config/deployments.json` (or can be overridden manually)
 - create/load markets and run lifecycle actions
 
 Time semantics (important):
@@ -78,12 +77,14 @@ Export required env vars:
 ```bash
 export RPC_URL_BASE_SEPOLIA="https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU"
 export PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
+source ./script/lib/deployments.sh
+ensure_factory_address "base-sepolia" "./config/deployments.json"
 ```
 
 #### Create market
 
 ```bash
-cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
+cast send "$FACTORY_ADDRESS" \
   "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
   "0xCOLLATERAL_TOKEN" \
   "Will X happen?" \
@@ -102,7 +103,7 @@ cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
 Optional seeded-liquidity overload (multi-outcome seed in one create tx):
 
 ```bash
-cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
+cast send "$FACTORY_ADDRESS" \
   "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
   "0xCOLLATERAL_TOKEN" \
   "Will X happen?" \
@@ -172,6 +173,12 @@ Create `.env` from template and run:
 cp .env.example .env
 set -a && source .env && set +a
 ./script/testnet/launch_testnet.sh
+```
+
+`launch_testnet.sh` writes the latest deployment to `config/deployments.json` (`baseSepolia.factoryAddress`), which is used as the shared default by the dApp and testnet suites. For manual updates:
+
+```bash
+./script/testnet/set_factory_address.sh 0x...
 ```
 
 Then use:

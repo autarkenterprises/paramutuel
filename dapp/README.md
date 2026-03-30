@@ -43,7 +43,7 @@ python3 -m http.server 8080
 ### How to configure
 
 In the dApp UI, paste:
-- `Factory address`
+- `Factory address` (auto-filled from `config/deployments.json` when available)
 - `Collateral token preset` (network-aware dropdown; includes Base mainnet and Base Sepolia presets)
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)
@@ -68,5 +68,6 @@ In the dApp UI, paste:
 - The contract compares against on-chain `block.timestamp`. If transaction inclusion is delayed, the effective remaining window can be shorter than expected; very tight windows can fail factory minimum-window checks at execution time.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - Seeding and batch bets support multi-outcome entries with one approval + one transaction path.
+- Factory address defaults are loaded from the repo-level single source of truth (`config/deployments.json`) when served over HTTP.
 - Shared logic used by the UI is in `dapp/logic.js` with independent tests in `dapp/tests/logic.test.js`.
 

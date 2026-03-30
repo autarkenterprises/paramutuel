@@ -6,7 +6,7 @@ This complements the [live integration suite](TESTNET-LIVE-SUITE.md) with **many
 
 | `STRESS_MODE` | What it does | Gas |
 |---------------|----------------|-----|
-| `readonly` (default) | Samples up to `STRESS_SAMPLE_MARKETS` latest markets from `FACTORY_ADDRESS` and asserts on-chain invariants | None |
+| `readonly` (default) | Samples up to `STRESS_SAMPLE_MARKETS` latest markets from configured factory address and asserts on-chain invariants | None |
 | `tx` | Creates `STRESS_MARKET_COUNT` new markets; each market uses **four different keys** for the four roles; runs resolve / retract / expire branches | One burst of txs |
 | `funded-tx` | Creates `STRESS_MARKET_COUNT` new markets; each market uses **six different keys** (4 roles + 2 bettors), does real `approve` + `placeBet`, then resolve/retract/expire and claims | Higher tx burst |
 
@@ -51,10 +51,13 @@ export STRESS_POOL_PATH="test/testnet/stress_wallet_pool.json"
 
 ## Run stress suite
 
+Factory address source:
+- default: `config/deployments.json` -> `baseSepolia.factoryAddress`
+- override: `FACTORY_ADDRESS`
+
 Read-only:
 
 ```bash
-FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 ./script/testnet/run_stress_suite.sh
 ```
@@ -62,7 +65,6 @@ RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 Transaction mode (after pool + funding):
 
 ```bash
-FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 STRESS_MODE=tx \
 STRESS_WALLET_POOL_PATH=test/testnet/stress_wallet_pool.json \
@@ -74,7 +76,6 @@ STRESS_MARKET_COUNT=5 \
 Funded transaction mode (after pool + ETH + collateral funding):
 
 ```bash
-FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 STRESS_MODE=funded-tx \
 STRESS_WALLET_POOL_PATH=test/testnet/stress_wallet_pool.json \
