@@ -29,7 +29,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         payload = path.read_bytes()
-        ctype = "text/html" if name.endswith(".html") else "application/javascript"
+        if name.endswith(".html"):
+            ctype = "text/html"
+        elif name.endswith(".css"):
+            ctype = "text/css"
+        else:
+            ctype = "application/javascript"
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(payload)))
@@ -42,6 +47,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_static("index.html")
         if path == "/app.js":
             return self._send_static("app.js")
+        if path == "/style.css":
+            return self._send_static("style.css")
         if path == "/health":
             return self._send_json(200, {"ok": True})
         if path.startswith("/api/"):

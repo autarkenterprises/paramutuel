@@ -1,6 +1,23 @@
 const params = new URLSearchParams(window.location.search);
 const API_BASE = params.get("api") || window.EXPLORER_API_BASE || "";
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
+const API_BASE_NORMALIZED = API_BASE.replace(/\/$/, "");
+
+function apiUrl(path) {
+  return `${API_BASE_NORMALIZED}${path}`;
+}
+
+async function fetchMarkets() {
+  const candidates = ["/api/markets?limit=100", "/markets?limit=100"];
+  let lastResponse = null;
+  for (const path of candidates) {
+    const response = await fetch(apiUrl(path));
+    if (response.ok) return response;
+    lastResponse = response;
+    if (response.status !== 404) return response;
+  }
+  return lastResponse;
+}
 
 async function loadConfiguredFactoryAddress() {
   const node = document.getElementById("factoryAddressDisplay");
@@ -20,9 +37,13 @@ async function loadConfiguredFactoryAddress() {
 
 async function loadMarkets() {
   const tbody = document.getElementById("markets");
+  const apiNode = document.getElementById("apiBaseDisplay");
+  if (apiNode) {
+    apiNode.textContent = API_BASE_NORMALIZED || "same origin";
+  }
   let res;
   try {
-    res = await fetch(API_BASE + "/api/markets?limit=100");
+    res = await fetchMarkets();
   } catch (e) {
     tbody.innerHTML = '<tr><td colspan="9">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>';
     return;

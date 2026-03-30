@@ -57,7 +57,7 @@ jobs:
           cp dapp/index.html dapp/app.js dapp/logic.js dapp/style.css _site/dapp/
 
           # Copy explorer static files
-          cp service/explorer/static/index.html service/explorer/static/app.js _site/explorer/
+          cp service/explorer/static/index.html service/explorer/static/app.js service/explorer/static/style.css _site/explorer/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

@@ -4,28 +4,40 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Paramutuel Explorer</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Paramutuel Explorer</h1>
-  <p>Reads market state from the indexer API.</p>
-  <p>Configured factory: <code id="factoryAddressDisplay">from deployments.json (if available)</code></p>
-  <button id="refresh">Refresh</button>
-  <table border="1" cellpadding="6">
-    <thead>
-      <tr>
-        <th>Market</th>
-        <th>State</th>
-        <th>Proposer</th>
-        <th>Resolver</th>
-        <th>Betting Closer</th>
-        <th>Resolution Closer</th>
-        <th>Bet Close</th>
-        <th>Resolution Window</th>
-        <th>Total Pot (raw)</th>
-      </tr>
-    </thead>
-    <tbody id="markets"></tbody>
-  </table>
+  <main class="container">
+    <section class="card">
+      <h1>Paramutuel Explorer</h1>
+      <p class="muted">Reads market state from the indexer API.</p>
+      <div class="meta">
+        <div><strong>Configured factory:</strong> <code id="factoryAddressDisplay">from deployments.json (if available)</code></div>
+        <div><strong>API base:</strong> <code id="apiBaseDisplay">default</code></div>
+      </div>
+      <div class="controls">
+        <button id="refresh">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Market</th>
+              <th>State</th>
+              <th>Proposer</th>
+              <th>Resolver</th>
+              <th>Betting Closer</th>
+              <th>Resolution Closer</th>
+              <th>Bet Close</th>
+              <th>Resolution Window</th>
+              <th>Total Pot (raw)</th>
+            </tr>
+          </thead>
+          <tbody id="markets"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
   <script src="app.js"></script>
 </body>
 </html>
