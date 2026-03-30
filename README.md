@@ -10,6 +10,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Testnet stress suite (multi-market / multi-actor):** see [`docs/TESTNET-STRESS-SUITE.md`](docs/TESTNET-STRESS-SUITE.md).
 **Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
+**Hosted dApp & website:** see [GitHub Pages deployment](#hosted-dapp--protocol-website).
 
 ## Clone and Use on Base Sepolia (dApp + CLI)
 
@@ -30,7 +31,7 @@ cd paramutuel
 forge build
 ```
 
-`forge build` is required because the dApp reads ABIs from `out/`, which is not committed.
+`forge build` is optional for local development — the dApp ships committed ABI files in `dapp/abi/` and falls back to `out/` when available. Run `forge build` (or `./script/sync-abi.sh`) after contract changes to update the committed ABIs.
 
 ### 3) Configure wallet/network
 
@@ -98,6 +99,27 @@ cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
   --private-key "$PRIVATE_KEY"
 ```
 
+Optional seeded-liquidity overload (multi-outcome seed in one create tx):
+
+```bash
+cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
+  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
+  "0xCOLLATERAL_TOKEN" \
+  "Will X happen?" \
+  "[\"YES\",\"NO\",\"MAYBE\"]" \
+  "$BETTING_CLOSE_TS" \
+  "$RESOLUTION_WINDOW_SECS" \
+  "0x0000000000000000000000000000000000000000" \
+  "0xBETTING_CLOSER_ADDRESS" \
+  "0xRESOLUTION_CLOSER_ADDRESS" \
+  "[]" \
+  "[]" \
+  "[0,2]" \
+  "[1000000,2500000]" \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
+  --private-key "$PRIVATE_KEY"
+```
+
 Notes:
 
 - `bettingCloseTime = 0` and `resolutionWindow = 0` create no-max (closer-managed) windows.
@@ -113,6 +135,15 @@ cast send "0xTOKEN" "approve(address,uint256)" "0xMARKET" 1000000000000000000 \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 
 cast send "0xMARKET" "placeBet(uint256,uint256)" 0 1000000000000000000 \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+```
+
+Batch bet (multiple outcomes in one tx):
+
+```bash
+cast send "0xTOKEN" "approve(address,uint256)" "0xMARKET" 3000000000000000000 \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xMARKET" "placeBets(uint256[],uint256[])" "[0,2]" "[1000000000000000000,2000000000000000000]" \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
@@ -218,10 +249,12 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
      - `bettingCloser` (`address(0)` disables authority close)
      - `resolutionCloser` (`address(0)` disables authority close)
      - `feeRecipients[]`, `feeBps[]` (optional)
+     - optional `seedOutcomeIndices[]`, `seedAmounts[]` for multi-option seeded liquidity at creation
    - Factory enforces sane constraints (min windows, caps, and rejects no-max windows without a matching closer).
 
 2. **Betting**
-   - Any address deposits collateral and chooses an outcome index.
+   - Any address deposits collateral and chooses one or more outcome indices.
+   - `placeBet` places one leg; `placeBets` places multiple legs in one transaction.
   - Bets stop when **`bettingCloseTime`** is reached **or** **`closeBetting()`** is called by `bettingCloser`.
   - If `bettingCloseTime = 0`, betting remains open until `closeBetting()`.
 
@@ -302,6 +335,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
     - `resolutionCloser`: authority address for early `closeResolutionWindow()`; use `address(0)` for time-only close on finite windows.
     - Guardrail: if `bettingCloseTime == 0`, `bettingCloser` must be non-zero; if `resolutionWindow == 0`, `resolutionCloser` must be non-zero.
     - `extraFeeRecipients[]`, `extraFeeBps[]`: optional, additional beneficiaries.
+    - optional `seedOutcomeIndices[]`, `seedAmounts[]` to seed multiple outcomes at creation.
 
   - You can call `createMarket`:
     - From a frontend using ethers.js / viem.
@@ -312,6 +346,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
   - **Bettors**:
     - `IERC20(collateralToken).approve(market, amount)`
     - `ParamutuelMarket(market).placeBet(outcomeIndex, amount)`
+    - or `ParamutuelMarket(market).placeBets(outcomeIndices[], amounts[])` for multi-option entry in one tx.
   - **Resolver** (often the proposer):
     - After `bettingCloseTime` and before `resolutionDeadline`:
       - `resolve(winningOutcomeIndex)` or `retract()`.
@@ -325,7 +360,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 
 A minimal no-build dApp is available in `dapp/`. It can:
 - create markets through the deployed `ParamutuelFactory`
-- place bets (`placeBet`)
+- seed markets at creation and place bets via `placeBet` / `placeBets`
 - resolve / retract / expire
 - claim payouts and withdraw fees
 
@@ -341,4 +376,26 @@ Then open:
 
 See `dapp/README.md` for UI details and deployment assumptions.
 
+### Hosted dApp & protocol website
 
+The dApp and a protocol website are deployed to GitHub Pages via CI. On every push to `master` that touches `src/`, `dapp/`, `service/explorer/static/`, or `site/`, a GitHub Actions workflow builds the contracts, extracts ABIs, and assembles the site.
+
+**Live URL:** `https://autarkenterprises.github.io/paramutuel/`
+
+The website (`site/`) is a navigation shell that embeds the dApp and explorer as iframes — no code duplication. When component files change, the website automatically stays current.
+
+Pages:
+- `/` — Landing page with protocol overview and network info
+- `/app.html` — Full dApp (embedded iframe)
+- `/explorer.html` — Market explorer with configurable indexer URL
+- `/dapp/` — Standalone dApp (also accessible directly)
+
+**Setup requirement:** In the GitHub repo settings, set Pages source to **"GitHub Actions"**.
+
+#### Syncing ABIs after contract changes
+
+```bash
+./script/sync-abi.sh
+```
+
+This runs `forge build` and extracts ABI-only JSON into `dapp/abi/`. Commit the updated files so the hosted dApp stays in sync with contract changes.

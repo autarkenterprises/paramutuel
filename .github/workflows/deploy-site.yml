@@ -1,0 +1,77 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'dapp/**'
+      - 'service/explorer/static/**'
+      - 'site/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Build contracts
+        run: forge build --sizes 2>&1 | tail -1
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/dapp/abi _site/explorer
+
+          # Extract ABIs from build output
+          python3 -c "
+          import json
+          for name in ['ParamutuelFactory', 'ParamutuelMarket']:
+              data = json.load(open(f'out/{name}.sol/{name}.json'))
+              with open(f'_site/dapp/abi/{name}.json', 'w') as f:
+                  json.dump({'abi': data['abi']}, f, indent=2)
+                  f.write('\n')
+          "
+
+          # Copy website shell
+          cp site/index.html site/app.html site/explorer.html site/style.css _site/
+
+          # Copy dApp files
+          cp dapp/index.html dapp/app.js dapp/logic.js dapp/style.css _site/dapp/
+
+          # Copy explorer static files
+          cp service/explorer/static/index.html service/explorer/static/app.js _site/explorer/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

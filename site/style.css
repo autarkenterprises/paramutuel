@@ -1,0 +1,272 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #0b0f19;
+  color: #e6edf3;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ── Navigation ── */
+
+nav {
+  background: #121a2a;
+  border-bottom: 1px solid #23304a;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+nav .logo {
+  font-weight: 700;
+  font-size: 18px;
+  color: #e6edf3;
+  letter-spacing: -0.3px;
+}
+
+nav .links {
+  display: flex;
+  gap: 4px;
+}
+
+nav .links a {
+  color: #97a6c4;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+nav .links a:hover,
+nav .links a.active {
+  background: #1c2640;
+  color: #e6edf3;
+  text-decoration: none;
+}
+
+nav .spacer {
+  flex: 1;
+}
+
+nav .links a.external {
+  color: #6e7a94;
+}
+
+/* ── Container ── */
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  width: 100%;
+}
+
+/* ── Cards ── */
+
+.card {
+  background: #121a2a;
+  border: 1px solid #23304a;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+/* ── Hero ── */
+
+.hero {
+  text-align: center;
+  padding: 64px 24px 48px;
+}
+
+.hero h1 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 12px;
+}
+
+.hero .tagline {
+  font-size: 20px;
+  color: #97a6c4;
+  margin-bottom: 32px;
+}
+
+.hero .actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.btn:hover {
+  opacity: 0.85;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: #2f6feb;
+  color: white;
+}
+
+.btn-secondary {
+  background: #1c2640;
+  color: #e6edf3;
+  border: 1px solid #23304a;
+}
+
+/* ── Feature grid ── */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.features .card h3 {
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.features .card p {
+  color: #97a6c4;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Network info ── */
+
+.network-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.network-info dt {
+  color: #97a6c4;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.network-info dd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+/* ── Iframe pages ── */
+
+.iframe-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.iframe-page iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  min-height: calc(100vh - 56px);
+}
+
+.iframe-config {
+  background: #121a2a;
+  border-bottom: 1px solid #23304a;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.iframe-config label {
+  color: #97a6c4;
+  white-space: nowrap;
+}
+
+.iframe-config input {
+  background: #0b0f19;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  flex: 1;
+  max-width: 400px;
+}
+
+.iframe-config button {
+  background: #2f6feb;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Footer ── */
+
+footer {
+  text-align: center;
+  padding: 24px;
+  color: #6e7a94;
+  font-size: 13px;
+  border-top: 1px solid #23304a;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 640px) {
+  nav {
+    padding: 0 12px;
+    gap: 12px;
+  }
+  nav .links a {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .hero h1 {
+    font-size: 28px;
+  }
+  .hero .tagline {
+    font-size: 16px;
+  }
+  .container {
+    padding: 24px 16px;
+  }
+}

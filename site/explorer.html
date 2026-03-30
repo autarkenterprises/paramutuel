@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel - Explorer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="iframe-page">
+  <nav>
+    <span class="logo">Paramutuel</span>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="app.html">App</a>
+      <a href="explorer.html" class="active">Explorer</a>
+      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+    </div>
+  </nav>
+  <div class="iframe-config">
+    <label for="indexerUrl">Indexer API URL:</label>
+    <input id="indexerUrl" type="text" placeholder="http://127.0.0.1:8090" />
+    <button id="loadExplorer">Connect</button>
+    <span style="color: #6e7a94;">Leave empty for default. Requires a running indexer service.</span>
+  </div>
+  <iframe id="explorerFrame" src="explorer/index.html" title="Paramutuel Explorer"></iframe>
+  <script>
+    document.getElementById("loadExplorer").addEventListener("click", () => {
+      const url = document.getElementById("indexerUrl").value.trim();
+      const frame = document.getElementById("explorerFrame");
+      const base = url ? "explorer/index.html?api=" + encodeURIComponent(url) : "explorer/index.html";
+      frame.src = base;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav>
+    <span class="logo">Paramutuel</span>
+    <div class="links">
+      <a href="index.html" class="active">Home</a>
+      <a href="app.html">App</a>
+      <a href="explorer.html">Explorer</a>
+      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>Paramutuel</h1>
+    <p class="tagline">Augur for prop bets &mdash; on-chain paramutuel markets on Base</p>
+    <div class="actions">
+      <a href="app.html" class="btn btn-primary">Launch App</a>
+      <a href="https://github.com/autarkenterprises/paramutuel" class="btn btn-secondary">View Source</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="features">
+      <div class="card">
+        <h3>Create Markets</h3>
+        <p>Deploy paramutuel markets for any question with custom outcomes, time windows, and fee structures. Supports templates for sports events, elections, and long-horizon forecasts.</p>
+      </div>
+      <div class="card">
+        <h3>Place Bets</h3>
+        <p>Bet on outcomes using ERC-20 collateral. Single bets or batch multi-outcome legs in one transaction. Live odds preview shows expected payouts before you commit.</p>
+      </div>
+      <div class="card">
+        <h3>Resolve &amp; Claim</h3>
+        <p>Markets resolve to a winning outcome, retract (refund minus fees), or expire if unresolved. Winners claim pro-rata payouts from the net pot.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 32px;">
+      <h3>Network</h3>
+      <dl class="network-info">
+        <div>
+          <dt>Chain</dt>
+          <dd>Base Sepolia (testnet, chain ID 84532)</dd>
+        </div>
+        <div>
+          <dt>Factory</dt>
+          <dd>0xb288575730Eff094d21d13f1705eB671e8799E70</dd>
+        </div>
+        <div>
+          <dt>Collateral</dt>
+          <dd>USDC (0x036CbD53842c5426634e7929541eC2318f3dCf7e)</dd>
+        </div>
+        <div>
+          <dt>Explorer</dt>
+          <dd><a href="https://sepolia.basescan.org">sepolia.basescan.org</a></dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3>How It Works</h3>
+      <ol style="color: #97a6c4; font-size: 14px; line-height: 1.8; padding-left: 20px;">
+        <li><strong style="color: #e6edf3;">Create</strong> &mdash; A proposer deploys a market with a question, outcomes, and time windows via the factory contract.</li>
+        <li><strong style="color: #e6edf3;">Bet</strong> &mdash; Anyone deposits ERC-20 collateral on an outcome during the betting window.</li>
+        <li><strong style="color: #e6edf3;">Resolve</strong> &mdash; The resolver selects the winning outcome (or retracts/expires).</li>
+        <li><strong style="color: #e6edf3;">Claim</strong> &mdash; Winners claim pro-rata payouts; fee recipients withdraw accrued fees.</li>
+      </ol>
+    </div>
+  </div>
+
+  <footer>
+    Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
+  </footer>
+</body>
+</html>

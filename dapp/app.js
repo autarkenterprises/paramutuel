@@ -3,8 +3,10 @@
 // The UMD bundle exposes `ethers` on `globalThis`.
 const ethers = globalThis.ethers;
 
-const FACTORY_ABI_URL = "../out/ParamutuelFactory.sol/ParamutuelFactory.json";
-const MARKET_ABI_URL = "../out/ParamutuelMarket.sol/ParamutuelMarket.json";
+const FACTORY_ABI_URL = "abi/ParamutuelFactory.json";
+const FACTORY_ABI_FALLBACK = "../out/ParamutuelFactory.sol/ParamutuelFactory.json";
+const MARKET_ABI_URL = "abi/ParamutuelMarket.json";
+const MARKET_ABI_FALLBACK = "../out/ParamutuelMarket.sol/ParamutuelMarket.json";
 const Logic = globalThis.ParamutuelLogic;
 
 let provider;
@@ -344,13 +346,23 @@ async function tryDetectDecimalsFromCollateralField() {
   }
 }
 
+async function fetchAbiWithFallback(primary, fallback) {
+  try {
+    const r = await fetch(primary);
+    if (!r.ok) throw new Error(r.status);
+    return (await r.json()).abi;
+  } catch (_) {
+    const r2 = await fetch(fallback);
+    if (!r2.ok) throw new Error("ABI not found at " + primary + " or " + fallback);
+    return (await r2.json()).abi;
+  }
+}
+
 async function loadAbi() {
-  const [factoryJson, marketJson] = await Promise.all([
-    fetch(FACTORY_ABI_URL).then((r) => r.json()),
-    fetch(MARKET_ABI_URL).then((r) => r.json()),
+  [factoryAbi, marketAbi] = await Promise.all([
+    fetchAbiWithFallback(FACTORY_ABI_URL, FACTORY_ABI_FALLBACK),
+    fetchAbiWithFallback(MARKET_ABI_URL, MARKET_ABI_FALLBACK),
   ]);
-  factoryAbi = factoryJson.abi;
-  marketAbi = marketJson.abi;
 }
 
 async function connectWallet() {
@@ -421,6 +433,8 @@ async function createMarket() {
   const bettingCloseAtRaw = $("bettingCloseAt").value.trim();
   const extraFeeRecipientsCsv = $("extraFeeRecipients").value.trim();
   const extraFeeBpsCsv = $("extraFeeBps").value.trim();
+  const seedOutcomeIndicesCsv = $("seedOutcomeIndices").value.trim();
+  const seedAmountsCsv = $("seedAmounts").value.trim();
   const resolverInput = $("resolverAddress").value.trim();
   const bettingCloserInput = $("bettingCloserAddress").value.trim();
   const resolutionCloserInput = $("resolutionCloserAddress").value.trim();
@@ -454,6 +468,7 @@ async function createMarket() {
   if (extraFeeRecipients.length !== extraFeeBps.length) {
     throw new Error("extraFeeRecipients and extraFeeBps length mismatch.");
   }
+  const seedParsed = Logic.parseMultiBetInputs(seedOutcomeIndicesCsv, seedAmountsCsv, true);
 
   const nowSec = Math.floor(Date.now() / 1000);
   let bettingCloseAtSec = null;
@@ -520,8 +535,26 @@ async function createMarket() {
     throw new Error("No max resolution window requires a resolution closer address.");
   }
 
+  let seedAmountsRaw = [];
+  let seedTotalAmount = 0n;
+  if (seedParsed.outcomeIndices.length > 0) {
+    const decimals = await resolveBettingDecimals(collateralToken);
+    seedAmountsRaw = seedParsed.amountNumbers.map((n) => parseAmount(n, decimals));
+    for (const amount of seedAmountsRaw) seedTotalAmount += amount;
+  }
+
+  if (seedAmountsRaw.length > 0) {
+    const erc20Abi = ["function approve(address spender,uint256 amount) external returns (bool)"];
+    const token = new ethers.Contract(collateralToken, erc20Abi, signer);
+    $("createStatus").textContent = "Approving collateral for seed liquidity...";
+    const approveTx = await token.approve(factoryAddress, seedTotalAmount);
+    await approveTx.wait();
+  }
+
   $("createStatus").textContent = "Submitting createMarket transaction...";
-  const tx = await factory.createMarket(
+  const tx = await factory[
+    "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])"
+  ](
     collateralToken,
     question,
     outcomes,
@@ -531,7 +564,9 @@ async function createMarket() {
     bettingCloserArg,
     resolutionCloserArg,
     extraFeeRecipients,
-    extraFeeBps
+    extraFeeBps,
+    seedParsed.outcomeIndices,
+    seedAmountsRaw
   );
   const receipt = await tx.wait();
 
@@ -576,6 +611,33 @@ async function placeBet() {
   const tx = await marketContract.placeBet(outcomeIndex, amount);
   await tx.wait();
   $("betStatus").textContent = "Bet placed.";
+  await updateOddsPreview();
+}
+
+async function placeBets() {
+  if (!marketContract) throw new Error("Create a market first.");
+
+  const parsed = Logic.parseMultiBetInputs($("betOutcomeIndices").value, $("betAmounts").value, false);
+  const collateralTokenAddress = await marketContract.collateralToken();
+  const decimals = await resolveBettingDecimals(collateralTokenAddress);
+  const erc20Abi = [
+    "function approve(address spender,uint256 amount) external returns (bool)",
+    "function transfer(address to,uint256 amount) external returns (bool)",
+  ];
+  const token = new ethers.Contract(collateralTokenAddress, erc20Abi, signer);
+
+  const amounts = parsed.amountNumbers.map((n) => parseAmount(n, decimals));
+  let totalAmount = 0n;
+  for (const amount of amounts) totalAmount += amount;
+
+  $("betStatus").textContent = "Approving collateral for batch bet...";
+  const approveTx = await token.approve(marketContract.target, totalAmount);
+  await approveTx.wait();
+
+  $("betStatus").textContent = "Placing batch bet...";
+  const tx = await marketContract.placeBets(parsed.outcomeIndices, amounts);
+  await tx.wait();
+  $("betStatus").textContent = "Batch bet placed.";
   await updateOddsPreview();
 }
 
@@ -721,6 +783,15 @@ async function main() {
     try {
       if (!signer) await connectWallet();
       await placeBet();
+    } catch (e) {
+      $("betStatus").textContent = `Error: ${e.message}`;
+    }
+  });
+
+  $("placeBetsBtn").addEventListener("click", async () => {
+    try {
+      if (!signer) await connectWallet();
+      await placeBets();
     } catch (e) {
       $("betStatus").textContent = `Error: ${e.message}`;
     }

@@ -14,13 +14,23 @@ def row_to_dict(row: sqlite3.Row) -> dict:
 
 
 def list_markets(conn: sqlite3.Connection, state: str | None, limit: int) -> list[dict]:
+    base_query = """
+        SELECT
+            m.*,
+            COALESCE(t.total_pot, '0') AS total_pot,
+            COALESCE(t.total_fee_bps, '0') AS total_fee_bps,
+            t.winning_outcome,
+            t.total_winning_stake
+        FROM markets m
+        LEFT JOIN market_totals t ON t.market_address = m.market_address
+    """
     if state:
         rows = conn.execute(
-            "SELECT * FROM markets WHERE state = ? ORDER BY created_block DESC LIMIT ?",
+            base_query + " WHERE m.state = ? ORDER BY m.created_block DESC LIMIT ?",
             (state, limit),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM markets ORDER BY created_block DESC LIMIT ?", (limit,)).fetchall()
+        rows = conn.execute(base_query + " ORDER BY m.created_block DESC LIMIT ?", (limit,)).fetchall()
     return [row_to_dict(r) for r in rows]
 
 
@@ -59,8 +69,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(payload)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
