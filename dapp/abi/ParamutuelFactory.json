@@ -118,6 +118,80 @@
           "name": "extraFeeBps",
           "type": "uint16[]",
           "internalType": "uint16[]"
+        },
+        {
+          "name": "seedOutcomeIndices",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        },
+        {
+          "name": "seedAmounts",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "market",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createMarket",
+      "inputs": [
+        {
+          "name": "collateralToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "question",
+          "type": "string",
+          "internalType": "string"
+        },
+        {
+          "name": "outcomes",
+          "type": "string[]",
+          "internalType": "string[]"
+        },
+        {
+          "name": "bettingCloseTime",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "resolutionWindow",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "resolver",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "bettingCloser",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "resolutionCloser",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "extraFeeRecipients",
+          "type": "address[]",
+          "internalType": "address[]"
+        },
+        {
+          "name": "extraFeeBps",
+          "type": "uint16[]",
+          "internalType": "uint16[]"
         }
       ],
       "outputs": [
@@ -282,6 +356,11 @@
     {
       "type": "error",
       "name": "BadOutcomes",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "BadSeedConfig",
       "inputs": []
     },
     {

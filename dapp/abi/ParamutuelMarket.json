@@ -380,6 +380,24 @@
     },
     {
       "type": "function",
+      "name": "placeBets",
+      "inputs": [
+        {
+          "name": "outcomeIndices",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        },
+        {
+          "name": "amounts",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "proposer",
       "inputs": [],
       "outputs": [
@@ -486,6 +504,29 @@
       "type": "function",
       "name": "retract",
       "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "seedInitialBetsFromFactory",
+      "inputs": [
+        {
+          "name": "bettor",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "outcomeIndices",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        },
+        {
+          "name": "amounts",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        }
+      ],
       "outputs": [],
       "stateMutability": "nonpayable"
     },
@@ -726,6 +767,11 @@
     },
     {
       "type": "error",
+      "name": "ArrayLengthMismatch",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "BettingClosed",
       "inputs": []
     },
@@ -752,6 +798,11 @@
     {
       "type": "error",
       "name": "NotBettingCloser",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NotFactory",
       "inputs": []
     },
     {
