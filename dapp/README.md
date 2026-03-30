@@ -58,6 +58,8 @@ In the dApp UI, paste:
 
 - The wallet section shows detected network (`chainId`) after connect. If token preset and wallet network mismatch, the UI warns and blocks create-market submission.
 - **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
+- Time fields in the create form use an offset UX. On submit, the dApp computes absolute unix values (for example, `bettingCloseTime = now + offset`) and sends those to the contract.
+- The contract compares against on-chain `block.timestamp`. If transaction inclusion is delayed, the effective remaining window can be shorter than expected; very tight windows can fail factory minimum-window checks at execution time.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - Shared logic used by the UI is in `dapp/logic.js` with independent tests in `dapp/tests/logic.test.js`.
 

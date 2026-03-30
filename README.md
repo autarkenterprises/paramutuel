@@ -64,6 +64,12 @@ In the dApp UI:
   - `0xb288575730Eff094d21d13f1705eB671e8799E70`
 - create/load markets and run lifecycle actions
 
+Time semantics (important):
+
+- In the dApp, fields like `Bet close (seconds from now)` are converted at click-time to an absolute unix timestamp (`now + offset`) and sent as `bettingCloseTime`.
+- The contract enforces closure against on-chain `block.timestamp`, not local browser time.
+- Because transaction inclusion takes time, effective remaining window may be shorter than the offset entered at click-time; with tight windows, delayed inclusion can cause create-market reverts against factory minimum window constraints.
+
 ### 5) CLI interaction (cast)
 
 Export required env vars:
