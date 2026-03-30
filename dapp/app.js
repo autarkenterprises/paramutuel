@@ -74,6 +74,22 @@ function toUnixSeconds(secondsFromNow) {
   return Math.floor(Date.now() / 1000) + Number(secondsFromNow);
 }
 
+function formatDateTimeLocal(date) {
+  const pad2 = (n) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}` +
+    `T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  );
+}
+
+function ensureDefaultAbsoluteBettingClose() {
+  if ($("bettingCloseAt").value) return;
+  const relativeSeconds = Number($("bettingCloseIn").value);
+  const fallbackSeconds = Number.isFinite(relativeSeconds) && relativeSeconds > 0 ? relativeSeconds : 7200;
+  const closeDate = new Date(Date.now() + fallbackSeconds * 1000);
+  $("bettingCloseAt").value = formatDateTimeLocal(closeDate);
+}
+
 function parseAmount(amountNumber, decimals) {
   // amountNumber is entered in whole tokens (e.g. "10" -> 10 tokens)
   const amountStr = String(amountNumber);
@@ -205,7 +221,15 @@ function syncDecimalsInputReadOnly() {
 }
 
 function syncWindowInputState() {
-  $("bettingCloseIn").readOnly = $("bettingNoMax").checked;
+  const bettingNoMax = $("bettingNoMax").checked;
+  const mode = $("bettingCloseMode").value;
+  $("bettingCloseIn").readOnly = bettingNoMax || mode !== "relative";
+  $("bettingCloseAt").disabled = bettingNoMax || mode !== "absolute";
+  $("bettingCloseInWrap").style.display = !bettingNoMax && mode === "relative" ? "" : "none";
+  $("bettingCloseAtWrap").style.display = !bettingNoMax && mode === "absolute" ? "" : "none";
+  if (!bettingNoMax && mode === "absolute") {
+    ensureDefaultAbsoluteBettingClose();
+  }
   $("resolutionWindow").readOnly = $("resolutionNoMax").checked;
 }
 
@@ -393,6 +417,8 @@ async function createMarket() {
   const resolutionWindow = Number($("resolutionWindow").value);
   const bettingNoMax = $("bettingNoMax").checked;
   const resolutionNoMax = $("resolutionNoMax").checked;
+  const bettingCloseMode = $("bettingCloseMode").value;
+  const bettingCloseAtRaw = $("bettingCloseAt").value.trim();
   const extraFeeRecipientsCsv = $("extraFeeRecipients").value.trim();
   const extraFeeBpsCsv = $("extraFeeBps").value.trim();
   const resolverInput = $("resolverAddress").value.trim();
@@ -430,20 +456,35 @@ async function createMarket() {
   }
 
   const nowSec = Math.floor(Date.now() / 1000);
+  let bettingCloseAtSec = null;
+  if (!bettingNoMax && bettingCloseMode === "absolute") {
+    if (!bettingCloseAtRaw) {
+      throw new Error("Bet close date/time is required for absolute mode.");
+    }
+    const betCloseMs = new Date(bettingCloseAtRaw).getTime();
+    if (!Number.isFinite(betCloseMs)) {
+      throw new Error("Bet close date/time is invalid.");
+    }
+    bettingCloseAtSec = Math.floor(betCloseMs / 1000);
+  }
+
   const { closeTime, resolutionWindowArg } = Logic.computeWindowArgs(
     nowSec,
     bettingCloseIn,
     resolutionWindow,
     bettingNoMax,
-    resolutionNoMax
+    resolutionNoMax,
+    bettingCloseMode,
+    bettingCloseAtSec
   );
 
   // Optional UI-side validation with factory constraints (still will revert if wrong).
   const { minBettingWindow, minResolutionWindow } = await getFactoryConstraints(factoryAddress);
+  const effectiveBettingCloseIn = bettingNoMax ? 0 : Math.max(0, closeTime - nowSec);
   const warnings = Logic.validateWindowMins(
     minBettingWindow,
     minResolutionWindow,
-    bettingCloseIn,
+    effectiveBettingCloseIn,
     resolutionWindow,
     bettingNoMax,
     resolutionNoMax
@@ -602,12 +643,14 @@ async function main() {
 
   $("marketTemplate").addEventListener("change", () => {
     const template = Logic.getTemplate($("marketTemplate").value);
+    $("bettingCloseMode").value = "relative";
     $("bettingCloseIn").value = String(template.bettingCloseIn);
     $("resolutionWindow").value = String(template.resolutionWindow);
     $("bettingNoMax").checked = template.bettingNoMax;
     $("resolutionNoMax").checked = template.resolutionNoMax;
     syncWindowInputState();
   });
+  $("bettingCloseMode").addEventListener("change", syncWindowInputState);
   $("bettingNoMax").addEventListener("change", syncWindowInputState);
   $("resolutionNoMax").addEventListener("change", syncWindowInputState);
   $("collateralPreset").addEventListener("change", () => {

@@ -22,15 +22,44 @@
     return MARKET_TEMPLATES[name] || MARKET_TEMPLATES.custom;
   }
 
-  function computeWindowArgs(nowSec, bettingCloseIn, resolutionWindow, bettingNoMax, resolutionNoMax) {
-    if (!bettingNoMax && (!Number.isFinite(bettingCloseIn) || bettingCloseIn <= 0)) {
+  function computeWindowArgs(
+    nowSec,
+    bettingCloseIn,
+    resolutionWindow,
+    bettingNoMax,
+    resolutionNoMax,
+    bettingCloseMode = "relative",
+    bettingCloseAt = null
+  ) {
+    if (bettingCloseMode !== "relative" && bettingCloseMode !== "absolute") {
+      throw new Error("bettingCloseMode must be 'relative' or 'absolute'.");
+    }
+    if (
+      !bettingNoMax &&
+      bettingCloseMode === "relative" &&
+      (!Number.isFinite(bettingCloseIn) || bettingCloseIn <= 0)
+    ) {
       throw new Error("bettingCloseIn must be positive unless no-max betting is enabled.");
+    }
+    if (
+      !bettingNoMax &&
+      bettingCloseMode === "absolute" &&
+      (!Number.isFinite(bettingCloseAt) || Number(bettingCloseAt) <= Math.floor(nowSec))
+    ) {
+      throw new Error("bettingCloseAt must be a future unix timestamp.");
     }
     if (!resolutionNoMax && (!Number.isFinite(resolutionWindow) || resolutionWindow <= 0)) {
       throw new Error("resolutionWindow must be positive unless no-max resolution is enabled.");
     }
+    let closeTime = 0;
+    if (!bettingNoMax) {
+      closeTime =
+        bettingCloseMode === "absolute"
+          ? Math.floor(Number(bettingCloseAt))
+          : Math.floor(nowSec) + Number(bettingCloseIn);
+    }
     return {
-      closeTime: bettingNoMax ? 0 : Math.floor(nowSec) + Number(bettingCloseIn),
+      closeTime,
       resolutionWindowArg: resolutionNoMax ? 0 : Number(resolutionWindow),
     };
   }

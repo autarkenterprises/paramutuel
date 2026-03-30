@@ -95,8 +95,19 @@
         </div>
 
         <label>
+          Bet close input mode
+          <select id="bettingCloseMode">
+            <option value="relative">Relative seconds from now</option>
+            <option value="absolute">Absolute date/time (local)</option>
+          </select>
+        </label>
+        <label id="bettingCloseInWrap">
           Bet close (seconds from now)
           <input id="bettingCloseIn" type="number" value="7200" />
+        </label>
+        <label id="bettingCloseAtWrap" style="display:none;">
+          Bet close at (local date/time)
+          <input id="bettingCloseAt" type="datetime-local" />
         </label>
         <label class="checkbox-label">
           <input type="checkbox" id="bettingNoMax" />

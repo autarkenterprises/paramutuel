@@ -66,7 +66,7 @@ In the dApp UI:
 
 Time semantics (important):
 
-- In the dApp, fields like `Bet close (seconds from now)` are converted at click-time to an absolute unix timestamp (`now + offset`) and sent as `bettingCloseTime`.
+- In the dApp, `Bet close` can be entered as either a relative offset or an absolute local date/time. At click-time, both are converted to an absolute unix timestamp and sent as `bettingCloseTime`.
 - The contract enforces closure against on-chain `block.timestamp`, not local browser time.
 - Because transaction inclusion takes time, effective remaining window may be shorter than the offset entered at click-time; with tight windows, delayed inclusion can cause create-market reverts against factory minimum window constraints.
 

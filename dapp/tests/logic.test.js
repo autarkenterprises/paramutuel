@@ -32,6 +32,20 @@ test("computeWindowArgs rejects invalid finite windows", () => {
   assert.throws(() => computeWindowArgs(1000, 3600, 0, false, false), /resolutionWindow/);
 });
 
+test("computeWindowArgs supports absolute betting close mode", () => {
+  const args = computeWindowArgs(1000, 0, 7200, false, false, "absolute", 5000);
+  assert.equal(args.closeTime, 5000);
+  assert.equal(args.resolutionWindowArg, 7200);
+});
+
+test("computeWindowArgs rejects invalid absolute betting close values", () => {
+  assert.throws(() => computeWindowArgs(1000, 0, 7200, false, false, "absolute", 1000), /bettingCloseAt/);
+  assert.throws(
+    () => computeWindowArgs(1000, 0, 7200, false, false, "absolute", Number.NaN),
+    /bettingCloseAt/
+  );
+});
+
 test("validateWindowMins warns for small betting window and throws for bad resolution window", () => {
   const warnings = validateWindowMins(3600n, 1800n, 1200, 7200, false, false);
   assert.equal(warnings.length, 1);
