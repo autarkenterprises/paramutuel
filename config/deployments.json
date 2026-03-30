@@ -3,7 +3,7 @@
   "baseSepolia": {
     "chainId": 84532,
     "factoryAddress": "0x8FBB3ab4BBCAEA196f7847e6c2fe575Eadc18B36",
-    "explorerApiBase": ""
+    "explorerApiBase": "https://paramutuel-indexer.onrender.com"
   },
   "baseMainnet": {
     "chainId": 8453,
