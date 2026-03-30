@@ -513,6 +513,12 @@ async function createMarket() {
     if (!ethers.isAddress(resolutionCloserInput)) throw new Error("Invalid resolution closer address.");
     resolutionCloserArg = resolutionCloserInput;
   }
+  if (bettingNoMax && bettingCloserArg === ethers.ZeroAddress) {
+    throw new Error("No max betting window requires a betting closer address.");
+  }
+  if (resolutionNoMax && resolutionCloserArg === ethers.ZeroAddress) {
+    throw new Error("No max resolution window requires a resolution closer address.");
+  }
 
   $("createStatus").textContent = "Submitting createMarket transaction...";
   const tx = await factory.createMarket(

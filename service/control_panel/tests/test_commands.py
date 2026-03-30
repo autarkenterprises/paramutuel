@@ -14,8 +14,8 @@ class ControlPanelCommandTests(unittest.TestCase):
             collateral="0x2222222222222222222222222222222222222222",
             question="Q?",
             outcomes=["YES", "NO"],
-            betting_close_time=0,
-            resolution_window=0,
+            betting_close_time=1234567890,
+            resolution_window=7200,
             resolver="0x0000000000000000000000000000000000000000",
             betting_closer="0x0000000000000000000000000000000000000000",
             resolution_closer="0x0000000000000000000000000000000000000000",
@@ -27,6 +27,24 @@ class ControlPanelCommandTests(unittest.TestCase):
         joined = " ".join(cmd.command)
         self.assertIn("createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])", joined)
         self.assertIn("[\"YES\",\"NO\"]", joined)
+
+    def test_create_market_rejects_uncloseable_no_max(self):
+        with self.assertRaises(ValueError):
+            build_create_market_command(
+                factory="0x1111111111111111111111111111111111111111",
+                collateral="0x2222222222222222222222222222222222222222",
+                question="Q?",
+                outcomes=["YES", "NO"],
+                betting_close_time=0,
+                resolution_window=0,
+                resolver="0x0000000000000000000000000000000000000000",
+                betting_closer="0x0000000000000000000000000000000000000000",
+                resolution_closer="0x0000000000000000000000000000000000000000",
+                extra_recipients=[],
+                extra_bps=[],
+                rpc_url="http://localhost:8545",
+                private_key="0xabc",
+            )
 
     def test_action_command_requires_outcome_for_resolve(self):
         with self.assertRaises(ValueError):

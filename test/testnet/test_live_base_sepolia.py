@@ -207,8 +207,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "0",
             "0",
             ZERO_ADDRESS,
-            ZERO_ADDRESS,
-            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
             "[]",
             "[]",
         )
@@ -222,7 +222,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
         betting_closer = _call(new_market, "bettingCloser()(address)")
         resolution_closer = _call(new_market, "resolutionCloser()(address)")
 
-        # With zero-address role inputs, proposer should be used for all role addresses.
+        # Resolver defaults to proposer when zero is passed.
+        # Closers are explicitly set to sender for no-max windows.
         self.assertEqual(proposer.lower(), self.sender.lower())
         self.assertEqual(resolver.lower(), self.sender.lower())
         self.assertEqual(betting_closer.lower(), self.sender.lower())
@@ -275,8 +276,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "0",
             "0",
             ZERO_ADDRESS,
-            ZERO_ADDRESS,
-            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
             extra_recipients,
             extra_bps_json,
         )
@@ -327,8 +328,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "0",
             "0",
             ZERO_ADDRESS,
-            ZERO_ADDRESS,
-            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
             "[]",
             "[]",
         )
@@ -349,8 +350,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "0",
             "0",
             ZERO_ADDRESS,
-            ZERO_ADDRESS,
-            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
             "[]",
             "[]",
         )
@@ -373,8 +374,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
                 "0",
                 "0",
                 ZERO_ADDRESS,
-                ZERO_ADDRESS,
-                ZERO_ADDRESS,
+                self.sender,
+                self.sender,
                 "[]",
                 "[]",
             )

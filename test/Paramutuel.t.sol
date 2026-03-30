@@ -128,8 +128,8 @@ contract ParamutuelTest is Test {
             bettingCloseTime,
             resolutionWindow,
             address(0), // resolver defaults to proposer
-            address(0), // bettingCloser defaults to proposer
-            address(0), // resolutionCloser defaults to proposer
+            proposer, // explicit betting closer
+            proposer, // explicit resolution closer
             extraRecipients,
             extraBps
         );
@@ -1273,8 +1273,8 @@ contract ParamutuelTest is Test {
             0, // no betting time cap
             0, // no resolution time cap
             address(0),
-            address(0),
-            address(0),
+            proposer,
+            proposer,
             extraRecipients,
             extraBps
         );
@@ -1322,7 +1322,7 @@ contract ParamutuelTest is Test {
             0, // no betting cap
             1 hours, // finite resolution window
             address(0),
-            address(0),
+            proposer,
             address(0),
             extraRecipients,
             extraBps
@@ -1364,7 +1364,7 @@ contract ParamutuelTest is Test {
             0, // no resolution time cap
             address(0),
             address(0),
-            address(0),
+            proposer,
             extraRecipients,
             extraBps
         );
@@ -1421,7 +1421,7 @@ contract ParamutuelTest is Test {
         assertTrue(market.resolutionWindowClosedByAuthority());
     }
 
-    function testNoMaxCreationStillAssignsNonZeroLifecycleAuthorities() public {
+    function testFiniteWindowsAllowNoAuthorityClosers() public {
         string[] memory outcomes = new string[](2);
         outcomes[0] = "YES";
         outcomes[1] = "NO";
@@ -1432,10 +1432,10 @@ contract ParamutuelTest is Test {
         vm.prank(proposer);
         address marketAddr = factory.createMarket(
             address(token),
-            "No max default authorities",
+            "Time-only finite windows",
             outcomes,
-            0,
-            0,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
             address(0),
             address(0),
             address(0),
@@ -1445,11 +1445,80 @@ contract ParamutuelTest is Test {
         ParamutuelMarket market = ParamutuelMarket(marketAddr);
 
         assertEq(market.resolver(), proposer);
-        assertEq(market.bettingCloser(), proposer);
-        assertEq(market.resolutionCloser(), proposer);
-        assertTrue(market.resolver() != address(0), "resolver non-zero");
-        assertTrue(market.bettingCloser() != address(0), "betting closer non-zero");
-        assertTrue(market.resolutionCloser() != address(0), "resolution closer non-zero");
+        assertEq(market.bettingCloser(), address(0));
+        assertEq(market.resolutionCloser(), address(0));
+
+        vm.expectRevert(ParamutuelMarket.NotBettingCloser.selector);
+        vm.prank(proposer);
+        market.closeBetting();
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        market.placeBet(0, 10 ether);
+        vm.stopPrank();
+
+        vm.warp(market.bettingCloseTime() + 1);
+        vm.expectRevert(ParamutuelMarket.NotResolutionCloser.selector);
+        vm.prank(proposer);
+        market.closeResolutionWindow();
+
+        vm.prank(proposer);
+        market.resolve(0);
+        assertEq(uint256(market.state()), uint256(ParamutuelMarket.State.Resolved));
+    }
+
+    function testNoMaxWindowsWithoutClosersRevert() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.expectRevert(ParamutuelFactory.InvalidLifecycleConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "No max without closers",
+            outcomes,
+            0,
+            0,
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+
+        vm.expectRevert(ParamutuelFactory.InvalidLifecycleConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "No max betting without betting closer",
+            outcomes,
+            0,
+            2 hours,
+            address(0),
+            address(0),
+            proposer,
+            extraRecipients,
+            extraBps
+        );
+
+        vm.expectRevert(ParamutuelFactory.InvalidLifecycleConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "No max resolution without resolution closer",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            0,
+            address(0),
+            proposer,
+            address(0),
+            extraRecipients,
+            extraBps
+        );
     }
 }
 

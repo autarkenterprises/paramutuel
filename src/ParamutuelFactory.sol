@@ -5,9 +5,9 @@ import {ParamutuelMarket} from "./ParamutuelMarket.sol";
 
 contract ParamutuelFactory {
     /// @param resolver The address that may `resolve` / `retract` (proposer if `resolver == address(0)`).
-    /// @param bettingCloser May `closeBetting` on the market (proposer if `address(0)`).
+    /// @param bettingCloser May `closeBetting` on the market (`address(0)` disables authority close).
     /// @param resolutionWindow Resolution window duration after effective betting close. `0` means no timeout.
-    /// @param resolutionCloser May `closeResolutionWindow` after betting ends (proposer if `address(0)`).
+    /// @param resolutionCloser May `closeResolutionWindow` after betting ends (`address(0)` disables authority close).
     event MarketCreated(
         address indexed market,
         address indexed proposer,
@@ -24,6 +24,7 @@ contract ParamutuelFactory {
     error BadOutcomes();
     error WindowTooShort();
     error TooManyOutcomes();
+    error InvalidLifecycleConfig();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 1_000; // 10% cap for MVP
@@ -53,8 +54,8 @@ contract ParamutuelFactory {
     /// @param bettingCloseTime Absolute betting close timestamp. Use `0` for no time cap (closer-only).
     /// @param resolutionWindow Resolution window duration after effective betting close. Use `0` for no time cap.
     /// @param resolver If `address(0)`, the resolver is the proposer (`msg.sender`).
-    /// @param bettingCloser If `address(0)`, the betting closer is the proposer.
-    /// @param resolutionCloser If `address(0)`, the resolution closer is the proposer.
+    /// @param bettingCloser If `address(0)`, authority-based betting close is disabled.
+    /// @param resolutionCloser If `address(0)`, authority-based resolution-window close is disabled.
     function createMarket(
         address collateralToken,
         string memory question,
@@ -73,6 +74,11 @@ contract ParamutuelFactory {
         uint64 nowTs = uint64(block.timestamp);
         if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
         if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
+        // Prevent permanently-open markets:
+        // - no betting timeout requires an authority closer
+        // - no resolution timeout requires an authority closer
+        if (bettingCloseTime == 0 && bettingCloser == address(0)) revert InvalidLifecycleConfig();
+        if (resolutionWindow == 0 && resolutionCloser == address(0)) revert InvalidLifecycleConfig();
 
         (address[] memory feeRecipients, uint16[] memory feeBps, uint256 totalFeeBps) = _buildFeeConfig(
             extraFeeRecipients,
@@ -84,8 +90,8 @@ contract ParamutuelFactory {
             (bettingCloseTime == 0 || resolutionWindow == 0) ? uint64(0) : bettingCloseTime + resolutionWindow;
 
         address resolvedResolver = resolver == address(0) ? msg.sender : resolver;
-        address resolvedBettingCloser = bettingCloser == address(0) ? msg.sender : bettingCloser;
-        address resolvedResolutionCloser = resolutionCloser == address(0) ? msg.sender : resolutionCloser;
+        address resolvedBettingCloser = bettingCloser;
+        address resolvedResolutionCloser = resolutionCloser;
 
         ParamutuelMarket m = new ParamutuelMarket(
             address(this),

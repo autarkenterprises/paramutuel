@@ -47,7 +47,7 @@ In the dApp UI, paste:
 - Outcomes (comma-separated strings)
 - Question text
 - Optional **Resolver address** (empty = your connected wallet resolves; or set an oracle / sponsored resolver)
-- Optional **Betting closer** and **Resolution closer** addresses
+- Optional **Betting closer** and **Resolution closer** addresses (`empty` disables authority close for that window)
 - `Bet close input mode` (`relative` seconds-from-now or `absolute` local date/time)
 - `Resolution window` (seconds after close)
 - Optional no-max checkboxes for both windows (closer-managed mode)
@@ -59,6 +59,8 @@ In the dApp UI, paste:
 - The wallet section shows detected network (`chainId`) after connect. If token preset and wallet network mismatch, the UI warns and blocks create-market submission.
 - **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
 - Time fields in the create form support both relative and absolute UX. On submit, the dApp sends an absolute unix `bettingCloseTime` either from `now + offset` (relative mode) or from your selected local date/time (absolute mode).
+- Leaving closer fields empty creates time-only finite windows (no authority pre-emption) when finite windows are configured.
+- If you enable a no-max window, the dApp requires the matching closer address to prevent creating an uncloseable market.
 - The contract compares against on-chain `block.timestamp`. If transaction inclusion is delayed, the effective remaining window can be shorter than expected; very tight windows can fail factory minimum-window checks at execution time.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - Shared logic used by the UI is in `dapp/logic.js` with independent tests in `dapp/tests/logic.test.js`.

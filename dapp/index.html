@@ -84,14 +84,14 @@
 
         <label>
           Betting closer (optional)
-          <input id="bettingCloserAddress" placeholder="Leave empty = you may call closeBetting" />
+          <input id="bettingCloserAddress" placeholder="Leave empty = disable authority closeBetting()" />
         </label>
         <label>
           Resolution closer (optional)
-          <input id="resolutionCloserAddress" placeholder="Leave empty = you may call closeResolutionWindow" />
+          <input id="resolutionCloserAddress" placeholder="Leave empty = disable authority closeResolutionWindow()" />
         </label>
         <div id="closersHint" class="muted span-2">
-          <code>closeBetting()</code> stops new bets before the scheduled close time; <code>closeResolutionWindow()</code> (after betting has ended) ends the resolver window early so anyone can <code>expire()</code>. Defaults match the proposer, like the resolver field.
+          <code>closeBetting()</code> stops new bets before the scheduled close time; <code>closeResolutionWindow()</code> (after betting has ended) ends the resolver window early so anyone can <code>expire()</code>. Empty closer fields disable authority-close functions. No-max windows require explicit closer addresses.
         </div>
 
         <label>

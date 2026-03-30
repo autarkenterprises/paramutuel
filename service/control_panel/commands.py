@@ -4,6 +4,8 @@ import json
 import shlex
 from dataclasses import dataclass
 
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
 
 @dataclass
 class CastCommand:
@@ -37,6 +39,10 @@ def build_create_market_command(
         raise ValueError("outcomes must have at least 2 items")
     if len(extra_recipients) != len(extra_bps):
         raise ValueError("extra_recipients and extra_bps length mismatch")
+    if betting_close_time == 0 and betting_closer.lower() == ZERO_ADDRESS:
+        raise ValueError("betting_close_time=0 requires a non-zero betting_closer")
+    if resolution_window == 0 and resolution_closer.lower() == ZERO_ADDRESS:
+        raise ValueError("resolution_window=0 requires a non-zero resolution_closer")
 
     cmd = [
         "cast",

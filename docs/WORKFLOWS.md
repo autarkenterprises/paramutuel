@@ -29,6 +29,12 @@ cast send "$FACTORY" \
   --private-key "$PRIVATE_KEY"
 ```
 
+Role input semantics:
+
+- `resolver = 0x000...0000` -> defaults resolver to proposer.
+- `bettingCloser = 0x000...0000` -> disables authority `closeBetting()` (time-only close).
+- `resolutionCloser = 0x000...0000` -> disables authority `closeResolutionWindow()` (time-only close).
+
 ### Closer-managed windows (no max)
 
 Use zero sentinels:
@@ -37,6 +43,7 @@ Use zero sentinels:
 - `resolutionWindow = 0`
 
 This means only closers can end those windows.
+Protocol guardrail: these modes require non-zero closer addresses (`bettingCloser` and `resolutionCloser`) at creation.
 
 ## 2) Place bet
 
@@ -99,6 +106,8 @@ If the same entity is both **resolver** and **resolutionCloser**, they still per
 2. `expire()` by anyone (often your sweeper), **or** `resolve()` / `retract()` by resolver before closure.
 
 Similarly, if using no-max betting (`bettingCloseTime = 0`), someone with `bettingCloser` authority must explicitly call `closeBetting()` before resolution can proceed.
+
+For finite windows, you may set `bettingCloser = address(0)` and/or `resolutionCloser = address(0)` to run in time-only mode (no authority pre-emption).
 
 ## 8) Service operator API workflows
 

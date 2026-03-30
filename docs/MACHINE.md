@@ -6,9 +6,12 @@ Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can int
 
 - **ABIs**: build with Foundry (`forge build`) and read JSON under `out/ParamutuelFactory.sol/` and `out/ParamutuelMarket.sol/`.
 - **Factory** `createMarket(collateralToken, question, outcomes, bettingCloseTime, resolutionWindow, resolver, bettingCloser, resolutionCloser, extraFeeRecipients, extraFeeBps)`  
-  - `resolver`, `bettingCloser`, or `resolutionCloser` may be `address(0)` to default all three roles to the **proposer** (`msg.sender`).
+  - `resolver` may be `address(0)` to default to the **proposer** (`msg.sender`).
+  - `bettingCloser = address(0)` disables authority `closeBetting()`.
+  - `resolutionCloser = address(0)` disables authority `closeResolutionWindow()`.
   - `bettingCloseTime = 0` means no max betting window (closer-managed).
   - `resolutionWindow = 0` means no max resolution window (closer-managed).
+  - Guardrail: `bettingCloseTime = 0` requires non-zero `bettingCloser`; `resolutionWindow = 0` requires non-zero `resolutionCloser`.
 - **Market lifecycle** (high level):
   - `placeBet` while open and not yet closed by time or `closeBetting()`.
   - `closeBetting()` — only `bettingCloser`; required to end betting when `bettingCloseTime = 0`.

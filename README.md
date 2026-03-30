@@ -90,8 +90,8 @@ cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
   0 \
   0 \
   0x0000000000000000000000000000000000000000 \
-  0x0000000000000000000000000000000000000000 \
-  0x0000000000000000000000000000000000000000 \
+  0xBETTING_CLOSER_ADDRESS \
+  0xRESOLUTION_CLOSER_ADDRESS \
   "[]" \
   "[]" \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" \
@@ -101,7 +101,10 @@ cast send "0xb288575730Eff094d21d13f1705eB671e8799E70" \
 Notes:
 
 - `bettingCloseTime = 0` and `resolutionWindow = 0` create no-max (closer-managed) windows.
-- zero addresses for resolver/closers default those roles to proposer.
+- `resolver = address(0)` defaults resolver to proposer.
+- `bettingCloser = address(0)` disables authority `closeBetting()`.
+- `resolutionCloser = address(0)` disables authority `closeResolutionWindow()`.
+- Protocol guardrail: `no-max + no closer` is rejected at market creation.
 
 #### Place bet
 
@@ -186,12 +189,12 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 - **Betting closer (per-market)**:
   - May call **`closeBetting()`** to stop new bets.
   - `bettingCloseTime = 0` enables **no max betting window**, so only `bettingCloser` can end betting.
-  - Defaults to the proposer when `bettingCloser == address(0)` at creation.
+  - `bettingCloser == address(0)` disables authority close (time-only mode for finite windows).
 
 - **Resolution closer (per-market)**:
   - After betting has ended, may call **`closeResolutionWindow()`** to end the resolver window.
   - `resolutionWindow = 0` enables **no max resolution window**, so only `resolutionCloser` can end it.
-  - Defaults to the proposer when `resolutionCloser == address(0)` at creation.
+  - `resolutionCloser == address(0)` disables authority close (time-only mode for finite windows).
 
 - **Bettors (per-market)**:
   - Deposit collateral during the betting window and allocate it to exactly one outcome per bet.
@@ -212,10 +215,10 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
     - `bettingCloseTime` (absolute time, or `0` for no max betting window)
     - `resolutionWindow` (duration after effective betting close, or `0` for no max resolution window)
      - `resolver` (`address(0)` → proposer)
-     - `bettingCloser` (`address(0)` → proposer)
-     - `resolutionCloser` (`address(0)` → proposer)
+     - `bettingCloser` (`address(0)` disables authority close)
+     - `resolutionCloser` (`address(0)` disables authority close)
      - `feeRecipients[]`, `feeBps[]` (optional)
-   - Factory enforces sane constraints (min betting window, min resolution window, caps).
+   - Factory enforces sane constraints (min windows, caps, and rejects no-max windows without a matching closer).
 
 2. **Betting**
    - Any address deposits collateral and chooses an outcome index.
@@ -295,6 +298,9 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
     - `bettingCloseTime`: unix timestamp \(>\) `block.timestamp + minBettingWindow`.
     - `resolutionWindow`: seconds \(>= minResolutionWindow\).
     - `resolver`: `address(0)` to use the proposer; otherwise the delegated resolver address.
+    - `bettingCloser`: authority address for early `closeBetting()`; use `address(0)` for time-only close on finite windows.
+    - `resolutionCloser`: authority address for early `closeResolutionWindow()`; use `address(0)` for time-only close on finite windows.
+    - Guardrail: if `bettingCloseTime == 0`, `bettingCloser` must be non-zero; if `resolutionWindow == 0`, `resolutionCloser` must be non-zero.
     - `extraFeeRecipients[]`, `extraFeeBps[]`: optional, additional beneficiaries.
 
   - You can call `createMarket`:
