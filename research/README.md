@@ -9,4 +9,8 @@
 - `checkpoint-2-governance-and-treasury-safe.md`: testnet-first Safe setup, signer policy, and governance operations template for fee policy.
 - `checkpoint-4-indexer-spec.md`: minimal custom indexer schema, API scope, and reorg/replay/testing requirements.
 - `checkpoint-5-odds-calculator-spec.md`: formulas, edge-case policy, and test vectors for odds/payout preview in dApp and service layers.
+- `go-to-market-strategy.md`: comprehensive GTM strategy covering positioning, audience segmentation, phased launch plan, machine distribution via MCP/AI agents, creator partnerships, and key metrics.
+- `investor-pitch-outline.md`: investor pitch framework covering market opportunity, competitive positioning, business model, and funding ask.
+- `outreach-targets.md`: prioritized outreach target list (38+ targets across 6 tiers) scored by relevance, receptivity, and market size, with competitive landscape analysis and phased outreach sequence.
+- `paramutuel-pitch-deck.pptx`: presentation deck for investor and partnership conversations.
 
