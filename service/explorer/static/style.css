@@ -38,6 +38,21 @@ code {
 
 .controls {
   margin: 12px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.controls input {
+  min-width: 320px;
+  max-width: 560px;
+  flex: 1;
+  background: #0b0f19;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 10px;
+  padding: 10px 12px;
 }
 
 button {

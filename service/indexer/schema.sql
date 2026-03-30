@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS markets (
   betting_closer TEXT NOT NULL,
   resolution_closer TEXT NOT NULL,
   collateral_token TEXT NOT NULL,
+  question TEXT NOT NULL DEFAULT '',
+  outcomes_json TEXT NOT NULL DEFAULT '[]',
   betting_close_time INTEGER NOT NULL,
   resolution_window INTEGER NOT NULL,
   resolution_deadline INTEGER NOT NULL,

@@ -38,12 +38,32 @@ const TOKEN_PRESETS = {
       address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       decimals: 6,
     },
+    {
+      symbol: "WETH",
+      address: "0x4200000000000000000000000000000000000006",
+      decimals: 18,
+    },
+    {
+      symbol: "DAI",
+      address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
+      decimals: 18,
+    },
+    {
+      symbol: "cbBTC",
+      address: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+      decimals: 8,
+    },
   ],
   84532: [
     {
       symbol: "USDC",
       address: "0x036CbD53842c5426634e7929541eC2318f3dCf7e",
       decimals: 6,
+    },
+    {
+      symbol: "WETH",
+      address: "0x4200000000000000000000000000000000000006",
+      decimals: 18,
     },
   ],
 };
@@ -470,15 +490,33 @@ async function setActiveMarket(marketAddress) {
   await updateOddsPreview();
 }
 
-async function ensureMarketForAction(inputId) {
-  const chosenAddress = $(inputId).value.trim();
-  if (!chosenAddress) {
-    if (!marketContract) {
-      throw new Error("Select a market address in this section, or load an active market above.");
-    }
-    return marketContract;
+async function ensureMarketForPlannedAction(actionName) {
+  const plan = Logic.planMarketAction(actionName, {
+    resolutionMarketAddress: $("resolutionMarketAddress").value,
+    claimsMarketAddress: $("claimsMarketAddress").value,
+    activeMarketAddress: $("activeMarketAddress").value,
+  });
+  if (!ethers.isAddress(plan.targetAddress)) {
+    throw new Error(`Invalid market address for ${actionName}.`);
   }
-  await setActiveMarket(chosenAddress);
+  if (
+    !marketContract ||
+    String(marketContract.target || "").toLowerCase() !== plan.targetAddress.toLowerCase()
+  ) {
+    await setActiveMarket(plan.targetAddress);
+  }
+  if (!marketContract) throw new Error("Failed to load target market.");
+  return { plan, targetMarket: marketContract };
+}
+
+async function runMarketAction(actionName, ...args) {
+  const { plan, targetMarket } = await ensureMarketForPlannedAction(actionName);
+  const method = plan.method;
+  if (typeof targetMarket[method] !== "function") {
+    throw new Error(`Market contract does not support action method ${method}.`);
+  }
+  const tx = await targetMarket[method](...args);
+  await tx.wait();
   return marketContract;
 }
 
@@ -705,65 +743,51 @@ async function placeBets() {
 }
 
 async function resolveMarket() {
-  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   const winningOutcomeIndex = Number($("winningOutcomeIndex").value);
 
   $("resolutionStatus").textContent = "Resolving...";
-  const tx = await targetMarket.resolve(winningOutcomeIndex);
-  await tx.wait();
+  await runMarketAction("resolve", winningOutcomeIndex);
   $("resolutionStatus").textContent = "Resolved.";
   await updateOddsPreview();
 }
 
 async function retractMarket() {
-  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Retracting...";
-  const tx = await targetMarket.retract();
-  await tx.wait();
+  await runMarketAction("retract");
   $("resolutionStatus").textContent = "Retracted.";
   await updateOddsPreview();
 }
 
 async function expireMarket() {
-  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Expiring...";
-  const tx = await targetMarket.expire();
-  await tx.wait();
+  await runMarketAction("expire");
   $("resolutionStatus").textContent = "Expired.";
   await updateOddsPreview();
 }
 
 async function closeBettingOnMarket() {
-  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Closing betting...";
-  const tx = await targetMarket.closeBetting();
-  await tx.wait();
+  await runMarketAction("closeBetting");
   $("resolutionStatus").textContent = "Betting closed (authority).";
   await updateOddsPreview();
 }
 
 async function closeResolutionWindowOnMarket() {
-  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Closing resolution window...";
-  const tx = await targetMarket.closeResolutionWindow();
-  await tx.wait();
+  await runMarketAction("closeResolutionWindow");
   $("resolutionStatus").textContent = "Resolution window closed (authority).";
   await updateOddsPreview();
 }
 
 async function claim() {
-  const targetMarket = await ensureMarketForAction("claimsMarketAddress");
   $("claimStatus").textContent = "Claiming payout...";
-  const tx = await targetMarket.claim();
-  await tx.wait();
+  await runMarketAction("claim");
   $("claimStatus").textContent = "Claimed (check token balance).";
 }
 
 async function withdrawFees() {
-  const targetMarket = await ensureMarketForAction("claimsMarketAddress");
   $("claimStatus").textContent = "Withdrawing fees...";
-  const tx = await targetMarket.withdrawFees();
-  await tx.wait();
+  await runMarketAction("withdrawFees");
   $("claimStatus").textContent = "Fees withdrawn.";
 }
 
@@ -775,9 +799,16 @@ async function main() {
   $("networkStatus").textContent = "Network: connect wallet to detect chain.";
 
   $("marketTemplate").addEventListener("change", () => {
-    const template = Logic.getTemplate($("marketTemplate").value);
-    $("bettingCloseMode").value = "relative";
+    const nowSec = Math.floor(Date.now() / 1000);
+    const template = Logic.resolveTemplate($("marketTemplate").value, nowSec);
+    const mode = template.bettingCloseMode || "relative";
+    $("bettingCloseMode").value = mode;
     $("bettingCloseIn").value = String(template.bettingCloseIn);
+    if (mode === "absolute" && Number.isFinite(template.bettingCloseAt)) {
+      $("bettingCloseAt").value = formatDateTimeLocal(new Date(template.bettingCloseAt * 1000));
+    } else if (mode === "absolute") {
+      ensureDefaultAbsoluteBettingClose();
+    }
     $("resolutionWindow").value = String(template.resolutionWindow);
     $("bettingNoMax").checked = template.bettingNoMax;
     $("resolutionNoMax").checked = template.resolutionNoMax;

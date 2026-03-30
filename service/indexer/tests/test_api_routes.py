@@ -23,6 +23,7 @@ class ApiRouteTests(unittest.TestCase):
         self.base_url = f"http://{host}:{port}"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
+        self._seed_market()
 
     def tearDown(self) -> None:
         self.server.shutdown()
@@ -36,6 +37,42 @@ class ApiRouteTests(unittest.TestCase):
         with request.urlopen(self.base_url + path, timeout=10) as resp:
             body = json.loads(resp.read().decode("utf-8"))
             return resp.status, body
+
+    def _seed_market(self) -> None:
+        market = "0xabc1000000000000000000000000000000000001"
+        self.conn.execute(
+            """
+            INSERT INTO markets(
+              market_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+              collateral_token, question, outcomes_json,
+              betting_close_time, resolution_window, resolution_deadline,
+              betting_closed_by_authority, resolution_window_closed, state, created_block, created_tx_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
+            """,
+            (
+                market,
+                "0xfac7000000000000000000000000000000000001",
+                "0xabc2000000000000000000000000000000000002",
+                "0xabc3000000000000000000000000000000000003",
+                "0xabc4000000000000000000000000000000000004",
+                "0xabc5000000000000000000000000000000000005",
+                "0xabc6000000000000000000000000000000000006",
+                "Will Team A win?",
+                json.dumps(["YES", "NO"]),
+                1000,
+                3600,
+                4600,
+                0,
+                0,
+                1,
+                "0xaaa",
+            ),
+        )
+        self.conn.execute(
+            "INSERT OR IGNORE INTO market_totals(market_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
+            (market,),
+        )
+        self.conn.commit()
 
     def test_root_returns_service_metadata(self) -> None:
         status, body = self._get_json("/")
@@ -51,6 +88,18 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(status2, 200)
         self.assertEqual(body1, body2)
         self.assertIn("markets", body1)
+
+    def test_markets_search_filters_on_question_text(self) -> None:
+        status, body = self._get_json("/markets?q=team%20a")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["markets"]), 1)
+        self.assertEqual(body["markets"][0]["question"], "Will Team A win?")
+
+    def test_prefixed_markets_search_filters_on_outcomes(self) -> None:
+        status, body = self._get_json("/api/markets?q=yes")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["markets"]), 1)
+        self.assertIn("YES", body["markets"][0]["outcomes_json"])
 
     def test_prefixed_health_route_works(self) -> None:
         status, body = self._get_json("/api/health")

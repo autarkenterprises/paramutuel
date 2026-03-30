@@ -7,8 +7,18 @@ function apiUrl(path) {
   return `${API_BASE_NORMALIZED}${path}`;
 }
 
-async function fetchMarkets() {
-  const candidates = ["/api/markets?limit=100", "/markets?limit=100"];
+function buildMarketsPath(prefix, queryText) {
+  const search = String(queryText || "").trim();
+  const params = new URLSearchParams({ limit: "100" });
+  if (search) params.set("q", search);
+  return `${prefix}/markets?${params.toString()}`;
+}
+
+async function fetchMarkets(queryText) {
+  const candidates = [
+    buildMarketsPath("/api", queryText),
+    buildMarketsPath("", queryText),
+  ];
   let lastResponse = null;
   for (const path of candidates) {
     const response = await fetch(apiUrl(path));
@@ -38,12 +48,13 @@ async function loadConfiguredFactoryAddress() {
 async function loadMarkets() {
   const tbody = document.getElementById("markets");
   const apiNode = document.getElementById("apiBaseDisplay");
+  const queryText = (document.getElementById("marketSearch")?.value || "").trim();
   if (apiNode) {
     apiNode.textContent = API_BASE_NORMALIZED || "same origin";
   }
   let res;
   try {
-    res = await fetchMarkets();
+    res = await fetchMarkets(queryText);
   } catch (e) {
     tbody.innerHTML = '<tr><td colspan="9">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>';
     return;
@@ -75,6 +86,18 @@ async function loadMarkets() {
 }
 
 document.getElementById("refresh").addEventListener("click", () => {
+  loadMarkets().catch((e) => {
+    console.error(e);
+  });
+});
+document.getElementById("searchBtn").addEventListener("click", () => {
+  loadMarkets().catch((e) => {
+    console.error(e);
+  });
+});
+document.getElementById("marketSearch").addEventListener("keydown", (ev) => {
+  if (ev.key !== "Enter") return;
+  ev.preventDefault();
   loadMarkets().catch((e) => {
     console.error(e);
   });

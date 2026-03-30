@@ -89,3 +89,21 @@ button:disabled {
   margin: 0;
 }
 
+.caption {
+  border: 1px solid #2c3a5a;
+  border-radius: 10px;
+  background: #0f1524;
+  padding: 8px 10px;
+}
+
+.caption summary {
+  cursor: pointer;
+  color: #c9d8f2;
+  font-size: 13px;
+  user-select: none;
+}
+
+.caption[open] summary {
+  margin-bottom: 8px;
+}
+

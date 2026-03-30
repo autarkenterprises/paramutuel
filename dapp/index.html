@@ -66,21 +66,27 @@
           Market template
           <select id="marketTemplate">
             <option value="custom">Custom</option>
+            <option value="flash">Flash market (15m betting, 2h resolution)</option>
             <option value="sports">Sports event (2h betting, 24h resolution)</option>
             <option value="election">Election cycle (30d betting, 14d resolution)</option>
             <option value="long">Long-horizon forecast (365d betting, 180d resolution)</option>
+            <option value="daily-utc-cutoff">Daily UTC cutoff (absolute close at next 00:00 UTC)</option>
+            <option value="weekly-utc-cutoff">Weekly UTC cutoff (absolute close at next Monday 00:00 UTC)</option>
             <option value="closer-only">Closer-managed (no max windows)</option>
           </select>
         </label>
-        <div class="muted span-2">Templates set sane defaults. You can still edit fields afterwards.</div>
+        <div class="muted span-2">Templates prefill window settings. You can still edit every field after selection.</div>
 
         <label>
           Resolver address (optional)
           <input id="resolverAddress" placeholder="Leave empty = you (proposer) resolve" />
         </label>
-        <div id="resolverHint" class="muted span-2">
-          If set, only that address may <code>resolve</code> / <code>retract</code>. You remain the on-chain <strong>proposer</strong>. Use <code>0x0000…0000</code> explicitly if your tooling requires it; empty field defaults resolver to your wallet.
-        </div>
+        <details id="resolverHint" class="caption span-2">
+          <summary>Resolver field help</summary>
+          <div class="muted">
+            If set, only that address may call <code>resolve()</code> and <code>retract()</code>. You remain the on-chain <strong>proposer</strong>. Leave empty to default resolver to your connected wallet.
+          </div>
+        </details>
 
         <label>
           Betting closer (optional)
@@ -90,9 +96,12 @@
           Resolution closer (optional)
           <input id="resolutionCloserAddress" placeholder="Leave empty = disable authority closeResolutionWindow()" />
         </label>
-        <div id="closersHint" class="muted span-2">
-          <code>closeBetting()</code> stops new bets before the scheduled close time; <code>closeResolutionWindow()</code> (after betting has ended) ends the resolver window early so anyone can <code>expire()</code>. Empty closer fields disable authority-close functions. No-max windows require explicit closer addresses.
-        </div>
+        <details id="closersHint" class="caption span-2">
+          <summary>Closer role help</summary>
+          <div class="muted">
+            <code>closeBetting()</code> can stop bets before the scheduled time. <code>closeResolutionWindow()</code> can close the resolver window early (after betting ends), allowing anyone to call <code>expire()</code>. Empty closer fields disable those authority actions. No-max windows require explicit closer addresses.
+          </div>
+        </details>
 
         <label>
           Bet close input mode
@@ -122,6 +131,12 @@
           <input type="checkbox" id="resolutionNoMax" />
           No max resolution window (closer-only end)
         </label>
+        <details class="caption span-2">
+          <summary>Time-window help</summary>
+          <div class="muted">
+            Relative mode sends <code>now + seconds</code>. Absolute mode sends a fixed unix timestamp derived from your local date/time input. No-max toggles set the on-chain value to <code>0</code>, which requires the corresponding closer role.
+          </div>
+        </details>
 
         <label>
           Optional fee recipients (comma-separated)
@@ -140,10 +155,12 @@
           Seed amounts (optional, comma-separated token units)
           <input id="seedAmounts" placeholder="10,3.5" />
         </label>
-        <div class="muted span-2">
-          Optional initial liquidity at create-time. Provide aligned lists of indices and amounts.
-          This executes one market-creation tx instead of separate seed bet txs.
-        </div>
+        <details class="caption span-2">
+          <summary>Seed liquidity help</summary>
+          <div class="muted">
+            Optional initial liquidity at create-time. Provide aligned index and amount lists (for example: indices <code>0,2</code> and amounts <code>10,3.5</code>). The dApp approves the total once and submits one create transaction.
+          </div>
+        </details>
 
         <label class="checkbox-label">
           <input type="checkbox" id="decimalsManual" />
@@ -229,9 +246,12 @@
       <div class="row">
         <input id="resolutionMarketAddress" placeholder="Optional market address for resolution actions (0x...)" />
       </div>
-      <div class="muted">
-        Leave empty to use the active market loaded above.
-      </div>
+      <details class="caption">
+        <summary>Resolution action targeting</summary>
+        <div class="muted">
+          Enter a market address here to run resolution actions against that specific market. Leave empty to use the active market loaded in the Betting section.
+        </div>
+      </details>
       <div class="grid">
         <label>
           Winning outcome index
@@ -255,9 +275,12 @@
       <div class="row">
         <input id="claimsMarketAddress" placeholder="Optional market address for claim/fee actions (0x...)" />
       </div>
-      <div class="muted">
-        Leave empty to use the active market loaded above.
-      </div>
+      <details class="caption">
+        <summary>Claim action targeting</summary>
+        <div class="muted">
+          Enter a market address here to claim payouts or withdraw fees from that market. Leave empty to use the active market loaded in the Betting section.
+        </div>
+      </details>
       <div class="row">
         <button id="claimBtn">Claim Payout (bettor)</button>
         <button id="withdrawFeesBtn">Withdraw Fees (fee recipient)</button>

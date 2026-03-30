@@ -1,7 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { getTemplate, computeWindowArgs, validateWindowMins, parseMultiBetInputs } = require("../logic.js");
+const {
+  getTemplate,
+  computeWindowArgs,
+  validateWindowMins,
+  parseMultiBetInputs,
+  resolveTemplate,
+  computeAbsoluteTemplateClose,
+  planMarketAction,
+} = require("../logic.js");
 
 test("template lookup falls back to custom", () => {
   const t = getTemplate("does-not-exist");
@@ -74,4 +82,76 @@ test("parseMultiBetInputs rejects invalid input shapes", () => {
   assert.throws(() => parseMultiBetInputs("0,1", "1", false), /length mismatch/);
   assert.throws(() => parseMultiBetInputs("x", "1", false), /Invalid outcome index/);
   assert.throws(() => parseMultiBetInputs("0", "0", false), /Invalid amount/);
+});
+
+test("planMarketAction routes resolution actions to resolution market", () => {
+  const resolutionAddr = "0x1111111111111111111111111111111111111111";
+  const claimsAddr = "0x2222222222222222222222222222222222222222";
+  const activeAddr = "0x3333333333333333333333333333333333333333";
+  const actions = ["closeBetting", "closeResolutionWindow", "resolve", "retract", "expire"];
+
+  for (const action of actions) {
+    const plan = planMarketAction(action, {
+      resolutionMarketAddress: resolutionAddr,
+      claimsMarketAddress: claimsAddr,
+      activeMarketAddress: activeAddr,
+    });
+    assert.equal(plan.section, "resolution");
+    assert.equal(plan.targetAddress, resolutionAddr);
+  }
+});
+
+test("planMarketAction routes claims actions to claims market", () => {
+  const resolutionAddr = "0x1111111111111111111111111111111111111111";
+  const claimsAddr = "0x2222222222222222222222222222222222222222";
+  const activeAddr = "0x3333333333333333333333333333333333333333";
+  const actions = ["claim", "withdrawFees"];
+
+  for (const action of actions) {
+    const plan = planMarketAction(action, {
+      resolutionMarketAddress: resolutionAddr,
+      claimsMarketAddress: claimsAddr,
+      activeMarketAddress: activeAddr,
+    });
+    assert.equal(plan.section, "claims");
+    assert.equal(plan.targetAddress, claimsAddr);
+  }
+});
+
+test("planMarketAction falls back to active market when section is empty", () => {
+  const activeAddr = "0x3333333333333333333333333333333333333333";
+  const plan = planMarketAction("resolve", {
+    resolutionMarketAddress: "",
+    claimsMarketAddress: "",
+    activeMarketAddress: activeAddr,
+  });
+  assert.equal(plan.targetAddress, activeAddr);
+  assert.equal(plan.method, "resolve");
+});
+
+test("planMarketAction enforces known actions and target presence", () => {
+  assert.throws(() => planMarketAction("unknownAction", {}), /Unsupported action/);
+  assert.throws(
+    () => planMarketAction("claim", { resolutionMarketAddress: "", claimsMarketAddress: "", activeMarketAddress: "" }),
+    /Select a market address/
+  );
+});
+
+test("resolveTemplate computes absolute close for daily UTC cutoff", () => {
+  const nowSec = Date.UTC(2026, 2, 30, 12, 0, 0) / 1000;
+  const t = resolveTemplate("daily-utc-cutoff", nowSec);
+  assert.equal(t.bettingCloseMode, "absolute");
+  assert.equal(t.bettingCloseAt, Date.UTC(2026, 2, 31, 0, 0, 0) / 1000);
+  assert.equal(t.bettingCloseIn, 12 * 60 * 60);
+});
+
+test("resolveTemplate computes absolute close for weekly UTC cutoff", () => {
+  const nowSec = Date.UTC(2026, 2, 30, 12, 0, 0) / 1000; // Monday
+  const t = resolveTemplate("weekly-utc-cutoff", nowSec);
+  assert.equal(t.bettingCloseMode, "absolute");
+  assert.equal(t.bettingCloseAt, Date.UTC(2026, 3, 6, 0, 0, 0) / 1000);
+});
+
+test("computeAbsoluteTemplateClose rejects unknown rules", () => {
+  assert.throws(() => computeAbsoluteTemplateClose(0, "unknown"), /Unknown absolute template rule/);
 });

@@ -1,25 +1,94 @@
 // Shared pure logic for the browser dApp and Node tests.
 (function initParamutuelLogic(globalScope) {
   const MARKET_TEMPLATES = {
-    custom: { bettingCloseIn: 7200, resolutionWindow: 7200, bettingNoMax: false, resolutionNoMax: false },
-    sports: { bettingCloseIn: 2 * 60 * 60, resolutionWindow: 24 * 60 * 60, bettingNoMax: false, resolutionNoMax: false },
+    custom: {
+      bettingCloseMode: "relative",
+      bettingCloseIn: 7200,
+      resolutionWindow: 7200,
+      bettingNoMax: false,
+      resolutionNoMax: false,
+    },
+    flash: {
+      bettingCloseMode: "relative",
+      bettingCloseIn: 15 * 60,
+      resolutionWindow: 2 * 60 * 60,
+      bettingNoMax: false,
+      resolutionNoMax: false,
+    },
+    sports: {
+      bettingCloseMode: "relative",
+      bettingCloseIn: 2 * 60 * 60,
+      resolutionWindow: 24 * 60 * 60,
+      bettingNoMax: false,
+      resolutionNoMax: false,
+    },
     election: {
+      bettingCloseMode: "relative",
       bettingCloseIn: 30 * 24 * 60 * 60,
       resolutionWindow: 14 * 24 * 60 * 60,
       bettingNoMax: false,
       resolutionNoMax: false,
     },
     long: {
+      bettingCloseMode: "relative",
       bettingCloseIn: 365 * 24 * 60 * 60,
       resolutionWindow: 180 * 24 * 60 * 60,
       bettingNoMax: false,
       resolutionNoMax: false,
     },
-    "closer-only": { bettingCloseIn: 7200, resolutionWindow: 7200, bettingNoMax: true, resolutionNoMax: true },
+    "daily-utc-cutoff": {
+      bettingCloseMode: "absolute",
+      absoluteRule: "nextUtcMidnight",
+      bettingCloseIn: 0,
+      resolutionWindow: 24 * 60 * 60,
+      bettingNoMax: false,
+      resolutionNoMax: false,
+    },
+    "weekly-utc-cutoff": {
+      bettingCloseMode: "absolute",
+      absoluteRule: "nextUtcMondayMidnight",
+      bettingCloseIn: 0,
+      resolutionWindow: 72 * 60 * 60,
+      bettingNoMax: false,
+      resolutionNoMax: false,
+    },
+    "closer-only": {
+      bettingCloseMode: "relative",
+      bettingCloseIn: 7200,
+      resolutionWindow: 7200,
+      bettingNoMax: true,
+      resolutionNoMax: true,
+    },
   };
 
   function getTemplate(name) {
     return MARKET_TEMPLATES[name] || MARKET_TEMPLATES.custom;
+  }
+
+  function computeAbsoluteTemplateClose(nowSec, rule) {
+    const now = new Date(Math.floor(nowSec) * 1000);
+    if (rule === "nextUtcMidnight") {
+      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) / 1000;
+    }
+    if (rule === "nextUtcMondayMidnight") {
+      const day = now.getUTCDay(); // 0=Sun ... 6=Sat
+      const daysUntilMonday = day === 0 ? 1 : 8 - day;
+      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday) / 1000;
+    }
+    throw new Error(`Unknown absolute template rule: ${rule}`);
+  }
+
+  function resolveTemplate(name, nowSec) {
+    const template = { ...getTemplate(name) };
+    if (template.bettingCloseMode !== "absolute") {
+      return template;
+    }
+    const closeAt = computeAbsoluteTemplateClose(nowSec, template.absoluteRule);
+    return {
+      ...template,
+      bettingCloseAt: closeAt,
+      bettingCloseIn: Math.max(0, closeAt - Math.floor(nowSec)),
+    };
   }
 
   function computeWindowArgs(
@@ -108,12 +177,45 @@
     return { outcomeIndices, amountNumbers };
   }
 
+  const MARKET_ACTION_CONFIG = {
+    closeBetting: { section: "resolution", method: "closeBetting" },
+    closeResolutionWindow: { section: "resolution", method: "closeResolutionWindow" },
+    resolve: { section: "resolution", method: "resolve" },
+    retract: { section: "resolution", method: "retract" },
+    expire: { section: "resolution", method: "expire" },
+    claim: { section: "claims", method: "claim" },
+    withdrawFees: { section: "claims", method: "withdrawFees" },
+  };
+
+  function planMarketAction(
+    actionName,
+    { resolutionMarketAddress = "", claimsMarketAddress = "", activeMarketAddress = "" } = {}
+  ) {
+    const config = MARKET_ACTION_CONFIG[actionName];
+    if (!config) throw new Error(`Unsupported action: ${actionName}`);
+    const selected = config.section === "resolution" ? resolutionMarketAddress : claimsMarketAddress;
+    const targetAddress = String(selected || "").trim() || String(activeMarketAddress || "").trim();
+    if (!targetAddress) {
+      throw new Error("Select a market address in this section, or load an active market above.");
+    }
+    return {
+      actionName,
+      section: config.section,
+      method: config.method,
+      targetAddress,
+    };
+  }
+
   const api = {
     MARKET_TEMPLATES,
     getTemplate,
     computeWindowArgs,
     validateWindowMins,
     parseMultiBetInputs,
+    computeAbsoluteTemplateClose,
+    resolveTemplate,
+    MARKET_ACTION_CONFIG,
+    planMarketAction,
   };
 
   if (typeof module !== "undefined" && module.exports) {

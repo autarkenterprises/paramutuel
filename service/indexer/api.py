@@ -13,7 +13,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
     return {k: row[k] for k in row.keys()}
 
 
-def list_markets(conn: sqlite3.Connection, state: str | None, limit: int) -> list[dict]:
+def list_markets(conn: sqlite3.Connection, state: str | None, limit: int, query_text: str | None) -> list[dict]:
     base_query = """
         SELECT
             m.*,
@@ -24,13 +24,24 @@ def list_markets(conn: sqlite3.Connection, state: str | None, limit: int) -> lis
         FROM markets m
         LEFT JOIN market_totals t ON t.market_address = m.market_address
     """
+    clauses = []
+    params: list = []
     if state:
-        rows = conn.execute(
-            base_query + " WHERE m.state = ? ORDER BY m.created_block DESC LIMIT ?",
-            (state, limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(base_query + " ORDER BY m.created_block DESC LIMIT ?", (limit,)).fetchall()
+        clauses.append("m.state = ?")
+        params.append(state)
+    if query_text and query_text.strip():
+        needle = f"%{query_text.strip().lower()}%"
+        clauses.append(
+            "(LOWER(m.market_address) LIKE ? OR LOWER(m.question) LIKE ? OR LOWER(m.outcomes_json) LIKE ?)"
+        )
+        params.extend([needle, needle, needle])
+
+    query = base_query
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY m.created_block DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(query, tuple(params)).fetchall()
     return [row_to_dict(r) for r in rows]
 
 
@@ -98,6 +109,7 @@ class Handler(BaseHTTPRequestHandler):
                     "endpoints": [
                         "/health",
                         "/markets?limit=100",
+                        "/markets?limit=100&q=<text>",
                         "/markets/{market_address}",
                         "/sweeper/expire-candidates",
                     ],
@@ -111,13 +123,14 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/markets":
             state = qs.get("state", [None])[0]
+            query_text = qs.get("q", [None])[0]
             limit_raw = qs.get("limit", ["100"])[0]
             try:
                 limit = max(1, min(1000, int(limit_raw)))
             except ValueError:
                 self._send_json(400, {"error": "invalid limit"})
                 return
-            self._send_json(200, {"markets": list_markets(self.conn, state, limit)})
+            self._send_json(200, {"markets": list_markets(self.conn, state, limit, query_text)})
             return
 
         if path.startswith("/markets/"):

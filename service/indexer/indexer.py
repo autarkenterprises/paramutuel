@@ -21,6 +21,9 @@ TOPICS = {
 }
 
 TOPIC_TO_EVENT = {v: k for k, v in TOPICS.items()}
+MARKET_QUESTION_SELECTOR = "0x3fad9ae0"  # question()
+MARKET_OUTCOMES_COUNT_SELECTOR = "0x7deb9776"  # outcomesCount()
+MARKET_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
 
 
 def db_connect(path: str) -> sqlite3.Connection:
@@ -33,7 +36,19 @@ def db_connect(path: str) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     schema = Path(__file__).with_name("schema.sql").read_text()
     conn.executescript(schema)
+    _migrate_db(conn)
     conn.commit()
+
+
+def _migrate_db(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(markets)").fetchall()
+    }
+    if "question" not in columns:
+        conn.execute("ALTER TABLE markets ADD COLUMN question TEXT NOT NULL DEFAULT ''")
+    if "outcomes_json" not in columns:
+        conn.execute("ALTER TABLE markets ADD COLUMN outcomes_json TEXT NOT NULL DEFAULT '[]'")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_markets_question ON markets(question)")
 
 
 def rpc_call(rpc_url: str, method: str, params: List[Any]) -> Any:
@@ -44,6 +59,61 @@ def rpc_call(rpc_url: str, method: str, params: List[Any]) -> Any:
     if "error" in body:
         raise RuntimeError(f"RPC error: {body['error']}")
     return body["result"]
+
+
+def _encode_u256(v: int) -> str:
+    return f"{v:064x}"
+
+
+def _decode_u256_word(data_hex: str) -> int:
+    payload = data_hex[2:] if data_hex.startswith("0x") else data_hex
+    if len(payload) < 64:
+        raise ValueError("short uint256 response")
+    return int(payload[:64], 16)
+
+
+def _decode_abi_string(data_hex: str) -> str:
+    payload = data_hex[2:] if data_hex.startswith("0x") else data_hex
+    if len(payload) < 128:
+        return ""
+    offset = int(payload[:64], 16) * 2
+    if offset + 64 > len(payload):
+        return ""
+    length = int(payload[offset : offset + 64], 16)
+    start = offset + 64
+    end = start + (length * 2)
+    if end > len(payload):
+        return ""
+    raw = bytes.fromhex(payload[start:end])
+    return raw.decode("utf-8", errors="replace")
+
+
+def _eth_call_hex(rpc_url: str, to_addr: str, data_hex: str) -> str:
+    return rpc_call(
+        rpc_url,
+        "eth_call",
+        [{"to": to_addr, "data": data_hex}, "latest"],
+    )
+
+
+def fetch_market_metadata(rpc_url: str, market_address: str) -> Dict[str, Any]:
+    question = ""
+    outcomes: List[str] = []
+    try:
+        question_hex = _eth_call_hex(rpc_url, market_address, MARKET_QUESTION_SELECTOR)
+        question = _decode_abi_string(question_hex)
+        count_hex = _eth_call_hex(rpc_url, market_address, MARKET_OUTCOMES_COUNT_SELECTOR)
+        outcomes_count = _decode_u256_word(count_hex)
+        # Hard safety cap mirrors protocol-level max outcomes.
+        outcomes_count = min(outcomes_count, 64)
+        for i in range(outcomes_count):
+            data_hex = MARKET_OUTCOME_TEXT_SELECTOR + _encode_u256(i)
+            out_hex = _eth_call_hex(rpc_url, market_address, data_hex)
+            outcomes.append(_decode_abi_string(out_hex))
+    except Exception:
+        # Metadata enrichment is best-effort and must not block core indexing.
+        pass
+    return {"question": question, "outcomes": outcomes}
 
 
 def to_int(hex_value: str) -> int:
@@ -104,7 +174,12 @@ def insert_event_log(
     return cur.rowcount == 1
 
 
-def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any]) -> None:
+def apply_log(
+    conn: sqlite3.Connection,
+    factory_address: str,
+    log: Dict[str, Any],
+    rpc_url: Optional[str] = None,
+) -> None:
     address = normalize_address(log["address"])
     topics = log.get("topics", [])
     if not topics:
@@ -132,6 +207,9 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
         resolution_deadline = to_int(data_word(log["data"], 3))
         betting_closer = topic_to_address(data_word(log["data"], 4))
         resolution_closer = topic_to_address(data_word(log["data"], 5))
+        metadata = {"question": "", "outcomes": []}
+        if rpc_url:
+            metadata = fetch_market_metadata(rpc_url, market)
 
         inserted = insert_event_log(
             conn,
@@ -160,9 +238,9 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
             """
             INSERT OR IGNORE INTO markets(
               market_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
-              collateral_token, betting_close_time, resolution_window, resolution_deadline, state, created_block, created_tx_hash
+              collateral_token, question, outcomes_json, betting_close_time, resolution_window, resolution_deadline, state, created_block, created_tx_hash
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
             """,
             (
                 market,
@@ -172,6 +250,8 @@ def apply_log(conn: sqlite3.Connection, factory_address: str, log: Dict[str, Any
                 betting_closer,
                 resolution_closer,
                 collateral_token,
+                metadata["question"],
+                json.dumps(metadata["outcomes"]),
                 betting_close_time,
                 resolution_window,
                 resolution_deadline,
@@ -365,7 +445,7 @@ def sync_logs(
         logs = rpc_call(rpc_url, "eth_getLogs", params)
         logs.sort(key=lambda l: (to_int(l["blockNumber"]), to_int(l["logIndex"])))
         for log in logs:
-            apply_log(conn, factory_address, log)
+            apply_log(conn, factory_address, log, rpc_url=rpc_url)
             processed += 1
 
         set_meta_int(conn, "last_indexed_block", end)
