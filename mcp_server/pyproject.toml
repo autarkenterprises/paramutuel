@@ -1,0 +1,14 @@
+[project]
+name = "paramutuel-mcp"
+version = "0.1.0"
+description = "MCP server for the Paramutuel on-chain betting protocol"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "httpx>=0.25.0",
+    "eth-abi>=5.0.0",
+    "eth-hash[pycryptodome]",
+]
+
+[project.scripts]
+paramutuel-mcp = "mcp_server.server:mcp_server.run"
