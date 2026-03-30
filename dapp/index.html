@@ -226,6 +226,12 @@
 
     <section class="card">
       <h2>Resolution</h2>
+      <div class="row">
+        <input id="resolutionMarketAddress" placeholder="Optional market address for resolution actions (0x...)" />
+      </div>
+      <div class="muted">
+        Leave empty to use the active market loaded above.
+      </div>
       <div class="grid">
         <label>
           Winning outcome index
@@ -246,6 +252,12 @@
 
     <section class="card">
       <h2>Claims & Fees</h2>
+      <div class="row">
+        <input id="claimsMarketAddress" placeholder="Optional market address for claim/fee actions (0x...)" />
+      </div>
+      <div class="muted">
+        Leave empty to use the active market loaded above.
+      </div>
       <div class="row">
         <button id="claimBtn">Claim Payout (bettor)</button>
         <button id="withdrawFeesBtn">Withdraw Fees (fee recipient)</button>

@@ -461,7 +461,25 @@ async function setActiveMarket(marketAddress) {
   marketContract = new ethers.Contract(marketAddress, marketAbi, getRunner());
   $("marketAddress").textContent = marketAddress;
   $("activeMarketAddress").value = marketAddress;
+  if (!$("resolutionMarketAddress").value.trim()) {
+    $("resolutionMarketAddress").value = marketAddress;
+  }
+  if (!$("claimsMarketAddress").value.trim()) {
+    $("claimsMarketAddress").value = marketAddress;
+  }
   await updateOddsPreview();
+}
+
+async function ensureMarketForAction(inputId) {
+  const chosenAddress = $(inputId).value.trim();
+  if (!chosenAddress) {
+    if (!marketContract) {
+      throw new Error("Select a market address in this section, or load an active market above.");
+    }
+    return marketContract;
+  }
+  await setActiveMarket(chosenAddress);
+  return marketContract;
 }
 
 async function createMarket() {
@@ -687,64 +705,64 @@ async function placeBets() {
 }
 
 async function resolveMarket() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   const winningOutcomeIndex = Number($("winningOutcomeIndex").value);
 
   $("resolutionStatus").textContent = "Resolving...";
-  const tx = await marketContract.resolve(winningOutcomeIndex);
+  const tx = await targetMarket.resolve(winningOutcomeIndex);
   await tx.wait();
   $("resolutionStatus").textContent = "Resolved.";
   await updateOddsPreview();
 }
 
 async function retractMarket() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Retracting...";
-  const tx = await marketContract.retract();
+  const tx = await targetMarket.retract();
   await tx.wait();
   $("resolutionStatus").textContent = "Retracted.";
   await updateOddsPreview();
 }
 
 async function expireMarket() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Expiring...";
-  const tx = await marketContract.expire();
+  const tx = await targetMarket.expire();
   await tx.wait();
   $("resolutionStatus").textContent = "Expired.";
   await updateOddsPreview();
 }
 
 async function closeBettingOnMarket() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Closing betting...";
-  const tx = await marketContract.closeBetting();
+  const tx = await targetMarket.closeBetting();
   await tx.wait();
   $("resolutionStatus").textContent = "Betting closed (authority).";
   await updateOddsPreview();
 }
 
 async function closeResolutionWindowOnMarket() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("resolutionMarketAddress");
   $("resolutionStatus").textContent = "Closing resolution window...";
-  const tx = await marketContract.closeResolutionWindow();
+  const tx = await targetMarket.closeResolutionWindow();
   await tx.wait();
   $("resolutionStatus").textContent = "Resolution window closed (authority).";
   await updateOddsPreview();
 }
 
 async function claim() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("claimsMarketAddress");
   $("claimStatus").textContent = "Claiming payout...";
-  const tx = await marketContract.claim();
+  const tx = await targetMarket.claim();
   await tx.wait();
   $("claimStatus").textContent = "Claimed (check token balance).";
 }
 
 async function withdrawFees() {
-  if (!marketContract) throw new Error("Create a market first.");
+  const targetMarket = await ensureMarketForAction("claimsMarketAddress");
   $("claimStatus").textContent = "Withdrawing fees...";
-  const tx = await marketContract.withdrawFees();
+  const tx = await targetMarket.withdrawFees();
   await tx.wait();
   $("claimStatus").textContent = "Fees withdrawn.";
 }
