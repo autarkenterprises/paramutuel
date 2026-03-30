@@ -12,6 +12,12 @@ set -euo pipefail
 #   STRESS_FUNDER_PRIVATE_KEY=0x... \
 #   ./script/testnet/run_stress_suite.sh
 #
+# Funded transaction mode: tx mode + real collateral approve/placeBet/claim.
+#   FACTORY_ADDRESS=... RPC_URL_BASE_SEPOLIA=... \
+#   STRESS_MODE=funded-tx STRESS_WALLET_POOL_PATH=test/testnet/stress_wallet_pool.json \
+#   STRESS_COLLATERAL_TOKEN=0x... STRESS_BET_AMOUNT=1 \
+#   ./script/testnet/run_stress_suite.sh
+#
 # Generate pool (do not commit):
 #   python3 script/testnet/gen_stress_wallet_pool.py 40 test/testnet/stress_wallet_pool.json
 # Fund actors (optional):
@@ -46,6 +52,23 @@ if [[ "$MODE" == "tx" ]]; then
   if [[ -n "${STRESS_FUNDER_PRIVATE_KEY:-}" ]]; then
     export PRIVATE_KEY="$STRESS_FUNDER_PRIVATE_KEY"
   fi
+fi
+
+if [[ "$MODE" == "funded-tx" ]]; then
+  if [[ -z "${STRESS_WALLET_POOL_PATH:-}" ]]; then
+    echo "error: STRESS_WALLET_POOL_PATH required for STRESS_MODE=funded-tx" >&2
+    exit 1
+  fi
+  if [[ ! -f "$STRESS_WALLET_POOL_PATH" ]]; then
+    echo "error: wallet pool not found: $STRESS_WALLET_POOL_PATH" >&2
+    exit 1
+  fi
+  if [[ -z "${STRESS_COLLATERAL_TOKEN:-}" ]]; then
+    echo "error: STRESS_COLLATERAL_TOKEN required for STRESS_MODE=funded-tx" >&2
+    exit 1
+  fi
+  export STRESS_WALLET_POOL_PATH
+  export STRESS_COLLATERAL_TOKEN
 fi
 
 export STRESS_MODE="$MODE"

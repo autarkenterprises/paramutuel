@@ -8,6 +8,7 @@ This complements the [live integration suite](TESTNET-LIVE-SUITE.md) with **many
 |---------------|----------------|-----|
 | `readonly` (default) | Samples up to `STRESS_SAMPLE_MARKETS` latest markets from `FACTORY_ADDRESS` and asserts on-chain invariants | None |
 | `tx` | Creates `STRESS_MARKET_COUNT` new markets; each market uses **four different keys** for the four roles; runs resolve / retract / expire branches | One burst of txs |
+| `funded-tx` | Creates `STRESS_MARKET_COUNT` new markets; each market uses **six different keys** (4 roles + 2 bettors), does real `approve` + `placeBet`, then resolve/retract/expire and claims | Higher tx burst |
 
 ## Automatically creating wallets
 
@@ -70,6 +71,18 @@ STRESS_MARKET_COUNT=5 \
 ./script/testnet/run_stress_suite.sh
 ```
 
+Funded transaction mode (after pool + ETH + collateral funding):
+
+```bash
+FACTORY_ADDRESS=0x... \
+RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
+STRESS_MODE=funded-tx \
+STRESS_WALLET_POOL_PATH=test/testnet/stress_wallet_pool.json \
+STRESS_COLLATERAL_TOKEN=0x... \
+STRESS_BET_AMOUNT=1 \
+./script/testnet/run_stress_suite.sh
+```
+
 `STRESS_FUNDER_PRIVATE_KEY` (or `PRIVATE_KEY`) must be funded; it is used for permissionless `expire()` in the expire-branch scenarios. Proposers and role wallets use their own keys from the pool.
 
 ## Tunables
@@ -80,8 +93,12 @@ STRESS_MARKET_COUNT=5 \
 | `STRESS_MARKET_COUNT` | `3` | Markets to create in `tx` mode |
 | `STRESS_WALLET_POOL_PATH` | (empty) | Required for `tx`; JSON from generator |
 | `STRESS_FUNDER_PRIVATE_KEY` | — | Funded key for `expire()`; falls back to `PRIVATE_KEY` |
+| `STRESS_COLLATERAL_TOKEN` | (empty) | Required for `funded-tx`; ERC20 with `decimals()/approve()/balanceOf()` |
+| `STRESS_BET_AMOUNT` | `1` | Human token units per bettor per market in `funded-tx` |
+| `STRESS_UNAUTHORIZED_PRIVATE_KEY` | (empty) | Optional; enables negative access-control checks in `funded-tx` |
 
 ## Alchemy / cost notes
 
 - **Readonly** mode only issues `eth_call`; Alchemy metered usage is cheap in practice and uses **no** test ETH.
 - **Tx** mode cost scales with `STRESS_MARKET_COUNT` (several txs per market). Keep counts low for routine runs; raise for occasional stress campaigns.
+- **Funded-tx** mode adds ERC20 transfers + claims, so both ETH gas and funded collateral balances are required for bettor wallets.
