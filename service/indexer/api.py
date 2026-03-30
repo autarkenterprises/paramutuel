@@ -85,6 +85,26 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         qs = parse_qs(parsed.query)
 
+        # Support both direct paths (/markets) and explorer-style prefixed paths (/api/markets).
+        if path.startswith("/api/"):
+            path = path[len("/api") :] or "/"
+
+        if path in ("/", "/api", "/api/"):
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "service": "paramutuel-indexer-api",
+                    "endpoints": [
+                        "/health",
+                        "/markets?limit=100",
+                        "/markets/{market_address}",
+                        "/sweeper/expire-candidates",
+                    ],
+                },
+            )
+            return
+
         if path == "/health":
             self._send_json(200, {"ok": True, "ts": int(time.time())})
             return
