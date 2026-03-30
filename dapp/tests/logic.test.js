@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { getTemplate, computeWindowArgs, validateWindowMins } = require("../logic.js");
+const { getTemplate, computeWindowArgs, validateWindowMins, parseMultiBetInputs } = require("../logic.js");
 
 test("template lookup falls back to custom", () => {
   const t = getTemplate("does-not-exist");
@@ -56,4 +56,22 @@ test("validateWindowMins warns for small betting window and throws for bad resol
 test("validateWindowMins ignores min checks in no-max mode", () => {
   const warnings = validateWindowMins(3600n, 1800n, 1, 1, true, true);
   assert.deepEqual(warnings, []);
+});
+
+test("parseMultiBetInputs parses aligned indices and amounts", () => {
+  const parsed = parseMultiBetInputs("0, 2,1", "1.5,3,4.25", false);
+  assert.deepEqual(parsed.outcomeIndices, [0, 2, 1]);
+  assert.deepEqual(parsed.amountNumbers, [1.5, 3, 4.25]);
+});
+
+test("parseMultiBetInputs allows empty when requested", () => {
+  const parsed = parseMultiBetInputs("", "", true);
+  assert.deepEqual(parsed.outcomeIndices, []);
+  assert.deepEqual(parsed.amountNumbers, []);
+});
+
+test("parseMultiBetInputs rejects invalid input shapes", () => {
+  assert.throws(() => parseMultiBetInputs("0,1", "1", false), /length mismatch/);
+  assert.throws(() => parseMultiBetInputs("x", "1", false), /Invalid outcome index/);
+  assert.throws(() => parseMultiBetInputs("0", "0", false), /Invalid amount/);
 });

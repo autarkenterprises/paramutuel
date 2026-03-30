@@ -101,6 +101,7 @@ contract ParamutuelTest is Test {
         token = new MockERC20();
 
         uint256 initial = 1_000_000 ether;
+        token.mint(proposer, initial);
         token.mint(bettor1, initial);
         token.mint(bettor2, initial);
         token.mint(bettor3, initial);
@@ -148,6 +149,133 @@ contract ParamutuelTest is Test {
         assertEq(market.outcomesCount(), 2, "outcomes");
         assertEq(market.bettingCloseTime(), block.timestamp + 2 hours, "bet close");
         assertEq(market.resolutionWindow(), 2 hours, "resolution window");
+    }
+
+    function testCreateMarketSupportsSeededBets() public {
+        string[] memory outcomes = new string[](3);
+        outcomes[0] = "A";
+        outcomes[1] = "B";
+        outcomes[2] = "C";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        uint256[] memory seedOutcomeIndices = new uint256[](3);
+        seedOutcomeIndices[0] = 0;
+        seedOutcomeIndices[1] = 1;
+        seedOutcomeIndices[2] = 2;
+        uint256[] memory seedAmounts = new uint256[](3);
+        seedAmounts[0] = 10 ether;
+        seedAmounts[1] = 20 ether;
+        seedAmounts[2] = 30 ether;
+
+        vm.startPrank(proposer);
+        token.approve(address(factory), 60 ether);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "Seeded market",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps,
+            seedOutcomeIndices,
+            seedAmounts
+        );
+        vm.stopPrank();
+
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+        assertEq(market.totalPot(), 60 ether, "seeded total pot");
+        assertEq(market.outcomeTotals(0), 10 ether, "seeded outcome 0");
+        assertEq(market.outcomeTotals(1), 20 ether, "seeded outcome 1");
+        assertEq(market.outcomeTotals(2), 30 ether, "seeded outcome 2");
+        assertEq(market.userTotalBet(proposer), 60 ether, "seeded proposer user total");
+        assertEq(market.bets(proposer, 0), 10 ether, "seeded proposer stake o0");
+        assertEq(market.bets(proposer, 1), 20 ether, "seeded proposer stake o1");
+        assertEq(market.bets(proposer, 2), 30 ether, "seeded proposer stake o2");
+        assertEq(token.balanceOf(address(market)), 60 ether, "market token balance includes seeds");
+    }
+
+    function testCreateMarketSeedRevertsForInvalidOutcome() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+        uint256[] memory seedOutcomeIndices = new uint256[](1);
+        uint256[] memory seedAmounts = new uint256[](1);
+        seedOutcomeIndices[0] = 2; // invalid
+        seedAmounts[0] = 1 ether;
+
+        vm.startPrank(proposer);
+        token.approve(address(factory), 1 ether);
+        vm.expectRevert(ParamutuelMarket.InvalidOutcome.selector);
+        factory.createMarket(
+            address(token),
+            "bad seed outcome",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps,
+            seedOutcomeIndices,
+            seedAmounts
+        );
+        vm.stopPrank();
+    }
+
+    function testCreateMarketSeedBadConfigReverts() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        uint256[] memory seedOutcomeIndices = new uint256[](1);
+        seedOutcomeIndices[0] = 0;
+        uint256[] memory seedAmountsMismatch = new uint256[](0);
+
+        vm.expectRevert(ParamutuelFactory.BadSeedConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "seed mismatch",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps,
+            seedOutcomeIndices,
+            seedAmountsMismatch
+        );
+
+        uint256[] memory seedAmountsZero = new uint256[](1);
+        seedAmountsZero[0] = 0;
+        vm.expectRevert(ParamutuelFactory.BadSeedConfig.selector);
+        vm.prank(proposer);
+        factory.createMarket(
+            address(token),
+            "seed zero amount",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps,
+            seedOutcomeIndices,
+            seedAmountsZero
+        );
     }
 
     function testFactoryConstructorValidation() public {
@@ -415,6 +543,13 @@ contract ParamutuelTest is Test {
         token.approve(address(market), amount);
         vm.expectRevert(ParamutuelMarket.BettingClosed.selector);
         market.placeBet(0, amount);
+
+        uint256[] memory outcomeIndices = new uint256[](1);
+        outcomeIndices[0] = 0;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        vm.expectRevert(ParamutuelMarket.BettingClosed.selector);
+        market.placeBets(outcomeIndices, amounts);
         vm.stopPrank();
     }
 
@@ -448,6 +583,90 @@ contract ParamutuelTest is Test {
         token.approve(address(market), 1 ether);
         vm.expectRevert("AMOUNT");
         market.placeBet(0, 0);
+        vm.stopPrank();
+    }
+
+    function testPlaceBetsAcrossMultipleOutcomes() public {
+        string[] memory outcomes = new string[](3);
+        outcomes[0] = "A";
+        outcomes[1] = "B";
+        outcomes[2] = "C";
+
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.prank(proposer);
+        address marketAddr = factory.createMarket(
+            address(token),
+            "Batch bet market",
+            outcomes,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelMarket market = ParamutuelMarket(marketAddr);
+
+        uint256[] memory outcomeIndices = new uint256[](3);
+        outcomeIndices[0] = 0;
+        outcomeIndices[1] = 1;
+        outcomeIndices[2] = 2;
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 5 ether;
+        amounts[1] = 15 ether;
+        amounts[2] = 25 ether;
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 45 ether);
+        market.placeBets(outcomeIndices, amounts);
+        vm.stopPrank();
+
+        assertEq(market.totalPot(), 45 ether);
+        assertEq(market.userTotalBet(bettor1), 45 ether);
+        assertEq(market.outcomeTotals(0), 5 ether);
+        assertEq(market.outcomeTotals(1), 15 ether);
+        assertEq(market.outcomeTotals(2), 25 ether);
+        assertEq(market.bets(bettor1, 0), 5 ether);
+        assertEq(market.bets(bettor1, 1), 15 ether);
+        assertEq(market.bets(bettor1, 2), 25 ether);
+    }
+
+    function testPlaceBetsRevertsForBadInputs() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        uint256[] memory outcomeIndices = new uint256[](2);
+        outcomeIndices[0] = 0;
+        outcomeIndices[1] = 1;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1 ether;
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        vm.expectRevert(ParamutuelMarket.ArrayLengthMismatch.selector);
+        market.placeBets(outcomeIndices, amounts);
+        vm.stopPrank();
+
+        uint256[] memory badIndices = new uint256[](1);
+        badIndices[0] = 2; // invalid for binary market
+        uint256[] memory badAmounts = new uint256[](1);
+        badAmounts[0] = 1 ether;
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        vm.expectRevert(ParamutuelMarket.InvalidOutcome.selector);
+        market.placeBets(badIndices, badAmounts);
+        vm.stopPrank();
+
+        uint256[] memory zeroAmountIndices = new uint256[](1);
+        zeroAmountIndices[0] = 0;
+        uint256[] memory zeroAmounts = new uint256[](1);
+        zeroAmounts[0] = 0;
+        vm.startPrank(bettor1);
+        token.approve(address(market), 10 ether);
+        vm.expectRevert(bytes("AMOUNT"));
+        market.placeBets(zeroAmountIndices, zeroAmounts);
         vm.stopPrank();
     }
 

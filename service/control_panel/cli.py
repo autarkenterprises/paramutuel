@@ -45,6 +45,8 @@ def main() -> int:
     c.add_argument("--resolution-closer", default="0x0000000000000000000000000000000000000000")
     c.add_argument("--extra-recipients", default="")
     c.add_argument("--extra-bps", default="")
+    c.add_argument("--seed-outcome-indices", default="", help="Comma-separated uint256 outcome indices")
+    c.add_argument("--seed-amounts", default="", help="Comma-separated raw token amounts (uint256)")
 
     a = sub.add_parser("market-action")
     a.add_argument("--market", required=True)
@@ -82,6 +84,8 @@ def main() -> int:
                 resolution_closer=args.resolution_closer,
                 extra_recipients=_split_csv(args.extra_recipients),
                 extra_bps=_split_int_csv(args.extra_bps),
+                seed_outcome_indices=_split_int_csv(args.seed_outcome_indices),
+                seed_amounts=_split_int_csv(args.seed_amounts),
                 rpc_url=args.rpc_url,
                 private_key=args.private_key,
             )

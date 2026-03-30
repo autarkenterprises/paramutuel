@@ -35,6 +35,8 @@ contract ParamutuelMarket is ReentrancyGuard {
     error NothingToClaim();
     error FeeConfigMismatch();
     error FeeTooHigh();
+    error NotFactory();
+    error ArrayLengthMismatch();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
@@ -187,18 +189,58 @@ contract ParamutuelMarket is ReentrancyGuard {
     function placeBet(uint256 outcomeIndex, uint256 amount) external nonReentrant {
         if (state != State.Open) revert NotOpen();
         if (_bettingClosed()) revert BettingClosed();
-        if (outcomeIndex >= _outcomes.length) revert InvalidOutcome();
-        require(amount > 0, "AMOUNT");
 
         bool ok = collateralToken.transferFrom(msg.sender, address(this), amount);
         require(ok, "TRANSFER_FROM");
 
-        bets[msg.sender][outcomeIndex] += amount;
-        userTotalBet[msg.sender] += amount;
+        _recordBet(msg.sender, outcomeIndex, amount);
+    }
+
+    /// @notice Place multiple bets across outcomes in one transaction.
+    /// @dev Caller transfers the sum of all amounts once, then each leg is recorded.
+    function placeBets(uint256[] calldata outcomeIndices, uint256[] calldata amounts) external nonReentrant {
+        if (state != State.Open) revert NotOpen();
+        if (_bettingClosed()) revert BettingClosed();
+        if (outcomeIndices.length == 0 || outcomeIndices.length != amounts.length) revert ArrayLengthMismatch();
+
+        uint256 totalAmount;
+        for (uint256 i; i < amounts.length; i++) {
+            uint256 amount = amounts[i];
+            if (outcomeIndices[i] >= _outcomes.length) revert InvalidOutcome();
+            require(amount > 0, "AMOUNT");
+            totalAmount += amount;
+        }
+
+        bool ok = collateralToken.transferFrom(msg.sender, address(this), totalAmount);
+        require(ok, "TRANSFER_FROM");
+
+        for (uint256 i; i < amounts.length; i++) {
+            _recordBet(msg.sender, outcomeIndices[i], amounts[i]);
+        }
+    }
+
+    /// @notice Seed initial market positions during factory creation.
+    /// @dev Callable only by factory; token transfer is handled by factory.
+    function seedInitialBetsFromFactory(address bettor, uint256[] memory outcomeIndices, uint256[] memory amounts)
+        external
+    {
+        if (msg.sender != factory) revert NotFactory();
+        if (state != State.Open) revert NotOpen();
+        if (outcomeIndices.length == 0 || outcomeIndices.length != amounts.length) revert ArrayLengthMismatch();
+
+        for (uint256 i; i < amounts.length; i++) {
+            _recordBet(bettor, outcomeIndices[i], amounts[i]);
+        }
+    }
+
+    function _recordBet(address bettor, uint256 outcomeIndex, uint256 amount) internal {
+        if (outcomeIndex >= _outcomes.length) revert InvalidOutcome();
+        require(amount > 0, "AMOUNT");
+        bets[bettor][outcomeIndex] += amount;
+        userTotalBet[bettor] += amount;
         outcomeTotals[outcomeIndex] += amount;
         totalPot += amount;
-
-        emit BetPlaced(msg.sender, outcomeIndex, amount);
+        emit BetPlaced(bettor, outcomeIndex, amount);
     }
 
     /// @notice Finalize the market to a winning outcome.

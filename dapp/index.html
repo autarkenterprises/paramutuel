@@ -132,6 +132,18 @@
           Optional fee bps (comma-separated)
           <input id="extraFeeBps" placeholder="300,100" />
         </label>
+        <label>
+          Seed outcome indices (optional, comma-separated)
+          <input id="seedOutcomeIndices" placeholder="0,2" />
+        </label>
+        <label>
+          Seed amounts (optional, comma-separated token units)
+          <input id="seedAmounts" placeholder="10,3.5" />
+        </label>
+        <div class="muted span-2">
+          Optional initial liquidity at create-time. Provide aligned lists of indices and amounts.
+          This executes one market-creation tx instead of separate seed bet txs.
+        </div>
 
         <label class="checkbox-label">
           <input type="checkbox" id="decimalsManual" />
@@ -175,6 +187,19 @@
       </div>
       <div class="grid">
         <label>
+          Batch outcome indices (optional, comma-separated)
+          <input id="betOutcomeIndices" placeholder="0,2,1" />
+        </label>
+        <label>
+          Batch bet amounts (optional, comma-separated token units)
+          <input id="betAmounts" placeholder="4,1.5,2" />
+        </label>
+      </div>
+      <div class="muted">
+        Batch mode places multiple outcome legs in one transaction using <code>placeBets()</code>.
+      </div>
+      <div class="grid">
+        <label>
           Current implied payout multiple (selected outcome)
           <input id="oddsCurrentMultiple" readonly />
         </label>
@@ -194,6 +219,7 @@
       <div id="oddsStatus" class="muted"></div>
       <div class="row">
         <button id="placeBetBtn">Place Bet</button>
+        <button id="placeBetsBtn">Place Batch Bet</button>
       </div>
       <div id="betStatus" class="muted"></div>
     </section>

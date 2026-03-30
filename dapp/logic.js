@@ -75,11 +75,45 @@
     return warnings;
   }
 
+  function parseMultiBetInputs(indicesCsv, amountsCsv, allowEmpty = true) {
+    const parseCsv = (s) =>
+      String(s || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0);
+
+    const rawIndices = parseCsv(indicesCsv);
+    const rawAmounts = parseCsv(amountsCsv);
+
+    if (rawIndices.length === 0 && rawAmounts.length === 0 && allowEmpty) {
+      return { outcomeIndices: [], amountNumbers: [] };
+    }
+    if (rawIndices.length === 0 || rawAmounts.length === 0) {
+      throw new Error("Both outcome indices and amounts are required.");
+    }
+    if (rawIndices.length !== rawAmounts.length) {
+      throw new Error("Outcome indices and amounts length mismatch.");
+    }
+
+    const outcomeIndices = rawIndices.map((v) => {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0) throw new Error(`Invalid outcome index: ${v}`);
+      return n;
+    });
+    const amountNumbers = rawAmounts.map((v) => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n <= 0) throw new Error(`Invalid amount: ${v}`);
+      return n;
+    });
+    return { outcomeIndices, amountNumbers };
+  }
+
   const api = {
     MARKET_TEMPLATES,
     getTemplate,
     computeWindowArgs,
     validateWindowMins,
+    parseMultiBetInputs,
   };
 
   if (typeof module !== "undefined" && module.exports) {

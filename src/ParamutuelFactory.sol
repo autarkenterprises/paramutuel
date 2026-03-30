@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ParamutuelMarket} from "./ParamutuelMarket.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
 
 contract ParamutuelFactory {
     /// @param resolver The address that may `resolve` / `retract` (proposer if `resolver == address(0)`).
@@ -25,6 +26,7 @@ contract ParamutuelFactory {
     error WindowTooShort();
     error TooManyOutcomes();
     error InvalidLifecycleConfig();
+    error BadSeedConfig();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 1_000; // 10% cap for MVP
@@ -51,6 +53,7 @@ contract ParamutuelFactory {
         return markets.length;
     }
 
+    /// @notice Create market without seeded bets.
     /// @param bettingCloseTime Absolute betting close timestamp. Use `0` for no time cap (closer-only).
     /// @param resolutionWindow Resolution window duration after effective betting close. Use `0` for no time cap.
     /// @param resolver If `address(0)`, the resolver is the proposer (`msg.sender`).
@@ -68,8 +71,81 @@ contract ParamutuelFactory {
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps
     ) external returns (address market) {
+        uint256[] memory seedOutcomeIndices = new uint256[](0);
+        uint256[] memory seedAmounts = new uint256[](0);
+        return _createMarket(
+            collateralToken,
+            question,
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            resolver,
+            bettingCloser,
+            resolutionCloser,
+            extraFeeRecipients,
+            extraFeeBps,
+            seedOutcomeIndices,
+            seedAmounts
+        );
+    }
+
+    /// @notice Create market with optional initial seeded bets from proposer.
+    /// @param seedOutcomeIndices Outcome indices for seeded legs.
+    /// @param seedAmounts Raw token amounts for each seeded leg.
+    function createMarket(
+        address collateralToken,
+        string memory question,
+        string[] memory outcomes,
+        uint64 bettingCloseTime,
+        uint64 resolutionWindow,
+        address resolver,
+        address bettingCloser,
+        address resolutionCloser,
+        address[] memory extraFeeRecipients,
+        uint16[] memory extraFeeBps,
+        uint256[] memory seedOutcomeIndices,
+        uint256[] memory seedAmounts
+    ) external returns (address market) {
+        return _createMarket(
+            collateralToken,
+            question,
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            resolver,
+            bettingCloser,
+            resolutionCloser,
+            extraFeeRecipients,
+            extraFeeBps,
+            seedOutcomeIndices,
+            seedAmounts
+        );
+    }
+
+    function _createMarket(
+        address collateralToken,
+        string memory question,
+        string[] memory outcomes,
+        uint64 bettingCloseTime,
+        uint64 resolutionWindow,
+        address resolver,
+        address bettingCloser,
+        address resolutionCloser,
+        address[] memory extraFeeRecipients,
+        uint16[] memory extraFeeBps,
+        uint256[] memory seedOutcomeIndices,
+        uint256[] memory seedAmounts
+    ) internal returns (address market) {
         if (outcomes.length < 2) revert BadOutcomes();
         if (outcomes.length > MAX_OUTCOMES) revert TooManyOutcomes();
+        if (seedOutcomeIndices.length != seedAmounts.length) revert BadSeedConfig();
+
+        uint256 seedTotal;
+        for (uint256 i; i < seedAmounts.length; i++) {
+            uint256 amount = seedAmounts[i];
+            if (amount == 0) revert BadSeedConfig();
+            seedTotal += amount;
+        }
 
         uint64 nowTs = uint64(block.timestamp);
         if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
@@ -122,6 +198,12 @@ contract ParamutuelFactory {
             resolvedBettingCloser,
             resolvedResolutionCloser
         );
+
+        if (seedAmounts.length > 0) {
+            bool ok = IERC20(collateralToken).transferFrom(msg.sender, market, seedTotal);
+            require(ok, "TRANSFER_FROM");
+            m.seedInitialBetsFromFactory(msg.sender, seedOutcomeIndices, seedAmounts);
+        }
     }
 
     function _buildFeeConfig(address[] memory extraRecipients, uint16[] memory extraBps)

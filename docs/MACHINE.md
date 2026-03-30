@@ -6,14 +6,16 @@ Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can int
 
 - **ABIs**: build with Foundry (`forge build`) and read JSON under `out/ParamutuelFactory.sol/` and `out/ParamutuelMarket.sol/`.
 - **Factory** `createMarket(collateralToken, question, outcomes, bettingCloseTime, resolutionWindow, resolver, bettingCloser, resolutionCloser, extraFeeRecipients, extraFeeBps)`  
+  - Also supports seeded overload: `createMarket(..., extraFeeRecipients, extraFeeBps, seedOutcomeIndices, seedAmounts)`.
   - `resolver` may be `address(0)` to default to the **proposer** (`msg.sender`).
   - `bettingCloser = address(0)` disables authority `closeBetting()`.
   - `resolutionCloser = address(0)` disables authority `closeResolutionWindow()`.
   - `bettingCloseTime = 0` means no max betting window (closer-managed).
   - `resolutionWindow = 0` means no max resolution window (closer-managed).
   - Guardrail: `bettingCloseTime = 0` requires non-zero `bettingCloser`; `resolutionWindow = 0` requires non-zero `resolutionCloser`.
+  - Seeded overload records proposer bets at create-time; seed arrays must align and contain positive amounts.
 - **Market lifecycle** (high level):
-  - `placeBet` while open and not yet closed by time or `closeBetting()`.
+  - `placeBet` / `placeBets` while open and not yet closed by time or `closeBetting()`.
   - `closeBetting()` — only `bettingCloser`; required to end betting when `bettingCloseTime = 0`.
   - After betting is closed: `resolve` / `retract` by `resolver` while the resolution window is open.
   - `closeResolutionWindow()` — only `resolutionCloser`, only after betting has ended; required to end resolution when `resolutionWindow = 0`.

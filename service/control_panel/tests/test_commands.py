@@ -25,7 +25,10 @@ class ControlPanelCommandTests(unittest.TestCase):
             private_key="0xabc",
         )
         joined = " ".join(cmd.command)
-        self.assertIn("createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])", joined)
+        self.assertIn(
+            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
+            joined,
+        )
         self.assertIn("[\"YES\",\"NO\"]", joined)
 
     def test_create_market_rejects_uncloseable_no_max(self):
@@ -45,6 +48,28 @@ class ControlPanelCommandTests(unittest.TestCase):
                 rpc_url="http://localhost:8545",
                 private_key="0xabc",
             )
+
+    def test_create_market_accepts_seed_arrays(self):
+        cmd = build_create_market_command(
+            factory="0x1111111111111111111111111111111111111111",
+            collateral="0x2222222222222222222222222222222222222222",
+            question="Q?",
+            outcomes=["YES", "NO"],
+            betting_close_time=1234567890,
+            resolution_window=7200,
+            resolver="0x0000000000000000000000000000000000000000",
+            betting_closer="0x0000000000000000000000000000000000000000",
+            resolution_closer="0x0000000000000000000000000000000000000000",
+            extra_recipients=[],
+            extra_bps=[],
+            seed_outcome_indices=[0, 1],
+            seed_amounts=[100, 200],
+            rpc_url="http://localhost:8545",
+            private_key="0xabc",
+        )
+        joined = " ".join(cmd.command)
+        self.assertIn("[0,1]", joined)
+        self.assertIn("[100,200]", joined)
 
     def test_action_command_requires_outcome_for_resolve(self):
         with self.assertRaises(ValueError):

@@ -78,6 +78,8 @@ class Handler(BaseHTTPRequestHandler):
                     resolution_closer=payload.get("resolutionCloser", "0x0000000000000000000000000000000000000000"),
                     extra_recipients=payload.get("extraRecipients", []),
                     extra_bps=payload.get("extraBps", []),
+                    seed_outcome_indices=payload.get("seedOutcomeIndices", []),
+                    seed_amounts=payload.get("seedAmounts", []),
                     rpc_url=self.rpc_url,
                     private_key=self.private_key,
                 )

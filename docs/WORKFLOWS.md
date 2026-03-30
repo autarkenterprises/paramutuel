@@ -29,6 +29,27 @@ cast send "$FACTORY" \
   --private-key "$PRIVATE_KEY"
 ```
 
+### Finite windows + optional seeded liquidity
+
+```bash
+cast send "$FACTORY" \
+  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
+  "$COLLATERAL" \
+  "Will X happen?" \
+  "[YES,NO,MAYBE]" \
+  "$BETTING_CLOSE_TS" \
+  "$RESOLUTION_WINDOW_SECS" \
+  "$RESOLVER_OR_ZERO" \
+  "$BETTING_CLOSER_OR_ZERO" \
+  "$RESOLUTION_CLOSER_OR_ZERO" \
+  "[$EXTRA_RECIPIENTS]" \
+  "[$EXTRA_BPS]" \
+  "[0,2]" \
+  "[$SEED_AMOUNT_0,$SEED_AMOUNT_2]" \
+  --rpc-url "$RPC_URL" \
+  --private-key "$PRIVATE_KEY"
+```
+
 Role input semantics:
 
 - `resolver = 0x000...0000` -> defaults resolver to proposer.
@@ -54,6 +75,13 @@ cast send "$TOKEN" "approve(address,uint256)" "$MARKET" "$AMOUNT" \
 
 # place bet
 cast send "$MARKET" "placeBet(uint256,uint256)" "$OUTCOME_INDEX" "$AMOUNT" \
+  --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+```
+
+Batch bet (multiple outcomes in one tx):
+
+```bash
+cast send "$MARKET" "placeBets(uint256[],uint256[])" "[0,2,3]" "[$A0,$A2,$A3]" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 

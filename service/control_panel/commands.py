@@ -32,13 +32,24 @@ def build_create_market_command(
     resolution_closer: str,
     extra_recipients: list[str],
     extra_bps: list[int],
+    seed_outcome_indices: list[int] | None = None,
+    seed_amounts: list[int] | None = None,
     rpc_url: str,
     private_key: str,
 ) -> CastCommand:
+    if seed_outcome_indices is None:
+        seed_outcome_indices = []
+    if seed_amounts is None:
+        seed_amounts = []
     if len(outcomes) < 2:
         raise ValueError("outcomes must have at least 2 items")
     if len(extra_recipients) != len(extra_bps):
         raise ValueError("extra_recipients and extra_bps length mismatch")
+    if len(seed_outcome_indices) != len(seed_amounts):
+        raise ValueError("seed_outcome_indices and seed_amounts length mismatch")
+    for amount in seed_amounts:
+        if amount <= 0:
+            raise ValueError("seed_amounts must be positive integers")
     if betting_close_time == 0 and betting_closer.lower() == ZERO_ADDRESS:
         raise ValueError("betting_close_time=0 requires a non-zero betting_closer")
     if resolution_window == 0 and resolution_closer.lower() == ZERO_ADDRESS:
@@ -48,7 +59,7 @@ def build_create_market_command(
         "cast",
         "send",
         factory,
-        "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+        "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
         collateral,
         question,
         _json_arg(outcomes),
@@ -59,6 +70,8 @@ def build_create_market_command(
         resolution_closer,
         _json_arg(extra_recipients),
         _json_arg(extra_bps),
+        _json_arg(seed_outcome_indices),
+        _json_arg(seed_amounts),
         "--rpc-url",
         rpc_url,
         "--private-key",
