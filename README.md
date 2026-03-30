@@ -8,6 +8,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
 **Live testnet integration suite:** see [`docs/TESTNET-LIVE-SUITE.md`](docs/TESTNET-LIVE-SUITE.md).
 **Testnet stress suite (multi-market / multi-actor):** see [`docs/TESTNET-STRESS-SUITE.md`](docs/TESTNET-STRESS-SUITE.md).
+**Live indexer hosting (Render):** see [`docs/INDEXER-HOSTING.md`](docs/INDEXER-HOSTING.md).
 **Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
 **Hosted dApp & website:** see [GitHub Pages deployment](#hosted-dapp--protocol-website).
@@ -22,6 +23,7 @@ This section is for an arbitrary user who clones the repo and wants to interact 
 - `python3` and `node`
 - MetaMask (or other EVM wallet)
 - Base Sepolia test ETH
+- Base Sepolia test USDC (for funded bet flows)
 
 ### 2) Clone and build
 
@@ -41,6 +43,14 @@ In MetaMask, use **Base Sepolia**:
 - Chain ID: `84532`
 - Currency: `ETH`
 - Explorer: `https://sepolia.basescan.org`
+
+### 3.1) Get test funds (Base Sepolia)
+
+- **USDC (Base Sepolia):** [Circle faucet](https://faucet.circle.com/)  
+  Select `Base Sepolia`, token `USDC`, and request to your wallet.
+- **ETH gas (Base Sepolia):**
+  - [Alchemy Base Sepolia faucet](https://www.alchemy.com/faucets/base-sepolia)
+  - [Chainlink faucet](https://faucets.chain.link/base-sepolia)
 
 ### 4) Start the dApp locally
 
@@ -396,6 +406,11 @@ Pages:
 - `/app.html` — Full dApp (embedded iframe)
 - `/explorer.html` — Market explorer with configurable indexer URL
 - `/dapp/` — Standalone dApp (also accessible directly)
+
+Runtime defaults for these surfaces are read from `config/deployments.json`:
+- `defaultNetwork` selects which network config to use by default
+- `<network>.factoryAddress` feeds dApp/website factory defaults
+- `<network>.explorerApiBase` feeds website explorer API default (optional)
 
 **Setup requirement:** In the GitHub repo settings, set Pages source to **"GitHub Actions"**.
 

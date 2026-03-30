@@ -47,7 +47,7 @@
       <dl class="network-info">
         <div>
           <dt>Chain</dt>
-          <dd>Base Sepolia (testnet, chain ID 84532)</dd>
+          <dd id="networkDisplay">Configured in deployments.json</dd>
         </div>
         <div>
           <dt>Factory</dt>
@@ -55,7 +55,7 @@
         </div>
         <div>
           <dt>Collateral</dt>
-          <dd>USDC (0x036CbD53842c5426634e7929541eC2318f3dCf7e)</dd>
+          <dd>Market-configured ERC-20 (USDC presets available in dApp)</dd>
         </div>
         <div>
           <dt>Explorer</dt>
@@ -84,13 +84,26 @@
         const response = await fetch("config/deployments.json");
         if (!response.ok) return;
         const data = await response.json();
-        const addr = (data?.baseSepolia?.factoryAddress || "").trim();
-        if (!addr) return;
-        const node = document.getElementById("factoryAddressDisplay");
-        if (!node) return;
-        node.textContent = addr;
+        const defaultNetwork = (data?.defaultNetwork || "baseSepolia").trim();
+        const networkNames = {
+          baseSepolia: "Base Sepolia",
+          baseMainnet: "Base Mainnet",
+        };
+        const chainId = data?.[defaultNetwork]?.chainId;
+        const networkNode = document.getElementById("networkDisplay");
+        if (networkNode) {
+          const networkLabel = networkNames[defaultNetwork] || defaultNetwork;
+          networkNode.textContent =
+            chainId !== undefined ? `${networkLabel} (chain ID ${chainId})` : networkLabel;
+        }
+
+        const addr = (data?.[defaultNetwork]?.factoryAddress || "").trim();
+        const factoryNode = document.getElementById("factoryAddressDisplay");
+        if (factoryNode && addr) {
+          factoryNode.textContent = addr;
+        }
       } catch (_) {
-        // Keep the fallback address if config is unavailable.
+        // Keep static fallback text if config is unavailable.
       }
     })();
   </script>

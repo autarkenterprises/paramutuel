@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import os
+import threading
+import time
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+from .api import Handler
+from .indexer import db_connect, init_db, normalize_address, sync_logs
+
+NETWORK_KEY_MAP = {
+    "base-sepolia": "baseSepolia",
+    "base-sepolia-testnet": "baseSepolia",
+    "base-mainnet": "baseMainnet",
+    "base": "baseMainnet",
+}
+
+
+def _env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default).strip()
+
+
+def _resolve_int_env(name: str, default: int) -> int:
+    value = _env(name)
+    if not value:
+        return default
+    return int(value)
+
+
+def _resolve_optional_int_env(name: str) -> int | None:
+    value = _env(name)
+    if not value:
+        return None
+    return int(value)
+
+
+def _factory_from_config(config_path: str, network: str) -> str:
+    path = Path(config_path)
+    if not path.exists():
+        return ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    key = NETWORK_KEY_MAP.get(network, network)
+    return str((data.get(key) or {}).get("factoryAddress") or "").strip()
+
+
+def _resolve_factory_address(explicit: str, network: str, config_path: str) -> str:
+    if explicit:
+        return normalize_address(explicit)
+
+    from_env = _env("FACTORY_ADDRESS")
+    if from_env:
+        return normalize_address(from_env)
+
+    from_config = _factory_from_config(config_path, network)
+    if from_config:
+        return normalize_address(from_config)
+
+    raise RuntimeError("Factory address is required (arg, FACTORY_ADDRESS env, or deployments config)")
+
+
+def _resolve_rpc_url(explicit: str) -> str:
+    if explicit:
+        return explicit
+    rpc = _env("RPC_URL_BASE_SEPOLIA") or _env("RPC_URL_SEPOLIA") or _env("RPC_URL")
+    if not rpc:
+        raise RuntimeError("RPC URL is required (arg, RPC_URL_BASE_SEPOLIA, RPC_URL_SEPOLIA, or RPC_URL)")
+    return rpc
+
+
+def _sync_loop(
+    stop_event: threading.Event,
+    rpc_url: str,
+    conn,
+    factory_address: str,
+    poll_interval_seconds: int,
+    chunk_size: int,
+    initial_from_block: int | None,
+) -> None:
+    from_block = initial_from_block
+    while not stop_event.is_set():
+        try:
+            processed = sync_logs(
+                rpc_url=rpc_url,
+                conn=conn,
+                factory_address=factory_address,
+                from_block=from_block,
+                to_block=None,
+                chunk_size=chunk_size,
+            )
+            from_block = None
+            if processed:
+                print(f"[indexer-sync] processed logs: {processed}")
+        except Exception as exc:
+            print(f"[indexer-sync] error: {exc}")
+
+        stop_event.wait(max(1, poll_interval_seconds))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Live indexer API (sync loop + HTTP API in one process)")
+    parser.add_argument("--db-path", default=_env("INDEXER_DB_PATH", "service/indexer/indexer.db"))
+    parser.add_argument("--rpc-url", default=_env("RPC_URL_BASE_SEPOLIA") or _env("RPC_URL_SEPOLIA") or _env("RPC_URL"))
+    parser.add_argument("--factory-address", default=_env("FACTORY_ADDRESS"))
+    parser.add_argument("--network", default=_env("INDEXER_NETWORK", "base-sepolia"))
+    parser.add_argument("--deployments-config-path", default=_env("DEPLOYMENTS_CONFIG_PATH", "config/deployments.json"))
+    parser.add_argument("--host", default=_env("HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=_resolve_int_env("PORT", 8090))
+    parser.add_argument("--poll-interval-seconds", type=int, default=_resolve_int_env("INDEXER_POLL_INTERVAL_SECONDS", 15))
+    parser.add_argument("--chunk-size", type=int, default=_resolve_int_env("INDEXER_CHUNK_SIZE", 2_000))
+    parser.add_argument("--from-block", type=int, default=_resolve_optional_int_env("INDEXER_FROM_BLOCK"))
+    args = parser.parse_args()
+
+    rpc_url = _resolve_rpc_url(args.rpc_url)
+    factory_address = _resolve_factory_address(
+        explicit=args.factory_address,
+        network=args.network,
+        config_path=args.deployments_config_path,
+    )
+
+    api_conn = db_connect(args.db_path)
+    sync_conn = db_connect(args.db_path)
+    init_db(api_conn)
+    init_db(sync_conn)
+    Handler.conn = api_conn
+
+    stop_event = threading.Event()
+    sync_thread = threading.Thread(
+        target=_sync_loop,
+        args=(
+            stop_event,
+            rpc_url,
+            sync_conn,
+            factory_address,
+            args.poll_interval_seconds,
+            args.chunk_size,
+            args.from_block,
+        ),
+        daemon=True,
+    )
+    sync_thread.start()
+
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    print(f"Indexer live API listening on http://{args.host}:{args.port}")
+    print(f"Factory: {factory_address}")
+    print(f"Poll interval: {args.poll_interval_seconds}s")
+    try:
+        server.serve_forever()
+    finally:
+        stop_event.set()
+        sync_thread.join(timeout=5)
+        api_conn.close()
+        sync_conn.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -61,6 +61,12 @@ function deploymentConfigKeyForChain(chainId) {
   if (chainId !== null && DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId]) {
     return DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId];
   }
+  if (deploymentsConfig && typeof deploymentsConfig.defaultNetwork === "string") {
+    const configured = deploymentsConfig.defaultNetwork.trim();
+    if (configured.length > 0 && deploymentsConfig[configured]) {
+      return configured;
+    }
+  }
   return "baseSepolia";
 }
 

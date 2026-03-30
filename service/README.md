@@ -14,6 +14,17 @@ python3 -m service.explorer.server --indexer-base-url http://127.0.0.1:8090 --po
 
 Open `http://127.0.0.1:8091`.
 
+## Live indexer API (single process)
+
+For lightweight hosted deployments, run sync loop + API together:
+
+```bash
+PYTHONPATH=. python3 -m service.indexer.live_api --host 0.0.0.0 --port 8090
+```
+
+It resolves `RPC_URL_BASE_SEPOLIA`/`RPC_URL_SEPOLIA`/`RPC_URL` and factory address from
+`FACTORY_ADDRESS` or `config/deployments.json`.
+
 ### Can this be modularly appended to the dApp?
 
 Yes. It is already modular:

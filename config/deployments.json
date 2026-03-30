@@ -1,10 +1,13 @@
 {
+  "defaultNetwork": "baseSepolia",
   "baseSepolia": {
     "chainId": 84532,
-    "factoryAddress": "0x8FBB3ab4BBCAEA196f7847e6c2fe575Eadc18B36"
+    "factoryAddress": "0x8FBB3ab4BBCAEA196f7847e6c2fe575Eadc18B36",
+    "explorerApiBase": ""
   },
   "baseMainnet": {
     "chainId": 8453,
-    "factoryAddress": ""
+    "factoryAddress": "",
+    "explorerApiBase": ""
   }
 }

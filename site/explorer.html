@@ -20,16 +20,38 @@
     <label for="indexerUrl">Indexer API URL:</label>
     <input id="indexerUrl" type="text" placeholder="http://127.0.0.1:8090" />
     <button id="loadExplorer">Connect</button>
-    <span style="color: #6e7a94;">Leave empty for default. Requires a running indexer service.</span>
+    <span id="indexerHint" style="color: #6e7a94;">Leave empty for default. Requires a running indexer service.</span>
   </div>
   <iframe id="explorerFrame" src="explorer/index.html" title="Paramutuel Explorer"></iframe>
   <script>
-    document.getElementById("loadExplorer").addEventListener("click", () => {
+    const configUrl = "config/deployments.json";
+
+    function setExplorerFrameFromInput() {
       const url = document.getElementById("indexerUrl").value.trim();
       const frame = document.getElementById("explorerFrame");
-      const base = url ? "explorer/index.html?api=" + encodeURIComponent(url) : "explorer/index.html";
-      frame.src = base;
-    });
+      frame.src = url ? "explorer/index.html?api=" + encodeURIComponent(url) : "explorer/index.html";
+    }
+
+    async function applyDefaultIndexerFromConfig() {
+      try {
+        const response = await fetch(configUrl);
+        if (!response.ok) return;
+        const data = await response.json();
+        const defaultNetwork = String((data?.defaultNetwork || "baseSepolia")).trim();
+        const apiBase = String((data?.[defaultNetwork]?.explorerApiBase || "")).trim();
+        if (!apiBase) return;
+        const input = document.getElementById("indexerUrl");
+        input.value = apiBase;
+        const hint = document.getElementById("indexerHint");
+        hint.textContent = "Default from deployments config. You can still override manually.";
+      } catch (_) {
+        // Keep manual-only mode if config is unavailable.
+      }
+    }
+
+    document.getElementById("loadExplorer").addEventListener("click", setExplorerFrameFromInput);
+
+    applyDefaultIndexerFromConfig().finally(setExplorerFrameFromInput);
   </script>
 </body>
 </html>

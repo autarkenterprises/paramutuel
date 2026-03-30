@@ -9,7 +9,8 @@ async function loadConfiguredFactoryAddress() {
     const response = await fetch(DEPLOYMENTS_CONFIG_URL);
     if (!response.ok) return;
     const data = await response.json();
-    const addr = String((data?.baseSepolia?.factoryAddress || "")).trim();
+    const defaultNetwork = String((data?.defaultNetwork || "baseSepolia")).trim();
+    const addr = String((data?.[defaultNetwork]?.factoryAddress || "")).trim();
     if (!addr) return;
     node.textContent = addr;
   } catch (_) {
