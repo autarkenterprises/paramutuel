@@ -25,6 +25,7 @@
         <div id="walletAddr" class="muted">Not connected</div>
       </div>
       <div id="walletStatus" class="muted"></div>
+      <div id="networkStatus" class="muted"></div>
     </section>
 
     <section class="card">
@@ -37,10 +38,20 @@
         </label>
 
         <label>
+          Collateral token preset
+          <select id="collateralPreset">
+            <option value="custom">Custom token address</option>
+          </select>
+        </label>
+
+        <label>
           Collateral token (ERC20) address
           <input id="collateralToken" placeholder="0x..." />
         </label>
-        <div id="tokenMeta" class="muted span-2">Connect wallet, then tab out of the token field to auto-detect <code>decimals()</code>.</div>
+        <div id="tokenMeta" class="muted span-2">
+          Connect wallet to auto-detect network and token decimals.
+          Pick a known token preset, or keep custom entry.
+        </div>
 
         <label>
           Outcomes (comma-separated)

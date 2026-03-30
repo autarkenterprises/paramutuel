@@ -44,12 +44,18 @@ In MetaMask, use **Base Sepolia**:
 ### 4) Start the dApp locally
 
 ```bash
-python3 -m http.server 8080
+./script/dapp/launch_dapp.sh
 ```
 
 Open:
 
 - `http://localhost:8080/dapp/`
+
+Alternative manual server command:
+
+```bash
+python3 -m http.server 8080
+```
 
 In the dApp UI:
 

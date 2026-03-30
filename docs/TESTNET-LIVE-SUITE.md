@@ -2,10 +2,11 @@
 
 This suite tests deployed contracts on Base Sepolia rather than local unit-test code paths.
 
-It has two modes:
+It has three modes:
 
 - `readonly` (default): `eth_call` checks only, no transactions, no gas.
 - `minimal-tx`: one lightweight lifecycle flow with low-value/no-value actions to validate live state transitions.
+- `funded-tx`: real collateral flow (`approve` + `placeBet` + `resolve/retract/expire` + `claim` + optional `withdrawFees`) plus optional unauthorized-role negative checks.
 
 ## Why this is low-cost
 
@@ -23,6 +24,11 @@ Optional:
 - `TESTNET_MARKET_ADDRESS` (to run additional read checks on a known market)
 - `TESTNET_MODE=minimal-tx` (for transaction checks)
 - `PRIVATE_KEY` (required for `minimal-tx`)
+- `TESTNET_MODE=funded-tx` (for funded lifecycle checks)
+- `TESTNET_COLLATERAL_TOKEN` (required for `funded-tx`, ERC20 with `decimals()/approve()/balanceOf()`)
+- `TESTNET_BET_AMOUNT` (optional, default `1`; human token units)
+- `TESTNET_SECONDARY_PRIVATE_KEY` (optional; if funded, places a second bet on opposite outcome)
+- `TESTNET_UNAUTHORIZED_PRIVATE_KEY` (optional; enables negative access-control tx checks)
 
 ## Run
 
@@ -48,6 +54,18 @@ FACTORY_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 TESTNET_MODE=minimal-tx \
 PRIVATE_KEY=0x... \
+./script/testnet/run_live_suite.sh
+```
+
+Funded tx mode:
+
+```bash
+FACTORY_ADDRESS=0x... \
+RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
+TESTNET_MODE=funded-tx \
+PRIVATE_KEY=0x... \
+TESTNET_COLLATERAL_TOKEN=0x... \
+TESTNET_BET_AMOUNT=1 \
 ./script/testnet/run_live_suite.sh
 ```
 

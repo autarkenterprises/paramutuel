@@ -25,17 +25,24 @@ It supports:
 From repo root:
 
 ```bash
-python3 -m http.server 8080
+./script/dapp/launch_dapp.sh
 ```
 
 Then open:
 
 `http://localhost:8080/dapp/`
 
+Manual alternative:
+
+```bash
+python3 -m http.server 8080
+```
+
 ### How to configure
 
 In the dApp UI, paste:
 - `Factory address`
+- `Collateral token preset` (network-aware dropdown; includes Base mainnet and Base Sepolia presets)
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)
 - Question text
@@ -49,6 +56,7 @@ In the dApp UI, paste:
 
 ### Notes
 
+- The wallet section shows detected network (`chainId`) after connect. If token preset and wallet network mismatch, the UI warns and blocks create-market submission.
 - **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - Shared logic used by the UI is in `dapp/logic.js` with independent tests in `dapp/tests/logic.test.js`.

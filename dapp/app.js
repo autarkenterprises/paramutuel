@@ -15,9 +15,52 @@ let factoryAbi;
 let marketAbi;
 
 let marketContract; // last-created market
+let currentChainId = null;
+let walletListenersAttached = false;
+
+const CHAIN_INFO = {
+  8453: { name: "Base Mainnet" },
+  84532: { name: "Base Sepolia" },
+};
+
+const TOKEN_PRESETS = {
+  8453: [
+    {
+      symbol: "USDC",
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      decimals: 6,
+    },
+  ],
+  84532: [
+    {
+      symbol: "USDC",
+      address: "0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+      decimals: 6,
+    },
+  ],
+};
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function chainName(chainId) {
+  const info = CHAIN_INFO[chainId];
+  return info ? info.name : `Unknown chain (${chainId})`;
+}
+
+function tokenPresetValue(chainId, token) {
+  return `${chainId}:${token.address}:${token.decimals}:${token.symbol}`;
+}
+
+function parseTokenPresetValue(value) {
+  const [chainIdRaw, address, decimalsRaw, symbol] = value.split(":");
+  return {
+    chainId: Number(chainIdRaw),
+    address,
+    decimals: Number(decimalsRaw),
+    symbol,
+  };
 }
 
 function parseCsvToArray(s) {
@@ -166,6 +209,80 @@ function syncWindowInputState() {
   $("resolutionWindow").readOnly = $("resolutionNoMax").checked;
 }
 
+function populateCollateralPresets() {
+  const select = $("collateralPreset");
+  const previous = select.value;
+  select.innerHTML = "";
+
+  const custom = document.createElement("option");
+  custom.value = "custom";
+  custom.textContent = "Custom token address";
+  select.appendChild(custom);
+
+  const chainIds = Object.keys(TOKEN_PRESETS).map(Number);
+  for (const chainId of chainIds) {
+    const tokens = TOKEN_PRESETS[chainId] || [];
+    for (const token of tokens) {
+      const option = document.createElement("option");
+      option.value = tokenPresetValue(chainId, token);
+      option.textContent = `${token.symbol} (${chainName(chainId)})`;
+      select.appendChild(option);
+    }
+  }
+
+  if (previous && [...select.options].some((opt) => opt.value === previous)) {
+    select.value = previous;
+  } else {
+    select.value = "custom";
+  }
+}
+
+async function applySelectedCollateralPreset() {
+  const presetRaw = $("collateralPreset").value;
+  if (presetRaw === "custom") return;
+
+  const preset = parseTokenPresetValue(presetRaw);
+  $("collateralToken").value = preset.address;
+
+  if (!$("decimalsManual").checked) {
+    $("decimals").value = String(preset.decimals);
+  }
+
+  let message = `Selected ${preset.symbol} on ${chainName(preset.chainId)} (${preset.address}).`;
+  if (currentChainId !== null && currentChainId !== preset.chainId) {
+    message += ` Wallet is connected to ${chainName(currentChainId)}; switch network before transacting.`;
+    $("tokenMeta").textContent = message;
+    return;
+  }
+
+  $("tokenMeta").textContent = message;
+  await tryDetectDecimalsFromCollateralField();
+}
+
+async function refreshConnectedNetwork() {
+  if (!provider) {
+    currentChainId = null;
+    $("networkStatus").textContent = "Network: connect wallet to detect chain.";
+    populateCollateralPresets();
+    return;
+  }
+
+  const network = await provider.getNetwork();
+  currentChainId = Number(network.chainId);
+  $("networkStatus").textContent = `Network: ${chainName(currentChainId)} (chainId ${currentChainId})`;
+  populateCollateralPresets();
+}
+
+async function ensureContractExistsOnCurrentNetwork(address, label) {
+  if (!provider) return;
+  const code = await provider.getCode(address);
+  if (code === "0x") {
+    throw new Error(
+      `${label} has no contract code on ${chainName(currentChainId)}. Check network and address.`
+    );
+  }
+}
+
 /**
  * Decimals used when parsing bet amounts: chain by default, manual if checked.
  */
@@ -219,13 +336,32 @@ async function connectWallet() {
   await provider.send("eth_requestAccounts", []);
   signer = await provider.getSigner();
   userAddress = await signer.getAddress();
+  await refreshConnectedNetwork();
 
   $("walletAddr").textContent = userAddress;
   $("walletStatus").textContent = "Connected.";
   await tryDetectDecimalsFromCollateralField();
+
+  if (!walletListenersAttached && window.ethereum && window.ethereum.on) {
+    window.ethereum.on("chainChanged", async () => {
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      await refreshConnectedNetwork();
+      $("walletStatus").textContent = "Network changed. Review factory/token before transacting.";
+      await tryDetectDecimalsFromCollateralField();
+    });
+    window.ethereum.on("accountsChanged", async () => {
+      if (!provider) return;
+      signer = await provider.getSigner();
+      userAddress = await signer.getAddress();
+      $("walletAddr").textContent = userAddress;
+    });
+    walletListenersAttached = true;
+  }
 }
 
 async function getFactoryConstraints(factoryAddress) {
+  await ensureContractExistsOnCurrentNetwork(factoryAddress, "Factory address");
   const factory = new ethers.Contract(factoryAddress, factoryAbi, provider);
   const minBettingWindow = await factory.minBettingWindow();
   const minResolutionWindow = await factory.minResolutionWindow();
@@ -240,6 +376,7 @@ function getRunner() {
 
 async function setActiveMarket(marketAddress) {
   if (!ethers.isAddress(marketAddress)) throw new Error("Invalid market address.");
+  await ensureContractExistsOnCurrentNetwork(marketAddress, "Market address");
   marketContract = new ethers.Contract(marketAddress, marketAbi, getRunner());
   $("marketAddress").textContent = marketAddress;
   $("activeMarketAddress").value = marketAddress;
@@ -266,6 +403,18 @@ async function createMarket() {
   if (!collateralToken) throw new Error("Collateral token is required.");
   if (!outcomesCsv) throw new Error("Outcomes are required.");
   if (!question) throw new Error("Question is required.");
+  if (!ethers.isAddress(factoryAddress)) throw new Error("Factory address is invalid.");
+  if (!ethers.isAddress(collateralToken)) throw new Error("Collateral token address is invalid.");
+
+  const presetRaw = $("collateralPreset").value;
+  if (presetRaw !== "custom" && currentChainId !== null) {
+    const preset = parseTokenPresetValue(presetRaw);
+    if (preset.chainId !== currentChainId) {
+      throw new Error(
+        `Selected token preset is for ${chainName(preset.chainId)}, but wallet is on ${chainName(currentChainId)}.`
+      );
+    }
+  }
 
   const outcomes = parseCsvToArray(outcomesCsv);
   if (outcomes.length < 2) throw new Error("Need at least 2 outcomes.");
@@ -448,6 +597,8 @@ async function withdrawFees() {
 
 async function main() {
   syncWindowInputState();
+  populateCollateralPresets();
+  $("networkStatus").textContent = "Network: connect wallet to detect chain.";
 
   $("marketTemplate").addEventListener("change", () => {
     const template = Logic.getTemplate($("marketTemplate").value);
@@ -459,6 +610,11 @@ async function main() {
   });
   $("bettingNoMax").addEventListener("change", syncWindowInputState);
   $("resolutionNoMax").addEventListener("change", syncWindowInputState);
+  $("collateralPreset").addEventListener("change", () => {
+    applySelectedCollateralPreset().catch((e) => {
+      $("tokenMeta").textContent = `Preset error: ${e.message}`;
+    });
+  });
 
   // Initialize UI with custom defaults.
   $("marketTemplate").value = "custom";

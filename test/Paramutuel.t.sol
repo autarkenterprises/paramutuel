@@ -322,6 +322,49 @@ contract ParamutuelTest is Test {
         assertEq(after2 - before2, 285 ether);
     }
 
+    function testRetractRoundingCannotOverpayAndBreakFeeWithdrawals() public {
+        ParamutuelMarket market = _createBasicMarket();
+
+        // 5% fee market, low-denomination stakes expose floor-rounding edge cases.
+        uint256 amount1 = 1;
+        uint256 amount2 = 19;
+
+        vm.startPrank(bettor1);
+        token.approve(address(market), amount1);
+        market.placeBet(0, amount1);
+        vm.stopPrank();
+
+        vm.startPrank(bettor2);
+        token.approve(address(market), amount2);
+        market.placeBet(1, amount2);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        market.retract();
+
+        uint256 netPot = market.totalPot() - ((market.totalPot() * market.totalFeeBps()) / 10_000);
+
+        vm.startPrank(bettor1);
+        uint256 paid1 = market.claim();
+        vm.stopPrank();
+
+        vm.startPrank(bettor2);
+        uint256 paid2 = market.claim();
+        vm.stopPrank();
+
+        // Total payouts must never exceed net pot.
+        assertLe(paid1 + paid2, netPot, "claims overpay net pot");
+
+        uint256 extraFee = market.feeBalances(extraFeeRecipient);
+        assertEq(extraFee, 1, "expected non-zero fee balance");
+
+        vm.startPrank(extraFeeRecipient);
+        uint256 withdrawn = market.withdrawFees();
+        vm.stopPrank();
+        assertEq(withdrawn, extraFee, "withdraw fee amount mismatch");
+    }
+
     function testExpireAfterDeadline() public {
         ParamutuelMarket market = _createBasicMarket();
 

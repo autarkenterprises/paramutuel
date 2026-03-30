@@ -260,10 +260,9 @@ contract ParamutuelMarket is ReentrancyGuard {
         uint256 netPot = totalPot - _totalFeesAmount();
 
         if (state == State.Retracted) {
-            // Refund pro-rata after fees, which simplifies to each user getting their stake minus fee share.
-            // fee share = userStake * totalFeeBps / 10_000
-            uint256 feeShare = (grossUserStake * totalFeeBps) / BPS_DENOMINATOR;
-            paid = grossUserStake - feeShare;
+            // Use a deterministic pro-rata share of the post-fee pool.
+            // This avoids per-account floor rounding from overpaying total claims beyond `netPot`.
+            paid = (grossUserStake * netPot) / totalPot;
         } else {
             uint256 userWinStake = bets[msg.sender][winningOutcome];
             if (userWinStake == 0) revert NothingToClaim();

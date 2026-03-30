@@ -59,6 +59,45 @@ def _send(address: str, signature: str, *fn_args: str) -> str:
     raise RuntimeError(f"Unable to parse tx hash from cast output:\n{out}")
 
 
+def _send_with_key(private_key: str, address: str, signature: str, *fn_args: str) -> str:
+    rpc = _rpc_url()
+    if not rpc or not private_key:
+        raise RuntimeError("RPC_URL_BASE_SEPOLIA and a private key are required")
+    out = _run_cast(
+        ["send", address, signature, *fn_args, "--rpc-url", rpc, "--private-key", private_key, "--json"]
+    )
+    try:
+        payload = json.loads(out)
+        tx_hash = payload.get("transactionHash")
+        if tx_hash:
+            return tx_hash
+    except json.JSONDecodeError:
+        pass
+
+    for token in out.replace('"', " ").split():
+        if token.startswith("0x") and len(token) == 66:
+            return token
+    raise RuntimeError(f"Unable to parse tx hash from cast output:\n{out}")
+
+
+def _send_expect_failure(private_key: str, address: str, signature: str, *fn_args: str) -> None:
+    rpc = _rpc_url()
+    if not rpc:
+        raise RuntimeError("RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA) is required")
+    proc = subprocess.run(
+        ["cast", "send", address, signature, *fn_args, "--rpc-url", rpc, "--private-key", private_key],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode == 0:
+        raise AssertionError(
+            "Expected transaction to fail, but it succeeded:\n"
+            f"stdout:\n{proc.stdout}\n"
+            f"stderr:\n{proc.stderr}"
+        )
+
+
 def _as_int(value: str) -> int:
     value = value.strip()
     if value.startswith("0x"):
@@ -75,6 +114,24 @@ def _as_bool(value: str) -> bool:
     raise ValueError(f"Expected bool-like value, got: {value}")
 
 
+def _parse_units(amount: str, decimals: int) -> int:
+    value = amount.strip()
+    if not value:
+        raise ValueError("Amount cannot be empty")
+    if value.count(".") > 1:
+        raise ValueError(f"Invalid amount format: {amount}")
+    if "." not in value:
+        return int(value) * (10 ** decimals)
+
+    whole, frac = value.split(".", 1)
+    if not whole:
+        whole = "0"
+    if len(frac) > decimals:
+        raise ValueError(f"Too many decimal places for token decimals={decimals}: {amount}")
+    frac_scaled = frac.ljust(decimals, "0")
+    return int(whole) * (10 ** decimals) + int(frac_scaled)
+
+
 class TestBaseSepoliaLive(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -83,6 +140,10 @@ class TestBaseSepoliaLive(unittest.TestCase):
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
         cls.market_address = _env("TESTNET_MARKET_ADDRESS")
         cls.private_key = _env("PRIVATE_KEY")
+        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
+        cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
+        cls.unauthorized_private_key = _env("TESTNET_UNAUTHORIZED_PRIVATE_KEY")
 
         if not cls.rpc:
             raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
@@ -92,6 +153,9 @@ class TestBaseSepoliaLive(unittest.TestCase):
         cls.sender = ""
         if cls.private_key:
             cls.sender = _run_cast(["wallet", "address", "--private-key", cls.private_key])
+        cls.secondary_sender = ""
+        if cls.secondary_private_key:
+            cls.secondary_sender = _run_cast(["wallet", "address", "--private-key", cls.secondary_private_key])
 
     def test_factory_view_invariants(self) -> None:
         treasury = _call(self.factory, "treasury()(address)")
@@ -175,6 +239,148 @@ class TestBaseSepoliaLive(unittest.TestCase):
         _send(new_market, "expire()")
         state = _as_int(_call(new_market, "state()(uint8)"))
         self.assertEqual(state, 2)  # Retracted
+
+    def test_funded_tx_lifecycle_and_claims(self) -> None:
+        if self.mode != "funded-tx":
+            self.skipTest("Set TESTNET_MODE=funded-tx to run funded lifecycle checks")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY to run funded lifecycle checks")
+        if not self.collateral_token:
+            self.skipTest("Set TESTNET_COLLATERAL_TOKEN to run funded lifecycle checks")
+
+        decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
+        amount_raw = _parse_units(self.bet_amount, decimals)
+        if amount_raw <= 0:
+            self.skipTest("TESTNET_BET_AMOUNT must parse to a positive amount")
+
+        sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
+        if sender_balance < amount_raw:
+            self.skipTest(
+                f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
+            )
+
+        before_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
+        protocol_fee_bps = _as_int(_call(self.factory, "protocolFeeBps()(uint16)"))
+        extra_bps = 1 if protocol_fee_bps < 1000 else 0
+        extra_recipients = f'["{self.sender}"]' if extra_bps > 0 else "[]"
+        extra_bps_json = f"[{extra_bps}]" if extra_bps > 0 else "[]"
+
+        # Resolve branch with real collateral + claim + fee withdrawal.
+        _send(
+            self.factory,
+            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            self.collateral_token,
+            f"funded-resolve-{int(time.time())}",
+            '["YES","NO"]',
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            extra_recipients,
+            extra_bps_json,
+        )
+        after_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
+        self.assertEqual(after_count, before_count + 1)
+        resolve_market = _call(self.factory, "markets(uint256)(address)", str(after_count - 1))
+
+        _send(self.collateral_token, "approve(address,uint256)", resolve_market, str(amount_raw))
+        _send(resolve_market, "placeBet(uint256,uint256)", "0", str(amount_raw))
+
+        if self.secondary_private_key:
+            secondary_balance = _as_int(
+                _call(self.collateral_token, "balanceOf(address)(uint256)", self.secondary_sender)
+            )
+            if secondary_balance >= amount_raw:
+                _send_with_key(
+                    self.secondary_private_key,
+                    self.collateral_token,
+                    "approve(address,uint256)",
+                    resolve_market,
+                    str(amount_raw),
+                )
+                _send_with_key(
+                    self.secondary_private_key,
+                    resolve_market,
+                    "placeBet(uint256,uint256)",
+                    "1",
+                    str(amount_raw),
+                )
+
+        _send(resolve_market, "closeBetting()")
+        _send(resolve_market, "resolve(uint256)", "0")
+        _send(resolve_market, "claim()")
+        if extra_bps > 0:
+            sender_fee_balance = _as_int(
+                _call(resolve_market, "feeBalances(address)(uint256)", self.sender)
+            )
+            if sender_fee_balance > 0:
+                _send(resolve_market, "withdrawFees()")
+
+        # Retract branch with funded bet + claim.
+        _send(
+            self.factory,
+            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            self.collateral_token,
+            f"funded-retract-{int(time.time())}",
+            '["YES","NO"]',
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            "[]",
+            "[]",
+        )
+        retract_market = _call(self.factory, "markets(uint256)(address)", str(after_count))
+        _send(self.collateral_token, "approve(address,uint256)", retract_market, str(amount_raw))
+        _send(retract_market, "placeBet(uint256,uint256)", "1", str(amount_raw))
+        _send(retract_market, "closeBetting()")
+        _send(retract_market, "retract()")
+        _send(retract_market, "claim()")
+
+        # Expire branch with funded bet + claim.
+        _send(
+            self.factory,
+            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            self.collateral_token,
+            f"funded-expire-{int(time.time())}",
+            '["YES","NO"]',
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            "[]",
+            "[]",
+        )
+        expire_market = _call(self.factory, "markets(uint256)(address)", str(after_count + 1))
+        _send(self.collateral_token, "approve(address,uint256)", expire_market, str(amount_raw))
+        _send(expire_market, "placeBet(uint256,uint256)", "0", str(amount_raw))
+        _send(expire_market, "closeBetting()")
+        _send(expire_market, "closeResolutionWindow()")
+        _send(expire_market, "expire()")
+        _send(expire_market, "claim()")
+
+        # Optional negative-role checks from a non-authorized key.
+        if self.unauthorized_private_key:
+            _send(
+                self.factory,
+                "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+                self.collateral_token,
+                f"funded-unauth-{int(time.time())}",
+                '["YES","NO"]',
+                "0",
+                "0",
+                ZERO_ADDRESS,
+                ZERO_ADDRESS,
+                ZERO_ADDRESS,
+                "[]",
+                "[]",
+            )
+            unauth_market = _call(self.factory, "markets(uint256)(address)", str(after_count + 2))
+            _send_expect_failure(self.unauthorized_private_key, unauth_market, "closeBetting()")
+            _send_expect_failure(self.unauthorized_private_key, unauth_market, "resolve(uint256)", "0")
 
 
 if __name__ == "__main__":
