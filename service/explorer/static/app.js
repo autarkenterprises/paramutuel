@@ -1,5 +1,21 @@
 const params = new URLSearchParams(window.location.search);
 const API_BASE = params.get("api") || window.EXPLORER_API_BASE || "";
+const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
+
+async function loadConfiguredFactoryAddress() {
+  const node = document.getElementById("factoryAddressDisplay");
+  if (!node) return;
+  try {
+    const response = await fetch(DEPLOYMENTS_CONFIG_URL);
+    if (!response.ok) return;
+    const data = await response.json();
+    const addr = String((data?.baseSepolia?.factoryAddress || "")).trim();
+    if (!addr) return;
+    node.textContent = addr;
+  } catch (_) {
+    // Optional when explorer is served standalone without deployments config.
+  }
+}
 
 async function loadMarkets() {
   const tbody = document.getElementById("markets");
@@ -43,5 +59,9 @@ document.getElementById("refresh").addEventListener("click", () => {
 });
 
 loadMarkets().catch((e) => {
+  console.error(e);
+});
+
+loadConfiguredFactoryAddress().catch((e) => {
   console.error(e);
 });
