@@ -3,12 +3,11 @@ import argparse
 import json
 import os
 import threading
-import time
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from .api import Handler
-from .indexer import db_connect, init_db, normalize_address, sync_logs
+from .indexer import db_connect, get_meta_int, init_db, normalize_address, sync_logs
 
 NETWORK_KEY_MAP = {
     "base-sepolia": "baseSepolia",
@@ -34,6 +33,21 @@ def _resolve_optional_int_env(name: str) -> int | None:
     if not value:
         return None
     return int(value)
+
+
+def _indexer_from_block_from_config(config_path: str, network: str) -> int | None:
+    path = Path(config_path)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    key = NETWORK_KEY_MAP.get(network, network)
+    raw = (data.get(key) or {}).get("indexerFromBlock")
+    if raw is None or raw == "":
+        return None
+    return int(raw)
 
 
 def _factory_from_config(config_path: str, network: str) -> str:
@@ -79,20 +93,20 @@ def _sync_loop(
     factory_address: str,
     poll_interval_seconds: int,
     chunk_size: int,
-    initial_from_block: int | None,
+    initial_from_block: int,
 ) -> None:
-    from_block = initial_from_block
     while not stop_event.is_set():
         try:
+            last = get_meta_int(conn, "last_indexed_block")
+            effective_from: int | None = None if last is not None else initial_from_block
             processed = sync_logs(
                 rpc_url=rpc_url,
                 conn=conn,
                 factory_address=factory_address,
-                from_block=from_block,
+                from_block=effective_from,
                 to_block=None,
                 chunk_size=chunk_size,
             )
-            from_block = None
             if processed:
                 print(f"[indexer-sync] processed logs: {processed}")
         except Exception as exc:
@@ -122,6 +136,17 @@ def main() -> None:
         config_path=args.deployments_config_path,
     )
 
+    initial_from_block = args.from_block
+    if initial_from_block is None:
+        initial_from_block = _indexer_from_block_from_config(
+            args.deployments_config_path, args.network
+        )
+    if initial_from_block is None:
+        raise RuntimeError(
+            "Initial indexer from-block is required: set env INDEXER_FROM_BLOCK or add "
+            f"indexerFromBlock to the network entry in {args.deployments_config_path}"
+        )
+
     api_conn = db_connect(args.db_path)
     sync_conn = db_connect(args.db_path)
     init_db(api_conn)
@@ -138,7 +163,7 @@ def main() -> None:
             factory_address,
             args.poll_interval_seconds,
             args.chunk_size,
-            args.from_block,
+            initial_from_block,
         ),
         daemon=True,
     )

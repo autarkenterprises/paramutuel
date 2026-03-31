@@ -163,6 +163,20 @@ def set_meta_int(conn: sqlite3.Connection, key: str, value: int) -> None:
     )
 
 
+def get_meta_str(conn: sqlite3.Connection, key: str) -> Optional[str]:
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    if not row:
+        return None
+    return str(row["value"])
+
+
+def set_meta_str(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (key, value),
+    )
+
+
 def insert_event_log(
     conn: sqlite3.Connection,
     eid: str,
@@ -424,18 +438,39 @@ def sync_logs(
     from_block: Optional[int],
     to_block: Optional[int],
     chunk_size: int,
+    *,
+    allow_genesis_start: bool = False,
 ) -> int:
     factory_address = normalize_address(factory_address)
 
     latest = to_int(rpc_call(rpc_url, "eth_blockNumber", []))
+    set_meta_int(conn, "chain_head", latest)
+    set_meta_str(conn, "last_sync_error", "")
+    conn.commit()
+
     if to_block is None:
         to_block = latest
     to_block = min(to_block, latest)
 
     if from_block is None:
         last_indexed = get_meta_int(conn, "last_indexed_block")
-        from_block = (last_indexed + 1) if last_indexed is not None else 0
+        if last_indexed is not None:
+            from_block = last_indexed + 1
+        elif allow_genesis_start:
+            from_block = 0
+        else:
+            raise RuntimeError(
+                "Indexer has no last_indexed_block cursor and from_block was not supplied "
+                "(set INDEXER_FROM_BLOCK or indexerFromBlock in deployments for live_api)"
+            )
+
     if from_block > to_block:
+        set_meta_str(
+            conn,
+            "last_sync_error",
+            f"from_block {from_block} is ahead of chain head {to_block} (check INDEXER_FROM_BLOCK / indexerFromBlock)",
+        )
+        conn.commit()
         return 0
 
     topic_filter = [list(TOPICS.values())]
@@ -451,13 +486,28 @@ def sync_logs(
                 "topics": topic_filter,
             }
         ]
-        logs = rpc_call(rpc_url, "eth_getLogs", params)
+        try:
+            logs = rpc_call(rpc_url, "eth_getLogs", params)
+        except Exception as exc:
+            set_meta_str(
+                conn,
+                "last_sync_error",
+                f"eth_getLogs blocks {start}-{end}: {exc}"[:800],
+            )
+            conn.commit()
+            raise
         logs.sort(key=lambda l: (to_int(l["blockNumber"]), to_int(l["logIndex"])))
         for log in logs:
-            apply_log(conn, factory_address, log, rpc_url=rpc_url)
-            processed += 1
+            try:
+                apply_log(conn, factory_address, log, rpc_url=rpc_url)
+                processed += 1
+            except Exception as exc:
+                tx = log.get("transactionHash", "?")
+                li = log.get("logIndex", "?")
+                print(f"[indexer-sync] skip log {tx}:{li}: {exc}")
 
         set_meta_int(conn, "last_indexed_block", end)
+        set_meta_str(conn, "last_sync_error", "")
         conn.commit()
         start = end + 1
 
@@ -483,6 +533,7 @@ def main() -> None:
         from_block=args.from_block,
         to_block=args.to_block,
         chunk_size=args.chunk_size,
+        allow_genesis_start=True,
     )
     print(f"Processed logs: {count}")
 

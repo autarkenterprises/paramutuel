@@ -277,15 +277,24 @@ async function loadWagers({ append = false } = {}) {
         const hb = await hr.json();
         const wc = hb.wager_count ?? 0;
         const lb = hb.last_indexed_block;
+        const head = hb.chain_head;
+        const err = hb.last_sync_error;
         lastIndexerHint =
           ` — indexer: ${wc} wager(s) stored` +
           (lb != null ? `, last indexed block ${lb}` : "") +
+          (head != null ? `, chain head ${head}` : "") +
           ".";
-        if (wc === 0 && lb != null && lb > 0) {
+        if (err) {
+          lastIndexerHint += ` Sync error: ${err}`;
+        } else if (wc === 0 && lb != null && lb > 0) {
           lastIndexerHint +=
             " Chain has been scanned but no wagers were ingested; redeploy Cloud Run from the latest master (indexer event topics must match the factory).";
-        } else if (wc === 0 && (lb == null || lb === 0)) {
-          lastIndexerHint += " Wait for the first sync cycle or check RPC / from-block settings.";
+        } else if (wc === 0 && lb == null && head != null) {
+          lastIndexerHint +=
+            " RPC is reachable but no blocks were indexed yet (first sync may still be running).";
+        } else if (wc === 0 && (lb == null || lb === 0) && head == null) {
+          lastIndexerHint +=
+            " RPC or sync not initialized; confirm INDEXER_FROM_BLOCK / indexerFromBlock in deployments and redeploy Cloud Run.";
         }
       }
     } catch (_) {

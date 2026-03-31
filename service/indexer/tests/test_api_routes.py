@@ -204,6 +204,8 @@ class ApiRouteTests(unittest.TestCase):
         self.assertTrue(body.get("ok"))
         self.assertIn("wager_count", body)
         self.assertIn("last_indexed_block", body)
+        self.assertIn("chain_head", body)
+        self.assertIn("last_sync_error", body)
 
 
 if __name__ == "__main__":

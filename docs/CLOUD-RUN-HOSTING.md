@@ -19,6 +19,10 @@ The root `Dockerfile` sets everything needed for a no-console deploy:
 
 Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC_URL_BASE_SEPOLIA`, `INDEXER_FROM_BLOCK`, etc.
 
+**Do not** set `INDEXER_FROM_BLOCK` to an empty value in the console: that overrides the Dockerfile default with “unset”, and the live indexer then relies on `indexerFromBlock` in `config/deployments.json` inside the image (added in-repo next to the factory). If both are missing, the container fails fast at startup.
+
+Smaller `INDEXER_CHUNK_SIZE` (default `400` in the Dockerfile) reduces `eth_getLogs` payload on public RPCs.
+
 ## Deploy via Cloud Run UI (repo-connected)
 
 1. Create service in Cloud Run and connect this GitHub repo.
