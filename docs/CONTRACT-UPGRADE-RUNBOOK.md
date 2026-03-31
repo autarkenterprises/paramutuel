@@ -37,17 +37,18 @@ Expected outcomes:
 
 ## 5) Hosting propagation
 
-- Update `render.yaml`:
-  - Set `INDEXER_FROM_BLOCK` to the new deployment block.
+- Update `config/deployments.json` (`baseSepolia.factoryAddress` is usually set by `launch_testnet.sh`):
+  - Set `baseSepolia.indexerFromBlock` to the new factory deployment block.
+- Update the root `Dockerfile` env `INDEXER_FROM_BLOCK` if you rely on image defaults for Cloud Run.
 - Commit and push:
   - `config/deployments.json`
-  - `render.yaml` (if block changed)
+  - `Dockerfile` (if the default from-block changed)
   - any ABI/docs/test changes.
 
 ## 6) Redeploy hosted components
 
 - GitHub Pages redeploy should trigger on push (`deploy-site.yml`).
-- Render indexer should auto-redeploy on push if blueprint service is linked.
+- **Cloud Run** indexer: rebuild and deploy a new revision from the updated `master` (see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md)).
 - Verify:
   - `GET /health` returns `ok`.
   - `GET /wagers` route works and reflects new factory over time.

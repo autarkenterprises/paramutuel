@@ -121,7 +121,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 **Current status:**
 - Core protocol: complete, tested (40+ Solidity tests), deployed on Base Sepolia
 - dApp: functional, all lifecycle flows working, hosted on GitHub Pages
-- Indexer + API: operational, reorg-safe, deterministic, hosted on Render
+- Indexer + API: operational, reorg-safe, deterministic, hosted on Cloud Run
 - Explorer + control panel: operational
 - MCP server: built (16 tools for LLM agent integration)
 - Protocol website: live at `https://autarkenterprises.github.io/paramutuel/`
@@ -220,7 +220,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 - Test coverage: 40+ tests, all passing
 - MCP server: built and tested (16 tools)
 - Hosted dApp + protocol website: live on GitHub Pages
-- Indexer API: hosted on Render
+- Indexer API: hosted on Cloud Run
 - Architecture: immutable core, modular resolution
 - Roadmap checkpoints completed vs. remaining
 

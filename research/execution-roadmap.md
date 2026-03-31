@@ -111,7 +111,7 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Checkpoint 4 — Minimal Custom Indexer v1
 
-**Status:** Complete (indexer, API, reorg-safe replay, all event types, hosted on Render)
+**Status:** Complete (indexer, API, reorg-safe replay, all event types, hosted on Cloud Run)
 
 **Goal:** Provide deterministic wager state querying for dApp and service.
 

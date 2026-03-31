@@ -1,48 +1,30 @@
-# Live indexer hosting (Render)
+# Live indexer hosting
 
-GitHub Pages is static-only, so a live indexer API must run on a service host.  
-The lightest setup in this repo is Render free tier using `render.yaml`.
-For Google Cloud Run setup, see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md).
+GitHub Pages is static-only, so the indexer HTTP API (`/health`, `/wagers`, `/wagers/:address`, …) must run on a container host.
 
-## What gets deployed
+**Canonical setup:** Google Cloud Run — see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md) (Dockerfile at repo root, env defaults, redeploy notes).
 
-- Web service entrypoint: `service.indexer.live_api`
-- Behavior:
-  - runs the log sync loop continuously against your RPC
-  - serves the HTTP API (`/health`, `/wagers`, `/wagers/:address`) on the same process
+## What runs
 
-## Render setup
+- Process: `python3 -m service.indexer.live_api`
+- Log sync loop and HTTP API share one process and SQLite (`INDEXER_DB_PATH`, typically ephemeral `/tmp` on Cloud Run).
 
-1. In Render, create a **Blueprint** from this repo (so `render.yaml` is applied automatically).
-2. Deploy.
+## Repo defaults
 
-No manual env vars are required for the default Base Sepolia setup in this repo:
-- RPC defaults to `https://sepolia.base.org` via `render.yaml` env config.
-- Factory address defaults from `config/deployments.json` (`defaultNetwork` + `<network>.factoryAddress`).
+- Factory and indexer start block: `config/deployments.json` (`baseSepolia.factoryAddress`, `baseSepolia.indexerFromBlock`).
+- Explorer / dApp API base: `baseSepolia.explorerApiBase` in the same file.
 
-Optional overrides:
-- set `RPC_URL_BASE_SEPOLIA` in Render if you want a different RPC provider
-- set `FACTORY_ADDRESS` if you need to temporarily override config without committing
+## Wire the hosted explorer
 
-The service URL will look like:
-- `https://<your-service>.onrender.com`
-
-## Wire website explorer default
-
-After you have the service URL:
+After you have the indexer URL:
 
 ```bash
-./script/testnet/set_explorer_api_base.sh "https://<your-service>.onrender.com"
+./script/testnet/set_explorer_api_base.sh "https://your-indexer.example.run.app"
 ```
 
-Then commit/push `config/deployments.json`.  
-`site/explorer.html` will use that value as the default API base automatically.
+Commit and push `config/deployments.json` so GitHub Pages picks up the default.
 
 ## Notes
 
-- Render free tier does **not** support persistent disks. This repo's `render.yaml` is configured for free tier:
-  - `INDEXER_DB_PATH=/tmp/indexer.db` (ephemeral)
-  - `INDEXER_FROM_BLOCK=39562334` (latest Base Sepolia factory deployment block at time of writing)
-- Free tier may cold-start after idle periods. On cold start, indexer state is rebuilt from `INDEXER_FROM_BLOCK`.
-- If redeploying a new factory, update `INDEXER_FROM_BLOCK` to that deployment block for faster warm-up.
-- If you need persistent index state across restarts, use a paid plan with a disk and set `INDEXER_DB_PATH` to disk storage.
+- Ephemeral DB: on cold start the indexer replays logs from `indexerFromBlock` / `INDEXER_FROM_BLOCK`.
+- After a **new factory** deploy, update `indexerFromBlock` (and Dockerfile `INDEXER_FROM_BLOCK` if you rely on image defaults), then redeploy the hosted indexer.
