@@ -12,8 +12,8 @@ ENV INDEXER_NETWORK=base-sepolia
 ENV DEPLOYMENTS_CONFIG_PATH=config/deployments.json
 ENV INDEXER_DB_PATH=/tmp/indexer.db
 ENV INDEXER_POLL_INTERVAL_SECONDS=15
-# Smaller chunks help public RPCs (e.g. sepolia.base.org) stay within getLogs limits.
-ENV INDEXER_CHUNK_SIZE=400
+# Initial window per getLogs; bisection splits further on HTTP 400 from strict RPCs.
+ENV INDEXER_CHUNK_SIZE=120
 # Zero-UI Cloud Run: public Base Sepolia RPC + factory deploy block (override in console if needed).
 ENV RPC_URL_BASE_SEPOLIA=https://sepolia.base.org
 ENV INDEXER_FROM_BLOCK=39608044

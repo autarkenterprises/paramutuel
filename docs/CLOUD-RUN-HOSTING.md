@@ -21,7 +21,7 @@ Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC
 
 **Do not** set `INDEXER_FROM_BLOCK` to an empty value in the console: that overrides the Dockerfile default with “unset”, and the live indexer then relies on `indexerFromBlock` in `config/deployments.json` inside the image (added in-repo next to the factory). If both are missing, the container fails fast at startup.
 
-Smaller `INDEXER_CHUNK_SIZE` (default `400` in the Dockerfile) reduces `eth_getLogs` payload on public RPCs.
+`INDEXER_CHUNK_SIZE` (default `120` in the Dockerfile) sets the first `eth_getLogs` window; the indexer **bisects** the range automatically if the RPC returns HTTP 400 for an oversized window.
 
 ## Deploy via Cloud Run UI (repo-connected)
 

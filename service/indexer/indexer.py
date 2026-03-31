@@ -431,6 +431,33 @@ def get_expire_candidates(conn: sqlite3.Connection, now_ts: Optional[int] = None
     ).fetchall()
 
 
+def _eth_get_logs_bisect(
+    rpc_url: str,
+    start: int,
+    end: int,
+    topic_filter: List[List[str]],
+    min_span: int = 1,
+) -> List[Dict[str, Any]]:
+    """Return logs for [start, end], recursively halving the block span on RPC failure.
+
+    Public RPCs (e.g. Base Sepolia) sometimes respond with HTTP 400 for wide getLogs
+    windows even when smaller ranges succeed.
+    """
+    if start > end:
+        return []
+    span = end - start + 1
+    params = [{"fromBlock": hex(start), "toBlock": hex(end), "topics": topic_filter}]
+    try:
+        return rpc_call(rpc_url, "eth_getLogs", params)
+    except Exception:
+        if span <= min_span:
+            raise
+        mid = start + (span // 2) - 1
+        left = _eth_get_logs_bisect(rpc_url, start, mid, topic_filter, min_span)
+        right = _eth_get_logs_bisect(rpc_url, mid + 1, end, topic_filter, min_span)
+        return left + right
+
+
 def sync_logs(
     rpc_url: str,
     conn: sqlite3.Connection,
@@ -479,15 +506,8 @@ def sync_logs(
     start = from_block
     while start <= to_block:
         end = min(start + chunk_size - 1, to_block)
-        params = [
-            {
-                "fromBlock": hex(start),
-                "toBlock": hex(end),
-                "topics": topic_filter,
-            }
-        ]
         try:
-            logs = rpc_call(rpc_url, "eth_getLogs", params)
+            logs = _eth_get_logs_bisect(rpc_url, start, end, topic_filter, min_span=1)
         except Exception as exc:
             set_meta_str(
                 conn,
