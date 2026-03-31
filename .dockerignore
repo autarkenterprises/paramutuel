@@ -1,0 +1,13 @@
+.git
+.github
+.claude
+cache
+broadcast
+lib
+out
+node_modules
+test
+research
+.env
+.env~
+*.db

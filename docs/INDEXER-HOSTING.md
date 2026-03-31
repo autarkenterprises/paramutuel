@@ -2,6 +2,7 @@
 
 GitHub Pages is static-only, so a live indexer API must run on a service host.  
 The lightest setup in this repo is Render free tier using `render.yaml`.
+For Google Cloud Run setup, see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md).
 
 ## What gets deployed
 
