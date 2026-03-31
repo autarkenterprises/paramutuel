@@ -13,6 +13,6 @@ services:
       - key: INDEXER_POLL_INTERVAL_SECONDS
         value: "15"
       - key: INDEXER_FROM_BLOCK
-        value: "39562334"
+        value: "39606078"
       - key: INDEXER_DB_PATH
         value: /tmp/indexer.db
