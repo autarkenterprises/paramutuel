@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'dapp/**'
+      - 'service/indexer/**'
       - 'service/explorer/static/**'
       - 'site/**'
       - 'config/deployments.json'
