@@ -21,7 +21,7 @@ Already wallet-ready. Lowest friction to adopt. Understand on-chain mechanics.
 |---|--------|------------|------|-------|---|---|---|-------|-----|
 | 1 | **Bankless** (Ryan Sean Adams, David Hoffman) | Podcast, YouTube, Twitter | DeFi media | 650+ episodes, 200k+ YouTube subs | 5 | 4 | 5 | **14** | Definitive DeFi podcast; regularly covers prediction markets as "first real breakout product for consumer crypto." Deep Ethereum/Base alignment. Feature or interview = massive credibility. |
 | 2 | **AIXBT** (@aixbt_agent) | Twitter/X, Virtuals/Base | AI agent | 400k+ followers, 3% crypto Twitter mindshare | 5 | 4 | 5 | **14** | Most famous AI crypto agent. Built on Virtuals/Base. Monitors 400+ KOLs. Natural first machine integration target — could use the protocol to formalize its predictions. |
-| 3 | **Olas / Polystrat** | On-chain, Twitter | AI agent framework | 4,200+ trades on Polymarket, growing ecosystem | 5 | 5 | 4 | **14** | Already builds autonomous prediction market trading agents. Polystrat trades Polymarket 24/7. Paramutuel markets = new venue for their agents. Direct integration partnership. |
+| 3 | **Olas / Polystrat** | On-chain, Twitter | AI agent framework | 4,200+ trades on Polymarket, growing ecosystem | 5 | 5 | 4 | **14** | Already builds autonomous prediction market trading agents. Polystrat trades Polymarket 24/7. Parimutuel markets = new venue for their agents. Direct integration partnership. |
 | 4 | **Limitless Exchange** | Base, Farcaster | Prediction market | $550M+ volume, $10M seed round | 4 | 3 | 5 | **12** | Largest prediction market on Base. Coinbase Ventures-backed. Potential co-marketing or integration partner, though partially competitive. Farcaster integration model to learn from. |
 | 5 | **dvces** | Twitch | Crypto streamer | 61k followers, 720 avg viewers | 5 | 5 | 3 | **13** | Top English-speaking crypto Twitch channel since Feb 2025. Streams live memecoin trading. Audience is 20-24, finance/crypto-native. Perfect fit for on-stream prop markets. |
 | 6 | **CryptoStache** | Twitch, YouTube | Web3 gaming / NFTs | Mid-tier, established | 4 | 5 | 3 | **12** | One of the earliest Twitch streamers to fully embrace NFT gaming and blockchain education. Audience already understands wallets and tokens. |
@@ -78,8 +78,8 @@ Not individuals to "outreach" in the traditional sense, but platforms and regist
 | 29 | **Smithery AI** (smithery.ai) | MCP registry/marketplace | 6,000+ MCP servers | `smithery mcp publish` | **Critical** | Largest MCP registry. Go-to marketplace for discovering MCP servers. Listing here = visible to all Smithery users. |
 | 30 | **LangChain / LangGraph** | Agent framework | 47M+ PyPI downloads, largest ecosystem | Publish as LangChain tool/integration | **High** | Dominant agent framework. 200+ integrations. Publishing a LangChain-compatible tool wrapper = accessible to the largest developer base. |
 | 31 | **CrewAI** | Agent framework | 45,900+ GitHub stars, fastest growing | Publish as CrewAI tool | **High** | #2 agent framework, seamlessly uses LangChain tools. Fast-growing community of agent builders. |
-| 32 | **Virtuals Protocol** (agent integration) | AI agent platform on Base | $500M+ market cap agents | Build Virtuals agent module | **High** | Agents on Virtuals could autonomously create and trade in paramutuel markets. Direct Base ecosystem alignment. |
-| 33 | **Olas / Autonolas** | Agent framework | Growing agent economy | Propose as new market venue | **High** | Already building autonomous prediction market agents. Paramutuel = new market type for their agents. |
+| 32 | **Virtuals Protocol** (agent integration) | AI agent platform on Base | $500M+ market cap agents | Build Virtuals agent module | **High** | Agents on Virtuals could autonomously create and trade in parimutuel markets. Direct Base ecosystem alignment. |
+| 33 | **Olas / Autonolas** | Agent framework | Growing agent economy | Propose as new market venue | **High** | Already building autonomous prediction market agents. Parimutuel = new market type for their agents. |
 | 34 | **GitHub modelcontextprotocol/servers** | Open source repo | Official MCP server collection | Submit PR | **Medium** | Anthropic's curated collection of reference MCP servers. PR acceptance = high-visibility endorsement. |
 
 ## Tier 6 — Ecosystem & Infrastructure Partners
@@ -155,9 +155,9 @@ Understanding existing players is critical for positioning outreach. These are t
 
 | Competitor | Type | Chain/Platform | Differentiator | Weakness vs. us |
 |-----------|------|---------------|---------------|----------------|
-| **Polymarket** | Prediction market | Polygon | $3.7B+ monthly volume, Nate Silver advisor | Binary yes/no format only; not prop/paramutuel; US re-entry via license |
+| **Polymarket** | Prediction market | Polygon | $3.7B+ monthly volume, Nate Silver advisor | Binary yes/no format only; not prop/parimutuel; US re-entry via license |
 | **Kalshi** | Regulated prediction market | Centralized | $11B valuation, CFTC-regulated | Centralized, KYC-heavy, US-only, not crypto-native |
-| **Limitless** | Prediction market | Base | $789M+ volume, largest on Base | Prediction market format, not paramutuel prop bets |
+| **Limitless** | Prediction market | Base | $789M+ volume, largest on Base | Prediction market format, not parimutuel prop bets |
 | **Azuro Protocol** | Sports betting infra | Multi-EVM | $358M volume, 27 front-end apps | Sports-focused infrastructure layer, not social/prop |
 | **Overtime Markets** | Sports betting | Optimism/Base (Thales) | Established DeFi sports book | Sports-only, not general prop bets |
 | **BettorEdge** | Social P2P betting | Centralized app | 45+ US states, no house edge | Centralized, not on-chain, no machine API |
@@ -166,7 +166,7 @@ Understanding existing players is critical for positioning outreach. These are t
 | **Mevu** | P2P betting | Ethereum | Bet on virtually anything | Early stage, limited traction |
 | **Kryptium** | P2P betting | Ethereum | Decentralized, no bookmaker | Low activity, older project |
 
-**Our positioning**: The only protocol purpose-built for multi-outcome paramutuel prop bets on Base, with first-class MCP server integration for AI agent access. Unlike prediction markets (binary yes/no), we support N-outcome propositions with paramutuel pooling. Unlike centralized social betting apps, we're fully on-chain and programmable.
+**Our positioning**: The only protocol purpose-built for multi-outcome parimutuel prop bets on Base, with first-class MCP server integration for AI agent access. Unlike prediction markets (binary yes/no), we support N-outcome propositions with parimutuel pooling. Unlike centralized social betting apps, we're fully on-chain and programmable.
 
 ## Appendix B — Additional outreach targets (supplementary research, 2026-03-29)
 
@@ -174,11 +174,11 @@ Understanding existing players is critical for positioning outreach. These are t
 
 | Target | Platform(s) | Reach | Why relevant |
 |--------|------------|-------|-------------|
-| **All-In Podcast** (Chamath, Calacanis, Sacks, Friedberg) | Podcast, YouTube | Top tech/VC podcast; millions of downloads | Hosts make annual "super predictions" and put them on Polymarket. Paramutuel format fits their multi-outcome debates. Aspirational but high-impact. |
-| **Nate Silver** (Silver Bulletin, Risky Business podcast) | Substack, podcast | 282k+ Substack subs, Polymarket advisor | Literally the world's most famous forecaster. His Polymarket advisory role makes him aware of prediction market UX gaps. Paramutuel prop bets address formats Polymarket can't. |
+| **All-In Podcast** (Chamath, Calacanis, Sacks, Friedberg) | Podcast, YouTube | Top tech/VC podcast; millions of downloads | Hosts make annual "super predictions" and put them on Polymarket. Parimutuel format fits their multi-outcome debates. Aspirational but high-impact. |
+| **Nate Silver** (Silver Bulletin, Risky Business podcast) | Substack, podcast | 282k+ Substack subs, Polymarket advisor | Literally the world's most famous forecaster. His Polymarket advisory role makes him aware of prediction market UX gaps. Parimutuel prop bets address formats Polymarket can't. |
 | **Bill Simmons** (The Bill Simmons Podcast) | Podcast, YouTube | Most downloaded sports podcast of all time | Regularly runs prop bet segments with Cousin Sal. His audience understands props intuitively. Super Bowl prop bet episodes are cultural events. |
 | **Pat McAfee** (The Pat McAfee Show) | YouTube, ESPN | Millions of daily viewers across platforms | Chaotic live sports show, massive daily reach. Audience loves action and engagement. Prop bet integration would fit the show's energy. |
-| **Caan Berry Pro Trader** | YouTube | 190k+ subs, 486 videos | Professional Betfair trader. Audience is betting-strategy-literate. Would appreciate on-chain transparency and paramutuel mechanics. |
+| **Caan Berry Pro Trader** | YouTube | 190k+ subs, 486 videos | Professional Betfair trader. Audience is betting-strategy-literate. Would appreciate on-chain transparency and parimutuel mechanics. |
 
 ### Social Betting P2P Platforms (potential integration/partnership)
 
@@ -192,7 +192,7 @@ Understanding existing players is critical for positioning outreach. These are t
 
 | Target | Type | Why relevant |
 |--------|------|-------------|
-| **Edwin (DeFi agent bridge)** | LangChain + ElizaOS DeFi integration | Bridges AI agent frameworks to DeFi protocols (Aave, Uniswap). Adding paramutuel as a supported protocol = distribution to all Edwin users. |
+| **Edwin (DeFi agent bridge)** | LangChain + ElizaOS DeFi integration | Bridges AI agent frameworks to DeFi protocols (Aave, Uniswap). Adding Paramutuel as a supported protocol = distribution to all Edwin users. |
 | **Walbi** | No-code AI trading agents | Launched March 2026. Users describe strategy in plain language; agents execute. Our MCP server is a natural tool for these agents. |
 | **CoinGecko MCP Server** | Data MCP server | Already provides crypto data via MCP. Natural partner — their price data + our betting protocol = price prediction markets via AI agents. |
 | **PulseMCP** | MCP server directory | Lists DeFi-specific MCP servers. Listing here targets developers building DeFi agent tools. |

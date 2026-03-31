@@ -22,7 +22,7 @@ Markets created through the factory therefore see at most the factory cap (10% t
 
 ## Product: browser extension ("bet you on the web")
 
-**Goal:** While browsing (e.g. Twitter/X), a user can say "I bet you that will not happen", **create a Paramutuel market** from page context (question, outcomes), and **share a link** so a counterparty can open or bet without hunting addresses manually.
+**Goal:** While browsing (e.g. Twitter/X), a user can say "I bet you that will not happen", **create a parimutuel market** from page context (question, outcomes), and **share a link** so a counterparty can open or bet without hunting addresses manually.
 
 **Likely scope:**
 
