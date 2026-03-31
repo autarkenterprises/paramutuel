@@ -10,8 +10,8 @@ Usage:
     python -m mcp_server
 
     # or with explicit config
-    INDEXER_URL=https://paramutuel-indexer.onrender.com \
-    FACTORY_ADDRESS=0x8FBB3ab4BBCAEA196f7847e6c2fe575Eadc18B36 \
+    INDEXER_URL=https://paramutuel-git-406244230167.europe-west1.run.app \
+    FACTORY_ADDRESS=0x655f6c5a3dc4cb3bf68173952bca9dac1bb5bf39 \
         python -m mcp_server
 """
 
