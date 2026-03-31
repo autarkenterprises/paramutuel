@@ -56,3 +56,18 @@ Markets created through the factory therefore see at most the factory cap (10% t
 - [ ] Build Tier 1 happy-path website flow for USDC + selected stablecoins.
 - [ ] Add observability dashboards for sponsorship cost, failures by token/path, and abuse indicators.
 - [ ] Document user-facing fallback from assisted website path to advanced dApp self-custody flow.
+
+---
+
+## Protocol v2: multi-winner resolution and generalized payout semantics (ADR-0008)
+
+**Goal:** Enable wagers where multiple options can be true simultaneously, without requiring subset enumeration as explicit outcomes.
+
+- [ ] Specify canonical payout policies and formulas (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`; with extension hooks for threshold/weighted variants).
+- [ ] Define compact winner-set and ticket-selection encoding (bitset or equivalent) with strict bounds.
+- [ ] Draft v2 factory/wager interfaces for policy-bound creation and winner-set resolution.
+- [ ] Define claim accounting invariants for multi-winner settlement and add exhaustive property tests.
+- [ ] Add indexer schema/API changes for winner-set + policy metadata and policy-aware claimability views.
+- [ ] Update dApp/explorer UX copy and controls for policy selection, selection tickets, and resolver set submission.
+- [ ] Extend service/control/MCP command surfaces for policy-aware create/resolve workflows.
+- [ ] Produce gas/safety analysis for option count and policy complexity limits before implementation sign-off.

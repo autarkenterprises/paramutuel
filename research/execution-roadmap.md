@@ -238,6 +238,38 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ---
 
+## Checkpoint 10 — Multi-winner and generalized settlement (v2 track)
+
+**Status:** Not started
+
+**Goal:** Support propositions with multiple simultaneously true options without combinatorial outcome explosion.
+
+**Architecture reference:** `ADR-0008`
+
+**Deliverables**
+- Canonical policy spec and settlement math with executable vectors:
+  - `SINGLE_WINNER` (compatibility baseline)
+  - `ANY_OF`
+  - `EXACT_SET`
+- v2 contract design/package:
+  - winner-set resolution encoding
+  - policy-bound wager creation
+  - policy-aware claim accounting
+- Indexer/API upgrade plan:
+  - winner-set and policy metadata schema support
+  - policy-aware payout/claimability views
+- UX/service updates:
+  - dApp wager creation + resolver set-entry UX
+  - explorer/control/MCP policy-aware surfaces
+- Testnet certification matrix for multi-policy scenarios.
+
+**Exit criteria**
+- Multi-winner wagers resolve and settle deterministically under approved policies.
+- Gas and safety bounds accepted for configured option/policy limits.
+- End-to-end flows (create, bet, resolve set, claim) pass across protocol, dApp, indexer, and service tools.
+
+---
+
 ## Parallel Track A — Assisted UX and Gas Abstraction (Website/Service only)
 
 **Goal:** Improve non-power-user execution UX without changing protocol contracts or forcing dependencies into the advanced dApp.
