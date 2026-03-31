@@ -9,20 +9,21 @@ This runbook sets up the hosted indexer on Google Cloud Run from this repository
 - Port: `8080` (Cloud Run default)
 - DB path: `/tmp/indexer.db` (ephemeral; rebuilt from chain on cold start)
 
-## Required env vars
+## Environment (defaults in Dockerfile)
 
-- `RPC_URL_BASE_SEPOLIA` = your Base Sepolia RPC endpoint
-- `INDEXER_NETWORK` = `base-sepolia`
-- `INDEXER_FROM_BLOCK` = `39608044` (factory deploy block for current testnet factory)
-- `INDEXER_DB_PATH` = `/tmp/indexer.db`
-- `INDEXER_POLL_INTERVAL_SECONDS` = `15`
-- optional override: `FACTORY_ADDRESS` (normally read from `config/deployments.json`)
+The root `Dockerfile` sets everything needed for a no-console deploy:
+
+- `RPC_URL_BASE_SEPOLIA` = `https://sepolia.base.org` (public RPC; override for a private endpoint if you hit rate limits)
+- `INDEXER_FROM_BLOCK` = `39608044` (factory deploy block for the current testnet factory)
+- `INDEXER_NETWORK`, `INDEXER_DB_PATH`, `INDEXER_POLL_INTERVAL_SECONDS`, `PORT` = as in the Dockerfile
+
+Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC_URL_BASE_SEPOLIA`, `INDEXER_FROM_BLOCK`, etc.
 
 ## Deploy via Cloud Run UI (repo-connected)
 
 1. Create service in Cloud Run and connect this GitHub repo.
 2. Set build type to Dockerfile and point to `/Dockerfile`.
-3. Configure environment variables listed above.
+3. No environment variables are required unless you want overrides.
 4. Deploy to a supported region (free-tier friendly: `us-central1` recommended).
 5. After deployment, verify:
    - `GET /health` returns `{"ok": true, ...}`
