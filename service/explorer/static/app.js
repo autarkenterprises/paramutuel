@@ -9,6 +9,7 @@ let lastQueryText = "";
 let lastOrder = "desc";
 let exhausted = false;
 let includeRowDetails = true;
+let lastIndexerHint = "";
 
 const FIELD_DEFS = [
   { key: "wager_address", label: "Wager", core: true },
@@ -74,7 +75,7 @@ function updateResultMeta() {
   const orderLabel = lastOrder === "asc" ? "oldest first" : "newest first";
   const q = lastQueryText ? `, query: "${lastQueryText}"` : "";
   const tail = exhausted ? " (end reached)" : "";
-  meta.textContent = `Loaded ${currentOffset} wager(s), ${orderLabel}${q}${tail}`;
+  meta.textContent = `Loaded ${currentOffset} wager(s), ${orderLabel}${q}${tail}${lastIndexerHint}`;
 }
 
 function escapeHtml(value) {
@@ -249,6 +250,7 @@ async function loadWagers({ append = false } = {}) {
       offset: currentOffset,
     });
   } catch (e) {
+    lastIndexerHint = "";
     tbody.innerHTML = `<tr><td colspan="${Math.max(
       1,
       selectedFields().length
@@ -257,6 +259,7 @@ async function loadWagers({ append = false } = {}) {
     return;
   }
   if (!res.ok) {
+    lastIndexerHint = "";
     tbody.innerHTML = `<tr><td colspan="${Math.max(
       1,
       selectedFields().length
@@ -266,6 +269,29 @@ async function loadWagers({ append = false } = {}) {
   }
   const data = await res.json();
   const wagers = data.wagers || [];
+  lastIndexerHint = "";
+  if (!append && wagers.length === 0 && API_BASE_NORMALIZED) {
+    try {
+      const hr = await fetch(apiUrl("/health"));
+      if (hr.ok) {
+        const hb = await hr.json();
+        const wc = hb.wager_count ?? 0;
+        const lb = hb.last_indexed_block;
+        lastIndexerHint =
+          ` — indexer: ${wc} wager(s) stored` +
+          (lb != null ? `, last indexed block ${lb}` : "") +
+          ".";
+        if (wc === 0 && lb != null && lb > 0) {
+          lastIndexerHint +=
+            " Chain has been scanned but no wagers were ingested; redeploy Cloud Run from the latest master (indexer event topics must match the factory).";
+        } else if (wc === 0 && (lb == null || lb === 0)) {
+          lastIndexerHint += " Wait for the first sync cycle or check RPC / from-block settings.";
+        }
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
   renderWagers(wagers, { append });
   currentOffset += wagers.length;
   exhausted = wagers.length < PAGE_SIZE;

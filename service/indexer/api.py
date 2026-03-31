@@ -6,7 +6,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .indexer import db_connect, get_expire_candidates, init_db
+from .indexer import db_connect, get_expire_candidates, get_meta_int, init_db
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:
@@ -152,7 +152,18 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/health":
-            self._send_json(200, {"ok": True, "ts": int(time.time())})
+            wager_count = int(
+                self.conn.execute("SELECT COUNT(*) AS c FROM wagers").fetchone()["c"]
+            )
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "ts": int(time.time()),
+                    "wager_count": wager_count,
+                    "last_indexed_block": get_meta_int(self.conn, "last_indexed_block"),
+                },
+            )
             return
 
         if path == "/wagers":

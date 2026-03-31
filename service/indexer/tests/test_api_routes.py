@@ -202,6 +202,8 @@ class ApiRouteTests(unittest.TestCase):
         status, body = self._get_json("/api/health")
         self.assertEqual(status, 200)
         self.assertTrue(body.get("ok"))
+        self.assertIn("wager_count", body)
+        self.assertIn("last_indexed_block", body)
 
 
 if __name__ == "__main__":

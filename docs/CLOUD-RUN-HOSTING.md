@@ -26,8 +26,25 @@ Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC
 3. No environment variables are required unless you want overrides.
 4. Deploy to a supported region (free-tier friendly: `us-central1` recommended).
 5. After deployment, verify:
-   - `GET /health` returns `{"ok": true, ...}`
-   - `GET /wagers?limit=20&order=desc` returns populated results after sync
+   - `GET /health` returns `{"ok": true, "wager_count": N, "last_indexed_block": B, ...}`
+   - `GET /wagers?limit=20&order=desc` returns populated results after sync (may take one poll interval)
+
+## Redeploy after indexer or Dockerfile changes
+
+Cloud Run does **not** automatically pick up new Git commits unless your project has **continuous deployment** from this repo configured and working. After changing `service/indexer/`, the root `Dockerfile`, or event-topic logic, **redeploy** the service so a fresh container builds.
+
+**Console:** Cloud Run → your service → **Edit & deploy new revision** → deploy (or use **Deploy revision** from the service overview).
+
+**CLI (from repo root):** with `gcloud` authenticated:
+
+```bash
+export GCP_PROJECT_ID="your-gcp-project-id"
+./script/deploy/redeploy_cloud_run_indexer.sh
+```
+
+(Adjust `GCP_REGION` / `GCP_SERVICE` if your service name or region differs.)
+
+**How to tell the running image is stale:** `GET /health` shows `wager_count: 0` and `last_indexed_block` well above the factory deploy block, but Base Sepolia has `WagerCreated` logs for that factory. The running indexer likely predates the on-chain ABI (rebuild from latest `master`).
 
 ## Post-deploy wiring
 
