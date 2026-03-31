@@ -8,6 +8,35 @@ let currentOffset = 0;
 let lastQueryText = "";
 let lastOrder = "desc";
 let exhausted = false;
+let includeRowDetails = true;
+
+const FIELD_DEFS = [
+  { key: "market_address", label: "Wager", core: true },
+  { key: "state", label: "State", core: true },
+  { key: "question", label: "Proposition", core: true },
+  { key: "outcomes_json", label: "Outcomes", core: true },
+  { key: "proposer", label: "Proposer", core: true },
+  { key: "resolver", label: "Resolver", core: true },
+  { key: "collateral_token", label: "Collateral", core: true },
+  { key: "total_pot", label: "Total Pot (raw)", core: true },
+  { key: "total_fee_bps", label: "Total Fee BPS", core: false },
+  { key: "winning_outcome", label: "Winning Outcome", core: false },
+  { key: "total_winning_stake", label: "Winning Stake (raw)", core: false },
+  { key: "factory_address", label: "Factory", core: false },
+  { key: "betting_closer", label: "Betting Closer", core: false },
+  { key: "resolution_closer", label: "Resolution Closer", core: false },
+  { key: "betting_close_time", label: "Bet Close", core: false },
+  { key: "resolution_window", label: "Resolution Window", core: false },
+  { key: "resolution_deadline", label: "Resolution Deadline", core: false },
+  { key: "betting_closed_by_authority", label: "Betting Closed By Authority", core: false },
+  { key: "betting_closed_at", label: "Betting Closed At", core: false },
+  { key: "resolution_window_closed", label: "Resolution Window Closed", core: false },
+  { key: "resolution_window_closed_at", label: "Resolution Window Closed At", core: false },
+  { key: "created_block", label: "Created Block", core: false },
+  { key: "created_tx_hash", label: "Created Tx Hash", core: false },
+];
+const CORE_FIELD_KEYS = FIELD_DEFS.filter((f) => f.core).map((f) => f.key);
+let selectedFieldKeys = new Set(CORE_FIELD_KEYS);
 
 function apiUrl(path) {
   return `${API_BASE_NORMALIZED}${path}`;
@@ -48,6 +77,96 @@ function updateResultMeta() {
   meta.textContent = `Loaded ${currentOffset} wager(s), ${orderLabel}${q}${tail}`;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function selectedFields() {
+  return FIELD_DEFS.filter((f) => selectedFieldKeys.has(f.key));
+}
+
+function formatFieldValue(key, value) {
+  if (value === null || value === undefined || value === "") return '<span class="muted">—</span>';
+  if (key === "outcomes_json") {
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      if (Array.isArray(parsed)) {
+        return parsed.map((v) => `<code>${escapeHtml(v)}</code>`).join(", ");
+      }
+    } catch (_) {}
+  }
+  if (typeof value === "number") return String(value);
+  if (value === 0 || value === 1) {
+    if (key === "betting_closed_by_authority" || key === "resolution_window_closed") {
+      return value === 1 ? "true" : "false";
+    }
+  }
+  return escapeHtml(value);
+}
+
+function renderHeader() {
+  const headerRow = document.getElementById("marketHeader");
+  if (!headerRow) return;
+  const fields = selectedFields();
+  headerRow.innerHTML = fields.map((f) => `<th>${f.label}</th>`).join("");
+}
+
+function applyFieldPreset(keys) {
+  selectedFieldKeys = new Set(keys);
+  syncFieldPickerChecks();
+  renderHeader();
+}
+
+function syncFieldPickerChecks() {
+  const checkboxes = document.querySelectorAll('input[name="fieldKey"]');
+  for (const cb of checkboxes) {
+    cb.checked = selectedFieldKeys.has(cb.value);
+  }
+}
+
+function setupFieldPicker() {
+  const picker = document.getElementById("fieldPicker");
+  if (!picker) return;
+  picker.innerHTML = FIELD_DEFS.map(
+    (f) =>
+      `<label><input type="checkbox" name="fieldKey" value="${f.key}" ${
+        selectedFieldKeys.has(f.key) ? "checked" : ""
+      } /> ${f.label}</label>`
+  ).join("");
+  picker.addEventListener("change", (ev) => {
+    const target = ev.target;
+    if (!target || target.name !== "fieldKey") return;
+    if (target.checked) {
+      selectedFieldKeys.add(target.value);
+    } else {
+      selectedFieldKeys.delete(target.value);
+    }
+    if (selectedFieldKeys.size === 0) {
+      selectedFieldKeys.add("market_address");
+    }
+    renderHeader();
+    loadMarkets({ append: false }).catch((e) => console.error(e));
+  });
+
+  document.getElementById("fieldsCore")?.addEventListener("click", () => {
+    applyFieldPreset(CORE_FIELD_KEYS);
+    loadMarkets({ append: false }).catch((e) => console.error(e));
+  });
+  document.getElementById("fieldsAll")?.addEventListener("click", () => {
+    applyFieldPreset(FIELD_DEFS.map((f) => f.key));
+    loadMarkets({ append: false }).catch((e) => console.error(e));
+  });
+  document.getElementById("includeRowDetails")?.addEventListener("change", (ev) => {
+    includeRowDetails = !!ev.target.checked;
+    loadMarkets({ append: false }).catch((e) => console.error(e));
+  });
+}
+
 function setLoadMoreEnabled(enabled) {
   const button = document.getElementById("loadMore");
   if (!button) return;
@@ -72,26 +191,31 @@ async function loadConfiguredFactoryAddress() {
 
 function renderMarkets(markets, { append = false } = {}) {
   const tbody = document.getElementById("markets");
+  const fields = selectedFields();
+  const colspan = Math.max(1, fields.length);
   if (!append) {
     tbody.innerHTML = "";
   }
   for (const m of markets) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${m.market_address}</td>
-      <td>${m.state}</td>
-      <td>${m.proposer}</td>
-      <td>${m.resolver}</td>
-      <td>${m.betting_closer}</td>
-      <td>${m.resolution_closer}</td>
-      <td>${m.betting_close_time}</td>
-      <td>${m.resolution_window}</td>
-      <td>${m.total_pot}</td>
-    `;
+    tr.innerHTML = fields.map((f) => `<td>${formatFieldValue(f.key, m[f.key])}</td>`).join("");
     tbody.appendChild(tr);
+    if (includeRowDetails) {
+      const detailsRow = document.createElement("tr");
+      detailsRow.className = "details-row";
+      detailsRow.innerHTML = `
+        <td colspan="${colspan}">
+          <details>
+            <summary>All indexed fields</summary>
+            <pre>${escapeHtml(JSON.stringify(m, null, 2))}</pre>
+          </details>
+        </td>
+      `;
+      tbody.appendChild(detailsRow);
+    }
   }
   if (!append && markets.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9">No wagers found.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${colspan}">No wagers found.</td></tr>`;
   }
 }
 
@@ -119,12 +243,18 @@ async function loadMarkets({ append = false } = {}) {
       offset: currentOffset,
     });
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="9">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${Math.max(
+      1,
+      selectedFields().length
+    )}">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>`;
     updateResultMeta();
     return;
   }
   if (!res.ok) {
-    tbody.innerHTML = `<tr><td colspan="9">Indexer returned ${res.status}.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${Math.max(
+      1,
+      selectedFields().length
+    )}">Indexer returned ${res.status}.</td></tr>`;
     updateResultMeta();
     return;
   }
@@ -166,6 +296,8 @@ document.getElementById("marketSearch").addEventListener("keydown", (ev) => {
   });
 });
 
+setupFieldPicker();
+renderHeader();
 loadMarkets({ append: false }).catch((e) => {
   console.error(e);
 });

@@ -46,6 +46,9 @@ class ApiRouteTests(unittest.TestCase):
         outcomes: list[str],
         created_block: int,
         created_tx_hash: str,
+        proposer: str,
+        collateral_token: str,
+        total_pot: str = "0",
     ) -> None:
         self.conn.execute(
             """
@@ -59,11 +62,11 @@ class ApiRouteTests(unittest.TestCase):
             (
                 market,
                 "0xfac7000000000000000000000000000000000001",
-                "0xabc2000000000000000000000000000000000002",
+                proposer,
                 "0xabc3000000000000000000000000000000000003",
                 "0xabc4000000000000000000000000000000000004",
                 "0xabc5000000000000000000000000000000000005",
-                "0xabc6000000000000000000000000000000000006",
+                collateral_token,
                 question,
                 json.dumps(outcomes),
                 1000,
@@ -76,8 +79,8 @@ class ApiRouteTests(unittest.TestCase):
             ),
         )
         self.conn.execute(
-            "INSERT OR IGNORE INTO market_totals(market_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
-            (market,),
+            "INSERT OR IGNORE INTO market_totals(market_address, total_pot, total_fee_bps) VALUES (?, ?, '0')",
+            (market, total_pot),
         )
 
     def _seed_markets(self) -> None:
@@ -87,6 +90,9 @@ class ApiRouteTests(unittest.TestCase):
             outcomes=["YES", "NO"],
             created_block=1,
             created_tx_hash="0xaaa",
+            proposer="0xabc2000000000000000000000000000000000002",
+            collateral_token="0xabc6000000000000000000000000000000000006",
+            total_pot="12345",
         )
         self._insert_market(
             market="0xabc1000000000000000000000000000000000002",
@@ -94,6 +100,9 @@ class ApiRouteTests(unittest.TestCase):
             outcomes=["UP", "DOWN"],
             created_block=2,
             created_tx_hash="0xaab",
+            proposer="0xabc2000000000000000000000000000000000007",
+            collateral_token="0xabc6000000000000000000000000000000000008",
+            total_pot="0",
         )
         self._insert_market(
             market="0xabc1000000000000000000000000000000000003",
@@ -101,6 +110,9 @@ class ApiRouteTests(unittest.TestCase):
             outcomes=["GREEN", "RED"],
             created_block=3,
             created_tx_hash="0xaac",
+            proposer="0xabc2000000000000000000000000000000000009",
+            collateral_token="0xabc6000000000000000000000000000000000010",
+            total_pot="42",
         )
         self.conn.commit()
 
@@ -130,6 +142,17 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(len(body["markets"]), 1)
         self.assertIn("YES", body["markets"][0]["outcomes_json"])
+
+    def test_markets_search_filters_on_role_and_total_fields(self) -> None:
+        status, body = self._get_json("/markets?q=abc2000000000000000000000000000000000007")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["markets"]), 1)
+        self.assertEqual(body["markets"][0]["market_address"], "0xabc1000000000000000000000000000000000002")
+
+        status2, body2 = self._get_json("/markets?q=12345")
+        self.assertEqual(status2, 200)
+        self.assertEqual(len(body2["markets"]), 1)
+        self.assertEqual(body2["markets"][0]["market_address"], "0xabc1000000000000000000000000000000000001")
 
     def test_markets_default_order_is_most_recent_first(self) -> None:
         status, body = self._get_json("/markets?limit=3")

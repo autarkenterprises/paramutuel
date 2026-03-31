@@ -39,9 +39,33 @@ def list_markets(
     if query_text and query_text.strip():
         needle = f"%{query_text.strip().lower()}%"
         clauses.append(
-            "(LOWER(m.market_address) LIKE ? OR LOWER(m.question) LIKE ? OR LOWER(m.outcomes_json) LIKE ?)"
+            "("
+            "LOWER(m.market_address) LIKE ? OR "
+            "LOWER(m.factory_address) LIKE ? OR "
+            "LOWER(m.proposer) LIKE ? OR "
+            "LOWER(m.resolver) LIKE ? OR "
+            "LOWER(m.betting_closer) LIKE ? OR "
+            "LOWER(m.resolution_closer) LIKE ? OR "
+            "LOWER(m.collateral_token) LIKE ? OR "
+            "LOWER(m.question) LIKE ? OR "
+            "LOWER(m.outcomes_json) LIKE ? OR "
+            "LOWER(m.state) LIKE ? OR "
+            "LOWER(CAST(m.betting_close_time AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.resolution_window AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.resolution_deadline AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.betting_closed_by_authority AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.betting_closed_at AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.resolution_window_closed AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.resolution_window_closed_at AS TEXT)) LIKE ? OR "
+            "LOWER(CAST(m.created_block AS TEXT)) LIKE ? OR "
+            "LOWER(m.created_tx_hash) LIKE ? OR "
+            "LOWER(COALESCE(t.total_pot, '0')) LIKE ? OR "
+            "LOWER(COALESCE(t.total_fee_bps, '0')) LIKE ? OR "
+            "LOWER(COALESCE(t.winning_outcome, '')) LIKE ? OR "
+            "LOWER(COALESCE(t.total_winning_stake, '')) LIKE ?"
+            ")"
         )
-        params.extend([needle, needle, needle])
+        params.extend([needle] * 23)
 
     order_sql = "DESC" if order == "desc" else "ASC"
 
@@ -119,6 +143,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/health",
                         "/markets?limit=20&offset=0&order=desc",
                         "/markets?limit=20&offset=0&order=asc&q=<text>",
+                        "/markets?q=<searches all indexed wager fields>",
                         "/markets/{market_address}",
                         "/sweeper/expire-candidates",
                     ],

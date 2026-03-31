@@ -25,21 +25,25 @@
         <button id="refresh">Refresh</button>
         <button id="loadMore">Load More</button>
       </div>
+      <details class="field-controls">
+        <summary>Field visibility and details</summary>
+        <div class="field-controls-inner">
+          <div class="field-actions">
+            <button id="fieldsCore" type="button">Core fields</button>
+            <button id="fieldsAll" type="button">All fields</button>
+          </div>
+          <div id="fieldPicker" class="field-picker"></div>
+          <label class="field-toggle">
+            <input type="checkbox" id="includeRowDetails" checked />
+            Show collapsible full-field details per wager row
+          </label>
+        </div>
+      </details>
       <div id="resultMeta" class="muted"></div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr>
-              <th>Wager</th>
-              <th>State</th>
-              <th>Proposer</th>
-              <th>Resolver</th>
-              <th>Betting Closer</th>
-              <th>Resolution Closer</th>
-              <th>Bet Close</th>
-              <th>Resolution Window</th>
-              <th>Total Pot (raw)</th>
-            </tr>
+            <tr id="marketHeader"></tr>
           </thead>
           <tbody id="markets"></tbody>
         </table>

@@ -77,6 +77,42 @@ button {
   margin: 8px 0 10px;
 }
 
+.field-controls {
+  margin: 8px 0 12px;
+  border: 1px solid #2c3a5a;
+  border-radius: 10px;
+  background: #0f1524;
+  padding: 8px 10px;
+}
+
+.field-controls summary {
+  cursor: pointer;
+  color: #c9d8f2;
+}
+
+.field-controls-inner {
+  margin-top: 10px;
+}
+
+.field-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.field-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.field-picker label,
+.field-toggle {
+  font-size: 13px;
+  color: #c7d2e3;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -103,4 +139,20 @@ th {
 td {
   color: #c7d2e3;
   word-break: break-word;
+}
+
+.details-row td {
+  background: #0f1524;
+}
+
+.details-row details summary {
+  cursor: pointer;
+  color: #9fb3d9;
+}
+
+.details-row pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: #c7d2e3;
 }
