@@ -232,7 +232,7 @@ async def get_protocol_info() -> str:
             "wager_functions": sorted(set(wager_functions)),
             "constants": {
                 "BPS_DENOMINATOR": 10_000,
-                "MAX_TOTAL_FEE_BPS": 1_000,
+                "MAX_TOTAL_FEE_BPS": 10_000,
                 "MAX_OUTCOMES": 64,
             },
         },

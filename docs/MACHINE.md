@@ -2,6 +2,8 @@
 
 Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can interact without bespoke scraping.
 
+Contract upgrade/redeploy procedure: [`CONTRACT-UPGRADE-RUNBOOK.md`](CONTRACT-UPGRADE-RUNBOOK.md).
+
 ## ABIs
 
 Pre-extracted ABI-only JSON is committed at `dapp/abi/ParamutuelFactory.json` and `dapp/abi/ParamutuelWager.json`. These contain `{"abi": [...]}` and can be loaded directly. Full Foundry artifacts are available under `out/` after `forge build`.
@@ -15,7 +17,7 @@ To re-sync after contract changes: `./script/sync-abi.sh`.
 | Name | Value | Description |
 |------|-------|-------------|
 | `BPS_DENOMINATOR` | `10_000` | Basis-point denominator |
-| `MAX_TOTAL_FEE_BPS` | `1_000` | 10% fee cap (protocol + extra combined) |
+| `MAX_TOTAL_FEE_BPS` | `10_000` | 100% fee cap (protocol + extra combined) |
 | `MAX_OUTCOMES` | `64` | Maximum outcome count per wager |
 
 ### Read-only state

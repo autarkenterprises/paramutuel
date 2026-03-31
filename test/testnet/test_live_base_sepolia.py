@@ -323,7 +323,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
 
         self.assertNotEqual(treasury.lower(), ZERO_ADDRESS)
         self.assertGreaterEqual(protocol_fee_bps, 0)
-        self.assertLessEqual(protocol_fee_bps, 1000)
+        self.assertLessEqual(protocol_fee_bps, 10000)
         self.assertGreaterEqual(min_betting_window, 0)
         self.assertGreaterEqual(min_resolution_window, 0)
         self.assertGreaterEqual(wagers_count, 0)
@@ -423,7 +423,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
 
         before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
         protocol_fee_bps = _as_int(_call(self.factory, "protocolFeeBps()(uint16)"))
-        extra_bps = 1 if protocol_fee_bps < 1000 else 0
+        extra_bps = 1 if protocol_fee_bps < 10000 else 0
         extra_recipients = f"[{self.sender}]" if extra_bps > 0 else "[]"
         extra_bps_json = f"[{extra_bps}]" if extra_bps > 0 else "[]"
 

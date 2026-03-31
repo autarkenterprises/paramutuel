@@ -139,7 +139,7 @@ At **10 gwei** and **ETH ~$2,137**, `createWager` at **1.5M gas** ≈ **$32** pe
 
 ### 7.1 Current contract knobs (MVP)
 
-- Factory-level **`protocolFeeBps`** + per-wager **optional extra recipients** (`extraFeeBps`), capped by factory **`MAX_TOTAL_FEE_BPS`** (currently **1000 = 10%** in code).
+- Factory-level **`protocolFeeBps`** + per-wager **optional extra recipients** (`extraFeeBps`), capped by factory **`MAX_TOTAL_FEE_BPS`** (currently **10_000 = 100%** in code to support full-beneficiary wagers).
 - Fees are charged at **finalization** (`resolve` / `retract` / `expire`), which means **failed or invalidated wagers can still pay protocol fee** unless policy or code changes.
 
 ### 7.2 Recommended launch defaults

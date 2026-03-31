@@ -82,7 +82,7 @@ The honest answer: the SAM is early and hard to size. Our thesis is that **forma
 | $10M | $1.2M |
 | $100M | $12M |
 
-Revenue accrues to the protocol treasury (governed by a multisig Safe). Additional per-wager fees can be configured for creators, resolvers, or other participants (capped at 10% total by the factory contract, target <3% in practice).
+Revenue accrues to the protocol treasury (governed by a multisig Safe). Additional per-wager fees can be configured for creators, resolvers, or other participants (capped at 100% total by the factory contract to allow charity-style distributions, target <3% in standard consumer flows).
 
 **Revenue growth levers:**
 - More wagers (supply-side: creator adoption, machine integration)

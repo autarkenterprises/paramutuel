@@ -8,15 +8,15 @@ Cross-cutting items that are not tied to a single PR. Update this file when scop
 
 **Status:** Already enforced in the MVP contracts.
 
-- **Factory** (`createWager` in `src/ParamutuelFactory.sol`): builds fee recipients from `protocolFeeBps` (treasury) plus `extraFeeRecipients` / `extraFeeBps`. Reverts with `BadFeeConfig()` if `totalFeeBps > MAX_TOTAL_FEE_BPS`, where `MAX_TOTAL_FEE_BPS` is **1_000** (**10%** of the pot for MVP).
+- **Factory** (`createWager` in `src/ParamutuelFactory.sol`): builds fee recipients from `protocolFeeBps` (treasury) plus `extraFeeRecipients` / `extraFeeBps`. Reverts with `BadFeeConfig()` if `totalFeeBps > MAX_TOTAL_FEE_BPS`, where `MAX_TOTAL_FEE_BPS` is **10_000** (**100%** of the pot, enabling full-beneficiary/charity wagers).
 - **Wager** (constructor in `src/ParamutuelWager.sol`): reverts with `FeeTooHigh()` if the **sum of all `feeBps` exceeds `BPS_DENOMINATOR` (10_000)**, i.e. fee shares cannot exceed **100%** in basis points.
 
-Wagers created through the factory therefore see at most the factory cap (10% today); the wager check is the invariant that no fee vector can imply more than 100% taken from the pot.
+Wagers created through the factory therefore see at most the factory cap (100% today); the wager check is the invariant that no fee vector can imply more than 100% taken from the pot.
 
 **Follow-ups (optional):**
 
 - [x] Factory and wager fee reverts are covered in `test/Paramutuel.t.sol` (e.g. total above `MAX_TOTAL_FEE_BPS`, and `FeeTooHigh` on direct wager deploy).
-- [ ] If governance raises the MVP cap later, keep the wager `<= 100%` invariant; change factory constants only via audited deploy/upgrade.
+- [x] Factory cap raised to 100% (`MAX_TOTAL_FEE_BPS=10_000`) to support charity-beneficiary wagers while preserving wager-level `<= 100%` invariants.
 
 ---
 

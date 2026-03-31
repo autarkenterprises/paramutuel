@@ -29,7 +29,7 @@ contract ParamutuelFactory {
     error BadSeedConfig();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
-    uint16 public constant MAX_TOTAL_FEE_BPS = 1_000; // 10% cap for MVP
+    uint16 public constant MAX_TOTAL_FEE_BPS = 10_000; // 100% max to support full-beneficiary/charity wagers
     uint256 public constant MAX_OUTCOMES = 64;
 
     uint64 public immutable minBettingWindow;

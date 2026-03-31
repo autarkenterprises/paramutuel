@@ -92,7 +92,7 @@ Paramutuel is a permissionless, immutable parimutuel betting protocol on Base (E
 - **Anyone** can create a wager with 2-64 outcomes using any ERC-20 as collateral
 - **Bettors** deposit into outcome pools; winners split the net pot pro-rata
 - **Resolution** is modular: creator-resolved (MVP), upgradeable to oracle/DAO
-- **Fees** are configurable per wager (protocol fee + optional creator fee, capped at 10%)
+- **Fees** are configurable per wager (protocol fee + optional creator fee, capped at 100% for full-beneficiary/charity flows)
 
 Live dApp: https://autarkenterprises.github.io/paramutuel/
 

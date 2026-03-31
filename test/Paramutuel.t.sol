@@ -283,7 +283,7 @@ contract ParamutuelTest is Test {
         new ParamutuelFactory(address(0), protocolFeeBps, minBettingWindow, minResolutionWindow);
 
         vm.expectRevert(bytes("FEE"));
-        new ParamutuelFactory(treasury, 1_001, minBettingWindow, minResolutionWindow);
+        new ParamutuelFactory(treasury, 10_001, minBettingWindow, minResolutionWindow);
     }
 
     function testWagersCountIncrements() public {
@@ -953,11 +953,11 @@ contract ParamutuelTest is Test {
         uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
         uint64 resolutionWindow = 2 hours;
 
-        // protocolFeeBps = 200; extra 900 => 1100 > MAX_TOTAL_FEE_BPS (1000)
+        // protocolFeeBps = 200; extra 9900 => 10100 > MAX_TOTAL_FEE_BPS (10000)
         address[] memory extraRecipients = new address[](1);
         extraRecipients[0] = extraFeeRecipient;
         uint16[] memory extraBps = new uint16[](1);
-        extraBps[0] = 900;
+        extraBps[0] = 9900;
 
         vm.expectRevert(ParamutuelFactory.BadFeeConfig.selector);
         vm.prank(proposer);
@@ -973,6 +973,135 @@ contract ParamutuelTest is Test {
             extraRecipients,
             extraBps
         );
+    }
+
+    function testFactoryConstructorAllowsFullFeeCap() public {
+        ParamutuelFactory f = new ParamutuelFactory(treasury, 10_000, minBettingWindow, minResolutionWindow);
+        assertEq(f.protocolFeeBps(), 10_000);
+        assertEq(f.MAX_TOTAL_FEE_BPS(), 10_000);
+    }
+
+    function testFullFeeResolvePathPaysOnlyBeneficiaries() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+
+        // protocolFeeBps = 200, extra 9800 => 10000 total (100%).
+        address[] memory extraRecipients = new address[](1);
+        extraRecipients[0] = extraFeeRecipient;
+        uint16[] memory extraBps = new uint16[](1);
+        extraBps[0] = 9800;
+
+        vm.prank(proposer);
+        address wagerAddr = factory.createWager(
+            address(token),
+            "Charity resolve",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelWager wager = ParamutuelWager(wagerAddr);
+
+        vm.startPrank(bettor1);
+        token.approve(address(wager), 100 ether);
+        wager.placeBet(0, 100 ether);
+        vm.stopPrank();
+
+        vm.startPrank(bettor2);
+        token.approve(address(wager), 50 ether);
+        wager.placeBet(1, 50 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        wager.resolve(0);
+
+        uint256 winnerBefore = token.balanceOf(bettor1);
+        vm.prank(bettor1);
+        wager.claim();
+        uint256 winnerAfter = token.balanceOf(bettor1);
+        assertEq(winnerAfter - winnerBefore, 0, "winner payout must be zero at 100% fees");
+
+        assertEq(wager.feeBalances(treasury), 3 ether, "treasury gets 2%");
+        assertEq(wager.feeBalances(extraFeeRecipient), 147 ether, "beneficiary gets 98%");
+
+        uint256 treasuryBefore = token.balanceOf(treasury);
+        vm.prank(treasury);
+        wager.withdrawFees();
+        uint256 treasuryAfter = token.balanceOf(treasury);
+        assertEq(treasuryAfter - treasuryBefore, 3 ether);
+
+        uint256 beneficiaryBefore = token.balanceOf(extraFeeRecipient);
+        vm.prank(extraFeeRecipient);
+        wager.withdrawFees();
+        uint256 beneficiaryAfter = token.balanceOf(extraFeeRecipient);
+        assertEq(beneficiaryAfter - beneficiaryBefore, 147 ether);
+
+        assertEq(token.balanceOf(address(wager)), 0, "all funds disbursed");
+    }
+
+    function testFullFeeRetractPathPaysOnlyBeneficiaries() public {
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "YES";
+        outcomes[1] = "NO";
+
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+
+        address[] memory extraRecipients = new address[](1);
+        extraRecipients[0] = extraFeeRecipient;
+        uint16[] memory extraBps = new uint16[](1);
+        extraBps[0] = 9800;
+
+        vm.prank(proposer);
+        address wagerAddr = factory.createWager(
+            address(token),
+            "Charity retract",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            proposer,
+            proposer,
+            extraRecipients,
+            extraBps
+        );
+        ParamutuelWager wager = ParamutuelWager(wagerAddr);
+
+        vm.startPrank(bettor1);
+        token.approve(address(wager), 70 ether);
+        wager.placeBet(0, 70 ether);
+        vm.stopPrank();
+
+        vm.startPrank(bettor2);
+        token.approve(address(wager), 30 ether);
+        wager.placeBet(1, 30 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        wager.retract();
+
+        uint256 b1Before = token.balanceOf(bettor1);
+        vm.prank(bettor1);
+        wager.claim();
+        assertEq(token.balanceOf(bettor1) - b1Before, 0, "retract claim must be zero at 100% fees");
+
+        uint256 b2Before = token.balanceOf(bettor2);
+        vm.prank(bettor2);
+        wager.claim();
+        assertEq(token.balanceOf(bettor2) - b2Before, 0, "retract claim must be zero at 100% fees");
+
+        assertEq(wager.feeBalances(treasury), 2 ether, "treasury gets 2%");
+        assertEq(wager.feeBalances(extraFeeRecipient), 98 ether, "beneficiary gets 98%");
     }
 
     function testTooManyOutcomesReverts() public {
