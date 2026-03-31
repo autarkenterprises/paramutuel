@@ -49,6 +49,17 @@ export STRESS_POOL_PATH="test/testnet/stress_wallet_pool.json"
 ./script/testnet/fund_stress_wallets.sh
 ```
 
+For funded collateral scenarios, you can also fan out Base Sepolia USDC from a funded key:
+
+```bash
+export RPC_URL_BASE_SEPOLIA="https://base-sepolia.g.alchemy.com/v2/<key>"
+export PRIVATE_KEY="0xFUNDER"
+export STRESS_POOL_PATH="test/testnet/stress_wallet_pool.json"
+# optional: STRESS_USDC_TOKEN=0x036CbD53842c5426634e7929541eC2318f3dCf7e
+# optional: STRESS_USDC_AMOUNT_RAW=100000   # 0.1 USDC (6 decimals)
+./script/testnet/fund_stress_wallets_usdc.sh
+```
+
 ## Run stress suite
 
 Factory address source:
@@ -111,6 +122,7 @@ STRESS_BET_AMOUNT=1 \
 | `STRESS_COLLATERAL_TOKEN` | (empty) | Required for `funded-tx`; ERC20 with `decimals()/approve()/balanceOf()` |
 | `STRESS_BET_AMOUNT` | `1` | Human token units per bettor per wager in `funded-tx` |
 | `STRESS_UNAUTHORIZED_PRIVATE_KEY` | (empty) | Optional; enables negative access-control checks in `funded-tx` |
+| `STRESS_INDEXER_BASE_URL` | from `config/deployments.json` | Optional override for hosted indexer visibility checks |
 
 ## Alchemy / cost notes
 

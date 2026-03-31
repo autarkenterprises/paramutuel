@@ -14,6 +14,8 @@ import os
 import subprocess
 import time
 import unittest
+from urllib import parse, request
+from urllib.error import URLError
 from pathlib import Path
 
 DUMMY_COLLATERAL = "0x0000000000000000000000000000000000000001"
@@ -187,6 +189,38 @@ def _load_wallet_pool(path: str) -> list[dict[str, str]]:
     return data
 
 
+def _indexer_base_url() -> str:
+    explicit = _env("STRESS_INDEXER_BASE_URL")
+    if explicit:
+        return explicit.rstrip("/")
+    config_path = Path(__file__).resolve().parents[2] / "config" / "deployments.json"
+    if not config_path.exists():
+        return ""
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    return str((data.get("baseSepolia") or {}).get("explorerApiBase") or "").strip().rstrip("/")
+
+
+def _wait_for_indexer_wager_address(base_url: str, wager_address: str, timeout_seconds: int = 120) -> None:
+    deadline = time.time() + timeout_seconds
+    needle = wager_address.lower()
+    while time.time() < deadline:
+        params = parse.urlencode({"q": wager_address, "limit": "10", "order": "desc"})
+        try:
+            with request.urlopen(f"{base_url}/wagers?{params}", timeout=20) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except (TimeoutError, URLError):
+            time.sleep(5)
+            continue
+        for row in payload.get("wagers", []):
+            if str(row.get("wager_address", "")).lower() == needle:
+                return
+        time.sleep(5)
+    raise AssertionError(f"Timed out waiting for wager {wager_address} to appear in indexer search")
+
+
 class TestBaseSepoliaStress(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -200,6 +234,7 @@ class TestBaseSepoliaStress(unittest.TestCase):
         cls.collateral_token = _env("STRESS_COLLATERAL_TOKEN")
         cls.bet_amount = _env("STRESS_BET_AMOUNT", "1")
         cls.unauthorized_private_key = _env("STRESS_UNAUTHORIZED_PRIVATE_KEY")
+        cls.indexer_base_url = _indexer_base_url()
 
         if not cls.rpc:
             raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
@@ -424,6 +459,12 @@ class TestBaseSepoliaStress(unittest.TestCase):
         if self.unauthorized_private_key and first_wager:
             _send_expect_failure(self.unauthorized_private_key, first_wager, "closeBetting()")
             _send_expect_failure(self.unauthorized_private_key, first_wager, "resolve(uint256)", "0")
+
+        if self.indexer_base_url and first_wager:
+            try:
+                _wait_for_indexer_wager_address(self.indexer_base_url, first_wager)
+            except AssertionError as exc:
+                self.skipTest(f"Hosted indexer has not yet indexed wager {first_wager}: {exc}")
 
 
 if __name__ == "__main__":

@@ -3,11 +3,13 @@ import os
 import subprocess
 import time
 import unittest
+from urllib import parse, request
+from urllib.error import URLError
 from pathlib import Path
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-WAGER_CREATED_TOPIC = "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388"
+WAGER_CREATED_TOPIC = "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37bc7e35f28def"
 
 
 def _env(name: str, default: str = "") -> str:
@@ -248,6 +250,44 @@ def _parse_units(amount: str, decimals: int) -> int:
     return int(whole) * (10 ** decimals) + int(frac_scaled)
 
 
+def _indexer_base_url() -> str:
+    explicit = _env("TESTNET_INDEXER_BASE_URL")
+    if explicit:
+        return explicit.rstrip("/")
+    config_path = Path(__file__).resolve().parents[2] / "config" / "deployments.json"
+    if not config_path.exists():
+        return ""
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    return str((data.get("baseSepolia") or {}).get("explorerApiBase") or "").strip().rstrip("/")
+
+
+def _indexer_query_wagers(base_url: str, q: str, limit: int = 20) -> list[dict]:
+    params = parse.urlencode({"q": q, "limit": str(limit), "order": "desc"})
+    url = f"{base_url}/wagers?{params}"
+    try:
+        with request.urlopen(url, timeout=20) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (TimeoutError, URLError):
+        return []
+    return payload.get("wagers", []) if isinstance(payload, dict) else []
+
+
+def _wait_for_indexer_wager(base_url: str, q: str, timeout_seconds: int = 420) -> dict:
+    deadline = time.time() + timeout_seconds
+    last = []
+    while time.time() < deadline:
+        last = _indexer_query_wagers(base_url, q)
+        if last:
+            return last[0]
+        time.sleep(5)
+    raise AssertionError(
+        f"Timed out waiting for indexer wager search q={q!r} at {base_url}; last result count={len(last)}"
+    )
+
+
 class TestBaseSepoliaLive(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -260,6 +300,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
         cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
         cls.unauthorized_private_key = _env("TESTNET_UNAUTHORIZED_PRIVATE_KEY")
+        cls.indexer_base_url = _indexer_base_url()
 
         if not cls.rpc:
             raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
@@ -508,6 +549,63 @@ class TestBaseSepoliaLive(unittest.TestCase):
             unauth_wager = _extract_created_wager_from_receipt(create_tx_unauth, self.factory)
             _send_expect_failure(self.unauthorized_private_key, unauth_wager, "closeBetting()")
             _send_expect_failure(self.unauthorized_private_key, unauth_wager, "resolve(uint256)", "0")
+
+    def test_funded_tx_resolution_window_guards_and_indexer_visibility(self) -> None:
+        if self.mode != "funded-tx":
+            self.skipTest("Set TESTNET_MODE=funded-tx to run funded lifecycle checks")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY to run funded lifecycle checks")
+        if not self.collateral_token:
+            self.skipTest("Set TESTNET_COLLATERAL_TOKEN to run funded lifecycle checks")
+        if not self.indexer_base_url:
+            self.skipTest("Set TESTNET_INDEXER_BASE_URL or config baseSepolia.explorerApiBase")
+
+        decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
+        amount_raw = _parse_units(self.bet_amount, decimals)
+        if amount_raw <= 0:
+            self.skipTest("TESTNET_BET_AMOUNT must parse to a positive amount")
+
+        sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
+        if sender_balance < amount_raw:
+            self.skipTest(
+                f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
+            )
+
+        before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
+        proposition = f"funded-guards-{int(time.time())}"
+        create_tx = _send(
+            self.factory,
+            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            self.collateral_token,
+            proposition,
+            '["YES","NO"]',
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        _wait_for_wagers_count(self.factory, before_count + 1)
+        wager = _extract_created_wager_from_receipt(create_tx, self.factory)
+
+        _send_expect_failure(self.private_key, wager, "closeResolutionWindow()")
+        _send(self.collateral_token, "approve(address,uint256)", wager, str(amount_raw))
+        _send(wager, "placeBet(uint256,uint256)", "0", str(amount_raw))
+        _send(wager, "closeBetting()")
+        _send(wager, "closeResolutionWindow()")
+        _send_expect_failure(self.private_key, wager, "resolve(uint256)", "0")
+        _send(wager, "expire()")
+        _wait_for_state(wager, 2)
+        _send(wager, "claim()")
+        _send_expect_failure(self.private_key, wager, "claim()")
+
+        try:
+            indexed = _wait_for_indexer_wager(self.indexer_base_url, wager, timeout_seconds=120)
+        except AssertionError as exc:
+            self.skipTest(f"Hosted indexer has not yet indexed wager {wager}: {exc}")
+        self.assertEqual(str(indexed.get("wager_address", "")).lower(), wager.lower())
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ Optional:
 - `TESTNET_BET_AMOUNT` (optional, default `1`; human token units)
 - `TESTNET_SECONDARY_PRIVATE_KEY` (optional; if funded, places a second bet on opposite outcome)
 - `TESTNET_UNAUTHORIZED_PRIVATE_KEY` (optional; enables negative access-control tx checks)
+- `TESTNET_INDEXER_BASE_URL` (optional; defaults to `config/deployments.json` -> `baseSepolia.explorerApiBase` for hosted indexer visibility checks)
 
 ## Run
 
