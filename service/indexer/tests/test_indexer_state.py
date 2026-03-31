@@ -44,7 +44,7 @@ class IndexerStateTests(unittest.TestCase):
         return {
             "address": self.FACTORY,
             "topics": [
-                "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
+                "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37bc7e35f28def",
                 topic_addr(self.WAGER),
                 topic_addr(self.PROPOSER),
                 topic_addr(self.RESOLVER),
@@ -162,7 +162,7 @@ class IndexerStateTests(unittest.TestCase):
         create_log = {
             "address": self.FACTORY,
             "topics": [
-                "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
+                "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37bc7e35f28def",
                 topic_addr(self.WAGER),
                 topic_addr(self.PROPOSER),
                 topic_addr(self.RESOLVER),
