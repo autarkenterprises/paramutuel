@@ -23,6 +23,7 @@ let walletListenersAttached = false;
 let deploymentsConfig = null;
 
 const CHAIN_INFO = {
+  1: { name: "Ethereum Mainnet" },
   8453: { name: "Base Mainnet" },
   84532: { name: "Base Sepolia" },
 };
@@ -635,7 +636,9 @@ async function createMarket() {
     const preset = parseTokenPresetValue(presetRaw);
     if (preset.chainId !== currentChainId) {
       throw new Error(
-        `Selected token preset is for ${chainName(preset.chainId)}, but wallet is on ${chainName(currentChainId)}.`
+        `Selected token preset is for ${chainName(preset.chainId)}, but wallet is on ${chainName(
+          currentChainId
+        )}. Switch MetaMask to ${chainName(preset.chainId)} and retry.`
       );
     }
   }
