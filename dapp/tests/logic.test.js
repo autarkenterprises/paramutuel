@@ -164,7 +164,7 @@ test("planMarketAction enforces known actions and target presence", () => {
   assert.throws(() => planMarketAction("unknownAction", {}), /Unsupported action/);
   assert.throws(
     () => planMarketAction("claim", { resolutionMarketAddress: "", claimsMarketAddress: "", activeMarketAddress: "" }),
-    /Select a market address/
+    /Select a wager address/
   );
 });
 

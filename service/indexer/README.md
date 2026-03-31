@@ -4,8 +4,8 @@ This is a dependency-light Python indexer for Paramutuel, intended to satisfy ea
 
 - deterministic event ingestion
 - idempotent event log storage
-- market state queries
-- unresolved overdue market scanning for expiry sweeper jobs
+- wager state queries
+- unresolved overdue wager scanning for expiry sweeper jobs
 
 ### Files
 
@@ -40,5 +40,5 @@ python3 service/indexer/api.py \
 ### Notes
 
 - Current v1 keeps `total_fee_bps` at default `0` in indexed totals until extended with on-chain reads.
-- Indexer is designed to be extended with richer market metadata once resolver/service layers are integrated.
+- Indexer is designed to be extended with richer wager metadata once resolver/service layers are integrated.
 

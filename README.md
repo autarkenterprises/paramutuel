@@ -7,7 +7,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Operator workflows (CLI/API):** see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md).
 **Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
 **Live testnet integration suite:** see [`docs/TESTNET-LIVE-SUITE.md`](docs/TESTNET-LIVE-SUITE.md).
-**Testnet stress suite (multi-market / multi-actor):** see [`docs/TESTNET-STRESS-SUITE.md`](docs/TESTNET-STRESS-SUITE.md).
+**Testnet stress suite (multi-wager / multi-actor):** see [`docs/TESTNET-STRESS-SUITE.md`](docs/TESTNET-STRESS-SUITE.md).
 **Live indexer hosting (Render):** see [`docs/INDEXER-HOSTING.md`](docs/INDEXER-HOSTING.md).
 **Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
@@ -72,13 +72,13 @@ In the dApp UI:
 
 - connect wallet
 - factory address auto-fills from `config/deployments.json` (or can be overridden manually)
-- create/load markets and run lifecycle actions
+- create/load wagers and run lifecycle actions
 
 Time semantics (important):
 
 - In the dApp, `Bet close` can be entered as either a relative offset or an absolute local date/time. At click-time, both are converted to an absolute unix timestamp and sent as `bettingCloseTime`.
 - The contract enforces closure against on-chain `block.timestamp`, not local browser time.
-- Because transaction inclusion takes time, effective remaining window may be shorter than the offset entered at click-time; with tight windows, delayed inclusion can cause create-market reverts against factory minimum window constraints.
+- Because transaction inclusion takes time, effective remaining window may be shorter than the offset entered at click-time; with tight windows, delayed inclusion can cause create-wager reverts against factory minimum window constraints.
 
 ### 5) CLI interaction (cast)
 
@@ -91,7 +91,7 @@ source ./script/lib/deployments.sh
 ensure_factory_address "base-sepolia" "./config/deployments.json"
 ```
 
-#### Create market
+#### Create wager (`createMarket`)
 
 ```bash
 cast send "$FACTORY_ADDRESS" \
@@ -137,7 +137,7 @@ Notes:
 - `resolver = address(0)` defaults resolver to proposer.
 - `bettingCloser = address(0)` disables authority `closeBetting()`.
 - `resolutionCloser = address(0)` disables authority `closeResolutionWindow()`.
-- Protocol guardrail: `no-max + no closer` is rejected at market creation.
+- Protocol guardrail: `no-max + no closer` is rejected at wager creation.
 
 #### Place bet
 
@@ -203,18 +203,18 @@ Smart contracts cannot observe real-world truth directly. A fully decentralized 
 
 - **Dispute-driven bonded reporting (Augur-style)**: anyone can report, anyone can dispute with escalating bonds, eventual finalization, bond redistribution to honest participants, and an explicit **INVALID/AMBIGUOUS** path.
 - **Optimistic oracle**: a proposed answer finalizes unless challenged; disputes are adjudicated by a decentralized mechanism.
-- **Crypto-native outcomes only**: restrict markets to on-chain observable facts (prices, contract state) to avoid external truth dependencies.
+- **Crypto-native outcomes only**: restrict wagers to on-chain observable facts (prices, contract state) to avoid external truth dependencies.
 
-Key hard problems to plan for (later): invalid/ambiguous markets, liveness (no one reports), spam resistance, sybil resistance, and outcome representation for numeric / non-binary answers.
+Key hard problems to plan for (later): invalid/ambiguous wagers, liveness (no one reports), spam resistance, sybil resistance, and outcome representation for numeric / non-binary answers.
 
 ### MVP scope (current milestone)
 
-This MVP intentionally centralizes resolution **per-market** (not per-protocol):
+This MVP intentionally centralizes resolution **per-wager** (not per-protocol):
 
-- The **proposer** creates a market with a set of **text outcome strings**.
-- The **proposer is also the resolver** and finalizes the market by selecting exactly one outcome index.
-- The proposer may alternatively **retract** the market, which invalidates it and returns wagers **minus fees**.
-- A protocol **treasury** receives a default fee; additional fee recipients and percentages may be specified at market creation.
+- The **proposer** creates a wager with a set of **text outcome strings**.
+- The **proposer is also the resolver** and finalizes the wager by selecting exactly one outcome index.
+- The proposer may alternatively **retract** the wager, which invalidates it and returns wagers **minus fees**.
+- A protocol **treasury** receives a default fee; additional fee recipients and percentages may be specified at wager creation.
 
 The purpose of this MVP is to clarify **actors**, their **permissions**, and the **accounting model**, while keeping the contract modular so resolution can be swapped later.
 
@@ -227,38 +227,38 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 - **Protocol (Factory)**:
   - Maintains the protocol **treasury address** and the **default protocol fee** (basis points).
   - Enforces global constraints (min windows, caps on outcomes/fees).
-  - Deploys new markets.
+  - Deploys new wagers.
 
-- **Proposer (per-market)**:
+- **Proposer (per-wager)**:
   - The address that calls `createMarket` on the factory; stored on-chain as `proposer` for transparency.
 
-- **Resolver (per-market)**:
+- **Resolver (per-wager)**:
   - Address authorized to **resolve** (choose winning outcome) or **retract** (invalidate).
   - Defaults to the proposer when `resolver == address(0)` is passed at creation; may be set to any other address (oracle, sponsored resolver, multisig, etc.).
 
-- **Betting closer (per-market)**:
+- **Betting closer (per-wager)**:
   - May call **`closeBetting()`** to stop new bets.
   - `bettingCloseTime = 0` enables **no max betting window**, so only `bettingCloser` can end betting.
   - `bettingCloser == address(0)` disables authority close (time-only mode for finite windows).
 
-- **Resolution closer (per-market)**:
+- **Resolution closer (per-wager)**:
   - After betting has ended, may call **`closeResolutionWindow()`** to end the resolver window.
   - `resolutionWindow = 0` enables **no max resolution window**, so only `resolutionCloser` can end it.
   - `resolutionCloser == address(0)` disables authority close (time-only mode for finite windows).
 
-- **Bettors (per-market)**:
+- **Bettors (per-wager)**:
   - Deposit collateral during the betting window and allocate it to exactly one outcome per bet.
   - After resolve: winners can claim pro-rata payouts.
   - After retract/expire: bettors can claim refunds minus fees.
 
 - **Beneficiaries (fees)**:
   - The protocol treasury is always a beneficiary (unless protocol fee is set to 0).
-  - Market creation can specify additional recipients with fee BPS.
-  - Fees are taken once, at market finalization (resolve/retract/expire).
+  - Wager creation can specify additional recipients with fee BPS.
+  - Fees are taken once, at wager finalization (resolve/retract/expire).
 
 ### Lifecycle (MVP)
 
-1. **Create market**
+1. **Create wager**
    - Proposer supplies:
      - `collateralToken` (ERC20)
      - `outcomes[]` (strings)
@@ -291,7 +291,7 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 
 ### Notes on “distributed” roadmap (later)
 
-This MVP isolates resolution logic to per-market functions so it can later be extended/replaced with:
+This MVP isolates resolution logic to per-wager functions so it can later be extended/replaced with:
 
 - bonded reporting + dispute game
 - oracle adapters
@@ -339,9 +339,9 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 
   - The script logs the deployed `ParamutuelFactory` address; record this as the protocol entrypoint.
 
-- **3. Creating markets**
+- **3. Creating wagers**
 
-  Once the factory is deployed, markets are created via `createMarket`:
+  Once the factory is deployed, wagers are created via `createMarket`:
 
   - Inputs:
     - `collateralToken`: ERC20 address used for bets (e.g. USDC).
@@ -360,7 +360,7 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
     - From a frontend using ethers.js / viem.
     - From a Foundry script (to be added later).
 
-- **4. Using a deployed market**
+- **4. Using a deployed wager**
 
   - **Bettors**:
     - `IERC20(collateralToken).approve(market, amount)`
@@ -378,8 +378,8 @@ This MVP isolates resolution logic to per-market functions so it can later be ex
 ### Minimal dApp
 
 A minimal no-build dApp is available in `dapp/`. It can:
-- create markets through the deployed `ParamutuelFactory`
-- seed markets at creation and place bets via `placeBet` / `placeBets`
+- create wagers through the deployed `ParamutuelFactory`
+- seed wagers at creation and place bets via `placeBet` / `placeBets`
 - resolve / retract / expire
 - claim payouts and withdraw fees
 
@@ -406,7 +406,7 @@ The website (`site/`) is a navigation shell that embeds the dApp and explorer as
 Pages:
 - `/` — Landing page with protocol overview and network info
 - `/app.html` — Full dApp (embedded iframe)
-- `/explorer.html` — Market explorer with configurable indexer URL
+- `/explorer.html` — Wager explorer with configurable indexer URL
 - `/dapp/` — Standalone dApp (also accessible directly)
 
 Runtime defaults for these surfaces are read from `config/deployments.json`:

@@ -237,7 +237,7 @@ function netPot(totalPot, totalFeeBps) {
 
 async function updateOddsPreview() {
   if (!marketContract) {
-    clearOddsPreview("Create a market first to preview odds.");
+    clearOddsPreview("Create a wager first to preview odds.");
     return;
   }
 
@@ -255,7 +255,7 @@ async function updateOddsPreview() {
 
     const state = Number(await marketContract.state());
     if (state !== 0) {
-      clearOddsPreview("Market is not open. Odds preview is only shown for open markets.");
+      clearOddsPreview("Wager is not open. Odds preview is only shown for open wagers.");
       return;
     }
 
@@ -545,8 +545,8 @@ function getRunner() {
 }
 
 async function setActiveMarket(marketAddress) {
-  if (!ethers.isAddress(marketAddress)) throw new Error("Invalid market address.");
-  await ensureContractExistsOnCurrentNetwork(marketAddress, "Market address");
+  if (!ethers.isAddress(marketAddress)) throw new Error("Invalid wager address.");
+  await ensureContractExistsOnCurrentNetwork(marketAddress, "Wager address");
   marketContract = new ethers.Contract(marketAddress, marketAbi, getRunner());
   $("marketAddress").textContent = marketAddress;
   $("activeMarketAddress").value = marketAddress;
@@ -566,7 +566,7 @@ async function ensureMarketForPlannedAction(actionName) {
     activeMarketAddress: $("activeMarketAddress").value,
   });
   if (!ethers.isAddress(plan.targetAddress)) {
-    throw new Error(`Invalid market address for ${actionName}.`);
+    throw new Error(`Invalid wager address for ${actionName}.`);
   }
   if (
     !marketContract ||
@@ -574,7 +574,7 @@ async function ensureMarketForPlannedAction(actionName) {
   ) {
     await setActiveMarket(plan.targetAddress);
   }
-  if (!marketContract) throw new Error("Failed to load target market.");
+  if (!marketContract) throw new Error("Failed to load target wager.");
   return { plan, targetMarket: marketContract };
 }
 
@@ -582,7 +582,7 @@ async function runMarketAction(actionName, ...args) {
   const { plan, targetMarket } = await ensureMarketForPlannedAction(actionName);
   const method = plan.method;
   if (typeof targetMarket[method] !== "function") {
-    throw new Error(`Market contract does not support action method ${method}.`);
+    throw new Error(`Wager contract does not support action method ${method}.`);
   }
   const tx = await targetMarket[method](...args);
   await tx.wait();
@@ -614,7 +614,7 @@ async function createMarket() {
   if (!factoryAddressInput) throw new Error("Factory address is required.");
   if (!collateralTokenInput) throw new Error("Collateral token is required.");
   if (!outcomesCsv) throw new Error("Outcomes are required.");
-  if (!question) throw new Error("Question is required.");
+  if (!question) throw new Error("Proposition is required.");
   if (factoryAddressInput === null) throw new Error("Factory address is invalid.");
   if (collateralTokenInput === null) {
     throw new Error("Collateral token address is invalid. Use a 0x... ERC-20 address.");
@@ -748,7 +748,7 @@ async function createMarket() {
     await approveTx.wait();
   }
 
-  $("createStatus").textContent = "Submitting createMarket transaction...";
+  $("createStatus").textContent = "Submitting create wager transaction...";
   const tx = await factory[
     "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])"
   ](
@@ -781,11 +781,11 @@ async function createMarket() {
   if (!marketAddress) throw new Error("MarketCreated event not found in tx receipt.");
 
   await setActiveMarket(marketAddress);
-  $("createStatus").textContent = "Market created.";
+  $("createStatus").textContent = "Wager created.";
 }
 
 async function placeBet() {
-  if (!marketContract) throw new Error("Create a market first.");
+  if (!marketContract) throw new Error("Create a wager first.");
 
   const outcomeIndex = Number($("betOutcomeIndex").value);
   const amountNumber = Number($("betAmount").value);
@@ -812,7 +812,7 @@ async function placeBet() {
 }
 
 async function placeBets() {
-  if (!marketContract) throw new Error("Create a market first.");
+  if (!marketContract) throw new Error("Create a wager first.");
 
   const parsed = Logic.parseMultiBetInputs($("betOutcomeIndices").value, $("betAmounts").value, false);
   const collateralTokenAddress = await marketContract.collateralToken();
@@ -976,7 +976,7 @@ async function main() {
       if (!signer) await connectWallet();
       const address = $("activeMarketAddress").value.trim();
       await setActiveMarket(address);
-      $("betStatus").textContent = "Active market loaded.";
+      $("betStatus").textContent = "Active wager loaded.";
     } catch (e) {
       $("betStatus").textContent = `Error: ${e.message}`;
     }
@@ -1082,7 +1082,7 @@ async function main() {
 
   // Load ABIs for factory/market
   await loadAbi();
-  clearOddsPreview("Create a market first to preview odds.");
+  clearOddsPreview("Create a wager first to preview odds.");
   $("walletStatus").textContent = "Ready.";
 }
 

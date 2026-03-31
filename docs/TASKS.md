@@ -22,17 +22,17 @@ Markets created through the factory therefore see at most the factory cap (10% t
 
 ## Product: browser extension ("bet you on the web")
 
-**Goal:** While browsing (e.g. Twitter/X), a user can say "I bet you that will not happen", **create a parimutuel market** from page context (question, outcomes), and **share a link** so a counterparty can open or bet without hunting addresses manually.
+**Goal:** While browsing (e.g. Twitter/X), a user can say "I bet you that will not happen", **create a parimutuel wager** from page context (question, outcomes), and **share a link** so a counterparty can open or bet without hunting addresses manually.
 
 **Likely scope:**
 
 - [ ] Extension shell (MV3): Chrome/Firefox; prefer WalletConnect / injected wallet over storing raw keys in the extension.
 - [ ] Context capture: tweet or selection to prefill `question` / `outcomes` (always editable before submit).
 - [ ] Chain and factory registry aligned with the dApp (Base Sepolia / Base); clear network-mismatch UI.
-- [ ] Deep links: stable URLs (hosted dApp or similar) with `chainId`, `factory`, and `market` after creation.
+- [ ] Deep links: stable URLs (hosted dApp or similar) with `chainId`, `factory`, and wager address after creation.
 - [ ] Create flow using existing `createMarket` ABI; reuse templates aligned with `dapp/logic.js` where possible.
 - [ ] Share UX: copy link, optional "open in dApp" for users without the extension.
-- [ ] Safety: show factory/market addresses prominently; warn on unknown factories (phishing resistance).
+- [ ] Safety: show factory/wager addresses prominently; warn on unknown factories (phishing resistance).
 
 **Dependencies:** Stable deployed addresses, `docs/MACHINE.md` / ABI stability, and a bookmarkable dApp for counterparties.
 

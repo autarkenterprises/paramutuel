@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Paramutuel Protocol MCP Server.
 
-Exposes on-chain parimutuel market operations to LLM agents via the
+Exposes on-chain parimutuel wager operations to LLM agents via the
 Model Context Protocol.  Read operations hit the indexer HTTP API;
 write helpers return ABI-encoded calldata (no private keys needed).
 
@@ -56,13 +56,18 @@ CHAIN_ID = int(os.environ.get("CHAIN_ID", _network_cfg.get("chainId", 84532)))
 
 # ── ABI loading ────────────────────────────────────────────────────
 
-_ABI_DIR = _ROOT / "dapp" / "abi"
+_PACKAGE_ABI_DIR = Path(__file__).resolve().parent / "abi"
+_REPO_ABI_DIR = _ROOT / "dapp" / "abi"
 
 
 def _load_abi(name: str) -> list[dict]:
-    path = _ABI_DIR / f"{name}.json"
+    # 1) Bundled with pip package
+    path = _PACKAGE_ABI_DIR / f"{name}.json"
     if not path.exists():
-        # Fallback to Foundry output
+        # 2) Repo-relative committed ABIs
+        path = _REPO_ABI_DIR / f"{name}.json"
+    if not path.exists():
+        # 3) Foundry build output
         path = _ROOT / "out" / f"{name}.sol" / f"{name}.json"
     data = json.loads(path.read_text())
     return data["abi"]
@@ -152,9 +157,9 @@ async def _indexer_get(path: str) -> dict:
 mcp_server = FastMCP(
     "paramutuel",
     instructions=(
-        "Paramutuel Protocol: on-chain parimutuel betting markets on Base. "
-        "Use these tools to discover markets, analyze odds, and prepare "
-        "transactions for market creation, betting, resolution, and claims. "
+        "Paramutuel Protocol: on-chain parimutuel betting wagers on Base. "
+        "Use these tools to discover wagers, analyze odds, and prepare "
+        "transactions for wager creation, betting, resolution, and claims. "
         "Write tools return ABI-encoded calldata — the caller must sign and "
         "submit the transaction."
     ),
@@ -169,11 +174,11 @@ async def list_markets(
     state: str | None = None,
     limit: int = 100,
 ) -> str:
-    """List parimutuel markets from the indexer.
+    """List parimutuel wagers from the indexer.
 
     Args:
-        state: Filter by market state (OPEN, RESOLVED, RETRACTED). Omit for all.
-        limit: Max number of markets to return (1-1000, default 100).
+        state: Filter by wager state (OPEN, RESOLVED, RETRACTED). Omit for all.
+        limit: Max number of wagers to return (1-1000, default 100).
     """
     params = f"?limit={limit}"
     if state:
@@ -184,10 +189,10 @@ async def list_markets(
 
 @mcp_server.tool()
 async def get_market(market_address: str) -> str:
-    """Get full details for a specific market including totals, outcomes, and event history.
+    """Get full details for a specific wager including totals, outcomes, and event history.
 
     Args:
-        market_address: The market contract address (0x...).
+        market_address: The wager contract address (0x...).
     """
     data = await _indexer_get(f"/markets/{market_address}")
     return json.dumps(data, indent=2)
@@ -195,9 +200,9 @@ async def get_market(market_address: str) -> str:
 
 @mcp_server.tool()
 async def get_expire_candidates() -> str:
-    """Find markets that are past their resolution deadline and can be expired by anyone.
+    """Find wagers that are past their resolution deadline and can be expired by anyone.
 
-    Returns markets where expire() can be called to unlock refunds.
+    Returns wagers where expire() can be called to unlock refunds.
     """
     import time
 
@@ -249,12 +254,12 @@ async def calculate_odds(
 
     All amounts are in raw token units (e.g. for USDC with 6 decimals,
     1 USDC = 1000000). Read total_pot, outcome_total (outcomeTotals[i]),
-    and total_fee_bps from the market contract or indexer.
+    and total_fee_bps from the wager contract or indexer.
 
     Args:
         total_pot: Current total pot in raw token units.
         outcome_total: Current total wagered on the target outcome.
-        total_fee_bps: Market's total fee in basis points.
+        total_fee_bps: Wager's total fee in basis points.
         bet_amount: Hypothetical bet amount in raw token units.
     """
     result = _compute_odds(total_pot, outcome_total, total_fee_bps, bet_amount)
@@ -279,7 +284,7 @@ async def encode_create_market(
     seed_outcome_indices: list[int] | None = None,
     seed_amounts: list[int] | None = None,
 ) -> str:
-    """Encode calldata for creating a new parimutuel market.
+    """Encode calldata for creating a new parimutuel wager.
 
     Returns the ABI-encoded calldata to send to the factory contract.
     If seed arrays are provided, uses the seeded overload. The caller
@@ -287,7 +292,7 @@ async def encode_create_market(
 
     Args:
         collateral_token: ERC-20 token address for bets.
-        question: Human-readable market question.
+        question: Human-readable wager proposition.
         outcomes: List of outcome labels (minimum 2, max 64).
         betting_close_time: Absolute unix timestamp for betting close (0 = no time cap, requires betting_closer).
         resolution_window: Seconds after betting close for resolver to act (0 = no time cap, requires resolution_closer).
@@ -337,7 +342,7 @@ async def encode_create_market(
     result: dict[str, Any] = {
         "to": FACTORY_ADDRESS,
         "calldata": calldata,
-        "description": f"Create market: '{question}' with {len(outcomes)} outcomes",
+        "description": f"Create wager: '{question}' with {len(outcomes)} outcomes",
     }
     if total_seed > 0:
         result["approval_required"] = {
@@ -356,12 +361,12 @@ async def encode_place_bet(
     outcome_index: int,
     amount: int,
 ) -> str:
-    """Encode calldata for placing a single bet on a market outcome.
+    """Encode calldata for placing a single bet on a wager outcome.
 
-    The caller must first approve the market to spend the collateral token.
+    The caller must first approve the wager to spend the collateral token.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
         collateral_token: The ERC-20 collateral token address.
         outcome_index: Index of the outcome to bet on (0-based).
         amount: Bet amount in raw token units.
@@ -397,7 +402,7 @@ async def encode_place_bets(
     """Encode calldata for placing multiple bets across outcomes in one transaction.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
         collateral_token: The ERC-20 collateral token address.
         outcome_indices: List of outcome indices to bet on.
         amounts: List of bet amounts in raw token units (aligned with outcome_indices).
@@ -426,12 +431,12 @@ async def encode_place_bets(
 
 @mcp_server.tool()
 async def encode_resolve(market_address: str, winning_outcome_index: int) -> str:
-    """Encode calldata for resolving a market to a winning outcome.
+    """Encode calldata for resolving a wager to a winning outcome.
 
-    Only the market's resolver can submit this transaction.
+    Only the wager's resolver can submit this transaction.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
         winning_outcome_index: Index of the winning outcome.
     """
     calldata = _encode_call(
@@ -441,7 +446,7 @@ async def encode_resolve(market_address: str, winning_outcome_index: int) -> str
         {
             "to": market_address,
             "calldata": calldata,
-            "description": f"Resolve market to outcome {winning_outcome_index}",
+            "description": f"Resolve wager to outcome {winning_outcome_index}",
         },
         indent=2,
     )
@@ -449,32 +454,32 @@ async def encode_resolve(market_address: str, winning_outcome_index: int) -> str
 
 @mcp_server.tool()
 async def encode_retract(market_address: str) -> str:
-    """Encode calldata for retracting (invalidating) a market.
+    """Encode calldata for retracting (invalidating) a wager.
 
-    Only the market's resolver can submit this. Bettors get refunds minus fees.
+    Only the wager's resolver can submit this. Bettors get refunds minus fees.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
     """
     calldata = _encode_call("retract()", [], [])
     return json.dumps(
-        {"to": market_address, "calldata": calldata, "description": "Retract market"},
+        {"to": market_address, "calldata": calldata, "description": "Retract wager"},
         indent=2,
     )
 
 
 @mcp_server.tool()
 async def encode_expire(market_address: str) -> str:
-    """Encode calldata for expiring a market past its resolution deadline.
+    """Encode calldata for expiring a wager past its resolution deadline.
 
-    Anyone can submit this transaction. Moves market to Retracted state.
+    Anyone can submit this transaction. Moves wager to Retracted state.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
     """
     calldata = _encode_call("expire()", [], [])
     return json.dumps(
-        {"to": market_address, "calldata": calldata, "description": "Expire market"},
+        {"to": market_address, "calldata": calldata, "description": "Expire wager"},
         indent=2,
     )
 
@@ -483,10 +488,10 @@ async def encode_expire(market_address: str) -> str:
 async def encode_close_betting(market_address: str) -> str:
     """Encode calldata for closing the betting window early.
 
-    Only the market's bettingCloser can submit this.
+    Only the wager's bettingCloser can submit this.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
     """
     calldata = _encode_call("closeBetting()", [], [])
     return json.dumps(
@@ -503,11 +508,11 @@ async def encode_close_betting(market_address: str) -> str:
 async def encode_close_resolution_window(market_address: str) -> str:
     """Encode calldata for closing the resolution window early.
 
-    Only the market's resolutionCloser can submit this, and only after
+    Only the wager's resolutionCloser can submit this, and only after
     betting is closed.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
     """
     calldata = _encode_call("closeResolutionWindow()", [], [])
     return json.dumps(
@@ -522,13 +527,13 @@ async def encode_close_resolution_window(market_address: str) -> str:
 
 @mcp_server.tool()
 async def encode_claim(market_address: str) -> str:
-    """Encode calldata for claiming payout or refund after market finalization.
+    """Encode calldata for claiming payout or refund after wager finalization.
 
-    For resolved markets: winners get pro-rata payout from net pot.
-    For retracted/expired markets: all bettors get pro-rata refund minus fees.
+    For resolved wagers: winners get pro-rata payout from net pot.
+    For retracted/expired wagers: all bettors get pro-rata refund minus fees.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
     """
     calldata = _encode_call("claim()", [], [])
     return json.dumps(
@@ -544,7 +549,7 @@ async def encode_withdraw_fees(market_address: str) -> str:
     Only addresses listed as fee recipients can withdraw.
 
     Args:
-        market_address: The market contract address.
+        market_address: The wager contract address.
     """
     calldata = _encode_call("withdrawFees()", [], [])
     return json.dumps(

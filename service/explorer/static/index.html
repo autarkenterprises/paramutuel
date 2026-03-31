@@ -10,13 +10,13 @@
   <main class="container">
     <section class="card">
       <h1>Paramutuel Explorer</h1>
-      <p class="muted">Reads market state from the indexer API.</p>
+      <p class="muted">Reads wager state from the indexer API.</p>
       <div class="meta">
         <div><strong>Configured factory:</strong> <code id="factoryAddressDisplay">from deployments.json (if available)</code></div>
         <div><strong>API base:</strong> <code id="apiBaseDisplay">default</code></div>
       </div>
       <div class="controls">
-        <input id="marketSearch" placeholder="Search by question, outcome text, or market address" />
+        <input id="marketSearch" placeholder="Search by proposition, outcome text, or wager address" />
         <select id="marketOrder">
           <option value="desc">Newest first</option>
           <option value="asc">Oldest first</option>
@@ -30,7 +30,7 @@
         <table>
           <thead>
             <tr>
-              <th>Market</th>
+              <th>Wager</th>
               <th>State</th>
               <th>Proposer</th>
               <th>Resolver</th>

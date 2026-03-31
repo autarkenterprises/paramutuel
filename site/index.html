@@ -19,7 +19,7 @@
 
   <div class="hero">
     <h1>Paramutuel</h1>
-    <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel markets on Base</p>
+    <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel wagers on Base</p>
     <div class="actions">
       <a href="app.html" class="btn btn-primary">Launch App</a>
       <a href="https://github.com/autarkenterprises/paramutuel" class="btn btn-secondary">View Source</a>
@@ -29,8 +29,8 @@
   <div class="container">
     <div class="features">
       <div class="card">
-        <h3>Create Markets</h3>
-        <p>Deploy parimutuel markets for any question with custom outcomes, time windows, and fee structures. Supports templates for sports events, elections, and long-horizon forecasts.</p>
+        <h3>Create Wagers</h3>
+        <p>Deploy parimutuel wagers for any proposition with custom outcomes, time windows, and fee structures. Supports templates for sports events, elections, and long-horizon forecasts.</p>
       </div>
       <div class="card">
         <h3>Place Bets</h3>
@@ -38,7 +38,7 @@
       </div>
       <div class="card">
         <h3>Resolve &amp; Claim</h3>
-        <p>Markets resolve to a winning outcome, retract (refund minus fees), or expire if unresolved. Winners claim pro-rata payouts from the net pot.</p>
+        <p>Wagers resolve to a winning outcome, retract (refund minus fees), or expire if unresolved. Winners claim pro-rata payouts from the net pot.</p>
       </div>
     </div>
 
@@ -55,7 +55,7 @@
         </div>
         <div>
           <dt>Collateral</dt>
-          <dd>Market-configured ERC-20 (USDC presets available in dApp)</dd>
+          <dd>Wager-configured ERC-20 (USDC presets available in dApp)</dd>
         </div>
         <div>
           <dt>Explorer</dt>
@@ -67,7 +67,7 @@
     <div class="card">
       <h3>How It Works</h3>
       <ol style="color: #97a6c4; font-size: 14px; line-height: 1.8; padding-left: 20px;">
-        <li><strong style="color: #e6edf3;">Create</strong> &mdash; A proposer deploys a market with a question, outcomes, and time windows via the factory contract.</li>
+        <li><strong style="color: #e6edf3;">Create</strong> &mdash; A proposer deploys a wager with a proposition, outcomes, and time windows via the factory contract.</li>
         <li><strong style="color: #e6edf3;">Bet</strong> &mdash; Anyone deposits ERC-20 collateral on an outcome during the betting window.</li>
         <li><strong style="color: #e6edf3;">Resolve</strong> &mdash; The resolver selects the winning outcome (or retracts/expires).</li>
         <li><strong style="color: #e6edf3;">Claim</strong> &mdash; Winners claim pro-rata payouts; fee recipients withdraw accrued fees.</li>

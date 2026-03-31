@@ -3,8 +3,8 @@
 Service layer components:
 
 - `indexer/` — deterministic chain event indexer + JSON API.
-- `explorer/` — web explorer for market status, backed by indexer API.
-- `control_panel/` — operator controls (CLI + web) for full market lifecycle roles.
+- `explorer/` — web explorer for wager status, backed by indexer API.
+- `control_panel/` — operator controls (CLI + web) for full wager lifecycle roles.
 
 ## Explorer
 

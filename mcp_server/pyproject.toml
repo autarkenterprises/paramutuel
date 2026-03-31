@@ -1,8 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "paramutuel-mcp"
 version = "0.1.0"
-description = "MCP server for the Paramutuel on-chain betting protocol"
+description = "MCP server for the Paramutuel on-chain parimutuel betting protocol"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
+authors = [
+    { name = "Autark Enterprises" },
+]
+keywords = [
+    "mcp",
+    "paramutuel",
+    "betting",
+    "blockchain",
+    "base",
+    "ethereum",
+    "prediction-market",
+    "llm",
+    "ai-agent",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "mcp>=1.0.0",
     "httpx>=0.25.0",
@@ -10,5 +41,17 @@ dependencies = [
     "eth-hash[pycryptodome]",
 ]
 
+[project.urls]
+Homepage = "https://github.com/autarkenterprises/paramutuel"
+Repository = "https://github.com/autarkenterprises/paramutuel"
+Documentation = "https://github.com/autarkenterprises/paramutuel/blob/master/docs/MACHINE.md"
+"Bug Tracker" = "https://github.com/autarkenterprises/paramutuel/issues"
+
 [project.scripts]
 paramutuel-mcp = "mcp_server.server:mcp_server.run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_server"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"mcp_server/abi" = "mcp_server/abi"

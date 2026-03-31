@@ -227,7 +227,7 @@
     const selected = config.section === "resolution" ? resolutionMarketAddress : claimsMarketAddress;
     const targetAddress = String(selected || "").trim() || String(activeMarketAddress || "").trim();
     if (!targetAddress) {
-      throw new Error("Select a market address in this section, or load an active market above.");
+      throw new Error("Select a wager address in this section, or load an active wager above.");
     }
     return {
       actionName,

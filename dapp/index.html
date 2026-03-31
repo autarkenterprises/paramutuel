@@ -20,7 +20,7 @@
     </section>
 
     <section class="card">
-      <h2>Create Market</h2>
+      <h2>Create Wager</h2>
 
       <div class="grid">
         <label>
@@ -53,10 +53,10 @@
           <input id="outcomes" placeholder="YES,NO" />
         </label>
         <label>
-          Market template
+          Wager template
           <select id="marketTemplate">
             <option value="custom">Custom</option>
-            <option value="flash">Flash market (15m betting, 2h resolution)</option>
+            <option value="flash">Flash wager (15m betting, 2h resolution)</option>
             <option value="sports">Sports event (2h betting, 24h resolution)</option>
             <option value="election">Election cycle (30d betting, 14d resolution)</option>
             <option value="long">Long-horizon forecast (365d betting, 180d resolution)</option>
@@ -89,7 +89,7 @@
         <details id="closersHint" class="caption span-2">
           <summary>Closer role help</summary>
           <div class="muted">
-            <code>closeBetting()</code> can stop bets before the scheduled time. <code>closeResolutionWindow()</code> can close the resolver window early (after betting ends), allowing anyone to call <code>expire()</code>. Leave a closer field empty to disable that authority role. To delegate a closer role to the proposer, enter the same wallet address you are connected with when creating the market. No-max windows require explicit closer addresses.
+            <code>closeBetting()</code> can stop bets before the scheduled time. <code>closeResolutionWindow()</code> can close the resolver window early (after betting ends), allowing anyone to call <code>expire()</code>. Leave a closer field empty to disable that authority role. To delegate a closer role to the proposer, enter the same wallet address you are connected with when creating the wager. No-max windows require explicit closer addresses.
           </div>
         </details>
 
@@ -174,13 +174,13 @@
       </div>
 
       <div class="row">
-        <button id="createMarketBtn">Create Market</button>
+        <button id="createMarketBtn">Create Wager</button>
       </div>
 
       <div id="factoryConstraints" class="muted"></div>
 
       <div class="row">
-        <div class="muted">Created market:</div>
+        <div class="muted">Created wager:</div>
         <div id="marketAddress" class="mono muted">Not created</div>
       </div>
       <div id="createStatus" class="muted"></div>
@@ -188,10 +188,10 @@
 
     <section class="card">
       <h2>Betting</h2>
-      <div class="row muted">Load any existing market address to bet/resolve/claim against it.</div>
+      <div class="row muted">Load any existing wager address to bet/resolve/claim against it.</div>
       <div class="row">
-        <input id="activeMarketAddress" placeholder="Active market address (0x...)" />
-        <button id="loadMarketBtn">Load Market</button>
+        <input id="activeMarketAddress" placeholder="Active wager address (0x...)" />
+        <button id="loadMarketBtn">Load Wager</button>
       </div>
       <div class="grid">
         <label>
@@ -245,12 +245,12 @@
     <section class="card">
       <h2>Resolution</h2>
       <div class="row">
-        <input id="resolutionMarketAddress" placeholder="Optional market address for resolution actions (0x...)" />
+        <input id="resolutionMarketAddress" placeholder="Optional wager address for resolution actions (0x...)" />
       </div>
       <details class="caption">
         <summary>Resolution action targeting</summary>
         <div class="muted">
-          Enter a market address here to run resolution actions against that specific market. Leave empty to use the active market loaded in the Betting section.
+          Enter a wager address here to run resolution actions against that specific wager. Leave empty to use the active wager loaded in the Betting section.
         </div>
       </details>
       <div class="grid">
@@ -274,12 +274,12 @@
     <section class="card">
       <h2>Claims & Fees</h2>
       <div class="row">
-        <input id="claimsMarketAddress" placeholder="Optional market address for claim/fee actions (0x...)" />
+        <input id="claimsMarketAddress" placeholder="Optional wager address for claim/fee actions (0x...)" />
       </div>
       <details class="caption">
         <summary>Claim action targeting</summary>
         <div class="muted">
-          Enter a market address here to claim payouts or withdraw fees from that market. Leave empty to use the active market loaded in the Betting section.
+          Enter a wager address here to claim payouts or withdraw fees from that wager. Leave empty to use the active wager loaded in the Betting section.
         </div>
       </details>
       <div class="row">

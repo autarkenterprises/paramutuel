@@ -45,7 +45,7 @@ function updateResultMeta() {
   const orderLabel = lastOrder === "asc" ? "oldest first" : "newest first";
   const q = lastQueryText ? `, query: "${lastQueryText}"` : "";
   const tail = exhausted ? " (end reached)" : "";
-  meta.textContent = `Loaded ${currentOffset} market(s), ${orderLabel}${q}${tail}`;
+  meta.textContent = `Loaded ${currentOffset} wager(s), ${orderLabel}${q}${tail}`;
 }
 
 function setLoadMoreEnabled(enabled) {
@@ -91,7 +91,7 @@ function renderMarkets(markets, { append = false } = {}) {
     tbody.appendChild(tr);
   }
   if (!append && markets.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9">No markets found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9">No wagers found.</td></tr>';
   }
 }
 

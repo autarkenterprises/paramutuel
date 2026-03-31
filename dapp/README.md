@@ -3,14 +3,14 @@
 This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from committed files in `dapp/abi/`, with a fallback to Foundry build artifacts in `out/`.
 
 It supports:
-- Creating markets via `ParamutuelFactory`
+- Creating wagers via `ParamutuelFactory`
 - Optional seeded liquidity at create-time (multi-outcome in one tx)
 - Configuring delegated lifecycle roles (`resolver`, `bettingCloser`, `resolutionCloser`)
 - Finite windows or closer-managed no-max windows (`bettingCloseTime = 0`, `resolutionWindow = 0`)
 - Placing bets (`placeBet`)
 - Placing batch bets across outcomes (`placeBets`)
 - Odds/payout preview for the selected outcome and bet size
-- Closing betting / resolution windows + resolving / retracting / expiring markets
+- Closing betting / resolution windows + resolving / retracting / expiring wagers
 - Claiming payouts
 - Withdrawing fees (`withdrawFees`)
 
@@ -19,7 +19,7 @@ It supports:
 - A node wallet with gas funds on your target network
 - Deployed contract addresses:
   - `ParamutuelFactory` address
-  - (markets are created dynamically; the dApp reads the market address from the `MarketCreated` event)
+  - (wagers are created dynamically; the dApp reads the wager address from the `MarketCreated` event)
 - Serve the directory with an HTTP server (do not open via `file://...`).
 
 ### Run locally
@@ -47,26 +47,26 @@ In the dApp UI, paste:
 - `Collateral token preset` (network-aware dropdown; includes Base mainnet and Base Sepolia presets)
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)
-- Question text
+- Proposition
 - Optional **Resolver address** (empty = your connected wallet resolves; or set an oracle / sponsored resolver)
 - Optional **Betting closer** and **Resolution closer** addresses (`empty` disables authority close for that window; set either field to your connected wallet address to delegate that closer role to the proposer)
 - `Bet close input mode` (`relative` seconds-from-now or `absolute` local date/time)
 - `Resolution window input mode` (`relative` seconds-after-close or `absolute` local date/time)
 - `Resolution window` (seconds after close, when relative mode is selected)
 - Optional no-max checkboxes for both windows (closer-managed mode)
-- Market template selection (sports, election, long-horizon, closer-managed)
+- Wager template selection (sports, election, long-horizon, closer-managed)
 - Optional extra fee recipients + bps (comma-separated)
 - Optional seed outcome indices + seed amounts (comma-separated aligned lists)
 
 ### Notes
 
-- The wallet section shows detected network (`chainId`) after connect. If token preset and wallet network mismatch, the UI warns and blocks create-market submission.
+- The wallet section shows detected network (`chainId`) after connect. If token preset and wallet network mismatch, the UI warns and blocks wager-creation submission.
 - **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
 - Time fields in the create form support both relative and absolute UX. On submit, the dApp sends an absolute unix `bettingCloseTime` either from `now + offset` (relative mode) or from your selected local date/time (absolute mode).
 - Resolution timing supports both relative and absolute UX. In absolute mode, the dApp converts your selected resolution-close timestamp into `resolutionWindow` seconds after the effective betting close.
 - The dApp enforces that the computed resolution window (including absolute-mode conversion) is at least the factory `minResolutionWindow`.
 - Leaving closer fields empty creates time-only finite windows (no authority pre-emption) when finite windows are configured.
-- If you enable a no-max window, the dApp requires the matching closer address to prevent creating an uncloseable market.
+- If you enable a no-max window, the dApp requires the matching closer address to prevent creating an uncloseable wager.
 - Seeded create flow automatically performs token `approve(factory, totalSeedAmount)` before submitting `createMarket`.
 - The contract compares against on-chain `block.timestamp`. If transaction inclusion is delayed, the effective remaining window can be shorter than expected; very tight windows can fail factory minimum-window checks at execution time.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.

@@ -1,14 +1,14 @@
 # Testnet stress suite (Base Sepolia)
 
-This complements the [live integration suite](TESTNET-LIVE-SUITE.md) with **many markets** and **distinct EOAs per role** (proposer, resolver, betting closer, resolution closer).
+This complements the [live integration suite](TESTNET-LIVE-SUITE.md) with **many wagers** and **distinct EOAs per role** (proposer, resolver, betting closer, resolution closer).
 
 ## Modes
 
 | `STRESS_MODE` | What it does | Gas |
 |---------------|----------------|-----|
-| `readonly` (default) | Samples up to `STRESS_SAMPLE_MARKETS` latest markets from configured factory address and asserts on-chain invariants | None |
-| `tx` | Creates `STRESS_MARKET_COUNT` new markets; each market uses **four different keys** for the four roles; runs resolve / retract / expire branches | One burst of txs |
-| `funded-tx` | Creates `STRESS_MARKET_COUNT` new markets; each market uses **six different keys** (4 roles + 2 bettors), does real `approve` + `placeBet`, then resolve/retract/expire and claims | Higher tx burst |
+| `readonly` (default) | Samples up to `STRESS_SAMPLE_MARKETS` latest wagers from configured factory address and asserts on-chain invariants | None |
+| `tx` | Creates `STRESS_MARKET_COUNT` new wagers; each wager uses **four different keys** for the four roles; runs resolve / retract / expire branches | One burst of txs |
+| `funded-tx` | Creates `STRESS_MARKET_COUNT` new wagers; each wager uses **six different keys** (4 roles + 2 bettors), does real `approve` + `placeBet`, then resolve/retract/expire and claims | Higher tx burst |
 
 ## Automatically creating wallets
 
@@ -104,16 +104,16 @@ STRESS_BET_AMOUNT=1 \
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `STRESS_SAMPLE_MARKETS` | `12` | Max recent markets to read in `readonly` |
-| `STRESS_MARKET_COUNT` | `3` | Markets to create in `tx` mode |
+| `STRESS_SAMPLE_MARKETS` | `12` | Max recent wagers to read in `readonly` |
+| `STRESS_MARKET_COUNT` | `3` | Wagers to create in `tx` mode |
 | `STRESS_WALLET_POOL_PATH` | (empty) | Required for `tx`; JSON from generator |
 | `STRESS_FUNDER_PRIVATE_KEY` | — | Funded key for `expire()`; falls back to `PRIVATE_KEY` |
 | `STRESS_COLLATERAL_TOKEN` | (empty) | Required for `funded-tx`; ERC20 with `decimals()/approve()/balanceOf()` |
-| `STRESS_BET_AMOUNT` | `1` | Human token units per bettor per market in `funded-tx` |
+| `STRESS_BET_AMOUNT` | `1` | Human token units per bettor per wager in `funded-tx` |
 | `STRESS_UNAUTHORIZED_PRIVATE_KEY` | (empty) | Optional; enables negative access-control checks in `funded-tx` |
 
 ## Alchemy / cost notes
 
 - **Readonly** mode only issues `eth_call`; Alchemy metered usage is cheap in practice and uses **no** test ETH.
-- **Tx** mode cost scales with `STRESS_MARKET_COUNT` (several txs per market). Keep counts low for routine runs; raise for occasional stress campaigns.
+- **Tx** mode cost scales with `STRESS_MARKET_COUNT` (several txs per wager). Keep counts low for routine runs; raise for occasional stress campaigns.
 - **Funded-tx** mode adds ERC20 transfers + claims, so both ETH gas and funded collateral balances are required for bettor wallets.

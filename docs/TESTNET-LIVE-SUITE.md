@@ -11,7 +11,7 @@ It has three modes:
 ## Why this is low-cost
 
 - `readonly` mode uses only RPC calls (Alchemy dashboard usage, no ETH).
-- `minimal-tx` sends a small number of transactions (create market, close betting, close resolution window, expire).
+- `minimal-tx` sends a small number of transactions (create wager, close betting, close resolution window, expire).
 - It uses `bettingCloseTime=0` and `resolutionWindow=0` so no waiting windows are needed and no bet funding is required.
 
 ## Required environment
@@ -23,7 +23,7 @@ It has three modes:
 
 Optional:
 
-- `TESTNET_MARKET_ADDRESS` (to run additional read checks on a known market)
+- `TESTNET_MARKET_ADDRESS` (to run additional read checks on a known wager)
 - `TESTNET_MODE=minimal-tx` (for transaction checks)
 - `PRIVATE_KEY` (required for `minimal-tx`)
 - `TESTNET_MODE=funded-tx` (for funded lifecycle checks)
@@ -53,7 +53,7 @@ RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 ./script/testnet/run_live_suite.sh
 ```
 
-Read-only + existing market checks:
+Read-only + existing wager checks:
 
 ```bash
 TESTNET_MARKET_ADDRESS=0x... \
@@ -81,7 +81,7 @@ TESTNET_BET_AMOUNT=1 \
 ./script/testnet/run_live_suite.sh
 ```
 
-For multi-market and multi-actor stress testing, see [`TESTNET-STRESS-SUITE.md`](TESTNET-STRESS-SUITE.md).
+For multi-wager and multi-actor stress testing, see [`TESTNET-STRESS-SUITE.md`](TESTNET-STRESS-SUITE.md).
 
 ## Alchemy dashboard fit
 
