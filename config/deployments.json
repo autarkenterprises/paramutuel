@@ -2,7 +2,7 @@
   "defaultNetwork": "baseSepolia",
   "baseSepolia": {
     "chainId": 84532,
-    "factoryAddress": "0x8FBB3ab4BBCAEA196f7847e6c2fe575Eadc18B36",
+    "factoryAddress": "0x5f828426a707174a90637c6aabb3127cb6268444",
     "explorerApiBase": "https://paramutuel-indexer.onrender.com"
   },
   "baseMainnet": {
