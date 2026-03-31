@@ -4,6 +4,7 @@ import tempfile
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from urllib.error import HTTPError
 from urllib import request
 
 from service.indexer.api import Handler
@@ -23,7 +24,7 @@ class ApiRouteTests(unittest.TestCase):
         self.base_url = f"http://{host}:{port}"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        self._seed_market()
+        self._seed_markets()
 
     def tearDown(self) -> None:
         self.server.shutdown()
@@ -38,8 +39,14 @@ class ApiRouteTests(unittest.TestCase):
             body = json.loads(resp.read().decode("utf-8"))
             return resp.status, body
 
-    def _seed_market(self) -> None:
-        market = "0xabc1000000000000000000000000000000000001"
+    def _insert_market(
+        self,
+        market: str,
+        question: str,
+        outcomes: list[str],
+        created_block: int,
+        created_tx_hash: str,
+    ) -> None:
         self.conn.execute(
             """
             INSERT INTO markets(
@@ -57,20 +64,43 @@ class ApiRouteTests(unittest.TestCase):
                 "0xabc4000000000000000000000000000000000004",
                 "0xabc5000000000000000000000000000000000005",
                 "0xabc6000000000000000000000000000000000006",
-                "Will Team A win?",
-                json.dumps(["YES", "NO"]),
+                question,
+                json.dumps(outcomes),
                 1000,
                 3600,
                 4600,
                 0,
                 0,
-                1,
-                "0xaaa",
+                created_block,
+                created_tx_hash,
             ),
         )
         self.conn.execute(
             "INSERT OR IGNORE INTO market_totals(market_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
             (market,),
+        )
+
+    def _seed_markets(self) -> None:
+        self._insert_market(
+            market="0xabc1000000000000000000000000000000000001",
+            question="Will Team A win?",
+            outcomes=["YES", "NO"],
+            created_block=1,
+            created_tx_hash="0xaaa",
+        )
+        self._insert_market(
+            market="0xabc1000000000000000000000000000000000002",
+            question="Will Team B launch?",
+            outcomes=["UP", "DOWN"],
+            created_block=2,
+            created_tx_hash="0xaab",
+        )
+        self._insert_market(
+            market="0xabc1000000000000000000000000000000000003",
+            question="Will Team C ship?",
+            outcomes=["GREEN", "RED"],
+            created_block=3,
+            created_tx_hash="0xaac",
         )
         self.conn.commit()
 
@@ -79,7 +109,7 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(body.get("ok"))
         self.assertEqual(body.get("service"), "paramutuel-indexer-api")
-        self.assertIn("/markets?limit=100", body.get("endpoints", []))
+        self.assertIn("/markets?limit=20&offset=0&order=desc", body.get("endpoints", []))
 
     def test_prefixed_and_unprefixed_market_routes_match(self) -> None:
         status1, body1 = self._get_json("/markets?limit=1")
@@ -100,6 +130,44 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(len(body["markets"]), 1)
         self.assertIn("YES", body["markets"][0]["outcomes_json"])
+
+    def test_markets_default_order_is_most_recent_first(self) -> None:
+        status, body = self._get_json("/markets?limit=3")
+        self.assertEqual(status, 200)
+        addresses = [m["market_address"] for m in body["markets"]]
+        self.assertEqual(
+            addresses,
+            [
+                "0xabc1000000000000000000000000000000000003",
+                "0xabc1000000000000000000000000000000000002",
+                "0xabc1000000000000000000000000000000000001",
+            ],
+        )
+
+    def test_markets_oldest_first_order(self) -> None:
+        status, body = self._get_json("/markets?limit=3&order=asc")
+        self.assertEqual(status, 200)
+        addresses = [m["market_address"] for m in body["markets"]]
+        self.assertEqual(
+            addresses,
+            [
+                "0xabc1000000000000000000000000000000000001",
+                "0xabc1000000000000000000000000000000000002",
+                "0xabc1000000000000000000000000000000000003",
+            ],
+        )
+
+    def test_markets_offset_pagination(self) -> None:
+        status, body = self._get_json("/markets?limit=1&offset=1&order=desc")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["markets"]), 1)
+        self.assertEqual(body["markets"][0]["market_address"], "0xabc1000000000000000000000000000000000002")
+
+    def test_markets_invalid_order_or_offset_rejected(self) -> None:
+        with self.assertRaises(HTTPError):
+            self._get_json("/markets?order=latest")
+        with self.assertRaises(HTTPError):
+            self._get_json("/markets?offset=nan")
 
     def test_prefixed_health_route_works(self) -> None:
         status, body = self._get_json("/api/health")

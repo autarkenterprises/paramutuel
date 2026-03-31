@@ -42,7 +42,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
         if path == "/":
             return self._send_static("index.html")
         if path == "/app.js":
@@ -53,6 +54,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(200, {"ok": True})
         if path.startswith("/api/"):
             target = self.indexer_base_url.rstrip("/") + path.replace("/api", "", 1)
+            if parsed.query:
+                target += f"?{parsed.query}"
             try:
                 with request.urlopen(target, timeout=10) as resp:
                     body = resp.read()
