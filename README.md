@@ -397,7 +397,7 @@ See `dapp/README.md` for UI details and deployment assumptions.
 
 ### Hosted dApp & protocol website
 
-The dApp and a protocol website are deployed to GitHub Pages via CI. On every push to `master` that touches `src/`, `dapp/`, `service/explorer/static/`, or `site/`, a GitHub Actions workflow builds the contracts, extracts ABIs, and assembles the site.
+The dApp and a protocol website are deployed to GitHub Pages via CI. On every push to `master` that touches `src/`, `dapp/`, `service/explorer/static/`, `site/`, or `config/deployments.json`, a GitHub Actions workflow builds the contracts, extracts ABIs, and assembles the site.
 
 **Live URL:** `https://autarkenterprises.github.io/paramutuel/`
 
