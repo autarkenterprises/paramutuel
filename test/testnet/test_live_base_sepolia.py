@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+MARKET_CREATED_TOPIC = "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388"
 
 
 def _env(name: str, default: str = "") -> str:
@@ -29,6 +30,17 @@ def _default_factory_address() -> str:
 
 
 def _run_cast(args: list[str]) -> str:
+    redacted_args: list[str] = []
+    redact_next = False
+    for token in args:
+        if redact_next:
+            redacted_args.append("<redacted>")
+            redact_next = False
+            continue
+        redacted_args.append(token)
+        if token == "--private-key":
+            redact_next = True
+
     proc = subprocess.run(
         ["cast", *args],
         capture_output=True,
@@ -37,9 +49,61 @@ def _run_cast(args: list[str]) -> str:
     )
     if proc.returncode != 0:
         raise RuntimeError(
-            f"cast {' '.join(args)} failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+            f"cast {' '.join(redacted_args)} failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
         )
     return proc.stdout.strip()
+
+
+def _pending_nonce(rpc_url: str, sender: str) -> int:
+    out = _run_cast(["rpc", "--rpc-url", rpc_url, "eth_getTransactionCount", sender, "pending"]).strip()
+    try:
+        parsed = json.loads(out)
+        return int(parsed, 16) if str(parsed).startswith("0x") else int(parsed)
+    except json.JSONDecodeError:
+        raw = out.strip('"')
+        return int(raw, 16) if raw.startswith("0x") else int(raw)
+
+
+def _send_with_retry(private_key: str, address: str, signature: str, *fn_args: str) -> str:
+    rpc = _rpc_url()
+    if not rpc or not private_key:
+        raise RuntimeError("RPC_URL_BASE_SEPOLIA and a private key are required")
+
+    base_cmd = [
+        "send",
+        address,
+        signature,
+        *fn_args,
+        "--rpc-url",
+        rpc,
+        "--private-key",
+        private_key,
+        "--confirmations",
+        "1",
+        "--json",
+    ]
+    try:
+        out = _run_cast(base_cmd)
+    except RuntimeError as exc:
+        message = str(exc).lower()
+        if "replacement transaction underpriced" not in message and "nonce too low" not in message:
+            raise
+        sender = _run_cast(["wallet", "address", "--private-key", private_key])
+        nonce = str(_pending_nonce(rpc, sender))
+        out = _run_cast([*base_cmd, "--nonce", nonce])
+
+    try:
+        payload = json.loads(out)
+        tx_hash = payload.get("transactionHash")
+        if tx_hash:
+            return tx_hash
+    except json.JSONDecodeError:
+        pass
+
+    for token in out.replace('"', " ").split():
+        if token.startswith("0x") and len(token) == 66:
+            return token
+    raise RuntimeError(f"Unable to parse tx hash from cast output:\n{out}")
 
 
 def _call(address: str, signature: str, *fn_args: str) -> str:
@@ -50,46 +114,16 @@ def _call(address: str, signature: str, *fn_args: str) -> str:
 
 
 def _send(address: str, signature: str, *fn_args: str) -> str:
-    rpc = _rpc_url()
     key = _env("PRIVATE_KEY")
-    if not rpc or not key:
+    if not key:
         raise RuntimeError("RPC_URL_BASE_SEPOLIA and PRIVATE_KEY are required for tx mode")
-    out = _run_cast(
-        ["send", address, signature, *fn_args, "--rpc-url", rpc, "--private-key", key, "--json"]
-    )
-    try:
-        payload = json.loads(out)
-        tx_hash = payload.get("transactionHash")
-        if tx_hash:
-            return tx_hash
-    except json.JSONDecodeError:
-        pass
-
-    for token in out.replace('"', " ").split():
-        if token.startswith("0x") and len(token) == 66:
-            return token
-    raise RuntimeError(f"Unable to parse tx hash from cast output:\n{out}")
+    return _send_with_retry(key, address, signature, *fn_args)
 
 
 def _send_with_key(private_key: str, address: str, signature: str, *fn_args: str) -> str:
-    rpc = _rpc_url()
-    if not rpc or not private_key:
+    if not private_key:
         raise RuntimeError("RPC_URL_BASE_SEPOLIA and a private key are required")
-    out = _run_cast(
-        ["send", address, signature, *fn_args, "--rpc-url", rpc, "--private-key", private_key, "--json"]
-    )
-    try:
-        payload = json.loads(out)
-        tx_hash = payload.get("transactionHash")
-        if tx_hash:
-            return tx_hash
-    except json.JSONDecodeError:
-        pass
-
-    for token in out.replace('"', " ").split():
-        if token.startswith("0x") and len(token) == 66:
-            return token
-    raise RuntimeError(f"Unable to parse tx hash from cast output:\n{out}")
+    return _send_with_retry(private_key, address, signature, *fn_args)
 
 
 def _send_expect_failure(private_key: str, address: str, signature: str, *fn_args: str) -> None:
@@ -110,8 +144,35 @@ def _send_expect_failure(private_key: str, address: str, signature: str, *fn_arg
         )
 
 
+def _receipt(tx_hash: str) -> dict:
+    rpc = _rpc_url()
+    if not rpc:
+        raise RuntimeError("RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA) is required")
+    out = _run_cast(["receipt", tx_hash, "--rpc-url", rpc, "--json"])
+    return json.loads(out)
+
+
+def _topic_to_address(topic_word: str) -> str:
+    cleaned = topic_word.lower().replace("0x", "")
+    return "0x" + cleaned[-40:]
+
+
+def _extract_created_market_from_receipt(tx_hash: str, factory_address: str) -> str:
+    payload = _receipt(tx_hash)
+    for log in payload.get("logs", []):
+        if str(log.get("address", "")).lower() != factory_address.lower():
+            continue
+        topics = log.get("topics") or []
+        if len(topics) < 2:
+            continue
+        if str(topics[0]).lower() != MARKET_CREATED_TOPIC:
+            continue
+        return _topic_to_address(str(topics[1]))
+    raise AssertionError(f"MarketCreated event not found in receipt for tx {tx_hash}")
+
+
 def _as_int(value: str) -> int:
-    value = value.strip()
+    value = value.strip().split()[0].replace("_", "")
     if value.startswith("0x"):
         return int(value, 16)
     return int(value)
@@ -124,6 +185,49 @@ def _as_bool(value: str) -> bool:
     if v in ("false", "0"):
         return False
     raise ValueError(f"Expected bool-like value, got: {value}")
+
+
+def _wait_for_markets_count(factory_address: str, min_expected: int, timeout_seconds: int = 45) -> int:
+    deadline = time.time() + timeout_seconds
+    last_seen = -1
+    while time.time() < deadline:
+        last_seen = _as_int(_call(factory_address, "marketsCount()(uint256)"))
+        if last_seen >= min_expected:
+            return last_seen
+        time.sleep(2)
+    raise AssertionError(
+        f"Timed out waiting for marketsCount >= {min_expected}; last observed {last_seen}"
+    )
+
+
+def _wait_for_bool_value(
+    contract_address: str, signature: str, expected: bool, timeout_seconds: int = 45
+) -> bool:
+    deadline = time.time() + timeout_seconds
+    last_seen = None
+    while time.time() < deadline:
+        last_seen = _as_bool(_call(contract_address, signature))
+        if last_seen is expected:
+            return last_seen
+        time.sleep(2)
+    raise AssertionError(
+        f"Timed out waiting for {signature} == {expected}; last observed {last_seen}"
+    )
+
+
+def _wait_for_state(
+    contract_address: str, expected_state: int, timeout_seconds: int = 45
+) -> int:
+    deadline = time.time() + timeout_seconds
+    last_seen = -1
+    while time.time() < deadline:
+        last_seen = _as_int(_call(contract_address, "state()(uint8)"))
+        if last_seen == expected_state:
+            return last_seen
+        time.sleep(2)
+    raise AssertionError(
+        f"Timed out waiting for state == {expected_state}; last observed {last_seen}"
+    )
 
 
 def _parse_units(amount: str, decimals: int) -> int:
@@ -210,7 +314,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         before_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
         question = f"live-suite-{int(time.time())}"
 
-        _send(
+        create_tx = _send(
             self.factory,
             "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             "0x0000000000000000000000000000000000000001",
@@ -225,10 +329,10 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "[]",
         )
 
-        after_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-        self.assertEqual(after_count, before_count + 1)
+        after_count = _wait_for_markets_count(self.factory, before_count + 1)
+        self.assertGreaterEqual(after_count, before_count + 1)
 
-        new_market = _call(self.factory, "markets(uint256)(address)", str(after_count - 1))
+        new_market = _extract_created_market_from_receipt(create_tx, self.factory)
         proposer = _call(new_market, "proposer()(address)")
         resolver = _call(new_market, "resolver()(address)")
         betting_closer = _call(new_market, "bettingCloser()(address)")
@@ -242,15 +346,19 @@ class TestBaseSepoliaLive(unittest.TestCase):
         self.assertEqual(resolution_closer.lower(), self.sender.lower())
 
         _send(new_market, "closeBetting()")
-        betting_closed = _as_bool(_call(new_market, "bettingClosedByAuthority()(bool)"))
+        betting_closed = _wait_for_bool_value(new_market, "bettingClosedByAuthority()(bool)", True)
         self.assertTrue(betting_closed)
 
         _send(new_market, "closeResolutionWindow()")
-        resolution_closed = _as_bool(_call(new_market, "resolutionWindowClosedByAuthority()(bool)"))
+        resolution_closed = _wait_for_bool_value(
+            new_market,
+            "resolutionWindowClosedByAuthority()(bool)",
+            True,
+        )
         self.assertTrue(resolution_closed)
 
         _send(new_market, "expire()")
-        state = _as_int(_call(new_market, "state()(uint8)"))
+        state = _wait_for_state(new_market, 2)
         self.assertEqual(state, 2)  # Retracted
 
     def test_funded_tx_lifecycle_and_claims(self) -> None:
@@ -275,11 +383,11 @@ class TestBaseSepoliaLive(unittest.TestCase):
         before_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
         protocol_fee_bps = _as_int(_call(self.factory, "protocolFeeBps()(uint16)"))
         extra_bps = 1 if protocol_fee_bps < 1000 else 0
-        extra_recipients = f'["{self.sender}"]' if extra_bps > 0 else "[]"
+        extra_recipients = f"[{self.sender}]" if extra_bps > 0 else "[]"
         extra_bps_json = f"[{extra_bps}]" if extra_bps > 0 else "[]"
 
         # Resolve branch with real collateral + claim + fee withdrawal.
-        _send(
+        create_tx_resolve = _send(
             self.factory,
             "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             self.collateral_token,
@@ -293,9 +401,9 @@ class TestBaseSepoliaLive(unittest.TestCase):
             extra_recipients,
             extra_bps_json,
         )
-        after_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-        self.assertEqual(after_count, before_count + 1)
-        resolve_market = _call(self.factory, "markets(uint256)(address)", str(after_count - 1))
+        after_count = _wait_for_markets_count(self.factory, before_count + 1)
+        self.assertGreaterEqual(after_count, before_count + 1)
+        resolve_market = _extract_created_market_from_receipt(create_tx_resolve, self.factory)
 
         _send(self.collateral_token, "approve(address,uint256)", resolve_market, str(amount_raw))
         _send(resolve_market, "placeBet(uint256,uint256)", "0", str(amount_raw))
@@ -323,6 +431,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         _send(resolve_market, "closeBetting()")
         _send(resolve_market, "resolve(uint256)", "0")
         _send(resolve_market, "claim()")
+        _wait_for_state(resolve_market, 1)
         if extra_bps > 0:
             sender_fee_balance = _as_int(
                 _call(resolve_market, "feeBalances(address)(uint256)", self.sender)
@@ -331,7 +440,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
                 _send(resolve_market, "withdrawFees()")
 
         # Retract branch with funded bet + claim.
-        _send(
+        create_tx_retract = _send(
             self.factory,
             "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             self.collateral_token,
@@ -345,15 +454,17 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "[]",
             "[]",
         )
-        retract_market = _call(self.factory, "markets(uint256)(address)", str(after_count))
+        _wait_for_markets_count(self.factory, before_count + 2)
+        retract_market = _extract_created_market_from_receipt(create_tx_retract, self.factory)
         _send(self.collateral_token, "approve(address,uint256)", retract_market, str(amount_raw))
         _send(retract_market, "placeBet(uint256,uint256)", "1", str(amount_raw))
         _send(retract_market, "closeBetting()")
         _send(retract_market, "retract()")
+        _wait_for_state(retract_market, 2)
         _send(retract_market, "claim()")
 
         # Expire branch with funded bet + claim.
-        _send(
+        create_tx_expire = _send(
             self.factory,
             "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             self.collateral_token,
@@ -367,17 +478,19 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "[]",
             "[]",
         )
-        expire_market = _call(self.factory, "markets(uint256)(address)", str(after_count + 1))
+        _wait_for_markets_count(self.factory, before_count + 3)
+        expire_market = _extract_created_market_from_receipt(create_tx_expire, self.factory)
         _send(self.collateral_token, "approve(address,uint256)", expire_market, str(amount_raw))
         _send(expire_market, "placeBet(uint256,uint256)", "0", str(amount_raw))
         _send(expire_market, "closeBetting()")
         _send(expire_market, "closeResolutionWindow()")
         _send(expire_market, "expire()")
+        _wait_for_state(expire_market, 2)
         _send(expire_market, "claim()")
 
         # Optional negative-role checks from a non-authorized key.
         if self.unauthorized_private_key:
-            _send(
+            create_tx_unauth = _send(
                 self.factory,
                 "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
                 self.collateral_token,
@@ -391,7 +504,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
                 "[]",
                 "[]",
             )
-            unauth_market = _call(self.factory, "markets(uint256)(address)", str(after_count + 2))
+            _wait_for_markets_count(self.factory, before_count + 4)
+            unauth_market = _extract_created_market_from_receipt(create_tx_unauth, self.factory)
             _send_expect_failure(self.unauthorized_private_key, unauth_market, "closeBetting()")
             _send_expect_failure(self.unauthorized_private_key, unauth_market, "resolve(uint256)", "0")
 

@@ -48,9 +48,32 @@ for x in w:
 ")
 fi
 
+FUNDER_ADDRESS="$(cast wallet address --private-key "$PRIVATE_KEY")"
+pending_nonce() {
+  cast rpc --rpc-url "$RPC_URL_BASE_SEPOLIA" eth_getTransactionCount "$FUNDER_ADDRESS" pending | tr -d '"'
+}
+
 echo "==> Funding ${#ADDRS[@]} unique addresses with ${WEI} wei each"
 for addr in "${ADDRS[@]}"; do
   echo "    -> $addr"
-  cast send "$addr" --value "$WEI" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+  attempt=1
+  while true; do
+    nonce="$(pending_nonce)"
+    if output="$(cast send "$addr" --value "$WEI" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY" --nonce "$nonce" --confirmations 1 2>&1)"; then
+      echo "$output"
+      break
+    fi
+    if [[ "$output" == *"replacement transaction underpriced"* || "$output" == *"nonce too low"* ]]; then
+      if (( attempt >= 5 )); then
+        echo "$output" >&2
+        exit 1
+      fi
+      attempt=$((attempt + 1))
+      sleep 1
+      continue
+    fi
+    echo "$output" >&2
+    exit 1
+  done
 done
 echo "==> Done"

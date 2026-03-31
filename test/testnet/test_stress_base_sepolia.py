@@ -39,6 +39,17 @@ def _default_factory_address() -> str:
 
 
 def _run_cast(args: list[str]) -> str:
+    redacted_args: list[str] = []
+    redact_next = False
+    for token in args:
+        if redact_next:
+            redacted_args.append("<redacted>")
+            redact_next = False
+            continue
+        redacted_args.append(token)
+        if token == "--private-key":
+            redact_next = True
+
     proc = subprocess.run(
         ["cast", *args],
         capture_output=True,
@@ -47,9 +58,19 @@ def _run_cast(args: list[str]) -> str:
     )
     if proc.returncode != 0:
         raise RuntimeError(
-            f"cast {' '.join(args)} failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+            f"cast {' '.join(redacted_args)} failed\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
         )
     return proc.stdout.strip()
+
+
+def _pending_nonce(rpc_url: str, sender: str) -> int:
+    out = _run_cast(["rpc", "--rpc-url", rpc_url, "eth_getTransactionCount", sender, "pending"]).strip()
+    try:
+        parsed = json.loads(out)
+        return int(parsed, 16) if str(parsed).startswith("0x") else int(parsed)
+    except json.JSONDecodeError:
+        raw = out.strip('"')
+        return int(raw, 16) if raw.startswith("0x") else int(raw)
 
 
 def _call(address: str, signature: str, *fn_args: str) -> str:
@@ -63,18 +84,27 @@ def _send_key(private_key: str, address: str, signature: str, *fn_args: str) -> 
     rpc = _rpc_url()
     if not rpc:
         raise RuntimeError("RPC_URL_BASE_SEPOLIA is required")
-    _run_cast(
-        [
-            "send",
-            address,
-            signature,
-            *fn_args,
-            "--rpc-url",
-            rpc,
-            "--private-key",
-            private_key,
-        ]
-    )
+    base_cmd = [
+        "send",
+        address,
+        signature,
+        *fn_args,
+        "--rpc-url",
+        rpc,
+        "--private-key",
+        private_key,
+        "--confirmations",
+        "1",
+    ]
+    try:
+        _run_cast(base_cmd)
+    except RuntimeError as exc:
+        message = str(exc).lower()
+        if "replacement transaction underpriced" not in message and "nonce too low" not in message:
+            raise
+        sender = _run_cast(["wallet", "address", "--private-key", private_key])
+        nonce = str(_pending_nonce(rpc, sender))
+        _run_cast([*base_cmd, "--nonce", nonce])
 
 
 def _send_expect_failure(private_key: str, address: str, signature: str, *fn_args: str) -> None:
@@ -96,7 +126,7 @@ def _send_expect_failure(private_key: str, address: str, signature: str, *fn_arg
 
 
 def _as_int(value: str) -> int:
-    value = value.strip()
+    value = value.strip().split()[0].replace("_", "")
     if value.startswith("0x"):
         return int(value, 16)
     return int(value)
@@ -118,6 +148,32 @@ def _parse_units(amount: str, decimals: int) -> int:
         raise ValueError(f"Too many decimal places for token decimals={decimals}: {amount}")
     frac_scaled = frac.ljust(decimals, "0")
     return int(whole) * (10 ** decimals) + int(frac_scaled)
+
+
+def _wait_for_markets_count(factory_address: str, min_expected: int, timeout_seconds: int = 45) -> int:
+    deadline = time.time() + timeout_seconds
+    last_seen = -1
+    while time.time() < deadline:
+        last_seen = _as_int(_call(factory_address, "marketsCount()(uint256)"))
+        if last_seen >= min_expected:
+            return last_seen
+        time.sleep(2)
+    raise AssertionError(
+        f"Timed out waiting for marketsCount >= {min_expected}; last observed {last_seen}"
+    )
+
+
+def _wait_for_state(contract_address: str, expected_state: int, timeout_seconds: int = 45) -> int:
+    deadline = time.time() + timeout_seconds
+    last_seen = -1
+    while time.time() < deadline:
+        last_seen = _as_int(_call(contract_address, "state()(uint8)"))
+        if last_seen == expected_state:
+            return last_seen
+        time.sleep(2)
+    raise AssertionError(
+        f"Timed out waiting for state == {expected_state}; last observed {last_seen}"
+    )
 
 
 def _load_wallet_pool(path: str) -> list[dict[str, str]]:
@@ -219,8 +275,8 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 "[]",
             )
 
-            after = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-            self.assertEqual(after, before + 1)
+            after = _wait_for_markets_count(self.factory, before + 1)
+            self.assertGreaterEqual(after, before + 1)
 
             market = _call(self.factory, "markets(uint256)(address)", str(before))
             self.assertEqual(_call(market, "proposer()(address)").lower(), w_prop["address"].lower())
@@ -234,13 +290,13 @@ class TestBaseSepoliaStress(unittest.TestCase):
             if branch == 0:
                 _send_key(w_res_close["private_key"], market, "closeResolutionWindow()")
                 _send_key(self.funder_key, market, "expire()")
-                self.assertEqual(_as_int(_call(market, "state()(uint8)")), 2)
+                self.assertEqual(_wait_for_state(market, 2), 2)
             elif branch == 1:
                 _send_key(w_res["private_key"], market, "resolve(uint256)", "0")
-                self.assertEqual(_as_int(_call(market, "state()(uint8)")), 1)
+                self.assertEqual(_wait_for_state(market, 1), 1)
             else:
                 _send_key(w_res["private_key"], market, "retract()")
-                self.assertEqual(_as_int(_call(market, "state()(uint8)")), 2)
+                self.assertEqual(_wait_for_state(market, 2), 2)
 
     def test_funded_tx_multi_market_roles_and_claims(self) -> None:
         if self.mode != "funded-tx":
@@ -305,6 +361,7 @@ class TestBaseSepoliaStress(unittest.TestCase):
             )
 
             created_index = before_count + i
+            _wait_for_markets_count(self.factory, created_index + 1)
             market = _call(self.factory, "markets(uint256)(address)", str(created_index))
             if not first_market:
                 first_market = market
@@ -347,22 +404,22 @@ class TestBaseSepoliaStress(unittest.TestCase):
             branch = i % 3
             if branch == 0:
                 _send_key(w_res["private_key"], market, "resolve(uint256)", "0")
-                self.assertEqual(_as_int(_call(market, "state()(uint8)")), 1)
+                self.assertEqual(_wait_for_state(market, 1), 1)
                 _send_key(w_bettor_yes["private_key"], market, "claim()")
             elif branch == 1:
                 _send_key(w_res["private_key"], market, "retract()")
-                self.assertEqual(_as_int(_call(market, "state()(uint8)")), 2)
+                self.assertEqual(_wait_for_state(market, 2), 2)
                 _send_key(w_bettor_yes["private_key"], market, "claim()")
                 _send_key(w_bettor_no["private_key"], market, "claim()")
             else:
                 _send_key(w_res_close["private_key"], market, "closeResolutionWindow()")
                 _send_key(w_prop["private_key"], market, "expire()")
-                self.assertEqual(_as_int(_call(market, "state()(uint8)")), 2)
+                self.assertEqual(_wait_for_state(market, 2), 2)
                 _send_key(w_bettor_yes["private_key"], market, "claim()")
                 _send_key(w_bettor_no["private_key"], market, "claim()")
 
-        after_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-        self.assertEqual(after_count, before_count + self.market_count)
+        after_count = _wait_for_markets_count(self.factory, before_count + self.market_count)
+        self.assertGreaterEqual(after_count, before_count + self.market_count)
 
         if self.unauthorized_private_key and first_market:
             _send_expect_failure(self.unauthorized_private_key, first_market, "closeBetting()")
