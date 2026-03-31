@@ -110,6 +110,10 @@ chmod +x script/testnet/launch_testnet.sh
 RPC_URL_BASE_SEPOLIA=... PRIVATE_KEY=... TREASURY_ADDRESS=... ./script/testnet/launch_testnet.sh
 ```
 
+## MCP server
+
+A Model Context Protocol server for LLM agent integration lives in `mcp_server/` (separate from the service layer). See [`docs/MACHINE.md`](../docs/MACHINE.md) for tool list and usage.
+
 ## Tests
 
 Run service-layer tests independently:

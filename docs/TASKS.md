@@ -43,3 +43,16 @@ Markets created through the factory therefore see at most the factory cap (10% t
 ## Maintenance
 
 - [x] Link this file from `README.md` and `research/execution-roadmap.md` (keep discoverable).
+
+---
+
+## Website-assisted UX (post-ADR-0006/0007)
+
+**Goal:** Ship a centralized assisted transaction path for non-power users without changing protocol contracts or regressing the advanced dApp.
+
+- [ ] Define Assisted Transaction Gateway API contract (`quoteIntent`, `submitIntent`, `intentStatus`) and intent schema.
+- [ ] Implement token capability classifier (EIP-2612 -> Permit2 -> approve fallback).
+- [ ] Add preflight simulation and policy rejections (rate limits, spend caps, blocked token list).
+- [ ] Build Tier 1 happy-path website flow for USDC + selected stablecoins.
+- [ ] Add observability dashboards for sponsorship cost, failures by token/path, and abuse indicators.
+- [ ] Document user-facing fallback from assisted website path to advanced dApp self-custody flow.

@@ -55,6 +55,20 @@ Factory address source:
 - default: `config/deployments.json` -> `baseSepolia.factoryAddress`
 - override: `FACTORY_ADDRESS`
 
+Recommended cadence:
+
+1. `readonly` on each change set
+2. `tx` for lifecycle/state-transition stress
+3. `funded-tx` for full ERC-20 settlement paths
+
+Quick sanity check for the resolved factory address:
+
+```bash
+source ./script/lib/deployments.sh
+ensure_factory_address "base-sepolia" "./config/deployments.json"
+echo "$FACTORY_ADDRESS"
+```
+
 Read-only:
 
 ```bash

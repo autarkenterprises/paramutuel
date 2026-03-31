@@ -34,6 +34,20 @@ Optional:
 
 ## Run
 
+Recommended order:
+
+1. run `readonly` first (zero gas)
+2. run `minimal-tx` second (lifecycle smoke)
+3. run `funded-tx` last (full collateral flow)
+
+Before any mode, confirm the effective factory address (from config unless overridden):
+
+```bash
+source ./script/lib/deployments.sh
+ensure_factory_address "base-sepolia" "./config/deployments.json"
+echo "$FACTORY_ADDRESS"
+```
+
 ```bash
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 ./script/testnet/run_live_suite.sh

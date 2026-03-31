@@ -1,6 +1,6 @@
 ## Minimal dApp (MVP)
 
-This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from Foundry build artifacts in `out/`.
+This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from committed files in `dapp/abi/`, with a fallback to Foundry build artifacts in `out/`.
 
 It supports:
 - Creating markets via `ParamutuelFactory`
@@ -49,9 +49,10 @@ In the dApp UI, paste:
 - Outcomes (comma-separated strings)
 - Question text
 - Optional **Resolver address** (empty = your connected wallet resolves; or set an oracle / sponsored resolver)
-- Optional **Betting closer** and **Resolution closer** addresses (`empty` disables authority close for that window)
+- Optional **Betting closer** and **Resolution closer** addresses (`empty` disables authority close for that window; set either field to your connected wallet address to delegate that closer role to the proposer)
 - `Bet close input mode` (`relative` seconds-from-now or `absolute` local date/time)
-- `Resolution window` (seconds after close)
+- `Resolution window input mode` (`relative` seconds-after-close or `absolute` local date/time)
+- `Resolution window` (seconds after close, when relative mode is selected)
 - Optional no-max checkboxes for both windows (closer-managed mode)
 - Market template selection (sports, election, long-horizon, closer-managed)
 - Optional extra fee recipients + bps (comma-separated)
@@ -62,6 +63,8 @@ In the dApp UI, paste:
 - The wallet section shows detected network (`chainId`) after connect. If token preset and wallet network mismatch, the UI warns and blocks create-market submission.
 - **Bet amounts** are converted using the collateral token’s on-chain `decimals()` (read via your connected wallet’s RPC). You only need **Manual decimals override** if the token is non-standard or the call fails.
 - Time fields in the create form support both relative and absolute UX. On submit, the dApp sends an absolute unix `bettingCloseTime` either from `now + offset` (relative mode) or from your selected local date/time (absolute mode).
+- Resolution timing supports both relative and absolute UX. In absolute mode, the dApp converts your selected resolution-close timestamp into `resolutionWindow` seconds after the effective betting close.
+- The dApp enforces that the computed resolution window (including absolute-mode conversion) is at least the factory `minResolutionWindow`.
 - Leaving closer fields empty creates time-only finite windows (no authority pre-emption) when finite windows are configured.
 - If you enable a no-max window, the dApp requires the matching closer address to prevent creating an uncloseable market.
 - Seeded create flow automatically performs token `approve(factory, totalSeedAmount)` before submitting `createMarket`.

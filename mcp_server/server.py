@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Paramutuel Protocol MCP Server.
 
-Exposes on-chain paramutuel market operations to LLM agents via the
+Exposes on-chain parimutuel market operations to LLM agents via the
 Model Context Protocol.  Read operations hit the indexer HTTP API;
 write helpers return ABI-encoded calldata (no private keys needed).
 
@@ -152,7 +152,7 @@ async def _indexer_get(path: str) -> dict:
 mcp_server = FastMCP(
     "paramutuel",
     instructions=(
-        "Paramutuel Protocol: on-chain paramutuel betting markets on Base. "
+        "Paramutuel Protocol: on-chain parimutuel betting markets on Base. "
         "Use these tools to discover markets, analyze odds, and prepare "
         "transactions for market creation, betting, resolution, and claims. "
         "Write tools return ABI-encoded calldata — the caller must sign and "
@@ -169,7 +169,7 @@ async def list_markets(
     state: str | None = None,
     limit: int = 100,
 ) -> str:
-    """List paramutuel markets from the indexer.
+    """List parimutuel markets from the indexer.
 
     Args:
         state: Filter by market state (OPEN, RESOLVED, RETRACTED). Omit for all.
@@ -279,7 +279,7 @@ async def encode_create_market(
     seed_outcome_indices: list[int] | None = None,
     seed_amounts: list[int] | None = None,
 ) -> str:
-    """Encode calldata for creating a new paramutuel market.
+    """Encode calldata for creating a new parimutuel market.
 
     Returns the ABI-encoded calldata to send to the factory contract.
     If seed arrays are provided, uses the seeded overload. The caller

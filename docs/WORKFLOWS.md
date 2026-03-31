@@ -4,7 +4,7 @@ This document is for operators and machine agents interacting with Paramutuel co
 
 Assumptions:
 
-- Factory + market ABIs are available under `out/`.
+- Factory + market ABIs are committed at `dapp/abi/` and also available under `out/` after `forge build`.
 - You have `cast` (Foundry) installed.
 - Environment has `RPC_URL` and `PRIVATE_KEY`.
 

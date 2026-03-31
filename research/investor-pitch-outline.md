@@ -68,7 +68,7 @@ The honest answer: the SAM is early and hard to size. Our thesis is that **forma
 **Defensibility:**
 - **Immutability**: Core contracts cannot be changed, upgraded, or rug-pulled. This is a trust guarantee competitors with upgradeable proxies cannot offer.
 - **Permissionless creation**: No approval needed. Anyone, human or machine, can create a market.
-- **Machine-first interfaces**: ABI, JSON API, and planned MCP server make this the easiest protocol for agents to integrate.
+- **Machine-first interfaces**: ABI, JSON API, and MCP server (built, 16 tools) make this the easiest protocol for agents to integrate.
 - **Network effects**: Proposer reputation, bettor history, and integration ecosystem create switching costs.
 
 ### Business model
@@ -103,7 +103,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 - Hackathon sponsorships and integration bounties
 
 **Phase 3: Machine distribution**
-- MCP server for LLM agent integration
+- MCP server for LLM agent integration (built — 16 tools; publish to registries)
 - OpenAPI tool spec for function-calling LLMs
 - Embeddable SDK/widget for any website
 
@@ -120,10 +120,12 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 
 **Current status:**
 - Core protocol: complete, tested (40+ Solidity tests), deployed on Base Sepolia
-- dApp: functional, all lifecycle flows working
-- Indexer + API: operational, reorg-safe, deterministic
+- dApp: functional, all lifecycle flows working, hosted on GitHub Pages
+- Indexer + API: operational, reorg-safe, deterministic, hosted on Render
 - Explorer + control panel: operational
-- Live testnet integration suite: passing
+- MCP server: built (16 tools for LLM agent integration)
+- Protocol website: live at `https://autarkenterprises.github.io/paramutuel/`
+- Live testnet integration + stress suites: passing
 
 ### The ask
 
@@ -209,13 +211,16 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 - Streamer Kit concept
 
 ### Slide 14 — Machine distribution
-- MCP server, API, SDK
+- MCP server (built, 16 tools), API, SDK
 - "The protocol AI agents bet through"
 - Diagram: LLM -> MCP -> Protocol -> Settlement
 
 ### Slide 15 — Traction & status
 - Base Sepolia deployment: live
 - Test coverage: 40+ tests, all passing
+- MCP server: built and tested (16 tools)
+- Hosted dApp + protocol website: live on GitHub Pages
+- Indexer API: hosted on Render
 - Architecture: immutable core, modular resolution
 - Roadmap checkpoints completed vs. remaining
 

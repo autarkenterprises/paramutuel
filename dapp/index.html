@@ -10,15 +10,6 @@
   <main class="container">
     <h1>Paramutuel MVP</h1>
     <section class="card">
-      <h2>Service Tools</h2>
-      <div class="muted">
-        Optional modular views:
-        Explorer at <code>/service/explorer/</code> (or standalone server),
-        Resolver control panel at <code>/service/control_panel/</code>.
-      </div>
-    </section>
-
-    <section class="card">
       <h2>Wallet</h2>
       <div class="row">
         <button id="connectBtn">Connect Wallet</button>
@@ -99,7 +90,7 @@
         <details id="closersHint" class="caption span-2">
           <summary>Closer role help</summary>
           <div class="muted">
-            <code>closeBetting()</code> can stop bets before the scheduled time. <code>closeResolutionWindow()</code> can close the resolver window early (after betting ends), allowing anyone to call <code>expire()</code>. Empty closer fields disable those authority actions. No-max windows require explicit closer addresses.
+            <code>closeBetting()</code> can stop bets before the scheduled time. <code>closeResolutionWindow()</code> can close the resolver window early (after betting ends), allowing anyone to call <code>expire()</code>. Leave a closer field empty to disable that authority role. To delegate a closer role to the proposer, enter the same wallet address you are connected with when creating the market. No-max windows require explicit closer addresses.
           </div>
         </details>
 
@@ -124,8 +115,19 @@
         </label>
 
         <label>
+          Resolution window input mode
+          <select id="resolutionWindowMode">
+            <option value="relative">Relative seconds after betting close</option>
+            <option value="absolute">Absolute date/time (local)</option>
+          </select>
+        </label>
+        <label id="resolutionWindowWrap">
           Resolution window (seconds after close)
           <input id="resolutionWindow" type="number" value="7200" />
+        </label>
+        <label id="resolutionCloseAtWrap" style="display:none;">
+          Resolution window closes at (local date/time)
+          <input id="resolutionCloseAt" type="datetime-local" />
         </label>
         <label class="checkbox-label">
           <input type="checkbox" id="resolutionNoMax" />
@@ -134,7 +136,7 @@
         <details class="caption span-2">
           <summary>Time-window help</summary>
           <div class="muted">
-            Relative mode sends <code>now + seconds</code>. Absolute mode sends a fixed unix timestamp derived from your local date/time input. No-max toggles set the on-chain value to <code>0</code>, which requires the corresponding closer role.
+            Betting close can be relative (<code>now + seconds</code>) or absolute (local date/time converted to unix timestamp). Resolution window can also be relative (seconds after betting close) or absolute (a local date/time converted into a duration after betting close). No-max toggles set the on-chain value to <code>0</code>, which requires the corresponding closer role. In absolute resolution mode, the selected close time must be after betting close by at least the factory minimum resolution window.
           </div>
         </details>
 

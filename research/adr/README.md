@@ -10,4 +10,8 @@
   - Minimal custom indexer scope and odds/payout preview requirements.
 - `ADR-0005-delegated-betting-and-resolution-window-closure.md`
   - Optional `bettingCloser` / `resolutionCloser` roles, early `closeBetting` / `closeResolutionWindow`, and indexer/sweeper implications.
+- `ADR-0006-surface-separation-self-custody-vs-assisted-ux.md`
+  - Product-layer boundary: advanced self-custody dApp vs assisted website UX, with no core contract coupling.
+- `ADR-0007-assisted-transaction-gateway-and-approval-paths.md`
+  - Upper-layer gas abstraction via an assisted transaction gateway and pluggable permit/approval paths.
 

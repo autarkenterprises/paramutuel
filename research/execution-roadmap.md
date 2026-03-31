@@ -1,6 +1,6 @@
 # Paramutuel Execution Roadmap
 
-Date: 2026-03-20  
+Date: 2026-03-20 (statuses updated 2026-03-30)
 Status: Draft v1 (checkpoint-driven)
 
 This roadmap implements the architecture and governance decisions in `research/adr/`.
@@ -17,6 +17,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 ---
 
 ## Checkpoint 0 — Program Initialization
+
+**Status:** Partially complete (CI baseline done; owner map and change-control process informal)
 
 **Goal:** Establish ownership, timeline, and baseline tooling.
 
@@ -64,6 +66,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Checkpoint 2 — Governance + Treasury Safe Readiness
 
+**Status:** Not started
+
 **Goal:** Operational governance and custody before production deployment.
 
 **Deliverables**
@@ -88,6 +92,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Checkpoint 3 — Protocol Production Hardening
 
+**Status:** Partially complete (40+ tests passing, deployed on Base Sepolia; no formal audit or gas report yet)
+
 **Goal:** Finalize protocol implementation quality for launch.
 
 **Deliverables**
@@ -104,6 +110,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 ---
 
 ## Checkpoint 4 — Minimal Custom Indexer v1
+
+**Status:** Complete (indexer, API, reorg-safe replay, all event types, hosted on Render)
 
 **Goal:** Provide deterministic market state querying for dApp and service.
 
@@ -127,6 +135,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Checkpoint 5 — dApp v1.1 (Production Candidate)
 
+**Status:** Complete (odds preview, resolver/closer UX, explorer view, hosted on GitHub Pages)
+
 **Goal:** Harden dApp for mainnet UX and resolver configurability.
 
 **Deliverables**
@@ -146,6 +156,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 ---
 
 ## Checkpoint 6 — Service Entity MVP
+
+**Status:** Partially complete (control panel CLI + web, sweeper built and tested; no service web presence or policy docs yet)
 
 **Goal:** Launch independent proposal/resolution operations on testnet.
 
@@ -168,6 +180,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Checkpoint 7 — Full Testnet Certification (Protocol + dApp + Service)
 
+**Status:** In progress (live integration suite + stress suite built and passing; formal two-run certification not yet completed)
+
 **Goal:** Validate end-to-end behavior with realistic concurrency.
 
 **Required scenario matrix**
@@ -186,6 +200,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 ---
 
 ## Checkpoint 8 — Mainnet/L2 Launch
+
+**Status:** Not started
 
 **Goal:** Controlled production launch with observability.
 
@@ -206,6 +222,8 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Checkpoint 9 — Resolver Module R&D (Post-Launch Parallel Track)
 
+**Status:** Not started
+
 **Goal:** Build decentralized resolver alternatives without changing core protocol.
 
 **Deliverables**
@@ -217,6 +235,24 @@ This roadmap implements the architecture and governance decisions in `research/a
 **Exit criteria**
 - Module can resolve real markets via delegated resolver path.
 - Formal migration/positioning plan for expanded decentralization.
+
+---
+
+## Parallel Track A — Assisted UX and Gas Abstraction (Website/Service only)
+
+**Goal:** Improve non-power-user execution UX without changing protocol contracts or forcing dependencies into the advanced dApp.
+
+**Reference plan:** `research/assisted-ux-roadmap.md`  
+**Architecture references:** `ADR-0006`, `ADR-0007`
+
+**Boundaries**
+- keep `src/` contracts unchanged
+- keep `/dapp` as self-custody advanced surface
+- confine sponsorship/relayer/permit complexity to website/service layers
+
+**Exit criteria**
+- Tier 1 (USDC + selected stablecoins) sponsored flow is reliable in production
+- Tier 2 (generic ERC-20) path classifier and fallback support are live with policy controls
 
 ---
 

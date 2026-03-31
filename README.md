@@ -218,7 +218,9 @@ This MVP intentionally centralizes resolution **per-market** (not per-protocol):
 
 The purpose of this MVP is to clarify **actors**, their **permissions**, and the **accounting model**, while keeping the contract modular so resolution can be swapped later.
 
-**Agents & automation:** see [`docs/MACHINE.md`](docs/MACHINE.md) for JSON HTTP API shapes, ABI locations, and a concise on-chain state machine for bots.
+**Agents & automation:** see [`docs/MACHINE.md`](docs/MACHINE.md) for JSON HTTP API shapes, ABI locations, MCP server, and a concise on-chain state machine for bots.
+
+**MCP server:** A 16-tool MCP server for LLM agent integration is available at `mcp_server/`. Run with `python -m mcp_server`. See [`docs/MACHINE.md`](docs/MACHINE.md) for details.
 
 ### Actors and relationships (MVP)
 

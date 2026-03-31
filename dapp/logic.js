@@ -3,6 +3,7 @@
   const MARKET_TEMPLATES = {
     custom: {
       bettingCloseMode: "relative",
+      resolutionWindowMode: "relative",
       bettingCloseIn: 7200,
       resolutionWindow: 7200,
       bettingNoMax: false,
@@ -10,6 +11,7 @@
     },
     flash: {
       bettingCloseMode: "relative",
+      resolutionWindowMode: "relative",
       bettingCloseIn: 15 * 60,
       resolutionWindow: 2 * 60 * 60,
       bettingNoMax: false,
@@ -17,6 +19,7 @@
     },
     sports: {
       bettingCloseMode: "relative",
+      resolutionWindowMode: "relative",
       bettingCloseIn: 2 * 60 * 60,
       resolutionWindow: 24 * 60 * 60,
       bettingNoMax: false,
@@ -24,6 +27,7 @@
     },
     election: {
       bettingCloseMode: "relative",
+      resolutionWindowMode: "relative",
       bettingCloseIn: 30 * 24 * 60 * 60,
       resolutionWindow: 14 * 24 * 60 * 60,
       bettingNoMax: false,
@@ -31,6 +35,7 @@
     },
     long: {
       bettingCloseMode: "relative",
+      resolutionWindowMode: "relative",
       bettingCloseIn: 365 * 24 * 60 * 60,
       resolutionWindow: 180 * 24 * 60 * 60,
       bettingNoMax: false,
@@ -38,6 +43,7 @@
     },
     "daily-utc-cutoff": {
       bettingCloseMode: "absolute",
+      resolutionWindowMode: "relative",
       absoluteRule: "nextUtcMidnight",
       bettingCloseIn: 0,
       resolutionWindow: 24 * 60 * 60,
@@ -46,6 +52,7 @@
     },
     "weekly-utc-cutoff": {
       bettingCloseMode: "absolute",
+      resolutionWindowMode: "relative",
       absoluteRule: "nextUtcMondayMidnight",
       bettingCloseIn: 0,
       resolutionWindow: 72 * 60 * 60,
@@ -54,6 +61,7 @@
     },
     "closer-only": {
       bettingCloseMode: "relative",
+      resolutionWindowMode: "relative",
       bettingCloseIn: 7200,
       resolutionWindow: 7200,
       bettingNoMax: true,
@@ -98,10 +106,15 @@
     bettingNoMax,
     resolutionNoMax,
     bettingCloseMode = "relative",
-    bettingCloseAt = null
+    bettingCloseAt = null,
+    resolutionWindowMode = "relative",
+    resolutionCloseAt = null
   ) {
     if (bettingCloseMode !== "relative" && bettingCloseMode !== "absolute") {
       throw new Error("bettingCloseMode must be 'relative' or 'absolute'.");
+    }
+    if (resolutionWindowMode !== "relative" && resolutionWindowMode !== "absolute") {
+      throw new Error("resolutionWindowMode must be 'relative' or 'absolute'.");
     }
     if (
       !bettingNoMax &&
@@ -117,8 +130,15 @@
     ) {
       throw new Error("bettingCloseAt must be a future unix timestamp.");
     }
-    if (!resolutionNoMax && (!Number.isFinite(resolutionWindow) || resolutionWindow <= 0)) {
+    if (
+      !resolutionNoMax &&
+      resolutionWindowMode === "relative" &&
+      (!Number.isFinite(resolutionWindow) || resolutionWindow <= 0)
+    ) {
       throw new Error("resolutionWindow must be positive unless no-max resolution is enabled.");
+    }
+    if (!resolutionNoMax && resolutionWindowMode === "absolute" && bettingNoMax) {
+      throw new Error("resolutionCloseAt requires a finite betting close time.");
     }
     let closeTime = 0;
     if (!bettingNoMax) {
@@ -127,9 +147,20 @@
           ? Math.floor(Number(bettingCloseAt))
           : Math.floor(nowSec) + Number(bettingCloseIn);
     }
+    let resolutionWindowArg = 0;
+    if (resolutionNoMax) {
+      resolutionWindowArg = 0;
+    } else if (resolutionWindowMode === "relative") {
+      resolutionWindowArg = Number(resolutionWindow);
+    } else {
+      if (!Number.isFinite(resolutionCloseAt) || Number(resolutionCloseAt) <= closeTime) {
+        throw new Error("resolutionCloseAt must be after betting close time.");
+      }
+      resolutionWindowArg = Math.floor(Number(resolutionCloseAt)) - closeTime;
+    }
     return {
       closeTime,
-      resolutionWindowArg: resolutionNoMax ? 0 : Number(resolutionWindow),
+      resolutionWindowArg,
     };
   }
 

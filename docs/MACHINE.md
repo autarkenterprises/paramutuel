@@ -289,6 +289,31 @@ Static `dapp/` UI loads ABIs from `dapp/abi/` (committed), with a fallback to `.
 
 Operator transaction workflows are documented in `docs/WORKFLOWS.md`.
 
+## MCP server
+
+A ready-to-use MCP (Model Context Protocol) server is available at `mcp_server/`. It exposes 16 tools across three categories:
+
+- **Discovery:** `get_protocol_info`, `list_markets`, `get_market`, `get_expire_candidates`
+- **Analysis:** `calculate_odds`
+- **Transaction encoding:** `encode_create_market`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
+
+Run with:
+
+```bash
+pip install mcp httpx eth-abi "eth-hash[pycryptodome]"
+python -m mcp_server
+```
+
+Or via the entry point after `pip install -e mcp_server/`:
+
+```bash
+paramutuel-mcp
+```
+
+The server reads factory address and chain ID from `config/deployments.json` (overridable via `FACTORY_ADDRESS` and `CHAIN_ID` env vars). Discovery tools query the indexer API; transaction-encoding tools return raw calldata and approval instructions for the caller's signer.
+
+Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittest mcp_server/tests/test_server.py`).
+
 ## Versioning
 
 Changing `createMarket` or event layouts is an **ABI break**. Bump deployed factory version or document migration when upgrading.

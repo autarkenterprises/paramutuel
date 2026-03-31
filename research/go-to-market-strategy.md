@@ -150,21 +150,18 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 ### 4.1 MCP (Model Context Protocol) server
 
-**What:** Publish an MCP server that exposes paramutuel market operations as tools callable by LLMs (Claude, GPT, etc.).
+**Status:** Built (`mcp_server/`). 16 tools across discovery, analysis, and transaction encoding.
 
-**Tools to expose:**
-- `list_markets` — query open/resolved markets from the indexer API
-- `get_market_details` — full market state including outcomes, totals, odds
-- `create_market` — propose a new market (requires wallet/signer)
-- `place_bet` — bet on an outcome (requires wallet/signer)
-- `get_odds` — current implied payout multiples per outcome
-- `resolve_market` — finalize a market (resolver only)
+**Tools available:**
+- **Discovery:** `get_protocol_info`, `list_markets`, `get_market`, `get_expire_candidates`
+- **Analysis:** `calculate_odds`
+- **Transaction encoding:** `encode_create_market`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
 **Why this matters:** As LLM agents increasingly manage portfolios, make decisions, and interact with on-chain protocols, being the protocol that agents can natively call is a massive distribution advantage. An agent that can say "I'll create a market for that prediction" during a conversation is powerful.
 
-**Implementation path:**
-1. Build MCP server wrapping the existing indexer API (read operations) and ethers.js contract calls (write operations)
-2. Publish to MCP registries and package managers
+**Next steps:**
+1. Publish to MCP registries (Official MCP Registry, Smithery, Glama, PulseMCP)
+2. Publish as pip/npm packages for easy installation
 3. Document as a tool spec for agent frameworks (LangChain, CrewAI, AutoGPT, Claude Agent SDK)
 
 ### 4.2 LLM tool / function-calling spec

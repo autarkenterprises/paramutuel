@@ -125,6 +125,32 @@ function parseCsvToArray(s) {
     .filter((x) => x.length > 0);
 }
 
+function normalizeAddressInput(raw) {
+  const cleaned = String(raw || "")
+    // Remove common invisible unicode marks that can appear via copy/paste or browser autofill.
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E\u2060-\u2069]/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  if (!cleaned) return "";
+
+  let candidate = cleaned;
+  if (/^[0-9a-fA-F]{40}$/.test(candidate)) {
+    candidate = `0x${candidate}`;
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(candidate)) {
+    return null;
+  }
+  try {
+    return ethers.getAddress(candidate);
+  } catch (_) {
+    try {
+      return ethers.getAddress(candidate.toLowerCase());
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 function toUnixSeconds(secondsFromNow) {
   return Math.floor(Date.now() / 1000) + Number(secondsFromNow);
 }
@@ -143,6 +169,32 @@ function ensureDefaultAbsoluteBettingClose() {
   const fallbackSeconds = Number.isFinite(relativeSeconds) && relativeSeconds > 0 ? relativeSeconds : 7200;
   const closeDate = new Date(Date.now() + fallbackSeconds * 1000);
   $("bettingCloseAt").value = formatDateTimeLocal(closeDate);
+}
+
+function estimateBettingCloseFromInputs(nowSec) {
+  if ($("bettingNoMax").checked) return null;
+  const mode = $("bettingCloseMode").value;
+  if (mode === "absolute") {
+    const raw = $("bettingCloseAt").value.trim();
+    if (!raw) return null;
+    const tsMs = new Date(raw).getTime();
+    if (!Number.isFinite(tsMs)) return null;
+    return Math.floor(tsMs / 1000);
+  }
+  const closeIn = Number($("bettingCloseIn").value);
+  if (!Number.isFinite(closeIn) || closeIn <= 0) return null;
+  return Math.floor(nowSec) + Math.floor(closeIn);
+}
+
+function ensureDefaultAbsoluteResolutionClose() {
+  if ($("resolutionCloseAt").value) return;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const bettingCloseSec = estimateBettingCloseFromInputs(nowSec);
+  const relativeSeconds = Number($("resolutionWindow").value);
+  const fallbackSeconds = Number.isFinite(relativeSeconds) && relativeSeconds > 0 ? relativeSeconds : 7200;
+  const anchorSec = Number.isFinite(bettingCloseSec) ? bettingCloseSec : nowSec;
+  const closeDate = new Date((anchorSec + fallbackSeconds) * 1000);
+  $("resolutionCloseAt").value = formatDateTimeLocal(closeDate);
 }
 
 function parseAmount(amountNumber, decimals) {
@@ -277,15 +329,26 @@ function syncDecimalsInputReadOnly() {
 
 function syncWindowInputState() {
   const bettingNoMax = $("bettingNoMax").checked;
-  const mode = $("bettingCloseMode").value;
-  $("bettingCloseIn").readOnly = bettingNoMax || mode !== "relative";
-  $("bettingCloseAt").disabled = bettingNoMax || mode !== "absolute";
-  $("bettingCloseInWrap").style.display = !bettingNoMax && mode === "relative" ? "" : "none";
-  $("bettingCloseAtWrap").style.display = !bettingNoMax && mode === "absolute" ? "" : "none";
-  if (!bettingNoMax && mode === "absolute") {
+  const bettingMode = $("bettingCloseMode").value;
+  const resolutionNoMax = $("resolutionNoMax").checked;
+  const resolutionMode = $("resolutionWindowMode").value;
+
+  $("bettingCloseIn").readOnly = bettingNoMax || bettingMode !== "relative";
+  $("bettingCloseAt").disabled = bettingNoMax || bettingMode !== "absolute";
+  $("bettingCloseInWrap").style.display = !bettingNoMax && bettingMode === "relative" ? "" : "none";
+  $("bettingCloseAtWrap").style.display = !bettingNoMax && bettingMode === "absolute" ? "" : "none";
+  if (!bettingNoMax && bettingMode === "absolute") {
     ensureDefaultAbsoluteBettingClose();
   }
-  $("resolutionWindow").readOnly = $("resolutionNoMax").checked;
+
+  $("resolutionWindow").readOnly = resolutionNoMax || resolutionMode !== "relative";
+  $("resolutionCloseAt").disabled = resolutionNoMax || resolutionMode !== "absolute";
+  $("resolutionWindowWrap").style.display = !resolutionNoMax && resolutionMode === "relative" ? "" : "none";
+  $("resolutionCloseAtWrap").style.display =
+    !resolutionNoMax && resolutionMode === "absolute" ? "" : "none";
+  if (!resolutionNoMax && resolutionMode === "absolute") {
+    ensureDefaultAbsoluteResolutionClose();
+  }
 }
 
 function populateCollateralPresets() {
@@ -321,7 +384,11 @@ async function applySelectedCollateralPreset() {
   if (presetRaw === "custom") return;
 
   const preset = parseTokenPresetValue(presetRaw);
-  $("collateralToken").value = preset.address;
+  const normalizedPresetAddress = normalizeAddressInput(preset.address);
+  if (!normalizedPresetAddress) {
+    throw new Error(`Preset token address is invalid for ${preset.symbol}.`);
+  }
+  $("collateralToken").value = normalizedPresetAddress;
 
   if (!$("decimalsManual").checked) {
     $("decimals").value = String(preset.decimals);
@@ -383,11 +450,12 @@ async function resolveBettingDecimals(tokenAddress) {
 
 async function tryDetectDecimalsFromCollateralField() {
   if ($("decimalsManual").checked) return;
-  const addr = $("collateralToken").value.trim();
-  if (!addr || !ethers.isAddress(addr)) {
+  const addr = normalizeAddressInput($("collateralToken").value);
+  if (!addr) {
     $("tokenMeta").textContent = "Enter a valid token address, then tab away to detect decimals.";
     return;
   }
+  $("collateralToken").value = addr;
   if (!provider) {
     $("tokenMeta").textContent = "Connect wallet to read decimals() from the token.";
     return;
@@ -521,8 +589,8 @@ async function runMarketAction(actionName, ...args) {
 }
 
 async function createMarket() {
-  const factoryAddress = $("factoryAddress").value.trim();
-  const collateralToken = $("collateralToken").value.trim();
+  const factoryAddressInput = normalizeAddressInput($("factoryAddress").value);
+  const collateralTokenInput = normalizeAddressInput($("collateralToken").value);
   const outcomesCsv = $("outcomes").value.trim();
   const question = $("question").value.trim();
 
@@ -531,21 +599,36 @@ async function createMarket() {
   const bettingNoMax = $("bettingNoMax").checked;
   const resolutionNoMax = $("resolutionNoMax").checked;
   const bettingCloseMode = $("bettingCloseMode").value;
+  const resolutionWindowMode = $("resolutionWindowMode").value;
   const bettingCloseAtRaw = $("bettingCloseAt").value.trim();
+  const resolutionCloseAtRaw = $("resolutionCloseAt").value.trim();
   const extraFeeRecipientsCsv = $("extraFeeRecipients").value.trim();
   const extraFeeBpsCsv = $("extraFeeBps").value.trim();
   const seedOutcomeIndicesCsv = $("seedOutcomeIndices").value.trim();
   const seedAmountsCsv = $("seedAmounts").value.trim();
-  const resolverInput = $("resolverAddress").value.trim();
-  const bettingCloserInput = $("bettingCloserAddress").value.trim();
-  const resolutionCloserInput = $("resolutionCloserAddress").value.trim();
+  const resolverInput = normalizeAddressInput($("resolverAddress").value);
+  const bettingCloserInput = normalizeAddressInput($("bettingCloserAddress").value);
+  const resolutionCloserInput = normalizeAddressInput($("resolutionCloserAddress").value);
 
-  if (!factoryAddress) throw new Error("Factory address is required.");
-  if (!collateralToken) throw new Error("Collateral token is required.");
+  if (!factoryAddressInput) throw new Error("Factory address is required.");
+  if (!collateralTokenInput) throw new Error("Collateral token is required.");
   if (!outcomesCsv) throw new Error("Outcomes are required.");
   if (!question) throw new Error("Question is required.");
-  if (!ethers.isAddress(factoryAddress)) throw new Error("Factory address is invalid.");
-  if (!ethers.isAddress(collateralToken)) throw new Error("Collateral token address is invalid.");
+  if (factoryAddressInput === null) throw new Error("Factory address is invalid.");
+  if (collateralTokenInput === null) {
+    throw new Error("Collateral token address is invalid. Use a 0x... ERC-20 address.");
+  }
+  if (resolverInput === null) throw new Error("Invalid resolver address.");
+  if (bettingCloserInput === null) throw new Error("Invalid betting closer address.");
+  if (resolutionCloserInput === null) throw new Error("Invalid resolution closer address.");
+
+  const factoryAddress = factoryAddressInput;
+  const collateralToken = collateralTokenInput;
+  $("factoryAddress").value = factoryAddress;
+  $("collateralToken").value = collateralToken;
+  if (resolverInput) $("resolverAddress").value = resolverInput;
+  if (bettingCloserInput) $("bettingCloserAddress").value = bettingCloserInput;
+  if (resolutionCloserInput) $("resolutionCloserAddress").value = resolutionCloserInput;
 
   const presetRaw = $("collateralPreset").value;
   if (presetRaw !== "custom" && currentChainId !== null) {
@@ -583,6 +666,17 @@ async function createMarket() {
     }
     bettingCloseAtSec = Math.floor(betCloseMs / 1000);
   }
+  let resolutionCloseAtSec = null;
+  if (!resolutionNoMax && resolutionWindowMode === "absolute") {
+    if (!resolutionCloseAtRaw) {
+      throw new Error("Resolution close date/time is required for absolute mode.");
+    }
+    const resolutionCloseMs = new Date(resolutionCloseAtRaw).getTime();
+    if (!Number.isFinite(resolutionCloseMs)) {
+      throw new Error("Resolution close date/time is invalid.");
+    }
+    resolutionCloseAtSec = Math.floor(resolutionCloseMs / 1000);
+  }
 
   const { closeTime, resolutionWindowArg } = Logic.computeWindowArgs(
     nowSec,
@@ -591,7 +685,9 @@ async function createMarket() {
     bettingNoMax,
     resolutionNoMax,
     bettingCloseMode,
-    bettingCloseAtSec
+    bettingCloseAtSec,
+    resolutionWindowMode,
+    resolutionCloseAtSec
   );
 
   // Optional UI-side validation with factory constraints (still will revert if wrong).
@@ -601,7 +697,7 @@ async function createMarket() {
     minBettingWindow,
     minResolutionWindow,
     effectiveBettingCloseIn,
-    resolutionWindow,
+    resolutionWindowArg,
     bettingNoMax,
     resolutionNoMax
   );
@@ -613,20 +709,17 @@ async function createMarket() {
   const factory = new ethers.Contract(factoryAddress, factoryAbi, signer);
 
   let resolverArg = ethers.ZeroAddress;
-  if (resolverInput.length > 0) {
-    if (!ethers.isAddress(resolverInput)) throw new Error("Invalid resolver address.");
+  if (resolverInput && resolverInput.length > 0) {
     resolverArg = resolverInput;
   }
 
   let bettingCloserArg = ethers.ZeroAddress;
-  if (bettingCloserInput.length > 0) {
-    if (!ethers.isAddress(bettingCloserInput)) throw new Error("Invalid betting closer address.");
+  if (bettingCloserInput && bettingCloserInput.length > 0) {
     bettingCloserArg = bettingCloserInput;
   }
 
   let resolutionCloserArg = ethers.ZeroAddress;
-  if (resolutionCloserInput.length > 0) {
-    if (!ethers.isAddress(resolutionCloserInput)) throw new Error("Invalid resolution closer address.");
+  if (resolutionCloserInput && resolutionCloserInput.length > 0) {
     resolutionCloserArg = resolutionCloserInput;
   }
   if (bettingNoMax && bettingCloserArg === ethers.ZeroAddress) {
@@ -801,20 +894,28 @@ async function main() {
   $("marketTemplate").addEventListener("change", () => {
     const nowSec = Math.floor(Date.now() / 1000);
     const template = Logic.resolveTemplate($("marketTemplate").value, nowSec);
-    const mode = template.bettingCloseMode || "relative";
-    $("bettingCloseMode").value = mode;
+    const bettingMode = template.bettingCloseMode || "relative";
+    const resolutionMode = template.resolutionWindowMode || "relative";
+    $("bettingCloseMode").value = bettingMode;
+    $("resolutionWindowMode").value = resolutionMode;
     $("bettingCloseIn").value = String(template.bettingCloseIn);
-    if (mode === "absolute" && Number.isFinite(template.bettingCloseAt)) {
+    if (bettingMode === "absolute" && Number.isFinite(template.bettingCloseAt)) {
       $("bettingCloseAt").value = formatDateTimeLocal(new Date(template.bettingCloseAt * 1000));
-    } else if (mode === "absolute") {
+    } else if (bettingMode === "absolute") {
       ensureDefaultAbsoluteBettingClose();
     }
     $("resolutionWindow").value = String(template.resolutionWindow);
+    if (resolutionMode === "absolute" && Number.isFinite(template.resolutionCloseAt)) {
+      $("resolutionCloseAt").value = formatDateTimeLocal(new Date(template.resolutionCloseAt * 1000));
+    } else if (resolutionMode === "absolute") {
+      ensureDefaultAbsoluteResolutionClose();
+    }
     $("bettingNoMax").checked = template.bettingNoMax;
     $("resolutionNoMax").checked = template.resolutionNoMax;
     syncWindowInputState();
   });
   $("bettingCloseMode").addEventListener("change", syncWindowInputState);
+  $("resolutionWindowMode").addEventListener("change", syncWindowInputState);
   $("bettingNoMax").addEventListener("change", syncWindowInputState);
   $("resolutionNoMax").addEventListener("change", syncWindowInputState);
   $("collateralPreset").addEventListener("change", () => {
@@ -838,6 +939,26 @@ async function main() {
     tryDetectDecimalsFromCollateralField().catch((e) => {
       $("tokenMeta").textContent = `Could not read decimals(): ${e.message}`;
     });
+  });
+  $("factoryAddress").addEventListener("blur", () => {
+    const normalized = normalizeAddressInput($("factoryAddress").value);
+    if (normalized) $("factoryAddress").value = normalized;
+  });
+  $("collateralToken").addEventListener("input", () => {
+    const normalized = normalizeAddressInput($("collateralToken").value);
+    if (normalized) $("collateralToken").value = normalized;
+  });
+  $("resolverAddress").addEventListener("blur", () => {
+    const normalized = normalizeAddressInput($("resolverAddress").value);
+    if (normalized) $("resolverAddress").value = normalized;
+  });
+  $("bettingCloserAddress").addEventListener("blur", () => {
+    const normalized = normalizeAddressInput($("bettingCloserAddress").value);
+    if (normalized) $("bettingCloserAddress").value = normalized;
+  });
+  $("resolutionCloserAddress").addEventListener("blur", () => {
+    const normalized = normalizeAddressInput($("resolutionCloserAddress").value);
+    if (normalized) $("resolutionCloserAddress").value = normalized;
   });
 
   $("betOutcomeIndex").addEventListener("input", () => {

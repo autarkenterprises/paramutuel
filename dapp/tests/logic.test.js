@@ -46,6 +46,29 @@ test("computeWindowArgs supports absolute betting close mode", () => {
   assert.equal(args.resolutionWindowArg, 7200);
 });
 
+test("computeWindowArgs supports absolute resolution close with relative betting mode", () => {
+  const args = computeWindowArgs(1000, 3600, 0, false, false, "relative", null, "absolute", 9600);
+  assert.equal(args.closeTime, 4600);
+  assert.equal(args.resolutionWindowArg, 5000);
+});
+
+test("computeWindowArgs supports absolute resolution close with absolute betting mode", () => {
+  const args = computeWindowArgs(1000, 0, 0, false, false, "absolute", 5000, "absolute", 11000);
+  assert.equal(args.closeTime, 5000);
+  assert.equal(args.resolutionWindowArg, 6000);
+});
+
+test("computeWindowArgs rejects invalid absolute resolution close values", () => {
+  assert.throws(
+    () => computeWindowArgs(1000, 3600, 0, true, false, "relative", null, "absolute", 9000),
+    /resolutionCloseAt requires a finite betting close time/
+  );
+  assert.throws(
+    () => computeWindowArgs(1000, 3600, 0, false, false, "relative", null, "absolute", 4600),
+    /resolutionCloseAt must be after betting close time/
+  );
+});
+
 test("computeWindowArgs rejects invalid absolute betting close values", () => {
   assert.throws(() => computeWindowArgs(1000, 0, 7200, false, false, "absolute", 1000), /bettingCloseAt/);
   assert.throws(
@@ -59,6 +82,14 @@ test("validateWindowMins warns for small betting window and throws for bad resol
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /minBettingWindow/);
   assert.throws(() => validateWindowMins(3600n, 1800n, 7200, 1200, false, false), /minResolutionWindow/);
+});
+
+test("validateWindowMins enforces min resolution using computed absolute duration", () => {
+  const absoluteComputedWindow = 1700;
+  assert.throws(
+    () => validateWindowMins(3600n, 1800n, 7200, absoluteComputedWindow, false, false),
+    /minResolutionWindow/
+  );
 });
 
 test("validateWindowMins ignores min checks in no-max mode", () => {
