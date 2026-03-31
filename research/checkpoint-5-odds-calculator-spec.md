@@ -87,7 +87,7 @@ Interpretation:
 
 ## 6) Edge Cases
 
-- Market not open: disable betting preview.
+- Wager not open: disable betting preview.
 - `x <= 0`: invalid input.
 - `T_i == 0`:
   - no current multiple

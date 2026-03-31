@@ -46,7 +46,7 @@
 
         <label>
           Proposition
-          <input id="question" placeholder="Will team A win?" />
+          <input id="proposition" placeholder="Will team A win?" />
         </label>
         <label>
           Outcomes (comma-separated)
@@ -54,7 +54,7 @@
         </label>
         <label>
           Wager template
-          <select id="marketTemplate">
+          <select id="wagerTemplate">
             <option value="custom">Custom</option>
             <option value="flash">Flash wager (15m betting, 2h resolution)</option>
             <option value="sports">Sports event (2h betting, 24h resolution)</option>
@@ -174,14 +174,14 @@
       </div>
 
       <div class="row">
-        <button id="createMarketBtn">Create Wager</button>
+        <button id="createWagerBtn">Create Wager</button>
       </div>
 
       <div id="factoryConstraints" class="muted"></div>
 
       <div class="row">
         <div class="muted">Created wager:</div>
-        <div id="marketAddress" class="mono muted">Not created</div>
+        <div id="wagerAddress" class="mono muted">Not created</div>
       </div>
       <div id="createStatus" class="muted"></div>
     </section>
@@ -190,8 +190,8 @@
       <h2>Betting</h2>
       <div class="row muted">Load any existing wager address to bet/resolve/claim against it.</div>
       <div class="row">
-        <input id="activeMarketAddress" placeholder="Active wager address (0x...)" />
-        <button id="loadMarketBtn">Load Wager</button>
+        <input id="activeWagerAddress" placeholder="Active wager address (0x...)" />
+        <button id="loadWagerBtn">Load Wager</button>
       </div>
       <div class="grid">
         <label>
@@ -245,7 +245,7 @@
     <section class="card">
       <h2>Resolution</h2>
       <div class="row">
-        <input id="resolutionMarketAddress" placeholder="Optional wager address for resolution actions (0x...)" />
+        <input id="resolutionWagerAddress" placeholder="Optional wager address for resolution actions (0x...)" />
       </div>
       <details class="caption">
         <summary>Resolution action targeting</summary>
@@ -274,7 +274,7 @@
     <section class="card">
       <h2>Claims & Fees</h2>
       <div class="row">
-        <input id="claimsMarketAddress" placeholder="Optional wager address for claim/fee actions (0x...)" />
+        <input id="claimsWagerAddress" placeholder="Optional wager address for claim/fee actions (0x...)" />
       </div>
       <details class="caption">
         <summary>Claim action targeting</summary>

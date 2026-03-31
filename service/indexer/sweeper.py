@@ -17,11 +17,11 @@ class SweepResult:
     failed: int
 
 
-def _expire_command(market_address: str, rpc_url: str, private_key: str) -> list[str]:
+def _expire_command(wager_address: str, rpc_url: str, private_key: str) -> list[str]:
     return [
         "cast",
         "send",
-        market_address,
+        wager_address,
         "expire()",
         "--rpc-url",
         rpc_url,
@@ -47,8 +47,8 @@ def sweep_once(
     succeeded = 0
     failed = 0
     for row in candidates:
-        market = row["market_address"]
-        cmd = _expire_command(market, rpc_url, private_key)
+        wager = row["wager_address"]
+        cmd = _expire_command(wager, rpc_url, private_key)
         attempted += 1
         if not execute:
             print("DRY_RUN", " ".join(cmd))
@@ -56,10 +56,10 @@ def sweep_once(
             continue
         proc = runner(cmd, check=False, capture_output=True, text=True)
         if proc.returncode == 0:
-            print(f"EXPIRED {market}")
+            print(f"EXPIRED {wager}")
             succeeded += 1
         else:
-            print(f"FAILED {market} rc={proc.returncode} stderr={proc.stderr.strip()}")
+            print(f"FAILED {wager} rc={proc.returncode} stderr={proc.stderr.strip()}")
             failed += 1
 
     return SweepResult(attempted=attempted, succeeded=succeeded, failed=failed)

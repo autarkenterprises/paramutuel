@@ -1,4 +1,4 @@
-# Go-to-Market & Adoption Strategy
+# Go-to-Wager & Adoption Strategy
 
 **Date:** 2026-03-29
 **Status:** Draft v1
@@ -13,7 +13,7 @@ The goal is not just to ship a working protocol, but to become the **default pri
 - **Technical credibility**: immutable, audited, low-fee, well-documented.
 - **Social proof and network effects**: visible usage by recognizable people, easy integration into existing workflows, and a self-reinforcing cycle where more bettors attract more proposers.
 
-Polymarket became the default for prediction markets not because it was the only option, but because it achieved critical mass of liquidity and mindshare. This protocol must execute a similar playbook adapted for parimutuel prop betting.
+Polymarket became the default for prediction wagers not because it was the only option, but because it achieved critical mass of liquidity and mindshare. This protocol must execute a similar playbook adapted for parimutuel prop betting.
 
 ---
 
@@ -23,10 +23,10 @@ Polymarket became the default for prediction markets not because it was the only
 
 **Who:** Streamers, YouTubers, podcasters, Twitter/X personalities who already make informal bets or predictions with their audiences.
 
-**Why first:** They have built-in distribution, their audiences are accustomed to interactive engagement, and the "let's bet on it" moment happens organically in their content. A creator proposing and resolving a market is the simplest possible UX flow.
+**Why first:** They have built-in distribution, their audiences are accustomed to interactive engagement, and the "let's bet on it" moment happens organically in their content. A creator proposing and resolving a wager is the simplest possible UX flow.
 
 **Activation pattern:**
-- Creator proposes a market during a stream or episode
+- Creator proposes a wager during a stream or episode
 - Shares a link; audience places bets
 - Creator resolves after the outcome is known
 - Winner payouts create shareable moments ("I just won 3x on that call")
@@ -38,7 +38,7 @@ Polymarket became the default for prediction markets not because it was the only
 **Why second:** Already comfortable with wallets, ERC-20 tokens, and Base/Arbitrum. Low friction to adopt. Provides early liquidity depth and protocol credibility.
 
 **Activation pattern:**
-- Protocol-seeded markets on crypto-native topics (ETH price milestones, governance votes, protocol launches)
+- Protocol-seeded wagers on crypto-native topics (ETH price milestones, governance votes, protocol launches)
 - Integration into existing community tools (Discord bots, Telegram bots)
 - Composability stories (resolver DAOs, oracle integrations)
 
@@ -67,7 +67,7 @@ Before outreach, understand what creators currently use:
 | **Twitch Predictions** | Platform-native; channel points (not real money) | No real stakes; locked to Twitch; not on-chain |
 | **StreamElements / Streamlabs loyalty points** | Fake currency betting within stream overlays | Not real money; no portability; centralized |
 | **Kick predictions** | Platform-native predictions | Same limitations as Twitch; platform-locked |
-| **Polymarket** | Prediction market (CLOB) | Not designed for quick prop bets; binary-heavy; trading UX, not "let's bet" UX |
+| **Polymarket** | Prediction wager (CLOB) | Not designed for quick prop bets; binary-heavy; trading UX, not "let's bet" UX |
 | **Stake / Rollbit / crypto casinos** | House-edge gambling | House always wins; not peer-to-peer; regulatory pressure |
 | **Twitter/X polls** | Informal sentiment; no stakes | No money; no enforcement; no payout |
 | **Manual escrow (PayPal, Venmo)** | Ad-hoc peer bets | Trust-dependent; no multi-party; no transparency |
@@ -87,9 +87,9 @@ Before outreach, understand what creators currently use:
 
 **Approach:**
 1. Identify 20-50 mid-tier streamers (10k-100k followers) who regularly use Twitch Predictions or audience polls
-2. Offer a **white-glove onboarding**: pre-funded test markets, a dedicated support channel, and a stream overlay widget (to be built)
-3. Create a **"Streamer Kit"**: landing page explaining the value prop, step-by-step setup guide, and example market templates optimized for live content
-4. Revenue share: allow streamers to be `extraFeeRecipients` on their markets — they earn a cut of every bet placed
+2. Offer a **white-glove onboarding**: pre-funded test wagers, a dedicated support channel, and a stream overlay widget (to be built)
+3. Create a **"Streamer Kit"**: landing page explaining the value prop, step-by-step setup guide, and example wager templates optimized for live content
+4. Revenue share: allow streamers to be `extraFeeRecipients` on their wagers — they earn a cut of every bet placed
 
 **Why mid-tier first:** Large streamers are hard to reach and slow to adopt. Mid-tier creators are hungry for differentiation, more responsive, and their adoption creates social proof for larger creators.
 
@@ -104,40 +104,40 @@ Before outreach, understand what creators currently use:
 
 **Approach:**
 1. Target shows that regularly make predictions or have "prediction scorecard" segments
-2. Offer **co-branded markets** that the show can reference in episodes and link in show notes
+2. Offer **co-branded wagers** that the show can reference in episodes and link in show notes
 3. Build a **prediction leaderboard** that tracks audience members' records across episodes — gamifies the engagement loop
 
 #### Twitter/X personalities
 
 **Profile:** People who make public predictions, challenge each other to bets, or whose followers debate outcomes.
 
-- **Tech founders/VCs** who make product/market predictions
+- **Tech founders/VCs** who make product/wager predictions
 - **Sports commentators** with engaged followings
 - **Political commentators** across the spectrum
 - **"Friendly wager" culture** — tech moguls, public figures who tweet "I'll bet you X that Y happens"
 
 **Approach:**
 1. Monitor Twitter for "I'll bet" / "wanna bet?" / "friendly wager" moments
-2. **Reply with a pre-configured market link** — "Here's that bet, on-chain: [link]" — demonstrating the product in context
-3. Build a **Twitter bot / browser extension** (future) that detects bet-like language and offers to create a market
+2. **Reply with a pre-configured wager link** — "Here's that bet, on-chain: [link]" — demonstrating the product in context
+3. Build a **Twitter bot / browser extension** (future) that detects bet-like language and offers to create a wager
 4. Target the "tech mogul friendly wager" use case specifically: when public figures propose bets on Twitter, the protocol should be the obvious place to formalize it
 
 ### 3.3 Creator incentive structure
 
 | Incentive | Mechanism | Purpose |
 |-----------|-----------|---------|
-| **Fee revenue** | Creator as `extraFeeRecipient` (50-100 bps) | Direct financial incentive to propose markets |
+| **Fee revenue** | Creator as `extraFeeRecipient` (50-100 bps) | Direct financial incentive to propose wagers |
 | **Reputation score** | On-chain resolution history, displayed in explorer | Builds trust; creates competitive moat for reliable resolvers |
 | **Verified proposer badge** | Curated list of trusted, high-volume proposers | Social proof; discovery advantage |
-| **Grant program** | One-time grants for first N markets or first $X in volume | Lowers adoption risk; funds initial experimentation |
-| **Content amplification** | Protocol social accounts RT/share creator markets | Cross-pollination of audiences |
+| **Grant program** | One-time grants for first N wagers or first $X in volume | Lowers adoption risk; funds initial experimentation |
+| **Content amplification** | Protocol social accounts RT/share creator wagers | Cross-pollination of audiences |
 
 ### 3.4 Outreach execution timeline
 
 | Phase | Timing (relative to mainnet) | Actions |
 |-------|------------------------------|---------|
 | **Pre-launch seeding** | -8 to -4 weeks | Identify and contact 50 target creators; send Streamer Kit; offer testnet demos |
-| **Beta access** | -4 to -1 weeks | 5-10 creators get early mainnet access; co-create launch markets; collect feedback |
+| **Beta access** | -4 to -1 weeks | 5-10 creators get early mainnet access; co-create launch wagers; collect feedback |
 | **Launch week** | Week 0 | Coordinated "launch day" with beta creators going live simultaneously; PR push |
 | **Growth phase** | Weeks 1-12 | Expand to 50+ active creators; iterate on tooling based on feedback; introduce referral program |
 | **Scale phase** | Months 3-6 | Large creator outreach using social proof from early adopters; platform partnerships |
@@ -153,11 +153,11 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 **Status:** Built (`mcp_server/`). 16 tools across discovery, analysis, and transaction encoding.
 
 **Tools available:**
-- **Discovery:** `get_protocol_info`, `list_markets`, `get_market`, `get_expire_candidates`
+- **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`
 - **Analysis:** `calculate_odds`
 - **Transaction encoding:** `encode_create_market`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
-**Why this matters:** As LLM agents increasingly manage portfolios, make decisions, and interact with on-chain protocols, being the protocol that agents can natively call is a massive distribution advantage. An agent that can say "I'll create a market for that prediction" during a conversation is powerful.
+**Why this matters:** As LLM agents increasingly manage portfolios, make decisions, and interact with on-chain protocols, being the protocol that agents can natively call is a massive distribution advantage. An agent that can say "I'll create a wager for that prediction" during a conversation is powerful.
 
 **Next steps:**
 1. Publish to MCP registries (Official MCP Registry, Smithery, Glama, PulseMCP)
@@ -177,12 +177,12 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 ### 4.3 Embeddable SDK / widget
 
-**What:** A lightweight JavaScript SDK that any website or app can embed to create and interact with markets.
+**What:** A lightweight JavaScript SDK that any website or app can embed to create and interact with wagers.
 
 **Use cases:**
 - Blog post with an embedded "bet on this prediction" widget
-- Forum post where the author creates a market inline
-- Chat application (Discord, Slack) bot that creates markets from commands
+- Forum post where the author creates a wager inline
+- Chat application (Discord, Slack) bot that creates wagers from commands
 - Browser extension that detects "bet-like" language on any webpage
 
 ### 4.4 SEO & discoverability
@@ -199,9 +199,9 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 | "[competitor] alternative" | Comparison pages | Capture users exploring options |
 
 **Technical SEO:**
-- Ensure the dApp is SSR or has static meta tags for market sharing (Open Graph, Twitter Cards)
-- Each market should have a shareable URL with preview (question, current odds, total pot)
-- Structured data (JSON-LD) for market pages
+- Ensure the dApp is SSR or has static meta tags for wager sharing (Open Graph, Twitter Cards)
+- Each wager should have a shareable URL with preview (question, current odds, total pot)
+- Structured data (JSON-LD) for wager pages
 
 ---
 
@@ -213,8 +213,8 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 | Action | Channel | Purpose |
 |--------|---------|---------|
-| "Testnet challenge" | Twitter/X, Discord, crypto forums | Invite users to create and bet on testnet markets; reward most creative propositions |
-| Creator beta program | Direct outreach | 5-10 creators with early access; co-design launch markets |
+| "Testnet challenge" | Twitter/X, Discord, crypto forums | Invite users to create and bet on testnet wagers; reward most creative propositions |
+| Creator beta program | Direct outreach | 5-10 creators with early access; co-design launch wagers |
 | Technical blog series | Mirror/blog, dev forums | "How we built an immutable prop betting primitive" — establish credibility |
 | Protocol audit announcement | Twitter/X, security community | Signal seriousness; build trust |
 | Name/brand reveal | All channels | If a project name is chosen (see `market-viability.md` open question), do a coordinated reveal |
@@ -225,7 +225,7 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 | Action | Channel | Purpose |
 |--------|---------|---------|
-| **Flagship market** | Protocol-seeded, high-interest topic | One marquee market everyone wants to bet on (e.g., a major upcoming event) — the "Polymarket election" moment |
+| **Flagship wager** | Protocol-seeded, high-interest topic | One marquee wager everyone wants to bet on (e.g., a major upcoming event) — the "Polymarket election" moment |
 | **Creator simulcast** | 5-10 beta creators go live | Multiple streams/posts featuring the protocol on the same day |
 | **CT thread** | Twitter/X | "We just launched the on-chain prop bet protocol. Here's why it matters." — thread with demo GIFs |
 | **Hacker News / Reddit** | HN, r/ethereum, r/defi, r/cryptocurrency | Technical launch post emphasizing permissionless, immutable, low-fee |
@@ -236,11 +236,11 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 | Action | Cadence | Purpose |
 |--------|---------|---------|
-| **Weekly flagship market** | Weekly | Protocol-seeded market on trending topic; maintains visibility |
-| **Creator spotlight** | Bi-weekly | Feature a creator and their markets; cross-promote |
+| **Weekly flagship wager** | Weekly | Protocol-seeded wager on trending topic; maintains visibility |
+| **Creator spotlight** | Bi-weekly | Feature a creator and their wagers; cross-promote |
 | **Integration bounties** | Ongoing | Pay developers to build bots, widgets, integrations |
 | **Governance proposals** | Monthly | Community involvement in fee policy, feature priorities |
-| **Hackathon sponsorship** | Per event | Sponsor tracks at ETH hackathons; "best market" prizes |
+| **Hackathon sponsorship** | Per event | Sponsor tracks at ETH hackathons; "best wager" prizes |
 
 ---
 
@@ -251,8 +251,8 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 | Platform | Integration type | Priority |
 |----------|-----------------|----------|
 | **Discord** | Bot: `/bet create "question" "opt1, opt2, opt3"` | High — crypto communities live here |
-| **Telegram** | Bot: inline market creation and betting | High — crypto-native messaging |
-| **Twitter/X** | Bot that replies to "wanna bet?" tweets with market links; browser extension | High — viral loop |
+| **Telegram** | Bot: inline wager creation and betting | High — crypto-native messaging |
+| **Twitter/X** | Bot that replies to "wanna bet?" tweets with wager links; browser extension | High — viral loop |
 | **Farcaster** | Frame: inline betting within Farcaster posts | High — crypto-native social, Base-aligned |
 | **Twitch** | Overlay widget for streamers | Medium — requires more UX work |
 | **Lens** | Social integration | Medium — crypto-native social |
@@ -262,8 +262,8 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 | Partner type | Value exchange |
 |--------------|---------------|
-| **Oracle networks (Chainlink, UMA, Pyth)** | Resolution module for price/data-driven markets; credibility |
-| **Wallet providers (Coinbase Wallet, Rainbow, MetaMask)** | Featured dApp listing; embedded market discovery |
+| **Oracle networks (Chainlink, UMA, Pyth)** | Resolution module for price/data-driven wagers; credibility |
+| **Wallet providers (Coinbase Wallet, Rainbow, MetaMask)** | Featured dApp listing; embedded wager discovery |
 | **L2 ecosystem (Base, Arbitrum foundations)** | Grant funding; ecosystem promotion; featured project |
 | **Stablecoin issuers (Circle/USDC)** | Preferred collateral token; co-marketing |
 | **Other DeFi protocols** | Composability stories (e.g., use LP tokens as collateral) |
@@ -273,7 +273,7 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 Given the primary launch on Base, deep Farcaster integration is strategic:
 
 - **Frames**: A Farcaster Frame that lets users bet directly within their feed
-- **Channel**: Official protocol channel for market discovery
+- **Channel**: Official protocol channel for wager discovery
 - **Base ecosystem**: Apply for Base ecosystem grants; participate in Base builder programs
 - **Coinbase alignment**: Coinbase Wallet is the default Base wallet; optimize for it
 
@@ -286,8 +286,8 @@ Given the primary launch on Base, deep Farcaster integration is strategic:
 | Layer | Platform | Purpose |
 |-------|----------|---------|
 | **Core contributors** | GitHub, private Discord | Protocol development, governance |
-| **Proposer community** | Public Discord, Telegram | Market creators sharing ideas, resolution best practices |
-| **Bettor community** | Public Discord, Telegram, Farcaster | Discussion, market discovery, leaderboards |
+| **Proposer community** | Public Discord, Telegram | Wager creators sharing ideas, resolution best practices |
+| **Bettor community** | Public Discord, Telegram, Farcaster | Discussion, wager discovery, leaderboards |
 | **Developer community** | GitHub, developer Discord | Integration builders, resolver module developers |
 
 ### 7.2 Retention mechanics
@@ -296,9 +296,9 @@ Given the primary launch on Base, deep Farcaster integration is strategic:
 |-----------|-------------|
 | **Leaderboards** | Track best proposers (volume, resolution fairness) and best bettors (ROI, streak) |
 | **Reputation system** | On-chain history visible in explorer; trusted proposer badges |
-| **Recurring markets** | Templates for weekly/monthly recurring propositions (e.g., "weekly NFL props") |
-| **Notification system** | Alert subscribers when trusted proposers create new markets |
-| **Social sharing** | One-click share of bets, wins, and market outcomes with rich previews |
+| **Recurring wagers** | Templates for weekly/monthly recurring propositions (e.g., "weekly NFL props") |
+| **Notification system** | Alert subscribers when trusted proposers create new wagers |
+| **Social sharing** | One-click share of bets, wins, and wager outcomes with rich previews |
 
 ---
 
@@ -308,16 +308,16 @@ Given the primary launch on Base, deep Farcaster integration is strategic:
 
 | Metric | Definition | Why it matters |
 |--------|-----------|----------------|
-| **Monthly handle** | Total value bet across all markets in a month | Primary indicator of protocol traction |
-| **Active proposers** | Unique addresses creating markets per month | Measures supply-side health |
+| **Monthly handle** | Total value bet across all wagers in a month | Primary indicator of protocol traction |
+| **Active proposers** | Unique addresses creating wagers per month | Measures supply-side health |
 | **Active bettors** | Unique addresses placing bets per month | Measures demand-side health |
-| **Market completion rate** | % of markets that reach `resolved` (vs retracted/expired) | Measures ecosystem quality |
+| **Wager completion rate** | % of wagers that reach `resolved` (vs retracted/expired) | Measures ecosystem quality |
 
 ### 8.2 Milestone targets (illustrative)
 
 | Milestone | Target | Trigger |
 |-----------|--------|---------|
-| **Proof of life** | 100 markets, $10k cumulative handle | Validates basic product-market fit |
+| **Proof of life** | 100 wagers, $10k cumulative handle | Validates basic product-market fit |
 | **Creator traction** | 10 recurring proposers, 500 unique bettors | Validates creator distribution thesis |
 | **Machine adoption** | 5 integrations (bots/agents) placing bets | Validates machine distribution thesis |
 | **Growth inflection** | $100k monthly handle, 50 active proposers | Ready for aggressive scaling |
@@ -331,7 +331,7 @@ Given the primary launch on Base, deep Farcaster integration is strategic:
 |------|-----------|
 | **Regulatory uncertainty** | Immutable, permissionless protocol with no admin keys; protocol itself is infrastructure, not an operator. Service entity operates transparently with clear resolution policies. Legal review before mainnet. |
 | **Resolver abuse (unfair resolution)** | Reputation system makes abuse visible and costly; retraction mechanism exists; future dispute/challenge modules planned (Checkpoint 9) |
-| **Low initial liquidity** | Protocol-seeded flagship markets; creator incentive grants; focus on small-pot social markets where liquidity depth is less critical |
+| **Low initial liquidity** | Protocol-seeded flagship wagers; creator incentive grants; focus on small-pot social wagers where liquidity depth is less critical |
 | **Smart contract risk** | Comprehensive test suite (40+ tests); security audit before mainnet; immutable core means no upgrade risk |
 | **Creator churn** | Fee revenue sharing creates ongoing financial incentive; reputation moat rewards long-term commitment |
 | **Competitor response** | First-mover advantage in permissionless arbitrary prop betting; immutability means the protocol can't be rug-pulled; machine-readable interfaces create switching costs for integrators |
@@ -343,7 +343,7 @@ Given the primary launch on Base, deep Farcaster integration is strategic:
 | Category | Estimated range | Notes |
 |----------|----------------|-------|
 | **Security audit** | $20k-$80k | Scope-dependent; 466 lines of core Solidity is small |
-| **Creator grants** | $10k-$30k | Seed 20-50 creators with gas + initial market funding |
+| **Creator grants** | $10k-$30k | Seed 20-50 creators with gas + initial wager funding |
 | **Integration bounties** | $10k-$20k | Discord bot, Telegram bot, Farcaster Frame |
 | **Design & branding** | $5k-$15k | Logo, brand guide, dApp polish, social templates |
 | **Content & PR** | $5k-$15k | Launch campaign, blog posts, media outreach |
@@ -355,11 +355,11 @@ Given the primary launch on Base, deep Farcaster integration is strategic:
 ## 11. Summary: the flywheel
 
 ```
-Creators propose interesting markets
+Creators propose interesting wagers
     -> Audiences bet on them (volume, fees)
         -> Creators earn fees, gain reputation
             -> More creators adopt
-                -> More markets, more variety
+                -> More wagers, more variety
                     -> More bettors discover the protocol
                         -> Machines integrate for automated betting
                             -> Deeper liquidity attracts bigger bets

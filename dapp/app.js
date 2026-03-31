@@ -5,8 +5,8 @@ const ethers = globalThis.ethers;
 
 const FACTORY_ABI_URL = "abi/ParamutuelFactory.json";
 const FACTORY_ABI_FALLBACK = "../out/ParamutuelFactory.sol/ParamutuelFactory.json";
-const MARKET_ABI_URL = "abi/ParamutuelMarket.json";
-const MARKET_ABI_FALLBACK = "../out/ParamutuelMarket.sol/ParamutuelMarket.json";
+const WAGER_ABI_URL = "abi/ParamutuelWager.json";
+const WAGER_ABI_FALLBACK = "../out/ParamutuelWager.sol/ParamutuelWager.json";
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
 const Logic = globalThis.ParamutuelLogic;
 
@@ -15,9 +15,9 @@ let signer;
 let userAddress;
 
 let factoryAbi;
-let marketAbi;
+let wagerAbi;
 
-let marketContract; // last-created market
+let wagerContract; // last-created wager
 let currentChainId = null;
 let walletListenersAttached = false;
 let deploymentsConfig = null;
@@ -236,7 +236,7 @@ function netPot(totalPot, totalFeeBps) {
 }
 
 async function updateOddsPreview() {
-  if (!marketContract) {
+  if (!wagerContract) {
     clearOddsPreview("Create a wager first to preview odds.");
     return;
   }
@@ -253,26 +253,26 @@ async function updateOddsPreview() {
       return;
     }
 
-    const state = Number(await marketContract.state());
+    const state = Number(await wagerContract.state());
     if (state !== 0) {
       clearOddsPreview("Wager is not open. Odds preview is only shown for open wagers.");
       return;
     }
 
-    const outcomesCount = Number(await marketContract.outcomesCount());
+    const outcomesCount = Number(await wagerContract.outcomesCount());
     if (outcomeIndex >= outcomesCount) {
       clearOddsPreview(`Outcome index out of range (0-${outcomesCount - 1}).`);
       return;
     }
 
-    const collateralTokenAddress = await marketContract.collateralToken();
+    const collateralTokenAddress = await wagerContract.collateralToken();
     const decimals = await resolveBettingDecimals(collateralTokenAddress);
     const betAmount = parseAmount(amountNumber, decimals);
 
     const [totalPot, totalFeeBps, outcomeTotal] = await Promise.all([
-      marketContract.totalPot(),
-      marketContract.totalFeeBps(),
-      marketContract.outcomeTotals(outcomeIndex),
+      wagerContract.totalPot(),
+      wagerContract.totalFeeBps(),
+      wagerContract.outcomeTotals(outcomeIndex),
     ]);
 
     const netBefore = netPot(totalPot, totalFeeBps);
@@ -493,9 +493,9 @@ async function loadDeploymentsConfig() {
 }
 
 async function loadAbi() {
-  [factoryAbi, marketAbi] = await Promise.all([
+  [factoryAbi, wagerAbi] = await Promise.all([
     fetchAbiWithFallback(FACTORY_ABI_URL, FACTORY_ABI_FALLBACK),
-    fetchAbiWithFallback(MARKET_ABI_URL, MARKET_ABI_FALLBACK),
+    fetchAbiWithFallback(WAGER_ABI_URL, WAGER_ABI_FALLBACK),
   ]);
 }
 
@@ -544,56 +544,56 @@ function getRunner() {
   throw new Error("Connect wallet first.");
 }
 
-async function setActiveMarket(marketAddress) {
-  if (!ethers.isAddress(marketAddress)) throw new Error("Invalid wager address.");
-  await ensureContractExistsOnCurrentNetwork(marketAddress, "Wager address");
-  marketContract = new ethers.Contract(marketAddress, marketAbi, getRunner());
-  $("marketAddress").textContent = marketAddress;
-  $("activeMarketAddress").value = marketAddress;
-  if (!$("resolutionMarketAddress").value.trim()) {
-    $("resolutionMarketAddress").value = marketAddress;
+async function setActiveWager(wagerAddress) {
+  if (!ethers.isAddress(wagerAddress)) throw new Error("Invalid wager address.");
+  await ensureContractExistsOnCurrentNetwork(wagerAddress, "Wager address");
+  wagerContract = new ethers.Contract(wagerAddress, wagerAbi, getRunner());
+  $("wagerAddress").textContent = wagerAddress;
+  $("activeWagerAddress").value = wagerAddress;
+  if (!$("resolutionWagerAddress").value.trim()) {
+    $("resolutionWagerAddress").value = wagerAddress;
   }
-  if (!$("claimsMarketAddress").value.trim()) {
-    $("claimsMarketAddress").value = marketAddress;
+  if (!$("claimsWagerAddress").value.trim()) {
+    $("claimsWagerAddress").value = wagerAddress;
   }
   await updateOddsPreview();
 }
 
-async function ensureMarketForPlannedAction(actionName) {
-  const plan = Logic.planMarketAction(actionName, {
-    resolutionMarketAddress: $("resolutionMarketAddress").value,
-    claimsMarketAddress: $("claimsMarketAddress").value,
-    activeMarketAddress: $("activeMarketAddress").value,
+async function ensureWagerForPlannedAction(actionName) {
+  const plan = Logic.planWagerAction(actionName, {
+    resolutionWagerAddress: $("resolutionWagerAddress").value,
+    claimsWagerAddress: $("claimsWagerAddress").value,
+    activeWagerAddress: $("activeWagerAddress").value,
   });
   if (!ethers.isAddress(plan.targetAddress)) {
     throw new Error(`Invalid wager address for ${actionName}.`);
   }
   if (
-    !marketContract ||
-    String(marketContract.target || "").toLowerCase() !== plan.targetAddress.toLowerCase()
+    !wagerContract ||
+    String(wagerContract.target || "").toLowerCase() !== plan.targetAddress.toLowerCase()
   ) {
-    await setActiveMarket(plan.targetAddress);
+    await setActiveWager(plan.targetAddress);
   }
-  if (!marketContract) throw new Error("Failed to load target wager.");
-  return { plan, targetMarket: marketContract };
+  if (!wagerContract) throw new Error("Failed to load target wager.");
+  return { plan, targetWager: wagerContract };
 }
 
-async function runMarketAction(actionName, ...args) {
-  const { plan, targetMarket } = await ensureMarketForPlannedAction(actionName);
+async function runWagerAction(actionName, ...args) {
+  const { plan, targetWager } = await ensureWagerForPlannedAction(actionName);
   const method = plan.method;
-  if (typeof targetMarket[method] !== "function") {
+  if (typeof targetWager[method] !== "function") {
     throw new Error(`Wager contract does not support action method ${method}.`);
   }
-  const tx = await targetMarket[method](...args);
+  const tx = await targetWager[method](...args);
   await tx.wait();
-  return marketContract;
+  return wagerContract;
 }
 
-async function createMarket() {
+async function createWager() {
   const factoryAddressInput = normalizeAddressInput($("factoryAddress").value);
   const collateralTokenInput = normalizeAddressInput($("collateralToken").value);
   const outcomesCsv = $("outcomes").value.trim();
-  const question = $("question").value.trim();
+  const proposition = $("proposition").value.trim();
 
   const bettingCloseIn = Number($("bettingCloseIn").value);
   const resolutionWindow = Number($("resolutionWindow").value);
@@ -614,7 +614,7 @@ async function createMarket() {
   if (!factoryAddressInput) throw new Error("Factory address is required.");
   if (!collateralTokenInput) throw new Error("Collateral token is required.");
   if (!outcomesCsv) throw new Error("Outcomes are required.");
-  if (!question) throw new Error("Proposition is required.");
+  if (!proposition) throw new Error("Proposition is required.");
   if (factoryAddressInput === null) throw new Error("Factory address is invalid.");
   if (collateralTokenInput === null) {
     throw new Error("Collateral token address is invalid. Use a 0x... ERC-20 address.");
@@ -750,10 +750,10 @@ async function createMarket() {
 
   $("createStatus").textContent = "Submitting create wager transaction...";
   const tx = await factory[
-    "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])"
+    "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])"
   ](
     collateralToken,
-    question,
+    proposition,
     outcomes,
     BigInt(closeTime),
     BigInt(resolutionWindowArg),
@@ -767,30 +767,30 @@ async function createMarket() {
   );
   const receipt = await tx.wait();
 
-  // Extract MarketCreated event args
-  let marketAddress = null;
+  // Extract WagerCreated event args
+  let wagerAddress = null;
   for (const log of receipt.logs) {
     try {
       const parsed = factory.interface.parseLog(log);
-      if (parsed && parsed.name === "MarketCreated") {
-        marketAddress = parsed.args.market;
+      if (parsed && parsed.name === "WagerCreated") {
+        wagerAddress = parsed.args.wager;
         break;
       }
     } catch (_) {}
   }
-  if (!marketAddress) throw new Error("MarketCreated event not found in tx receipt.");
+  if (!wagerAddress) throw new Error("WagerCreated event not found in tx receipt.");
 
-  await setActiveMarket(marketAddress);
+  await setActiveWager(wagerAddress);
   $("createStatus").textContent = "Wager created.";
 }
 
 async function placeBet() {
-  if (!marketContract) throw new Error("Create a wager first.");
+  if (!wagerContract) throw new Error("Create a wager first.");
 
   const outcomeIndex = Number($("betOutcomeIndex").value);
   const amountNumber = Number($("betAmount").value);
 
-  const collateralTokenAddress = await marketContract.collateralToken();
+  const collateralTokenAddress = await wagerContract.collateralToken();
   const decimals = await resolveBettingDecimals(collateralTokenAddress);
   const erc20Abi = [
     "function approve(address spender,uint256 amount) external returns (bool)",
@@ -801,21 +801,21 @@ async function placeBet() {
   const amount = parseAmount(amountNumber, decimals);
 
   $("betStatus").textContent = "Approving collateral...";
-  const approveTx = await token.approve(marketContract.target, amount);
+  const approveTx = await token.approve(wagerContract.target, amount);
   await approveTx.wait();
 
   $("betStatus").textContent = "Placing bet...";
-  const tx = await marketContract.placeBet(outcomeIndex, amount);
+  const tx = await wagerContract.placeBet(outcomeIndex, amount);
   await tx.wait();
   $("betStatus").textContent = "Bet placed.";
   await updateOddsPreview();
 }
 
 async function placeBets() {
-  if (!marketContract) throw new Error("Create a wager first.");
+  if (!wagerContract) throw new Error("Create a wager first.");
 
   const parsed = Logic.parseMultiBetInputs($("betOutcomeIndices").value, $("betAmounts").value, false);
-  const collateralTokenAddress = await marketContract.collateralToken();
+  const collateralTokenAddress = await wagerContract.collateralToken();
   const decimals = await resolveBettingDecimals(collateralTokenAddress);
   const erc20Abi = [
     "function approve(address spender,uint256 amount) external returns (bool)",
@@ -828,62 +828,62 @@ async function placeBets() {
   for (const amount of amounts) totalAmount += amount;
 
   $("betStatus").textContent = "Approving collateral for batch bet...";
-  const approveTx = await token.approve(marketContract.target, totalAmount);
+  const approveTx = await token.approve(wagerContract.target, totalAmount);
   await approveTx.wait();
 
   $("betStatus").textContent = "Placing batch bet...";
-  const tx = await marketContract.placeBets(parsed.outcomeIndices, amounts);
+  const tx = await wagerContract.placeBets(parsed.outcomeIndices, amounts);
   await tx.wait();
   $("betStatus").textContent = "Batch bet placed.";
   await updateOddsPreview();
 }
 
-async function resolveMarket() {
+async function resolveWager() {
   const winningOutcomeIndex = Number($("winningOutcomeIndex").value);
 
   $("resolutionStatus").textContent = "Resolving...";
-  await runMarketAction("resolve", winningOutcomeIndex);
+  await runWagerAction("resolve", winningOutcomeIndex);
   $("resolutionStatus").textContent = "Resolved.";
   await updateOddsPreview();
 }
 
-async function retractMarket() {
+async function retractWager() {
   $("resolutionStatus").textContent = "Retracting...";
-  await runMarketAction("retract");
+  await runWagerAction("retract");
   $("resolutionStatus").textContent = "Retracted.";
   await updateOddsPreview();
 }
 
-async function expireMarket() {
+async function expireWager() {
   $("resolutionStatus").textContent = "Expiring...";
-  await runMarketAction("expire");
+  await runWagerAction("expire");
   $("resolutionStatus").textContent = "Expired.";
   await updateOddsPreview();
 }
 
-async function closeBettingOnMarket() {
+async function closeBettingOnWager() {
   $("resolutionStatus").textContent = "Closing betting...";
-  await runMarketAction("closeBetting");
+  await runWagerAction("closeBetting");
   $("resolutionStatus").textContent = "Betting closed (authority).";
   await updateOddsPreview();
 }
 
-async function closeResolutionWindowOnMarket() {
+async function closeResolutionWindowOnWager() {
   $("resolutionStatus").textContent = "Closing resolution window...";
-  await runMarketAction("closeResolutionWindow");
+  await runWagerAction("closeResolutionWindow");
   $("resolutionStatus").textContent = "Resolution window closed (authority).";
   await updateOddsPreview();
 }
 
 async function claim() {
   $("claimStatus").textContent = "Claiming payout...";
-  await runMarketAction("claim");
+  await runWagerAction("claim");
   $("claimStatus").textContent = "Claimed (check token balance).";
 }
 
 async function withdrawFees() {
   $("claimStatus").textContent = "Withdrawing fees...";
-  await runMarketAction("withdrawFees");
+  await runWagerAction("withdrawFees");
   $("claimStatus").textContent = "Fees withdrawn.";
 }
 
@@ -894,9 +894,9 @@ async function main() {
   applyDefaultFactoryAddress();
   $("networkStatus").textContent = "Network: connect wallet to detect chain.";
 
-  $("marketTemplate").addEventListener("change", () => {
+  $("wagerTemplate").addEventListener("change", () => {
     const nowSec = Math.floor(Date.now() / 1000);
-    const template = Logic.resolveTemplate($("marketTemplate").value, nowSec);
+    const template = Logic.resolveTemplate($("wagerTemplate").value, nowSec);
     const bettingMode = template.bettingCloseMode || "relative";
     const resolutionMode = template.resolutionWindowMode || "relative";
     $("bettingCloseMode").value = bettingMode;
@@ -928,7 +928,7 @@ async function main() {
   });
 
   // Initialize UI with custom defaults.
-  $("marketTemplate").value = "custom";
+  $("wagerTemplate").value = "custom";
 
   syncDecimalsInputReadOnly();
   $("decimalsManual").addEventListener("change", () => {
@@ -971,11 +971,11 @@ async function main() {
     updateOddsPreview();
   });
 
-  $("loadMarketBtn").addEventListener("click", async () => {
+  $("loadWagerBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      const address = $("activeMarketAddress").value.trim();
-      await setActiveMarket(address);
+      const address = $("activeWagerAddress").value.trim();
+      await setActiveWager(address);
       $("betStatus").textContent = "Active wager loaded.";
     } catch (e) {
       $("betStatus").textContent = `Error: ${e.message}`;
@@ -990,10 +990,10 @@ async function main() {
     }
   });
 
-  $("createMarketBtn").addEventListener("click", async () => {
+  $("createWagerBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      await createMarket();
+      await createWager();
     } catch (e) {
       $("createStatus").textContent = `Error: ${e.message}`;
     }
@@ -1020,7 +1020,7 @@ async function main() {
   $("resolveBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      await resolveMarket();
+      await resolveWager();
     } catch (e) {
       $("resolutionStatus").textContent = `Error: ${e.message}`;
     }
@@ -1029,7 +1029,7 @@ async function main() {
   $("retractBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      await retractMarket();
+      await retractWager();
     } catch (e) {
       $("resolutionStatus").textContent = `Error: ${e.message}`;
     }
@@ -1038,7 +1038,7 @@ async function main() {
   $("expireBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      await expireMarket();
+      await expireWager();
     } catch (e) {
       $("resolutionStatus").textContent = `Error: ${e.message}`;
     }
@@ -1047,7 +1047,7 @@ async function main() {
   $("closeBettingBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      await closeBettingOnMarket();
+      await closeBettingOnWager();
     } catch (e) {
       $("resolutionStatus").textContent = `Error: ${e.message}`;
     }
@@ -1056,7 +1056,7 @@ async function main() {
   $("closeResolutionBtn").addEventListener("click", async () => {
     try {
       if (!signer) await connectWallet();
-      await closeResolutionWindowOnMarket();
+      await closeResolutionWindowOnWager();
     } catch (e) {
       $("resolutionStatus").textContent = `Error: ${e.message}`;
     }
@@ -1080,7 +1080,7 @@ async function main() {
     }
   });
 
-  // Load ABIs for factory/market
+  // Load ABIs for factory/wager
   await loadAbi();
   clearOddsPreview("Create a wager first to preview odds.");
   $("walletStatus").textContent = "Ready.";

@@ -67,7 +67,7 @@
     },
     {
       "type": "function",
-      "name": "createMarket",
+      "name": "createWager",
       "inputs": [
         {
           "name": "collateralToken",
@@ -75,7 +75,7 @@
           "internalType": "address"
         },
         {
-          "name": "question",
+          "name": "proposition",
           "type": "string",
           "internalType": "string"
         },
@@ -132,7 +132,7 @@
       ],
       "outputs": [
         {
-          "name": "market",
+          "name": "wager",
           "type": "address",
           "internalType": "address"
         }
@@ -141,7 +141,7 @@
     },
     {
       "type": "function",
-      "name": "createMarket",
+      "name": "createWager",
       "inputs": [
         {
           "name": "collateralToken",
@@ -149,7 +149,7 @@
           "internalType": "address"
         },
         {
-          "name": "question",
+          "name": "proposition",
           "type": "string",
           "internalType": "string"
         },
@@ -196,44 +196,12 @@
       ],
       "outputs": [
         {
-          "name": "market",
+          "name": "wager",
           "type": "address",
           "internalType": "address"
         }
       ],
       "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "markets",
-      "inputs": [
-        {
-          "name": "",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "outputs": [
-        {
-          "name": "",
-          "type": "address",
-          "internalType": "address"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "marketsCount",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "stateMutability": "view"
     },
     {
       "type": "function",
@@ -288,11 +256,43 @@
       "stateMutability": "view"
     },
     {
-      "type": "event",
-      "name": "MarketCreated",
+      "type": "function",
+      "name": "wagers",
       "inputs": [
         {
-          "name": "market",
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "wagersCount",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "event",
+      "name": "WagerCreated",
+      "inputs": [
+        {
+          "name": "wager",
           "type": "address",
           "indexed": true,
           "internalType": "address"

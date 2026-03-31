@@ -13,7 +13,7 @@
 |----------|----------------|
 | **Primary launch chain** | **Base** |
 | **Secondary expansion** | **Arbitrum** |
-| **Avoid for MVP (this codebase)** | **Ethereum mainnet** (recurring per-market deploy cost too volatile) |
+| **Avoid for MVP (this codebase)** | **Ethereum mainnet** (recurring per-wager deploy cost too volatile) |
 | **Non-EVM (e.g. Solana)** | Not a near-term launch target without a full rewrite |
 | **Initial protocol fee** | **100 bps (1%)** default; keep **total** fee (protocol + optional extras) **≤ 200–300 bps** at launch |
 | **Fee review cadence** | Quarterly, or when monthly handle exceeds **$1M** or competitive landscape shifts materially |
@@ -23,7 +23,7 @@
 ## 2. Protocol mechanics relevant to cost
 
 - **`ParamutuelFactory`** deploy is a **one-time** protocol cost.
-- **`createMarket`** deploys a **new `ParamutuelMarket` contract per market** → **recurring deployment cost per market**, not a single storage write.
+- **`createWager`** deploys a **new `ParamutuelWager` contract per wager** → **recurring deployment cost per wager**, not a single storage write.
 - User flows also include **ERC-20 `approve`** (first time or when allowance exhausted) in addition to **`placeBet`**.
 
 ---
@@ -35,7 +35,7 @@ Source: `forge test --gas-report` on the repo contracts (Solc 0.8.24).
 | Operation | Gas (approx.) | Notes |
 |-----------|----------------|--------|
 | Deploy `ParamutuelFactory` | **2,544,138** | One-time per chain deployment |
-| `createMarket` | **avg ~1.11M**, **median ~1.50M**, **max ~1.52M** | Dominant cost; includes `new ParamutuelMarket` |
+| `createWager` | **avg ~1.11M**, **median ~1.50M**, **max ~1.52M** | Dominant cost; includes `new ParamutuelWager` |
 | `placeBet` | **avg ~124k** | Per bet |
 | ERC-20 `approve` (test mock) | **avg ~46k** | Per wallet/spender when needed |
 | `resolve` | **avg ~97k** | Per finalization path |
@@ -71,7 +71,7 @@ Sources (explorers, 2026-03-20): [Base gas tracker](https://basescan.org/gastrac
 | Flow | Gas | ~USD |
 |------|-----|------|
 | Factory deploy | 2.54M | ~**$0.03** |
-| `createMarket` (use ~1.5M) | 1.5M | ~**$0.016** |
+| `createWager` (use ~1.5M) | 1.5M | ~**$0.016** |
 | First `approve` + `placeBet` | ~170k | ~**$0.002** |
 | `resolve` | ~97k | ~**$0.001** |
 | `claim` | ~67k | ~**$0.0007** |
@@ -81,14 +81,14 @@ Sources (explorers, 2026-03-20): [Base gas tracker](https://basescan.org/gastrac
 | Flow | Gas | ~USD |
 |------|-----|------|
 | Factory deploy | 2.54M | ~**$0.11** |
-| `createMarket` (~1.5M) | 1.5M | ~**$0.067** |
+| `createWager` (~1.5M) | 1.5M | ~**$0.067** |
 | First `approve` + `placeBet` | ~170k | ~**$0.008** |
 | `resolve` | ~97k | ~**$0.004** |
 | `claim` | ~67k | ~**$0.003** |
 
 ### 4.4 Ethereum mainnet (stress illustration)
 
-At **10 gwei** and **ETH ~$2,137**, `createMarket` at **1.5M gas** ≈ **$32** per market — **poor fit** for permissionless, high-churn market creation unless the design moves to **minimal proxies / clones** or fewer deploys.
+At **10 gwei** and **ETH ~$2,137**, `createWager` at **1.5M gas** ≈ **$32** per wager — **poor fit** for permissionless, high-churn wager creation unless the design moves to **minimal proxies / clones** or fewer deploys.
 
 ---
 
@@ -96,7 +96,7 @@ At **10 gwei** and **ETH ~$2,137**, `createMarket` at **1.5M gas** ≈ **$32** p
 
 | Criterion | Base | Arbitrum | Optimism | Ethereum L1 | Solana (non-EVM) |
 |-----------|------|----------|----------|-------------|------------------|
-| Fit for **per-market contract deploy** | **Strong** (low L2 fees) | Strong | Good | **Weak** (cost volatility) | Different stack; rewrite |
+| Fit for **per-wager contract deploy** | **Strong** (low L2 fees) | Strong | Good | **Weak** (cost volatility) | Different stack; rewrite |
 | Retail / creator UX | **Strong** (onboarding, familiarity) | Strong DeFi / stablecoin depth | Good | Variable | N/A for current code |
 | Tooling / explorers / indexers | Mature | Mature | Mature | Mature | N/A |
 | Competitive signal | Large consumer L2 activity | **Paradox** (parimutuel) on Arbitrum | OP Stack ecosystem | Maximum trust anchor | **OpenTote**-class parimutuel exists |
@@ -119,10 +119,10 @@ At **10 gwei** and **ETH ~$2,137**, `createMarket` at **1.5M gas** ≈ **$32** p
 
 ### 6.2 Adjacent: prediction / CLOB (not parimutuel, but user expectations)
 
-- **Polymarket:** **most markets fee-free**; fee-enabled markets use a **price-dependent taker fee** with doc-stated **max effective ~1.56%** (crypto fee-enabled) and **~0.44%** (certain sports fee-enabled) at 50¢.  
+- **Polymarket:** **most wagers fee-free**; fee-enabled wagers use a **price-dependent taker fee** with doc-stated **max effective ~1.56%** (crypto fee-enabled) and **~0.44%** (certain sports fee-enabled) at 50¢.  
   Source: [Polymarket — Fees](https://docs.polymarket.com/polymarket-learn/trading/fees)
 
-- **Augur (historical framing):** permissionless markets with **creator fees** often discussed in the **~1–2%** range plus reporter economics; not a parimutuel comparator but relevant for “permissionless creation” fee culture.
+- **Augur (historical framing):** permissionless wagers with **creator fees** often discussed in the **~1–2%** range plus reporter economics; not a parimutuel comparator but relevant for “permissionless creation” fee culture.
 
 ### 6.3 Azuro / bookmaker-style apps (adjacent infrastructure)
 
@@ -139,13 +139,13 @@ At **10 gwei** and **ETH ~$2,137**, `createMarket` at **1.5M gas** ≈ **$32** p
 
 ### 7.1 Current contract knobs (MVP)
 
-- Factory-level **`protocolFeeBps`** + per-market **optional extra recipients** (`extraFeeBps`), capped by factory **`MAX_TOTAL_FEE_BPS`** (currently **1000 = 10%** in code).
-- Fees are charged at **finalization** (`resolve` / `retract` / `expire`), which means **failed or invalidated markets can still pay protocol fee** unless policy or code changes.
+- Factory-level **`protocolFeeBps`** + per-wager **optional extra recipients** (`extraFeeBps`), capped by factory **`MAX_TOTAL_FEE_BPS`** (currently **1000 = 10%** in code).
+- Fees are charged at **finalization** (`resolve` / `retract` / `expire`), which means **failed or invalidated wagers can still pay protocol fee** unless policy or code changes.
 
 ### 7.2 Recommended launch defaults
 
 - **Default protocol fee:** **100 bps (1%)** — aligns with **Paradox headline** and sits **at or below** Polymarket’s fee-enabled **effective** caps for many trades.
-- **Total fee ceiling (protocol + extras):** target **≤ 200 bps** for mainstream markets; **≤ 300 bps** as a hard ceiling early in production if governance insists on headroom.
+- **Total fee ceiling (protocol + extras):** target **≤ 200 bps** for mainstream wagers; **≤ 300 bps** as a hard ceiling early in production if governance insists on headroom.
 - **Revisit `MAX_TOTAL_FEE_BPS`:** **10%** is **far above** crypto-native peer benchmarks; consider lowering the cap for production or gating high fees behind explicit UI warnings and governance.
 
 ### 7.3 Sensitivity (fee dominates L2 gas for typical pots)
@@ -180,7 +180,7 @@ Example **$1,000** conceptual pot:
 1. **Production gas report** on target testnet/mainnet RPC (not only Foundry averages).
 2. **Explicit gas benchmark** for `withdrawFees` in tests.
 3. **Policy decision** on whether protocol fee applies to **`retract` / `expire`** at full rate.
-4. If market creation volume explodes: **EIP-1167 minimal proxy** or **clone** pattern to cut recurring `createMarket` cost.
+4. If wager creation volume explodes: **EIP-1167 minimal proxy** or **clone** pattern to cut recurring `createWager` cost.
 
 ---
 

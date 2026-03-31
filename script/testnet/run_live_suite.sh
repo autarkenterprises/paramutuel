@@ -7,8 +7,8 @@ set -euo pipefail
 #   RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
 #   # optional override: FACTORY_ADDRESS=0x...
 #
-# Optional existing market checks:
-#   TESTNET_MARKET_ADDRESS=0x...
+# Optional existing wager checks:
+#   TESTNET_WAGER_ADDRESS=0x...
 #
 # Minimal transaction mode (low gas):
 #   TESTNET_MODE=minimal-tx PRIVATE_KEY=0x... FACTORY_ADDRESS=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh

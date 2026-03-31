@@ -13,19 +13,19 @@ Implementation progress note (2026-03-20):
 
 Deliver a minimal, deterministic, reorg-safe indexer with low dependency footprint to power:
 
-- dApp market explorer
+- dApp wager explorer
 - service proposal/resolution console
-- overdue unresolved market sweeper (`expire`)
+- overdue unresolved wager sweeper (`expire`)
 
 ---
 
 ## 1) Event Ingestion Scope
 
-Index these events from `ParamutuelFactory` and `ParamutuelMarket`:
+Index these events from `ParamutuelFactory` and `ParamutuelWager`:
 
 - Factory:
-  - `MarketCreated`
-- Market:
+  - `WagerCreated`
+- Wager:
   - `BetPlaced`
   - `Resolved`
   - `Retracted`
@@ -38,9 +38,9 @@ Index these events from `ParamutuelFactory` and `ParamutuelMarket`:
 
 ## 2) Minimal Data Model
 
-### `markets`
+### `wagers`
 
-- `market_address` (pk)
+- `wager_address` (pk)
 - `factory_address`
 - `proposer`
 - `resolver`
@@ -53,14 +53,14 @@ Index these events from `ParamutuelFactory` and `ParamutuelMarket`:
 
 ### `market_outcomes`
 
-- `market_address`
+- `wager_address`
 - `outcome_index`
 - `outcome_text`
 - `outcome_total`
 
 ### `market_totals`
 
-- `market_address`
+- `wager_address`
 - `total_pot`
 - `total_fee_bps`
 - `winning_outcome` (nullable)
@@ -69,7 +69,7 @@ Index these events from `ParamutuelFactory` and `ParamutuelMarket`:
 ### `events_log` (append-only)
 
 - `event_id` (`tx_hash + log_index`)
-- `market_address`
+- `wager_address`
 - `event_name`
 - `block_number`
 - `tx_hash`
@@ -84,14 +84,14 @@ Index these events from `ParamutuelFactory` and `ParamutuelMarket`:
 
 ## 3) API Surface (v1)
 
-- `GET /markets?state=open|resolved|retracted`
-- `GET /markets/:address`
-- `GET /markets/:address/events`
+- `GET /wagers?state=open|resolved|retracted`
+- `GET /wagers/:address`
+- `GET /wagers/:address/events`
 - `GET /sweeper/expire-candidates`
 
 Optional:
 
-- `GET /markets/:address/odds` (if odds module colocated)
+- `GET /wagers/:address/odds` (if odds module colocated)
 
 ---
 
@@ -116,7 +116,7 @@ Optional:
 
 ### Integration tests
 
-- replay fixtures with multiple markets and mixed lifecycles
+- replay fixtures with multiple wagers and mixed lifecycles
 - reorg simulation with rollback/replay
 - sweeper candidate correctness
 
@@ -124,10 +124,10 @@ Optional:
 
 - Deterministic full rebuild from configured start block
 - Correct state for:
-  - open market
-  - resolved market
-  - retracted market
-  - expired market
+  - open wager
+  - resolved wager
+  - retracted wager
+  - expired wager
 
 ---
 

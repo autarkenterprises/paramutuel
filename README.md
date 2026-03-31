@@ -2,7 +2,7 @@
 
 Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is intentionally structured to later support more decentralized resolution mechanisms.
 
-**Market research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
+**Wager research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
 **Chain/fee decision memo:** see [`research/chain-and-fee-review.md`](research/chain-and-fee-review.md) (Base primary, Arbitrum secondary).
 **Operator workflows (CLI/API):** see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md).
 **Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
@@ -91,11 +91,11 @@ source ./script/lib/deployments.sh
 ensure_factory_address "base-sepolia" "./config/deployments.json"
 ```
 
-#### Create wager (`createMarket`)
+#### Create wager (`createWager`)
 
 ```bash
 cast send "$FACTORY_ADDRESS" \
-  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
+  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
   "0xCOLLATERAL_TOKEN" \
   "Will X happen?" \
   "[\"YES\",\"NO\"]" \
@@ -114,7 +114,7 @@ Optional seeded-liquidity overload (multi-outcome seed in one create tx):
 
 ```bash
 cast send "$FACTORY_ADDRESS" \
-  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
+  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
   "0xCOLLATERAL_TOKEN" \
   "Will X happen?" \
   "[\"YES\",\"NO\",\"MAYBE\"]" \
@@ -142,37 +142,37 @@ Notes:
 #### Place bet
 
 ```bash
-cast send "0xTOKEN" "approve(address,uint256)" "0xMARKET" 1000000000000000000 \
+cast send "0xTOKEN" "approve(address,uint256)" "0xWAGER" 1000000000000000000 \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 
-cast send "0xMARKET" "placeBet(uint256,uint256)" 0 1000000000000000000 \
+cast send "0xWAGER" "placeBet(uint256,uint256)" 0 1000000000000000000 \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
 Batch bet (multiple outcomes in one tx):
 
 ```bash
-cast send "0xTOKEN" "approve(address,uint256)" "0xMARKET" 3000000000000000000 \
+cast send "0xTOKEN" "approve(address,uint256)" "0xWAGER" 3000000000000000000 \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xMARKET" "placeBets(uint256[],uint256[])" "[0,2]" "[1000000000000000000,2000000000000000000]" \
+cast send "0xWAGER" "placeBets(uint256[],uint256[])" "[0,2]" "[1000000000000000000,2000000000000000000]" \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
 #### Lifecycle actions
 
 ```bash
-cast send "0xMARKET" "closeBetting()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xMARKET" "resolve(uint256)" 0 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xWAGER" "closeBetting()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xWAGER" "resolve(uint256)" 0 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 # or retract / expire
-cast send "0xMARKET" "retract()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xMARKET" "expire()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xWAGER" "retract()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xWAGER" "expire()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
 #### Claim and fee withdrawal
 
 ```bash
-cast send "0xMARKET" "claim()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xMARKET" "withdrawFees()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xWAGER" "claim()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "0xWAGER" "withdrawFees()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
 ### 6) Optional: full local service stack (explorer + control panel + sweeper)
@@ -230,7 +230,7 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
   - Deploys new wagers.
 
 - **Proposer (per-wager)**:
-  - The address that calls `createMarket` on the factory; stored on-chain as `proposer` for transparency.
+  - The address that calls `createWager` on the factory; stored on-chain as `proposer` for transparency.
 
 - **Resolver (per-wager)**:
   - Address authorized to **resolve** (choose winning outcome) or **retract** (invalidate).
@@ -341,11 +341,11 @@ This MVP isolates resolution logic to per-wager functions so it can later be ext
 
 - **3. Creating wagers**
 
-  Once the factory is deployed, wagers are created via `createMarket`:
+  Once the factory is deployed, wagers are created via `createWager`:
 
   - Inputs:
     - `collateralToken`: ERC20 address used for bets (e.g. USDC).
-    - `question`: human-readable prop question.
+    - `proposition`: human-readable wager proposition.
     - `outcomes[]`: text labels for possible outcomes.
     - `bettingCloseTime`: unix timestamp \(>\) `block.timestamp + minBettingWindow`.
     - `resolutionWindow`: seconds \(>= minResolutionWindow\).
@@ -356,16 +356,16 @@ This MVP isolates resolution logic to per-wager functions so it can later be ext
     - `extraFeeRecipients[]`, `extraFeeBps[]`: optional, additional beneficiaries.
     - optional `seedOutcomeIndices[]`, `seedAmounts[]` to seed multiple outcomes at creation.
 
-  - You can call `createMarket`:
+  - You can call `createWager`:
     - From a frontend using ethers.js / viem.
     - From a Foundry script (to be added later).
 
 - **4. Using a deployed wager**
 
   - **Bettors**:
-    - `IERC20(collateralToken).approve(market, amount)`
-    - `ParamutuelMarket(market).placeBet(outcomeIndex, amount)`
-    - or `ParamutuelMarket(market).placeBets(outcomeIndices[], amounts[])` for multi-option entry in one tx.
+    - `IERC20(collateralToken).approve(wager, amount)`
+    - `ParamutuelWager(wager).placeBet(outcomeIndex, amount)`
+    - or `ParamutuelWager(wager).placeBets(outcomeIndices[], amounts[])` for multi-option entry in one tx.
   - **Resolver** (often the proposer):
     - After `bettingCloseTime` and before `resolutionDeadline`:
       - `resolve(winningOutcomeIndex)` or `retract()`.

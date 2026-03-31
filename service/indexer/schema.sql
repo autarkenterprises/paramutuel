@@ -5,15 +5,15 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS markets (
-  market_address TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS wagers (
+  wager_address TEXT PRIMARY KEY,
   factory_address TEXT NOT NULL,
   proposer TEXT NOT NULL,
   resolver TEXT NOT NULL,
   betting_closer TEXT NOT NULL,
   resolution_closer TEXT NOT NULL,
   collateral_token TEXT NOT NULL,
-  question TEXT NOT NULL DEFAULT '',
+  proposition TEXT NOT NULL DEFAULT '',
   outcomes_json TEXT NOT NULL DEFAULT '[]',
   betting_close_time INTEGER NOT NULL,
   resolution_window INTEGER NOT NULL,
@@ -27,26 +27,26 @@ CREATE TABLE IF NOT EXISTS markets (
   created_tx_hash TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS market_totals (
-  market_address TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS wager_totals (
+  wager_address TEXT PRIMARY KEY,
   total_pot TEXT NOT NULL DEFAULT '0',
   total_fee_bps TEXT NOT NULL DEFAULT '0',
   winning_outcome TEXT,
   total_winning_stake TEXT,
-  FOREIGN KEY(market_address) REFERENCES markets(market_address)
+  FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
 );
 
-CREATE TABLE IF NOT EXISTS market_outcomes (
-  market_address TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS wager_outcomes (
+  wager_address TEXT NOT NULL,
   outcome_index INTEGER NOT NULL,
   outcome_total TEXT NOT NULL DEFAULT '0',
-  PRIMARY KEY (market_address, outcome_index),
-  FOREIGN KEY(market_address) REFERENCES markets(market_address)
+  PRIMARY KEY (wager_address, outcome_index),
+  FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
 );
 
 CREATE TABLE IF NOT EXISTS events_log (
   event_id TEXT PRIMARY KEY,
-  market_address TEXT,
+  wager_address TEXT,
   event_name TEXT NOT NULL,
   block_number INTEGER NOT NULL,
   tx_hash TEXT NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS events_log (
   payload_json TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_markets_state ON markets(state);
-CREATE INDEX IF NOT EXISTS idx_markets_deadline ON markets(resolution_deadline);
-CREATE INDEX IF NOT EXISTS idx_events_market ON events_log(market_address, block_number, log_index);
+CREATE INDEX IF NOT EXISTS idx_wagers_state ON wagers(state);
+CREATE INDEX IF NOT EXISTS idx_wagers_deadline ON wagers(resolution_deadline);
+CREATE INDEX IF NOT EXISTS idx_events_wager ON events_log(wager_address, block_number, log_index);
 

@@ -34,7 +34,7 @@
           "internalType": "address"
         },
         {
-          "name": "question_",
+          "name": "proposition_",
           "type": "string",
           "internalType": "string"
         },
@@ -411,7 +411,7 @@
     },
     {
       "type": "function",
-      "name": "question",
+      "name": "proposition",
       "inputs": [],
       "outputs": [
         {
@@ -538,7 +538,7 @@
         {
           "name": "",
           "type": "uint8",
-          "internalType": "enum ParamutuelMarket.State"
+          "internalType": "enum ParamutuelWager.State"
         }
       ],
       "stateMutability": "view"

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from urllib import request
 
 TOPICS = {
-    "MarketCreated": "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
+    "WagerCreated": "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388",
     "BettingClosedByAuthority": "0xee66a0cc21397ffefe70cadd94333bb96aa93548aaf0d7680d09ee50a5112898",
     "ResolutionWindowClosedByAuthority": "0x3a016249126bba7044eec394afa8eba111d1ea6bda5a42b663f7d86944fd1f87",
     "BetPlaced": "0x001ecf1d0c4d22f324b3ecb9cdf0e5f772bc74ac104e6626f4b3845433d03105",
@@ -21,9 +21,9 @@ TOPICS = {
 }
 
 TOPIC_TO_EVENT = {v: k for k, v in TOPICS.items()}
-MARKET_QUESTION_SELECTOR = "0x3fad9ae0"  # question()
-MARKET_OUTCOMES_COUNT_SELECTOR = "0x7deb9776"  # outcomesCount()
-MARKET_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
+WAGER_PROPOSITION_SELECTOR = "0xba002c61"  # proposition()
+WAGER_OUTCOMES_COUNT_SELECTOR = "0x7deb9776"  # outcomesCount()
+WAGER_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
 
 
 def db_connect(path: str) -> sqlite3.Connection:
@@ -42,13 +42,13 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 def _migrate_db(conn: sqlite3.Connection) -> None:
     columns = {
-        row["name"] for row in conn.execute("PRAGMA table_info(markets)").fetchall()
+        row["name"] for row in conn.execute("PRAGMA table_info(wagers)").fetchall()
     }
-    if "question" not in columns:
-        conn.execute("ALTER TABLE markets ADD COLUMN question TEXT NOT NULL DEFAULT ''")
+    if "proposition" not in columns:
+        conn.execute("ALTER TABLE wagers ADD COLUMN proposition TEXT NOT NULL DEFAULT ''")
     if "outcomes_json" not in columns:
-        conn.execute("ALTER TABLE markets ADD COLUMN outcomes_json TEXT NOT NULL DEFAULT '[]'")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_markets_question ON markets(question)")
+        conn.execute("ALTER TABLE wagers ADD COLUMN outcomes_json TEXT NOT NULL DEFAULT '[]'")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_wagers_proposition ON wagers(proposition)")
 
 
 def rpc_call(rpc_url: str, method: str, params: List[Any]) -> Any:
@@ -104,24 +104,24 @@ def _eth_call_hex(rpc_url: str, to_addr: str, data_hex: str) -> str:
     )
 
 
-def fetch_market_metadata(rpc_url: str, market_address: str) -> Dict[str, Any]:
-    question = ""
+def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
+    proposition = ""
     outcomes: List[str] = []
     try:
-        question_hex = _eth_call_hex(rpc_url, market_address, MARKET_QUESTION_SELECTOR)
-        question = _decode_abi_string(question_hex)
-        count_hex = _eth_call_hex(rpc_url, market_address, MARKET_OUTCOMES_COUNT_SELECTOR)
+        proposition_hex = _eth_call_hex(rpc_url, wager_address, WAGER_PROPOSITION_SELECTOR)
+        proposition = _decode_abi_string(proposition_hex)
+        count_hex = _eth_call_hex(rpc_url, wager_address, WAGER_OUTCOMES_COUNT_SELECTOR)
         outcomes_count = _decode_u256_word(count_hex)
         # Hard safety cap mirrors protocol-level max outcomes.
         outcomes_count = min(outcomes_count, 64)
         for i in range(outcomes_count):
-            data_hex = MARKET_OUTCOME_TEXT_SELECTOR + _encode_u256(i)
-            out_hex = _eth_call_hex(rpc_url, market_address, data_hex)
+            data_hex = WAGER_OUTCOME_TEXT_SELECTOR + _encode_u256(i)
+            out_hex = _eth_call_hex(rpc_url, wager_address, data_hex)
             outcomes.append(_decode_abi_string(out_hex))
     except Exception:
         # Metadata enrichment is best-effort and must not block core indexing.
         pass
-    return {"question": question, "outcomes": outcomes}
+    return {"proposition": proposition, "outcomes": outcomes}
 
 
 def to_int(hex_value: str) -> int:
@@ -165,7 +165,7 @@ def set_meta_int(conn: sqlite3.Connection, key: str, value: int) -> None:
 def insert_event_log(
     conn: sqlite3.Connection,
     eid: str,
-    market_address: Optional[str],
+    wager_address: Optional[str],
     event_name: str,
     block_number: int,
     tx_hash: str,
@@ -174,10 +174,10 @@ def insert_event_log(
 ) -> bool:
     cur = conn.execute(
         """
-        INSERT OR IGNORE INTO events_log(event_id, market_address, event_name, block_number, tx_hash, log_index, payload_json)
+        INSERT OR IGNORE INTO events_log(event_id, wager_address, event_name, block_number, tx_hash, log_index, payload_json)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (eid, market_address, event_name, block_number, tx_hash.lower(), log_index, json.dumps(payload)),
+        (eid, wager_address, event_name, block_number, tx_hash.lower(), log_index, json.dumps(payload)),
     )
     return cur.rowcount == 1
 
@@ -202,11 +202,11 @@ def apply_log(
     log_index = to_int(log["logIndex"])
     eid = event_id(tx_hash, log["logIndex"])
 
-    # MARKET CREATED (from factory only)
-    if event_name == "MarketCreated":
+    # WAGER CREATED (from factory only)
+    if event_name == "WagerCreated":
         if address != factory_address:
             return
-        market = topic_to_address(topics[1])
+        wager = topic_to_address(topics[1])
         proposer = topic_to_address(topics[2])
         resolver = topic_to_address(topics[3])
         collateral_token = topic_to_address(data_word(log["data"], 0))
@@ -215,20 +215,20 @@ def apply_log(
         resolution_deadline = to_int(data_word(log["data"], 3))
         betting_closer = topic_to_address(data_word(log["data"], 4))
         resolution_closer = topic_to_address(data_word(log["data"], 5))
-        metadata = {"question": "", "outcomes": []}
+        metadata = {"proposition": "", "outcomes": []}
         if rpc_url:
-            metadata = fetch_market_metadata(rpc_url, market)
+            metadata = fetch_wager_metadata(rpc_url, wager)
 
         inserted = insert_event_log(
             conn,
             eid,
-            market,
+            wager,
             event_name,
             block_number,
             tx_hash,
             log_index,
             {
-                "market": market,
+                "wager": wager,
                 "proposer": proposer,
                 "resolver": resolver,
                 "collateralToken": collateral_token,
@@ -244,21 +244,21 @@ def apply_log(
 
         conn.execute(
             """
-            INSERT OR IGNORE INTO markets(
-              market_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
-              collateral_token, question, outcomes_json, betting_close_time, resolution_window, resolution_deadline, state, created_block, created_tx_hash
+            INSERT OR IGNORE INTO wagers(
+              wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+              collateral_token, proposition, outcomes_json, betting_close_time, resolution_window, resolution_deadline, state, created_block, created_tx_hash
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
             """,
             (
-                market,
+                wager,
                 factory_address,
                 proposer,
                 resolver,
                 betting_closer,
                 resolution_closer,
                 collateral_token,
-                metadata["question"],
+                metadata["proposition"],
                 json.dumps(metadata["outcomes"]),
                 betting_close_time,
                 resolution_window,
@@ -268,40 +268,40 @@ def apply_log(
             ),
         )
         conn.execute(
-            "INSERT OR IGNORE INTO market_totals(market_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
-            (market,),
+            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
+            (wager,),
         )
         return
 
-    # all other events are emitted by market contracts
-    market = address
-    if not conn.execute("SELECT 1 FROM markets WHERE market_address = ?", (market,)).fetchone():
-        # Skip orphan logs; indexer expects MarketCreated first.
+    # all other events are emitted by wager contracts
+    wager = address
+    if not conn.execute("SELECT 1 FROM wagers WHERE wager_address = ?", (wager,)).fetchone():
+        # Skip orphan logs; indexer expects WagerCreated first.
         return
 
     if event_name == "BettingClosedByAuthority":
         closed_at = to_int(data_word(log["data"], 0))
         inserted = insert_event_log(
-            conn, eid, market, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
         )
         if not inserted:
             return
         conn.execute(
-            "UPDATE markets SET betting_closed_by_authority = 1, betting_closed_at = ? WHERE market_address = ?",
-            (closed_at, market),
+            "UPDATE wagers SET betting_closed_by_authority = 1, betting_closed_at = ? WHERE wager_address = ?",
+            (closed_at, wager),
         )
         return
 
     if event_name == "ResolutionWindowClosedByAuthority":
         closed_at = to_int(data_word(log["data"], 0))
         inserted = insert_event_log(
-            conn, eid, market, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
         )
         if not inserted:
             return
         conn.execute(
-            "UPDATE markets SET resolution_window_closed = 1, resolution_window_closed_at = ? WHERE market_address = ?",
-            (closed_at, market),
+            "UPDATE wagers SET resolution_window_closed = 1, resolution_window_closed_at = ? WHERE wager_address = ?",
+            (closed_at, wager),
         )
         return
 
@@ -312,7 +312,7 @@ def apply_log(
         inserted = insert_event_log(
             conn,
             eid,
-            market,
+            wager,
             event_name,
             block_number,
             tx_hash,
@@ -322,16 +322,16 @@ def apply_log(
         if not inserted:
             return
         conn.execute(
-            "INSERT OR IGNORE INTO market_outcomes(market_address, outcome_index, outcome_total) VALUES (?, ?, '0')",
-            (market, outcome_index),
+            "INSERT OR IGNORE INTO wager_outcomes(wager_address, outcome_index, outcome_total) VALUES (?, ?, '0')",
+            (wager, outcome_index),
         )
         conn.execute(
-            "UPDATE market_outcomes SET outcome_total = CAST(outcome_total AS INTEGER) + ? WHERE market_address = ? AND outcome_index = ?",
-            (amount, market, outcome_index),
+            "UPDATE wager_outcomes SET outcome_total = CAST(outcome_total AS INTEGER) + ? WHERE wager_address = ? AND outcome_index = ?",
+            (amount, wager, outcome_index),
         )
         conn.execute(
-            "UPDATE market_totals SET total_pot = CAST(total_pot AS INTEGER) + ? WHERE market_address = ?",
-            (amount, market),
+            "UPDATE wager_totals SET total_pot = CAST(total_pot AS INTEGER) + ? WHERE wager_address = ?",
+            (amount, wager),
         )
         return
 
@@ -340,7 +340,7 @@ def apply_log(
         inserted = insert_event_log(
             conn,
             eid,
-            market,
+            wager,
             event_name,
             block_number,
             tx_hash,
@@ -349,17 +349,17 @@ def apply_log(
         )
         if not inserted:
             return
-        conn.execute("UPDATE markets SET state = 'RESOLVED' WHERE market_address = ?", (market,))
-        conn.execute("UPDATE market_totals SET winning_outcome = ? WHERE market_address = ?", (str(outcome_index), market))
+        conn.execute("UPDATE wagers SET state = 'RESOLVED' WHERE wager_address = ?", (wager,))
+        conn.execute("UPDATE wager_totals SET winning_outcome = ? WHERE wager_address = ?", (str(outcome_index), wager))
         return
 
     if event_name in ("Retracted", "Expired"):
         inserted = insert_event_log(
-            conn, eid, market, event_name, block_number, tx_hash, log_index, {}
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, {}
         )
         if not inserted:
             return
-        conn.execute("UPDATE markets SET state = 'RETRACTED' WHERE market_address = ?", (market,))
+        conn.execute("UPDATE wagers SET state = 'RETRACTED' WHERE wager_address = ?", (wager,))
         return
 
     if event_name == "Claimed":
@@ -368,7 +368,7 @@ def apply_log(
         insert_event_log(
             conn,
             eid,
-            market,
+            wager,
             event_name,
             block_number,
             tx_hash,
@@ -383,7 +383,7 @@ def apply_log(
         insert_event_log(
             conn,
             eid,
-            market,
+            wager,
             event_name,
             block_number,
             tx_hash,
@@ -398,8 +398,8 @@ def get_expire_candidates(conn: sqlite3.Connection, now_ts: Optional[int] = None
         now_ts = int(time.time())
     return conn.execute(
         """
-        SELECT market_address, resolver, resolution_window, resolution_deadline, betting_closed_at, resolution_window_closed
-        FROM markets
+        SELECT wager_address, resolver, resolution_window, resolution_deadline, betting_closed_at, resolution_window_closed
+        FROM wagers
         WHERE state = 'OPEN' AND (
           resolution_window_closed = 1
           OR (

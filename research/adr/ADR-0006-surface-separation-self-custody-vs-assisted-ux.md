@@ -10,11 +10,11 @@ Accepted
 
 ## Context
 
-The protocol allows markets with arbitrary ERC-20 collateral, but transaction execution on Base requires ETH gas.
+The protocol allows wagers with arbitrary ERC-20 collateral, but transaction execution on Base requires ETH gas.
 
 Business requirement:
 
-- Users should be able to follow a market link and place a bet with collateral token balances only.
+- Users should be able to follow a wager link and place a bet with collateral token balances only.
 - Contract changes are strongly disfavored; current core contracts should remain intact.
 - Support should remain future-proof and general-purpose (not USDC-only at protocol level), while website UX can prioritize known happy paths (stablecoins and highly liquid tokens).
 
@@ -39,7 +39,7 @@ The project already has modular layers:
    - dApp remains fully functional without platform services and without dependencies on external relayer contracts.
 
 4. **Token policy model**:
-   - Protocol remains collateral-agnostic (any valid ERC-20 market collateral).
+   - Protocol remains collateral-agnostic (any valid ERC-20 wager collateral).
    - Website can channel users toward curated happy-path tokens for assisted flows (USDC and major stablecoins), while retaining a universal fallback path.
 
 ## Consequences

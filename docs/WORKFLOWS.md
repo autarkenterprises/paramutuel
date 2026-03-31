@@ -4,17 +4,17 @@ This document is for operators and machine agents interacting with Paramutuel co
 
 Assumptions:
 
-- Factory + market ABIs are committed at `dapp/abi/` and also available under `out/` after `forge build`.
+- Factory + wager ABIs are committed at `dapp/abi/` and also available under `out/` after `forge build`.
 - You have `cast` (Foundry) installed.
 - Environment has `RPC_URL` and `PRIVATE_KEY`.
 
-## 1) Create a market
+## 1) Create a wager
 
 ### Finite windows (time bounded)
 
 ```bash
 cast send "$FACTORY" \
-  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
+  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
   "$COLLATERAL" \
   "Will X happen?" \
   "[YES,NO]" \
@@ -33,7 +33,7 @@ cast send "$FACTORY" \
 
 ```bash
 cast send "$FACTORY" \
-  "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
+  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
   "$COLLATERAL" \
   "Will X happen?" \
   "[YES,NO,MAYBE]" \
@@ -70,18 +70,18 @@ Protocol guardrail: these modes require non-zero closer addresses (`bettingClose
 
 ```bash
 # approve collateral
-cast send "$TOKEN" "approve(address,uint256)" "$MARKET" "$AMOUNT" \
+cast send "$TOKEN" "approve(address,uint256)" "$WAGER" "$AMOUNT" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 
 # place bet
-cast send "$MARKET" "placeBet(uint256,uint256)" "$OUTCOME_INDEX" "$AMOUNT" \
+cast send "$WAGER" "placeBet(uint256,uint256)" "$OUTCOME_INDEX" "$AMOUNT" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
 Batch bet (multiple outcomes in one tx):
 
 ```bash
-cast send "$MARKET" "placeBets(uint256[],uint256[])" "[0,2,3]" "[$A0,$A2,$A3]" \
+cast send "$WAGER" "placeBets(uint256[],uint256[])" "[0,2,3]" "[$A0,$A2,$A3]" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
@@ -90,7 +90,7 @@ cast send "$MARKET" "placeBets(uint256[],uint256[])" "[0,2,3]" "[$A0,$A2,$A3]" \
 Only `bettingCloser` may call:
 
 ```bash
-cast send "$MARKET" "closeBetting()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "closeBetting()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
 ## 4) Resolve / Retract
@@ -98,9 +98,9 @@ cast send "$MARKET" "closeBetting()" --rpc-url "$RPC_URL" --private-key "$PRIVAT
 Only `resolver` may call:
 
 ```bash
-cast send "$MARKET" "resolve(uint256)" "$WINNING_INDEX" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "resolve(uint256)" "$WINNING_INDEX" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 # or
-cast send "$MARKET" "retract()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "retract()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
 ## 5) Close resolution window
@@ -108,22 +108,22 @@ cast send "$MARKET" "retract()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY
 Only `resolutionCloser` may call, and only after betting is closed:
 
 ```bash
-cast send "$MARKET" "closeResolutionWindow()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "closeResolutionWindow()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
-## 6) Expire unresolved market
+## 6) Expire unresolved wager
 
 Anyone may call `expire()` once resolution window is over (timed-out if configured, or authority-closed):
 
 ```bash
-cast send "$MARKET" "expire()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "expire()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
 ## 7) Claims / fees
 
 ```bash
-cast send "$MARKET" "claim()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
-cast send "$MARKET" "withdrawFees()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "claim()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "withdrawFees()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
 ## Role choreography (important)
@@ -144,7 +144,7 @@ For finite windows, you may set `bettingCloser = address(0)` and/or `resolutionC
 ```bash
 curl -sS -X POST "http://127.0.0.1:8092/api/preview/action" \
   -H "content-type: application/json" \
-  -d '{"market":"'"$MARKET"'","action":"close-betting"}'
+  -d '{"wager":"'"$WAGER"'","action":"close-betting"}'
 ```
 
 ### B) Control panel web (execute, token protected)
@@ -153,7 +153,7 @@ curl -sS -X POST "http://127.0.0.1:8092/api/preview/action" \
 curl -sS -X POST "http://127.0.0.1:8092/api/preview/action" \
   -H "content-type: application/json" \
   -H "authorization: Bearer $CONTROL_PANEL_TOKEN" \
-  -d '{"market":"'"$MARKET"'","action":"close-betting","execute":true}'
+  -d '{"wager":"'"$WAGER"'","action":"close-betting","execute":true}'
 ```
 
 ### C) Sweeper loop for unresolved candidates

@@ -13,7 +13,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
     return {k: row[k] for k in row.keys()}
 
 
-def list_markets(
+def list_wagers(
     conn: sqlite3.Connection,
     state: str | None,
     limit: int,
@@ -28,8 +28,8 @@ def list_markets(
             COALESCE(t.total_fee_bps, '0') AS total_fee_bps,
             t.winning_outcome,
             t.total_winning_stake
-        FROM markets m
-        LEFT JOIN market_totals t ON t.market_address = m.market_address
+        FROM wagers m
+        LEFT JOIN wager_totals t ON t.wager_address = m.wager_address
     """
     clauses = []
     params: list = []
@@ -40,14 +40,14 @@ def list_markets(
         needle = f"%{query_text.strip().lower()}%"
         clauses.append(
             "("
-            "LOWER(m.market_address) LIKE ? OR "
+            "LOWER(m.wager_address) LIKE ? OR "
             "LOWER(m.factory_address) LIKE ? OR "
             "LOWER(m.proposer) LIKE ? OR "
             "LOWER(m.resolver) LIKE ? OR "
             "LOWER(m.betting_closer) LIKE ? OR "
             "LOWER(m.resolution_closer) LIKE ? OR "
             "LOWER(m.collateral_token) LIKE ? OR "
-            "LOWER(m.question) LIKE ? OR "
+            "LOWER(m.proposition) LIKE ? OR "
             "LOWER(m.outcomes_json) LIKE ? OR "
             "LOWER(m.state) LIKE ? OR "
             "LOWER(CAST(m.betting_close_time AS TEXT)) LIKE ? OR "
@@ -78,21 +78,21 @@ def list_markets(
     return [row_to_dict(r) for r in rows]
 
 
-def get_market(conn: sqlite3.Connection, market_address: str) -> dict | None:
-    m = conn.execute("SELECT * FROM markets WHERE market_address = ?", (market_address.lower(),)).fetchone()
+def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
+    m = conn.execute("SELECT * FROM wagers WHERE wager_address = ?", (wager_address.lower(),)).fetchone()
     if not m:
         return None
-    totals = conn.execute("SELECT * FROM market_totals WHERE market_address = ?", (market_address.lower(),)).fetchone()
+    totals = conn.execute("SELECT * FROM wager_totals WHERE wager_address = ?", (wager_address.lower(),)).fetchone()
     outcomes = conn.execute(
-        "SELECT outcome_index, outcome_total FROM market_outcomes WHERE market_address = ? ORDER BY outcome_index ASC",
-        (market_address.lower(),),
+        "SELECT outcome_index, outcome_total FROM wager_outcomes WHERE wager_address = ? ORDER BY outcome_index ASC",
+        (wager_address.lower(),),
     ).fetchall()
     events = conn.execute(
-        "SELECT event_name, block_number, tx_hash, log_index, payload_json FROM events_log WHERE market_address = ? ORDER BY block_number ASC, log_index ASC",
-        (market_address.lower(),),
+        "SELECT event_name, block_number, tx_hash, log_index, payload_json FROM events_log WHERE wager_address = ? ORDER BY block_number ASC, log_index ASC",
+        (wager_address.lower(),),
     ).fetchall()
     return {
-        "market": row_to_dict(m),
+        "wager": row_to_dict(m),
         "totals": row_to_dict(totals) if totals else None,
         "outcomes": [row_to_dict(o) for o in outcomes],
         "events": [
@@ -129,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         qs = parse_qs(parsed.query)
 
-        # Support both direct paths (/markets) and explorer-style prefixed paths (/api/markets).
+        # Support both direct paths (/wagers) and explorer-style prefixed paths (/api/wagers).
         if path.startswith("/api/"):
             path = path[len("/api") :] or "/"
 
@@ -141,10 +141,10 @@ class Handler(BaseHTTPRequestHandler):
                     "service": "paramutuel-indexer-api",
                     "endpoints": [
                         "/health",
-                        "/markets?limit=20&offset=0&order=desc",
-                        "/markets?limit=20&offset=0&order=asc&q=<text>",
-                        "/markets?q=<searches all indexed wager fields>",
-                        "/markets/{market_address}",
+                        "/wagers?limit=20&offset=0&order=desc",
+                        "/wagers?limit=20&offset=0&order=asc&q=<text>",
+                        "/wagers?q=<searches all indexed wager fields>",
+                        "/wagers/{wager_address}",
                         "/sweeper/expire-candidates",
                     ],
                 },
@@ -155,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "ts": int(time.time())})
             return
 
-        if path == "/markets":
+        if path == "/wagers":
             state = qs.get("state", [None])[0]
             query_text = qs.get("q", [None])[0]
             limit_raw = qs.get("limit", ["100"])[0]
@@ -177,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(
                 200,
                 {
-                    "markets": list_markets(
+                    "wagers": list_wagers(
                         self.conn,
                         state,
                         limit,
@@ -189,11 +189,11 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
-        if path.startswith("/markets/"):
-            addr = path.split("/markets/", 1)[1].lower()
-            item = get_market(self.conn, addr)
+        if path.startswith("/wagers/"):
+            addr = path.split("/wagers/", 1)[1].lower()
+            item = get_wager(self.conn, addr)
             if not item:
-                self._send_json(404, {"error": "market not found"})
+                self._send_json(404, {"error": "wager not found"})
                 return
             self._send_json(200, item)
             return
@@ -208,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
                     "now": now_ts,
                     "candidates": [
                         {
-                            "market_address": r["market_address"],
+                            "wager_address": r["wager_address"],
                             "resolver": r["resolver"],
                             "resolution_window": r["resolution_window"],
                             "resolution_deadline": r["resolution_deadline"],

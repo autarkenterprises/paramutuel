@@ -20,7 +20,7 @@ Without generalized support, users must encode subsets as explicit outcomes, cau
 
 Adopt a staged architecture that introduces **generalized payoff policies** while preserving immutable-core posture for existing v1 contracts:
 
-1. **Keep v1 contracts and deployed markets unchanged.**  
+1. **Keep v1 contracts and deployed wagers unchanged.**  
    Existing single-winner wagers remain valid and operational.
 
 2. **Introduce generalized settlement via a new protocol version (v2) and policy-driven payoff model.**  

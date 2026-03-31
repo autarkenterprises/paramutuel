@@ -7,7 +7,7 @@
 
 Project requirements:
 
-- protocol fees should be adjustable as market research improves
+- protocol fees should be adjustable as wager research improves
 - treasury custody should be secure from day one
 - protocol aims for stable core contracts, but governance is still necessary
 

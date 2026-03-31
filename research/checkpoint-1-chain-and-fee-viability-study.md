@@ -20,7 +20,7 @@ Source memo: `research/chain-and-fee-review.md`
 
 - **Primary launch chain:** **Base**
 - **Secondary expansion chain:** **Arbitrum**
-- **Avoid for MVP (current deploy-per-market design):** Ethereum mainnet
+- **Avoid for MVP (current deploy-per-wager design):** Ethereum mainnet
 - **Initial protocol fee default:** **100 bps (1%)**
 - **Fee review cadence:** quarterly, or when monthly handle exceeds $1M / material competitive shift
 
@@ -32,7 +32,7 @@ Evaluate each candidate chain with measurable criteria:
 
 | Criterion | Weight | Candidate A | Candidate B | Candidate C | Notes |
 |----------|--------|-------------|-------------|-------------|-------|
-| Avg tx cost (`createMarket`) | High | TBD | TBD | TBD | Measured on testnet/mainnet env |
+| Avg tx cost (`createWager`) | High | TBD | TBD | TBD | Measured on testnet/mainnet env |
 | Avg tx cost (`placeBet`) | High | TBD | TBD | TBD | |
 | Avg tx cost (`resolve`/`retract`/`expire`) | Medium | TBD | TBD | TBD | |
 | Avg tx cost (`claim`) | High | TBD | TBD | TBD | |
@@ -50,10 +50,10 @@ Initial protocol fee BPS candidates: `100`, `200`, `300` (or alternatives).
 
 For each candidate fee:
 
-- bettor net payout impact by market profile
+- bettor net payout impact by wager profile
 - expected protocol revenue under TAM scenarios
 - competitiveness vs direct/adjacent products
-- sensitivity to low-volume markets
+- sensitivity to low-volume wagers
 
 ### Scenario table (example)
 
@@ -68,8 +68,8 @@ For each candidate fee:
 Capture explicit assumptions:
 
 - target user cohorts (creator-led communities, bettors, resolution service clients)
-- expected active markets/month
-- avg unique bettors/market
+- expected active wagers/month
+- avg unique bettors/wager
 - avg wager size distribution
 
 All assumptions must cite source or operator rationale.

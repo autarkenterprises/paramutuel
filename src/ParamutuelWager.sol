@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "./interfaces/IERC20.sol";
 import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 
-contract ParamutuelMarket is ReentrancyGuard {
+contract ParamutuelWager is ReentrancyGuard {
     enum State {
         Open,
         Resolved,
@@ -12,7 +12,7 @@ contract ParamutuelMarket is ReentrancyGuard {
     }
 
     event BetPlaced(address indexed bettor, uint256 indexed outcomeIndex, uint256 amount);
-    /// @notice Emitted when `bettingCloser` ends the betting period (needed for no-max markets).
+    /// @notice Emitted when `bettingCloser` ends the betting period (needed for no-max wagers).
     event BettingClosedByAuthority(uint64 closedAt);
     /// @notice Emitted when `resolutionCloser` ends the resolver window.
     event ResolutionWindowClosedByAuthority(uint64 closedAt);
@@ -41,7 +41,7 @@ contract ParamutuelMarket is ReentrancyGuard {
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
     address public immutable factory;
-    /// @notice Address that created the market via the factory (may differ from `resolver`).
+    /// @notice Address that created the wager via the factory (may differ from `resolver`).
     address public immutable proposer;
     /// @notice Address authorized to `resolve` and `retract` before the deadline.
     address public immutable resolver;
@@ -57,7 +57,7 @@ contract ParamutuelMarket is ReentrancyGuard {
     /// @notice Scheduled deadline from creation-time inputs (zero when no scheduled max exists).
     uint64 public immutable resolutionDeadline;
 
-    string public question;
+    string public proposition;
     State public state;
 
     string[] private _outcomes;
@@ -92,7 +92,7 @@ contract ParamutuelMarket is ReentrancyGuard {
         address bettingCloser_,
         address resolutionCloser_,
         address collateralToken_,
-        string memory question_,
+        string memory proposition_,
         string[] memory outcomes_,
         uint64 bettingCloseTime_,
         uint64 resolutionWindow_,
@@ -106,7 +106,7 @@ contract ParamutuelMarket is ReentrancyGuard {
         bettingCloser = bettingCloser_;
         resolutionCloser = resolutionCloser_;
         collateralToken = IERC20(collateralToken_);
-        question = question_;
+        proposition = proposition_;
         bettingCloseTime = bettingCloseTime_;
         resolutionWindow = resolutionWindow_;
         resolutionDeadline = resolutionDeadline_;
@@ -219,7 +219,7 @@ contract ParamutuelMarket is ReentrancyGuard {
         }
     }
 
-    /// @notice Seed initial market positions during factory creation.
+    /// @notice Seed initial wager positions during factory creation.
     /// @dev Callable only by factory; token transfer is handled by factory.
     function seedInitialBetsFromFactory(address bettor, uint256[] memory outcomeIndices, uint256[] memory amounts)
         external
@@ -243,7 +243,7 @@ contract ParamutuelMarket is ReentrancyGuard {
         emit BetPlaced(bettor, outcomeIndex, amount);
     }
 
-    /// @notice Finalize the market to a winning outcome.
+    /// @notice Finalize the wager to a winning outcome.
     /// @dev Callable only by `resolver`, after betting closes and while resolution window is open.
     ///      Fees are charged once at finalization.
     /// @param outcomeIndex The winning outcome index in `outcomes`.
@@ -262,9 +262,9 @@ contract ParamutuelMarket is ReentrancyGuard {
         emit Resolved(outcomeIndex);
     }
 
-    /// @notice Invalidate the market during the resolver window.
+    /// @notice Invalidate the wager during the resolver window.
     /// @dev Callable only by `resolver`, after betting closes and while resolution window is open.
-    ///      Retracted markets allow bettors to claim stake minus fee share.
+    ///      Retracted wagers allow bettors to claim stake minus fee share.
     function retract() external nonReentrant {
         if (msg.sender != resolver) revert NotResolver();
         if (state != State.Open) revert AlreadyFinalized();
@@ -354,4 +354,3 @@ contract ParamutuelMarket is ReentrancyGuard {
         return (totalPot * totalFeeBps) / BPS_DENOMINATOR;
     }
 }
-

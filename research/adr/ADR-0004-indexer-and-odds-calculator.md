@@ -7,8 +7,8 @@
 
 The project needs:
 
-- service-agnostic market scanning
-- a lightweight explorer for market states
+- service-agnostic wager scanning
+- a lightweight explorer for wager states
 - dApp/service odds and payout previews
 - minimal dependencies with strong test coverage
 
@@ -22,7 +22,7 @@ The project needs:
 
 Ingest and persist events:
 
-- `MarketCreated`
+- `WagerCreated`
 - `BetPlaced`
 - `Resolved`
 - `Retracted`
@@ -33,7 +33,7 @@ Ingest and persist events:
 
 Derived fields:
 
-- market status: `Open | Resolved | Retracted`
+- wager status: `Open | Resolved | Retracted`
 - unresolved overdue boolean (`now > resolutionDeadline` and still open)
 - per-outcome totals, total pot, fee bps, proposer, resolver
 
@@ -45,14 +45,14 @@ Operational requirements:
 
 ## Odds / Payout Calculator Requirements
 
-For each market/outcome:
+For each wager/outcome:
 
 1. **Current implied payout multiple if outcome wins now**
    - `multiple_i = netPot / outcomeTotal_i` (if `outcomeTotal_i > 0`)
    - where `netPot = totalPot - totalFees(totalPot)`
 
 2. **Expected payout for user bet amount `x` on outcome `i`**
-   - Pre-bet preview if market resolved immediately after this bet:
+   - Pre-bet preview if wager resolved immediately after this bet:
    - `newPot = totalPot + x`
    - `newOutcomeTotal_i = outcomeTotal_i + x`
    - `previewPayout = x / newOutcomeTotal_i * netPot(newPot)`
@@ -62,13 +62,13 @@ For each market/outcome:
 
 4. **Edge-case handling**
    - no-liquidity outcomes
-   - markets no longer open
+   - wagers no longer open
    - decimal precision and rounding disclosure
 
 ## Testing Requirements
 
 - unit tests for formula correctness and rounding behavior
-- fixture tests with multi-outcome markets
+- fixture tests with multi-outcome wagers
 - integration tests against testnet indexed data for consistency
 
 ## Consequences

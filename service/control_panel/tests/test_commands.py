@@ -1,18 +1,18 @@
 import unittest
 
 from service.control_panel.commands import (
-    build_create_market_command,
-    build_market_action_command,
+    build_create_wager_command,
+    build_wager_action_command,
     lifecycle_workflow,
 )
 
 
 class ControlPanelCommandTests(unittest.TestCase):
-    def test_create_market_command_shape(self):
-        cmd = build_create_market_command(
+    def test_create_wager_command_shape(self):
+        cmd = build_create_wager_command(
             factory="0x1111111111111111111111111111111111111111",
             collateral="0x2222222222222222222222222222222222222222",
-            question="Q?",
+            proposition="Q?",
             outcomes=["YES", "NO"],
             betting_close_time=1234567890,
             resolution_window=7200,
@@ -26,17 +26,17 @@ class ControlPanelCommandTests(unittest.TestCase):
         )
         joined = " ".join(cmd.command)
         self.assertIn(
-            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
+            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
             joined,
         )
         self.assertIn("[\"YES\",\"NO\"]", joined)
 
-    def test_create_market_rejects_uncloseable_no_max(self):
+    def test_create_wager_rejects_uncloseable_no_max(self):
         with self.assertRaises(ValueError):
-            build_create_market_command(
+            build_create_wager_command(
                 factory="0x1111111111111111111111111111111111111111",
                 collateral="0x2222222222222222222222222222222222222222",
-                question="Q?",
+                proposition="Q?",
                 outcomes=["YES", "NO"],
                 betting_close_time=0,
                 resolution_window=0,
@@ -49,11 +49,11 @@ class ControlPanelCommandTests(unittest.TestCase):
                 private_key="0xabc",
             )
 
-    def test_create_market_accepts_seed_arrays(self):
-        cmd = build_create_market_command(
+    def test_create_wager_accepts_seed_arrays(self):
+        cmd = build_create_wager_command(
             factory="0x1111111111111111111111111111111111111111",
             collateral="0x2222222222222222222222222222222222222222",
-            question="Q?",
+            proposition="Q?",
             outcomes=["YES", "NO"],
             betting_close_time=1234567890,
             resolution_window=7200,
@@ -73,8 +73,8 @@ class ControlPanelCommandTests(unittest.TestCase):
 
     def test_action_command_requires_outcome_for_resolve(self):
         with self.assertRaises(ValueError):
-            build_market_action_command(
-                market="0x3333333333333333333333333333333333333333",
+            build_wager_action_command(
+                wager="0x3333333333333333333333333333333333333333",
                 action="resolve",
                 outcome_index=None,
                 rpc_url="http://localhost:8545",

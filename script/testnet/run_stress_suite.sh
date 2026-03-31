@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Multi-market, multi-actor stress suite against deployed Base Sepolia contracts.
+# Multi-wager, multi-actor stress suite against deployed Base Sepolia contracts.
 #
-# Read-only (no gas): samples latest markets from the factory.
+# Read-only (no gas): samples latest wagers from the factory.
 #   RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_stress_suite.sh
 #   # optional override: FACTORY_ADDRESS=0x...
 #
-# Transaction mode: creates markets with distinct roles from a wallet pool JSON.
+# Transaction mode: creates wagers with distinct roles from a wallet pool JSON.
 #   FACTORY_ADDRESS=... RPC_URL_BASE_SEPOLIA=... \
 #   STRESS_MODE=tx STRESS_WALLET_POOL_PATH=test/testnet/stress_wallet_pool.json \
 #   STRESS_FUNDER_PRIVATE_KEY=0x... \

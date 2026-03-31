@@ -7,5 +7,5 @@ set -euo pipefail
 
 echo "Running focused gas report tests..."
 forge test --gas-report \
-  --match-test "testCreateMarketStoresParameters|testBetResolveAndClaimPayouts|testRetractRefundsMinusFees|testExpireAfterDeadline|testDelegatedResolverSeparateFromProposer"
+  --match-test "testCreateWagerStoresParameters|testBetResolveAndClaimPayouts|testRetractRefundsMinusFees|testExpireAfterDeadline|testDelegatedResolverSeparateFromProposer"
 

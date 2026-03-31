@@ -24,7 +24,7 @@ class ApiRouteTests(unittest.TestCase):
         self.base_url = f"http://{host}:{port}"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        self._seed_markets()
+        self._seed_wagers()
 
     def tearDown(self) -> None:
         self.server.shutdown()
@@ -39,10 +39,10 @@ class ApiRouteTests(unittest.TestCase):
             body = json.loads(resp.read().decode("utf-8"))
             return resp.status, body
 
-    def _insert_market(
+    def _insert_wager(
         self,
-        market: str,
-        question: str,
+        wager: str,
+        proposition: str,
         outcomes: list[str],
         created_block: int,
         created_tx_hash: str,
@@ -52,22 +52,22 @@ class ApiRouteTests(unittest.TestCase):
     ) -> None:
         self.conn.execute(
             """
-            INSERT INTO markets(
-              market_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
-              collateral_token, question, outcomes_json,
+            INSERT INTO wagers(
+              wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+              collateral_token, proposition, outcomes_json,
               betting_close_time, resolution_window, resolution_deadline,
               betting_closed_by_authority, resolution_window_closed, state, created_block, created_tx_hash
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
             """,
             (
-                market,
+                wager,
                 "0xfac7000000000000000000000000000000000001",
                 proposer,
                 "0xabc3000000000000000000000000000000000003",
                 "0xabc4000000000000000000000000000000000004",
                 "0xabc5000000000000000000000000000000000005",
                 collateral_token,
-                question,
+                proposition,
                 json.dumps(outcomes),
                 1000,
                 3600,
@@ -79,14 +79,14 @@ class ApiRouteTests(unittest.TestCase):
             ),
         )
         self.conn.execute(
-            "INSERT OR IGNORE INTO market_totals(market_address, total_pot, total_fee_bps) VALUES (?, ?, '0')",
-            (market, total_pot),
+            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, ?, '0')",
+            (wager, total_pot),
         )
 
-    def _seed_markets(self) -> None:
-        self._insert_market(
-            market="0xabc1000000000000000000000000000000000001",
-            question="Will Team A win?",
+    def _seed_wagers(self) -> None:
+        self._insert_wager(
+            wager="0xabc1000000000000000000000000000000000001",
+            proposition="Will Team A win?",
             outcomes=["YES", "NO"],
             created_block=1,
             created_tx_hash="0xaaa",
@@ -94,9 +94,9 @@ class ApiRouteTests(unittest.TestCase):
             collateral_token="0xabc6000000000000000000000000000000000006",
             total_pot="12345",
         )
-        self._insert_market(
-            market="0xabc1000000000000000000000000000000000002",
-            question="Will Team B launch?",
+        self._insert_wager(
+            wager="0xabc1000000000000000000000000000000000002",
+            proposition="Will Team B launch?",
             outcomes=["UP", "DOWN"],
             created_block=2,
             created_tx_hash="0xaab",
@@ -104,9 +104,9 @@ class ApiRouteTests(unittest.TestCase):
             collateral_token="0xabc6000000000000000000000000000000000008",
             total_pot="0",
         )
-        self._insert_market(
-            market="0xabc1000000000000000000000000000000000003",
-            question="Will Team C ship?",
+        self._insert_wager(
+            wager="0xabc1000000000000000000000000000000000003",
+            proposition="Will Team C ship?",
             outcomes=["GREEN", "RED"],
             created_block=3,
             created_tx_hash="0xaac",
@@ -121,43 +121,49 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(body.get("ok"))
         self.assertEqual(body.get("service"), "paramutuel-indexer-api")
-        self.assertIn("/markets?limit=20&offset=0&order=desc", body.get("endpoints", []))
+        self.assertIn("/wagers?limit=20&offset=0&order=desc", body.get("endpoints", []))
 
-    def test_prefixed_and_unprefixed_market_routes_match(self) -> None:
-        status1, body1 = self._get_json("/markets?limit=1")
-        status2, body2 = self._get_json("/api/markets?limit=1")
+    def test_prefixed_and_unprefixed_wager_routes_match(self) -> None:
+        status1, body1 = self._get_json("/wagers?limit=1")
+        status2, body2 = self._get_json("/api/wagers?limit=1")
         self.assertEqual(status1, 200)
         self.assertEqual(status2, 200)
         self.assertEqual(body1, body2)
-        self.assertIn("markets", body1)
+        self.assertIn("wagers", body1)
 
-    def test_markets_search_filters_on_question_text(self) -> None:
-        status, body = self._get_json("/markets?q=team%20a")
+    def test_legacy_market_routes_are_rejected(self) -> None:
+        with self.assertRaises(HTTPError):
+            self._get_json("/markets?limit=1")
+        with self.assertRaises(HTTPError):
+            self._get_json("/api/markets?limit=1")
+
+    def test_wagers_search_filters_on_proposition_text(self) -> None:
+        status, body = self._get_json("/wagers?q=team%20a")
         self.assertEqual(status, 200)
-        self.assertEqual(len(body["markets"]), 1)
-        self.assertEqual(body["markets"][0]["question"], "Will Team A win?")
+        self.assertEqual(len(body["wagers"]), 1)
+        self.assertEqual(body["wagers"][0]["proposition"], "Will Team A win?")
 
-    def test_prefixed_markets_search_filters_on_outcomes(self) -> None:
-        status, body = self._get_json("/api/markets?q=yes")
+    def test_prefixed_wagers_search_filters_on_outcomes(self) -> None:
+        status, body = self._get_json("/api/wagers?q=yes")
         self.assertEqual(status, 200)
-        self.assertEqual(len(body["markets"]), 1)
-        self.assertIn("YES", body["markets"][0]["outcomes_json"])
+        self.assertEqual(len(body["wagers"]), 1)
+        self.assertIn("YES", body["wagers"][0]["outcomes_json"])
 
-    def test_markets_search_filters_on_role_and_total_fields(self) -> None:
-        status, body = self._get_json("/markets?q=abc2000000000000000000000000000000000007")
+    def test_wagers_search_filters_on_role_and_total_fields(self) -> None:
+        status, body = self._get_json("/wagers?q=abc2000000000000000000000000000000000007")
         self.assertEqual(status, 200)
-        self.assertEqual(len(body["markets"]), 1)
-        self.assertEqual(body["markets"][0]["market_address"], "0xabc1000000000000000000000000000000000002")
+        self.assertEqual(len(body["wagers"]), 1)
+        self.assertEqual(body["wagers"][0]["wager_address"], "0xabc1000000000000000000000000000000000002")
 
-        status2, body2 = self._get_json("/markets?q=12345")
+        status2, body2 = self._get_json("/wagers?q=12345")
         self.assertEqual(status2, 200)
-        self.assertEqual(len(body2["markets"]), 1)
-        self.assertEqual(body2["markets"][0]["market_address"], "0xabc1000000000000000000000000000000000001")
+        self.assertEqual(len(body2["wagers"]), 1)
+        self.assertEqual(body2["wagers"][0]["wager_address"], "0xabc1000000000000000000000000000000000001")
 
-    def test_markets_default_order_is_most_recent_first(self) -> None:
-        status, body = self._get_json("/markets?limit=3")
+    def test_wagers_default_order_is_most_recent_first(self) -> None:
+        status, body = self._get_json("/wagers?limit=3")
         self.assertEqual(status, 200)
-        addresses = [m["market_address"] for m in body["markets"]]
+        addresses = [m["wager_address"] for m in body["wagers"]]
         self.assertEqual(
             addresses,
             [
@@ -167,10 +173,10 @@ class ApiRouteTests(unittest.TestCase):
             ],
         )
 
-    def test_markets_oldest_first_order(self) -> None:
-        status, body = self._get_json("/markets?limit=3&order=asc")
+    def test_wagers_oldest_first_order(self) -> None:
+        status, body = self._get_json("/wagers?limit=3&order=asc")
         self.assertEqual(status, 200)
-        addresses = [m["market_address"] for m in body["markets"]]
+        addresses = [m["wager_address"] for m in body["wagers"]]
         self.assertEqual(
             addresses,
             [
@@ -180,17 +186,17 @@ class ApiRouteTests(unittest.TestCase):
             ],
         )
 
-    def test_markets_offset_pagination(self) -> None:
-        status, body = self._get_json("/markets?limit=1&offset=1&order=desc")
+    def test_wagers_offset_pagination(self) -> None:
+        status, body = self._get_json("/wagers?limit=1&offset=1&order=desc")
         self.assertEqual(status, 200)
-        self.assertEqual(len(body["markets"]), 1)
-        self.assertEqual(body["markets"][0]["market_address"], "0xabc1000000000000000000000000000000000002")
+        self.assertEqual(len(body["wagers"]), 1)
+        self.assertEqual(body["wagers"][0]["wager_address"], "0xabc1000000000000000000000000000000000002")
 
-    def test_markets_invalid_order_or_offset_rejected(self) -> None:
+    def test_wagers_invalid_order_or_offset_rejected(self) -> None:
         with self.assertRaises(HTTPError):
-            self._get_json("/markets?order=latest")
+            self._get_json("/wagers?order=latest")
         with self.assertRaises(HTTPError):
-            self._get_json("/markets?offset=nan")
+            self._get_json("/wagers?offset=nan")
 
     def test_prefixed_health_route_works(self) -> None:
         status, body = self._get_json("/api/health")

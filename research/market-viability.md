@@ -1,4 +1,4 @@
-## Market Viability Research
+## Wager Viability Research
 
 Date recorded: 2026-03-20
 
@@ -6,22 +6,22 @@ Date recorded: 2026-03-20
 
 The core thesis of this project is:
 
-- **permissionless market creation**
+- **permissionless wager creation**
 - **on-chain custody and payout**
-- **arbitrary propositions rather than a fixed menu of platform-curated markets**
+- **arbitrary propositions rather than a fixed menu of platform-curated wagers**
 - **eventual decentralized resolution**
 
-This is meant to be to proposition betting what `Augur` was to prediction markets: an on-chain protocol where market creation is not bottlenecked by a platform operator, and where the resolution path is ultimately modular and decentralizable.
+This is meant to be to proposition betting what `Augur` was to prediction wagers: an on-chain protocol where wager creation is not bottlenecked by a platform operator, and where the resolution path is ultimately modular and decentralizable.
 
-This project is **not** primarily trying to replicate prediction markets that require the matching / convergence mechanics common to orderbook or AMM-style prediction products. Instead, it is focused on **parimutuel / pool-based proposition betting**, where participants allocate wagers into outcome pools and winners split the pot pro rata.
+This project is **not** primarily trying to replicate prediction wagers that require the matching / convergence mechanics common to orderbook or AMM-style prediction products. Instead, it is focused on **parimutuel / pool-based proposition betting**, where participants allocate wagers into outcome pools and winners split the pot pro rata.
 
 ### Why this space may still be viable
 
-The category is real: there are already on-chain products that look like direct or partial analogs. That reduces demand risk. However, the market still appears fragmented across:
+The category is real: there are already on-chain products that look like direct or partial analogs. That reduces demand risk. However, the wager still appears fragmented across:
 
 - traditional tote / racing-style parimutuel products
 - sportsbook-style on-chain prop products
-- prediction-market protocols that are adjacent but structurally distinct
+- prediction-wager protocols that are adjacent but structurally distinct
 
 The main whitespace appears to be the combination of:
 
@@ -70,7 +70,7 @@ Important caveat:
 Takeaway:
 
 - strong confirmation that EVM parimutuel betting has real design-space interest
-- also highlights that **resolution centralization remains an open problem** even for protocols that otherwise market themselves as decentralized
+- also highlights that **resolution centralization remains an open problem** even for protocols that otherwise wager themselves as decentralized
 
 #### Poolprops
 
@@ -82,7 +82,7 @@ Poolprops appears to be a Solana sports prop betting project, though primary-sou
 
 Takeaway:
 
-- likely evidence that the market is exploring **prop-betting-specific** product forms
+- likely evidence that the wager is exploring **prop-betting-specific** product forms
 - merits deeper follow-up if the project is still active
 
 ### Adjacent but indirect competitors
@@ -124,15 +124,15 @@ Takeaway:
 
 ### What is *not* a direct competitor
 
-Prediction markets remain relevant as a peer group, but are not the same product class for this thesis.
+Prediction wagers remain relevant as a peer group, but are not the same product class for this thesis.
 
 This distinction matters because:
 
-- prediction markets often depend on continuous pricing / matching / AMM convergence
+- prediction wagers often depend on continuous pricing / matching / AMM convergence
 - the user experience is often closer to trading than to saying "let's bet"
-- many prediction-market designs are weaker fits for arbitrary multi-outcome proposition betting in casual, social, or creator-led contexts
+- many prediction-wager designs are weaker fits for arbitrary multi-outcome proposition betting in casual, social, or creator-led contexts
 
-Accordingly, prediction markets should be treated as:
+Accordingly, prediction wagers should be treated as:
 
 - **indirect competitive pressure**
 - **design inspiration**
@@ -140,7 +140,7 @@ Accordingly, prediction markets should be treated as:
 
 ### MVP rationale: proposer as resolver
 
-The MVP currently uses a model where the **proposer is also the resolver**. This is comparable, in spirit, to a lightweight creator-resolved model such as `Manifold Markets`.
+The MVP currently uses a model where the **proposer is also the resolver**. This is comparable, in spirit, to a lightweight creator-resolved model such as `Manifold Wagers`.
 
 This may remain valuable beyond MVP for three reasons:
 
@@ -153,7 +153,7 @@ Benefits:
 - lower smart-contract complexity
 - easier UX
 - faster iteration
-- lower friction for rapid market creation
+- lower friction for rapid wager creation
 
 #### 2. Social / creator distribution
 
@@ -168,7 +168,7 @@ These users often want to instantiate a bet quickly in the same spirit as a real
 
 **Positioning note (Polymarket):** the **international** Polymarket-style stack is often discussed as having heavier, protocol-level resolution machinery than a lightweight creator-resolved line. Separately, **US-facing** or app-store-constrained offerings sometimes introduce **platform-level** controls (e.g. veto or moderation) that are a different axis from on-chain resolution design. This project’s contrast is with tying **permissionless creation** and **resolution authority** to a **single platform operator**—not a legal classification of any specific product.
 
-This makes creator-resolved markets attractive as a **fast, socially native primitive**, even if a more decentralized resolution path later exists in parallel.
+This makes creator-resolved wagers attractive as a **fast, socially native primitive**, even if a more decentralized resolution path later exists in parallel.
 
 #### 3. Reputation moat
 
@@ -184,11 +184,11 @@ This creates room for:
 
 There is a plausible business / ecosystem strategy where a separate organization under the umbrella of the protocol:
 
-- proposes many desirable markets
+- proposes many desirable wagers
 - resolves them fairly and consistently
-- becomes a de facto trusted source of liquidity and recurring market flow
+- becomes a de facto trusted source of liquidity and recurring wager flow
 
-This is analogous to how some platforms become habit-forming not merely because they host markets, but because they reliably seed them.
+This is analogous to how some platforms become habit-forming not merely because they host wagers, but because they reliably seed them.
 
 In this framing:
 
@@ -199,7 +199,7 @@ This may be a stronger strategic position than trying to force all value capture
 
 ### Architectural refinement: configurable resolver
 
-A strong follow-on design change would be to allow each market to specify a **resolver address** distinct from the proposer address.
+A strong follow-on design change would be to allow each wager to specify a **resolver address** distinct from the proposer address.
 
 Desired behavior:
 
@@ -218,9 +218,9 @@ Why this matters:
 
 - preserves MVP simplicity for ordinary users
 - creates forward compatibility for more sophisticated resolution mechanisms
-- allows the protocol to support multiple social and technical trust models without rewriting the market primitive
+- allows the protocol to support multiple social and technical trust models without rewriting the wager primitive
 
-This suggests a long-term architecture where the core market contract is resolution-agnostic:
+This suggests a long-term architecture where the core wager contract is resolution-agnostic:
 
 - it only knows **which address may finalize**
 - that address can be a person, committee, bot, or oracle adapter
@@ -229,12 +229,12 @@ This suggests a long-term architecture where the core market contract is resolut
 
 The most defensible positioning currently appears to be:
 
-> A permissionless, on-chain protocol for arbitrary parimutuel prop bets, with lightweight creator-resolved markets today and modular decentralized resolution tomorrow.
+> A permissionless, on-chain protocol for arbitrary parimutuel prop bets, with lightweight creator-resolved wagers today and modular decentralized resolution tomorrow.
 
 This is more precise than:
 
 - "sports betting on-chain"
-- "prediction markets for everything"
+- "prediction wagers for everything"
 - "just another decentralized sportsbook"
 
 It emphasizes the actual wedge:
@@ -249,8 +249,8 @@ It emphasizes the actual wedge:
 A likely sequencing strategy is:
 
 1. **MVP**
-   - creator-resolved markets
-   - simplest possible market creation UX
+   - creator-resolved wagers
+   - simplest possible wager creation UX
    - focus on small communities and creator-led use cases
 
 2. **Reputation layer**
@@ -275,14 +275,14 @@ A project name is still needed. The name should ideally signal some combination 
 
 - proposition / "prop" betting
 - pooled / parimutuel wagering
-- permissionless market creation
+- permissionless wager creation
 - open, on-chain, or trust-minimized settlement
 
 The naming problem should be revisited after the desired brand tone is clearer:
 
 - serious protocol infrastructure
 - creator-social betting app
-- or neutral market primitive
+- or neutral wager primitive
 
 ### Bottom line
 
@@ -290,6 +290,6 @@ The research indicates:
 
 - direct analogs already exist, so the category is credible
 - the exact thesis of **permissionless arbitrary parimutuel prop creation with modular decentralized resolution** is still not obviously saturated
-- creator-resolved markets are not merely an MVP compromise; they may be a strategically important product mode
+- creator-resolved wagers are not merely an MVP compromise; they may be a strategically important product mode
 - configurable resolver support is likely the correct bridge between MVP simplicity and long-term protocol ambition
 

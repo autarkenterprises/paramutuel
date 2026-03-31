@@ -4,7 +4,7 @@ Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can int
 
 ## ABIs
 
-Pre-extracted ABI-only JSON is committed at `dapp/abi/ParamutuelFactory.json` and `dapp/abi/ParamutuelMarket.json`. These contain `{"abi": [...]}` and can be loaded directly. Full Foundry artifacts are available under `out/` after `forge build`.
+Pre-extracted ABI-only JSON is committed at `dapp/abi/ParamutuelFactory.json` and `dapp/abi/ParamutuelWager.json`. These contain `{"abi": [...]}` and can be loaded directly. Full Foundry artifacts are available under `out/` after `forge build`.
 
 To re-sync after contract changes: `./script/sync-abi.sh`.
 
@@ -16,7 +16,7 @@ To re-sync after contract changes: `./script/sync-abi.sh`.
 |------|-------|-------------|
 | `BPS_DENOMINATOR` | `10_000` | Basis-point denominator |
 | `MAX_TOTAL_FEE_BPS` | `1_000` | 10% fee cap (protocol + extra combined) |
-| `MAX_OUTCOMES` | `64` | Maximum outcome count per market |
+| `MAX_OUTCOMES` | `64` | Maximum outcome count per wager |
 
 ### Read-only state
 
@@ -26,16 +26,16 @@ To re-sync after contract changes: `./script/sync-abi.sh`.
 | `protocolFeeBps()` | `uint16` | Default protocol fee in basis points |
 | `minBettingWindow()` | `uint64` | Minimum seconds from creation to `bettingCloseTime` |
 | `minResolutionWindow()` | `uint64` | Minimum `resolutionWindow` duration in seconds |
-| `marketsCount()` | `uint256` | Number of markets created |
-| `markets(i)` | `address` | Market address by index |
+| `wagersCount()` | `uint256` | Number of wagers created |
+| `wagers(i)` | `address` | Wager address by index |
 
-### `createMarket` (two overloads)
+### `createWager` (two overloads)
 
 ```solidity
 // Without seeds
-function createMarket(
+function createWager(
     address collateralToken,
-    string memory question,
+    string memory proposition,
     string[] memory outcomes,
     uint64  bettingCloseTime,
     uint64  resolutionWindow,
@@ -44,12 +44,12 @@ function createMarket(
     address resolutionCloser,
     address[] memory extraFeeRecipients,
     uint16[]  memory extraFeeBps
-) external returns (address market);
+) external returns (address wager);
 
 // With seeds
-function createMarket(
+function createWager(
     address collateralToken,
-    string memory question,
+    string memory proposition,
     string[] memory outcomes,
     uint64  bettingCloseTime,
     uint64  resolutionWindow,
@@ -60,7 +60,7 @@ function createMarket(
     uint16[]  memory extraFeeBps,
     uint256[] memory seedOutcomeIndices,
     uint256[] memory seedAmounts
-) external returns (address market);
+) external returns (address wager);
 ```
 
 **Parameter semantics:**
@@ -71,7 +71,7 @@ function createMarket(
 - `bettingCloseTime = 0` → no time cap on betting (closer-managed). **Requires** non-zero `bettingCloser`.
 - `resolutionWindow = 0` → no time cap on resolution (closer-managed). **Requires** non-zero `resolutionCloser`.
 - `resolutionDeadline` is computed as `bettingCloseTime + resolutionWindow` (or `0` if either is `0`).
-- Seeded overload: proposer's tokens are `transferFrom`'d to the market and recorded as bets at create-time. Seed arrays must be same length and contain positive amounts. Caller must have approved the factory for the total seed amount.
+- Seeded overload: proposer's tokens are `transferFrom`'d to the wager and recorded as bets at create-time. Seed arrays must be same length and contain positive amounts. Caller must have approved the factory for the total seed amount.
 
 **Validation / reverts:**
 
@@ -90,8 +90,8 @@ function createMarket(
 ### Events
 
 ```solidity
-event MarketCreated(
-    address indexed market,
+event WagerCreated(
+    address indexed wager,
     address indexed proposer,
     address indexed resolver,
     address collateralToken,
@@ -103,7 +103,7 @@ event MarketCreated(
 );
 ```
 
-## Market (`ParamutuelMarket`)
+## Wager (`ParamutuelWager`)
 
 ### State enum
 
@@ -111,7 +111,7 @@ event MarketCreated(
 enum State { Open, Resolved, Retracted }
 ```
 
-- **Open** — betting may be active; market is not finalized.
+- **Open** — betting may be active; wager is not finalized.
 - **Resolved** — winning outcome selected; winners can claim.
 - **Retracted** — invalidated (by resolver retract or expiry); all bettors can claim refund minus fees.
 
@@ -119,13 +119,13 @@ enum State { Open, Resolved, Retracted }
 
 | Getter | Returns | Description |
 |--------|---------|-------------|
-| `factory()` | `address` | Factory that created this market |
-| `proposer()` | `address` | Address that called `createMarket` |
+| `factory()` | `address` | Factory that created this wager |
+| `proposer()` | `address` | Address that called `createWager` |
 | `resolver()` | `address` | Address authorized to resolve/retract |
 | `bettingCloser()` | `address` | Authority for `closeBetting()` (`address(0)` = disabled) |
 | `resolutionCloser()` | `address` | Authority for `closeResolutionWindow()` (`address(0)` = disabled) |
 | `collateralToken()` | `address` | ERC-20 token address used for bets |
-| `question()` | `string` | Market question text |
+| `proposition()` | `string` | Wager proposition text |
 | `state()` | `State` | Current lifecycle state |
 | `bettingCloseTime()` | `uint64` | Scheduled betting close (0 = no time cap) |
 | `resolutionWindow()` | `uint64` | Duration after betting close for resolver to act (0 = no time cap) |
@@ -153,7 +153,7 @@ enum State { Open, Resolved, Retracted }
 **Betting** (state must be `Open`, betting window must be open):
 
 ```solidity
-// Caller must first: collateralToken.approve(market, amount)
+// Caller must first: collateralToken.approve(wager, amount)
 function placeBet(uint256 outcomeIndex, uint256 amount) external returns ();
 function placeBets(uint256[] calldata outcomeIndices, uint256[] calldata amounts) external returns ();
 ```
@@ -247,14 +247,14 @@ event FeeWithdrawn(address indexed recipient, uint256 amount);
 | `NotResolver` | `resolve`, `retract` — caller is not the resolver |
 | `NotBettingCloser` | `closeBetting` — caller is not the betting closer |
 | `NotResolutionCloser` | `closeResolutionWindow` — caller is not the resolution closer |
-| `AlreadyFinalized` | `resolve`, `retract`, `expire` — market already resolved/retracted |
+| `AlreadyFinalized` | `resolve`, `retract`, `expire` — wager already resolved/retracted |
 | `NothingToClaim` | `claim` — no stake, no winning stake, or already claimed; `withdrawFees` — zero balance |
 | `ArrayLengthMismatch` | `placeBets`, `seedInitialBetsFromFactory` — indices/amounts length mismatch |
 | `NotFactory` | `seedInitialBetsFromFactory` — caller is not the factory |
 | `FeeConfigMismatch` | constructor — `feeRecipients` and `feeBps` length mismatch |
 | `FeeTooHigh` | constructor — total fee BPS exceeds `BPS_DENOMINATOR` |
 
-**Note:** `seedInitialBetsFromFactory(address bettor, uint256[] outcomeIndices, uint256[] amounts)` is callable only by the factory during market creation. External callers cannot invoke it. `FeeConfigMismatch` and `FeeTooHigh` are constructor-level checks (the factory validates first, so these are defensive guards).
+**Note:** `seedInitialBetsFromFactory(address bettor, uint256[] outcomeIndices, uint256[] amounts)` is callable only by the factory during wager creation. External callers cannot invoke it. `FeeConfigMismatch` and `FeeTooHigh` are constructor-level checks (the factory validates first, so these are defensive guards).
 
 ## HTTP indexer API (JSON)
 
@@ -263,15 +263,15 @@ Run `python -m service.indexer.api` (see module for flags). All responses are `a
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | `{ "ok": true, "ts": <unix> }` |
-| GET | `/markets?state=OPEN&limit=100` | List markets (optional `state`, `limit` 1–1000). |
-| GET | `/markets/:address` | Single market, totals, outcome rows, event history (`payload_json` parsed). |
-| GET | `/sweeper/expire-candidates?now=<unix>` | Markets still `OPEN` where `expire()` is valid: timed-out resolution window (from effective betting close + `resolution_window`) or `resolution_window_closed` set by indexer from `ResolutionWindowClosedByAuthority`. |
+| GET | `/wagers?state=OPEN&limit=100` | List wagers (optional `state`, `limit` 1–1000). |
+| GET | `/wagers/:address` | Single wager, totals, outcome rows, event history (`payload_json` parsed). |
+| GET | `/sweeper/expire-candidates?now=<unix>` | Wagers still `OPEN` where `expire()` is valid: timed-out resolution window (from effective betting close + `resolution_window`) or `resolution_window_closed` set by indexer from `ResolutionWindowClosedByAuthority`. |
 
 ### Environment / ops
 
 - **`RPC_URL`**: use your node when running the indexer CLI (`service.indexer.indexer`).
 - **`--db-path`**: SQLite file for the indexer (schema in `service/indexer/schema.sql`).
-- **`--factory-address`**: factory contract to filter `MarketCreated` logs.
+- **`--factory-address`**: factory contract to filter `WagerCreated` logs.
 
 ## Configuration
 
@@ -293,9 +293,9 @@ Operator transaction workflows are documented in `docs/WORKFLOWS.md`.
 
 A ready-to-use MCP (Model Context Protocol) server is available at `mcp_server/`. It exposes 16 tools across three categories:
 
-- **Discovery:** `get_protocol_info`, `list_markets`, `get_market`, `get_expire_candidates`
+- **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`
 - **Analysis:** `calculate_odds`
-- **Transaction encoding:** `encode_create_market`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
+- **Transaction encoding:** `encode_create_wager`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
 Run with:
 
@@ -316,6 +316,6 @@ Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittes
 
 ## Versioning
 
-Changing `createMarket` or event layouts is an **ABI break**. Bump deployed factory version or document migration when upgrading.
+Changing `createWager` or event layouts is an **ABI break**. Bump deployed factory version or document migration when upgrading.
 
-Upgrading the indexer from a pre–window-delegation build: **recreate the SQLite DB** (or migrate with `ALTER TABLE`) so `markets` includes `betting_closer`, `resolution_closer`, `resolution_window`, `betting_closed_by_authority`, `betting_closed_at`, `resolution_window_closed`, and `resolution_window_closed_at`; `MarketCreated` and closure-event topics changed.
+Upgrading the indexer from a pre–window-delegation build: **recreate the SQLite DB** (or migrate with `ALTER TABLE`) so `wagers` includes `betting_closer`, `resolution_closer`, `resolution_window`, `betting_closed_by_authority`, `betting_closed_at`, `resolution_window_closed`, and `resolution_window_closed_at`; `WagerCreated` and closure-event topics changed.

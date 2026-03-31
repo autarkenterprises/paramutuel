@@ -1,13 +1,13 @@
 import unittest
 
-from service.explorer.logic import can_expire_candidate_row, classify_market_state
+from service.explorer.logic import can_expire_candidate_row, classify_wager_state
 
 
 class ExplorerLogicTests(unittest.TestCase):
     def test_state_classification(self):
-        self.assertEqual(classify_market_state({"state": "OPEN"}), "open")
-        self.assertEqual(classify_market_state({"state": "RESOLVED"}), "resolved")
-        self.assertEqual(classify_market_state({"state": "RETRACTED"}), "retracted")
+        self.assertEqual(classify_wager_state({"state": "OPEN"}), "open")
+        self.assertEqual(classify_wager_state({"state": "RESOLVED"}), "resolved")
+        self.assertEqual(classify_wager_state({"state": "RETRACTED"}), "retracted")
 
     def test_can_expire_for_closed_resolution_window(self):
         row = {"resolution_window_closed": 1, "resolution_window": 0}

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ParamutuelMarket} from "./ParamutuelMarket.sol";
+import {ParamutuelWager} from "./ParamutuelWager.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 
 contract ParamutuelFactory {
     /// @param resolver The address that may `resolve` / `retract` (proposer if `resolver == address(0)`).
-    /// @param bettingCloser May `closeBetting` on the market (`address(0)` disables authority close).
+    /// @param bettingCloser May `closeBetting` on the wager (`address(0)` disables authority close).
     /// @param resolutionWindow Resolution window duration after effective betting close. `0` means no timeout.
     /// @param resolutionCloser May `closeResolutionWindow` after betting ends (`address(0)` disables authority close).
-    event MarketCreated(
-        address indexed market,
+    event WagerCreated(
+        address indexed wager,
         address indexed proposer,
         address indexed resolver,
         address collateralToken,
@@ -38,7 +38,7 @@ contract ParamutuelFactory {
     address public treasury;
     uint16 public protocolFeeBps;
 
-    address[] public markets;
+    address[] public wagers;
 
     constructor(address treasury_, uint16 protocolFeeBps_, uint64 minBettingWindow_, uint64 minResolutionWindow_) {
         require(treasury_ != address(0), "TREASURY");
@@ -49,19 +49,19 @@ contract ParamutuelFactory {
         minResolutionWindow = minResolutionWindow_;
     }
 
-    function marketsCount() external view returns (uint256) {
-        return markets.length;
+    function wagersCount() external view returns (uint256) {
+        return wagers.length;
     }
 
-    /// @notice Create market without seeded bets.
+    /// @notice Create wager without seeded bets.
     /// @param bettingCloseTime Absolute betting close timestamp. Use `0` for no time cap (closer-only).
     /// @param resolutionWindow Resolution window duration after effective betting close. Use `0` for no time cap.
     /// @param resolver If `address(0)`, the resolver is the proposer (`msg.sender`).
     /// @param bettingCloser If `address(0)`, authority-based betting close is disabled.
     /// @param resolutionCloser If `address(0)`, authority-based resolution-window close is disabled.
-    function createMarket(
+    function createWager(
         address collateralToken,
-        string memory question,
+        string memory proposition,
         string[] memory outcomes,
         uint64 bettingCloseTime,
         uint64 resolutionWindow,
@@ -70,12 +70,12 @@ contract ParamutuelFactory {
         address resolutionCloser,
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps
-    ) external returns (address market) {
+    ) external returns (address wager) {
         uint256[] memory seedOutcomeIndices = new uint256[](0);
         uint256[] memory seedAmounts = new uint256[](0);
-        return _createMarket(
+        return _createWager(
             collateralToken,
-            question,
+            proposition,
             outcomes,
             bettingCloseTime,
             resolutionWindow,
@@ -89,12 +89,12 @@ contract ParamutuelFactory {
         );
     }
 
-    /// @notice Create market with optional initial seeded bets from proposer.
+    /// @notice Create wager with optional initial seeded bets from proposer.
     /// @param seedOutcomeIndices Outcome indices for seeded legs.
     /// @param seedAmounts Raw token amounts for each seeded leg.
-    function createMarket(
+    function createWager(
         address collateralToken,
-        string memory question,
+        string memory proposition,
         string[] memory outcomes,
         uint64 bettingCloseTime,
         uint64 resolutionWindow,
@@ -105,10 +105,10 @@ contract ParamutuelFactory {
         uint16[] memory extraFeeBps,
         uint256[] memory seedOutcomeIndices,
         uint256[] memory seedAmounts
-    ) external returns (address market) {
-        return _createMarket(
+    ) external returns (address wager) {
+        return _createWager(
             collateralToken,
-            question,
+            proposition,
             outcomes,
             bettingCloseTime,
             resolutionWindow,
@@ -122,9 +122,9 @@ contract ParamutuelFactory {
         );
     }
 
-    function _createMarket(
+    function _createWager(
         address collateralToken,
-        string memory question,
+        string memory proposition,
         string[] memory outcomes,
         uint64 bettingCloseTime,
         uint64 resolutionWindow,
@@ -135,7 +135,7 @@ contract ParamutuelFactory {
         uint16[] memory extraFeeBps,
         uint256[] memory seedOutcomeIndices,
         uint256[] memory seedAmounts
-    ) internal returns (address market) {
+    ) internal returns (address wager) {
         if (outcomes.length < 2) revert BadOutcomes();
         if (outcomes.length > MAX_OUTCOMES) revert TooManyOutcomes();
         if (seedOutcomeIndices.length != seedAmounts.length) revert BadSeedConfig();
@@ -150,7 +150,7 @@ contract ParamutuelFactory {
         uint64 nowTs = uint64(block.timestamp);
         if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
         if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
-        // Prevent permanently-open markets:
+        // Prevent permanently-open wagers:
         // - no betting timeout requires an authority closer
         // - no resolution timeout requires an authority closer
         if (bettingCloseTime == 0 && bettingCloser == address(0)) revert InvalidLifecycleConfig();
@@ -169,14 +169,14 @@ contract ParamutuelFactory {
         address resolvedBettingCloser = bettingCloser;
         address resolvedResolutionCloser = resolutionCloser;
 
-        ParamutuelMarket m = new ParamutuelMarket(
+        ParamutuelWager w = new ParamutuelWager(
             address(this),
             msg.sender,
             resolvedResolver,
             resolvedBettingCloser,
             resolvedResolutionCloser,
             collateralToken,
-            question,
+            proposition,
             outcomes,
             bettingCloseTime,
             resolutionWindow,
@@ -185,10 +185,10 @@ contract ParamutuelFactory {
             feeBps
         );
 
-        market = address(m);
-        markets.push(market);
-        emit MarketCreated(
-            market,
+        wager = address(w);
+        wagers.push(wager);
+        emit WagerCreated(
+            wager,
             msg.sender,
             resolvedResolver,
             collateralToken,
@@ -200,9 +200,9 @@ contract ParamutuelFactory {
         );
 
         if (seedAmounts.length > 0) {
-            bool ok = IERC20(collateralToken).transferFrom(msg.sender, market, seedTotal);
+            bool ok = IERC20(collateralToken).transferFrom(msg.sender, wager, seedTotal);
             require(ok, "TRANSFER_FROM");
-            m.seedInitialBetsFromFactory(msg.sender, seedOutcomeIndices, seedAmounts);
+            w.seedInitialBetsFromFactory(msg.sender, seedOutcomeIndices, seedAmounts);
         }
     }
 

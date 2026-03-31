@@ -9,36 +9,36 @@ Use this sheet while executing `docs/TESTNET-REHEARSAL.md`.
 - Indexer DB path: `________________________`
 - Run ID / date: `________________________`
 
-## Market set (minimum 5)
+## Wager set (minimum 5)
 
 1. **Finite resolved**
-   - Market: `________________`
+   - Wager: `________________`
    - Expected: `RESOLVED`
    - Result: `[ ] pass  [ ] fail`
 
 2. **Finite retracted**
-   - Market: `________________`
+   - Wager: `________________`
    - Expected: `RETRACTED`
    - Result: `[ ] pass  [ ] fail`
 
 3. **Finite expired by third party**
-   - Market: `________________`
+   - Wager: `________________`
    - Expected: `RETRACTED` via `expire()`
    - Result: `[ ] pass  [ ] fail`
 
 4. **Delegated resolver/closers**
-   - Market: `________________`
+   - Wager: `________________`
    - Expected: delegated role calls succeed, unauthorized calls revert
    - Result: `[ ] pass  [ ] fail`
 
 5. **No-max closer-managed**
-   - Market: `________________`
+   - Wager: `________________`
    - Expected: cannot progress until closer calls; then lifecycle completes
    - Result: `[ ] pass  [ ] fail`
 
 ## Service checks
 
-- Indexer state accurate for all markets: `[ ] pass  [ ] fail`
+- Indexer state accurate for all wagers: `[ ] pass  [ ] fail`
 - Explorer displays all states correctly: `[ ] pass  [ ] fail`
 - Control panel web + CLI both operate correctly: `[ ] pass  [ ] fail`
 - Sweeper handles candidates and idempotency: `[ ] pass  [ ] fail`

@@ -19,7 +19,7 @@ It supports:
 - A node wallet with gas funds on your target network
 - Deployed contract addresses:
   - `ParamutuelFactory` address
-  - (wagers are created dynamically; the dApp reads the wager address from the `MarketCreated` event)
+  - (wagers are created dynamically; the dApp reads the wager address from the `WagerCreated` event)
 - Serve the directory with an HTTP server (do not open via `file://...`).
 
 ### Run locally
@@ -67,7 +67,7 @@ In the dApp UI, paste:
 - The dApp enforces that the computed resolution window (including absolute-mode conversion) is at least the factory `minResolutionWindow`.
 - Leaving closer fields empty creates time-only finite windows (no authority pre-emption) when finite windows are configured.
 - If you enable a no-max window, the dApp requires the matching closer address to prevent creating an uncloseable wager.
-- Seeded create flow automatically performs token `approve(factory, totalSeedAmount)` before submitting `createMarket`.
+- Seeded create flow automatically performs token `approve(factory, totalSeedAmount)` before submitting `createWager`.
 - The contract compares against on-chain `block.timestamp`. If transaction inclusion is delayed, the effective remaining window can be shorter than expected; very tight windows can fail factory minimum-window checks at execution time.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - Seeding and batch bets support multi-outcome entries with one approval + one transaction path.

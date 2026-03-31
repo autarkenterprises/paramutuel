@@ -19,7 +19,7 @@ from mcp_server.server import (
     encode_claim,
     encode_close_betting,
     encode_close_resolution_window,
-    encode_create_market,
+    encode_create_wager,
     encode_expire,
     encode_place_bet,
     encode_place_bets,
@@ -29,7 +29,7 @@ from mcp_server.server import (
     get_protocol_info,
     FACTORY_ABI,
     FACTORY_ADDRESS,
-    MARKET_ABI,
+    WAGER_ABI,
 )
 
 
@@ -190,12 +190,12 @@ class TestTools(unittest.TestCase):
         )
         self.assertTrue(result["calldata"].startswith("0x476343ee"))
 
-    def test_encode_create_market_no_seeds(self):
+    def test_encode_create_wager_no_seeds(self):
         result = json.loads(
             _run(
-                encode_create_market(
+                encode_create_wager(
                     collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
-                    question="Test?",
+                    proposition="Test?",
                     outcomes=["A", "B"],
                     betting_closer="0x" + "aa" * 20,
                     resolution_closer="0x" + "bb" * 20,
@@ -206,12 +206,12 @@ class TestTools(unittest.TestCase):
         self.assertNotIn("approval_required", result)
         self.assertEqual(result["to"], FACTORY_ADDRESS)
 
-    def test_encode_create_market_with_seeds(self):
+    def test_encode_create_wager_with_seeds(self):
         result = json.loads(
             _run(
-                encode_create_market(
+                encode_create_wager(
                     collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
-                    question="Test?",
+                    proposition="Test?",
                     outcomes=["A", "B"],
                     betting_closer="0x" + "aa" * 20,
                     resolution_closer="0x" + "bb" * 20,
@@ -228,8 +228,8 @@ class TestABILoading(unittest.TestCase):
     def test_factory_abi_count(self):
         self.assertEqual(len(FACTORY_ABI), 19)
 
-    def test_market_abi_count(self):
-        self.assertEqual(len(MARKET_ABI), 63)
+    def test_wager_abi_count(self):
+        self.assertEqual(len(WAGER_ABI), 63)
 
     def test_factory_address_set(self):
         self.assertTrue(FACTORY_ADDRESS.startswith("0x"))

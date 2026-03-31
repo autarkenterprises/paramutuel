@@ -7,47 +7,47 @@
 
 Before live launch, protocol and all auxiliary layers must be validated on testnet.
 
-Requirement clarified: tests must cover **multiple deployed markets** across **all lifecycle states**, not just isolated single-market happy paths.
+Requirement clarified: tests must cover **multiple deployed wagers** across **all lifecycle states**, not just isolated single-wager happy paths.
 
 ## Decision
 
-A launch candidate is not production-eligible unless protocol, dApp, and service all pass the multi-market certification matrix below.
+A launch candidate is not production-eligible unless protocol, dApp, and service all pass the multi-wager certification matrix below.
 
 ## Certification Matrix (Required)
 
 ### A) Protocol (on-chain)
 
-Run with at least 5 concurrently deployed markets:
+Run with at least 5 concurrently deployed wagers:
 
-- open markets with active bets
-- resolved markets
-- retracted markets
-- expired markets
-- markets with delegated resolvers
+- open wagers with active bets
+- resolved wagers
+- retracted wagers
+- expired wagers
+- wagers with delegated resolvers
 
 Must validate:
 
-- market creation works repeatedly without state cross-contamination
-- claims and fee withdrawals work correctly per market
-- unresolved markets can be expired by third parties after deadline
+- wager creation works repeatedly without state cross-contamination
+- claims and fee withdrawals work correctly per wager
+- unresolved wagers can be expired by third parties after deadline
 
 ### B) dApp (end-user)
 
 Must support and correctly render:
 
-- listing many markets with mixed states
-- creating new market with default and delegated resolver
-- placing bets and claiming from specific chosen market
+- listing many wagers with mixed states
+- creating new wager with default and delegated resolver
+- placing bets and claiming from specific chosen wager
 - lifecycle state refresh under concurrent state changes
 
 ### C) Service Entity
 
 Must demonstrate:
 
-- market proposal cadence over multiple markets
-- resolver service operations on multiple markets
-- **expiry sweeper** job that scans unresolved overdue markets and calls `expire()`
-- idempotent behavior (repeat sweeps do not break already-finalized markets)
+- wager proposal cadence over multiple wagers
+- resolver service operations on multiple wagers
+- **expiry sweeper** job that scans unresolved overdue wagers and calls `expire()`
+- idempotent behavior (repeat sweeps do not break already-finalized wagers)
 
 ## Exit Criteria for Mainnet/L2 Launch
 

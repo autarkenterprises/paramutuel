@@ -4,8 +4,8 @@
   - Immutable-core posture, delegated resolver model, pairing workflows, and security implications.
 - `ADR-0002-governance-fees-and-treasury-safe.md`
   - Governance requirement, adjustable fee policy, and treasury Safe setup/testing.
-- `ADR-0003-testnet-certification-multi-market.md`
-  - Mandatory testnet certification matrix across multiple markets and lifecycle states.
+- `ADR-0003-testnet-certification-multi-wager.md`
+  - Mandatory testnet certification matrix across multiple wagers and lifecycle states.
 - `ADR-0004-indexer-and-odds-calculator.md`
   - Minimal custom indexer scope and odds/payout preview requirements.
 - `ADR-0005-delegated-betting-and-resolution-window-closure.md`

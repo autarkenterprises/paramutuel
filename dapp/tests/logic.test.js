@@ -8,7 +8,7 @@ const {
   parseMultiBetInputs,
   resolveTemplate,
   computeAbsoluteTemplateClose,
-  planMarketAction,
+  planWagerAction,
 } = require("../logic.js");
 
 test("template lookup falls back to custom", () => {
@@ -115,55 +115,55 @@ test("parseMultiBetInputs rejects invalid input shapes", () => {
   assert.throws(() => parseMultiBetInputs("0", "0", false), /Invalid amount/);
 });
 
-test("planMarketAction routes resolution actions to resolution market", () => {
+test("planWagerAction routes resolution actions to resolution wager", () => {
   const resolutionAddr = "0x1111111111111111111111111111111111111111";
   const claimsAddr = "0x2222222222222222222222222222222222222222";
   const activeAddr = "0x3333333333333333333333333333333333333333";
   const actions = ["closeBetting", "closeResolutionWindow", "resolve", "retract", "expire"];
 
   for (const action of actions) {
-    const plan = planMarketAction(action, {
-      resolutionMarketAddress: resolutionAddr,
-      claimsMarketAddress: claimsAddr,
-      activeMarketAddress: activeAddr,
+    const plan = planWagerAction(action, {
+      resolutionWagerAddress: resolutionAddr,
+      claimsWagerAddress: claimsAddr,
+      activeWagerAddress: activeAddr,
     });
     assert.equal(plan.section, "resolution");
     assert.equal(plan.targetAddress, resolutionAddr);
   }
 });
 
-test("planMarketAction routes claims actions to claims market", () => {
+test("planWagerAction routes claims actions to claims wager", () => {
   const resolutionAddr = "0x1111111111111111111111111111111111111111";
   const claimsAddr = "0x2222222222222222222222222222222222222222";
   const activeAddr = "0x3333333333333333333333333333333333333333";
   const actions = ["claim", "withdrawFees"];
 
   for (const action of actions) {
-    const plan = planMarketAction(action, {
-      resolutionMarketAddress: resolutionAddr,
-      claimsMarketAddress: claimsAddr,
-      activeMarketAddress: activeAddr,
+    const plan = planWagerAction(action, {
+      resolutionWagerAddress: resolutionAddr,
+      claimsWagerAddress: claimsAddr,
+      activeWagerAddress: activeAddr,
     });
     assert.equal(plan.section, "claims");
     assert.equal(plan.targetAddress, claimsAddr);
   }
 });
 
-test("planMarketAction falls back to active market when section is empty", () => {
+test("planWagerAction falls back to active wager when section is empty", () => {
   const activeAddr = "0x3333333333333333333333333333333333333333";
-  const plan = planMarketAction("resolve", {
-    resolutionMarketAddress: "",
-    claimsMarketAddress: "",
-    activeMarketAddress: activeAddr,
+  const plan = planWagerAction("resolve", {
+    resolutionWagerAddress: "",
+    claimsWagerAddress: "",
+    activeWagerAddress: activeAddr,
   });
   assert.equal(plan.targetAddress, activeAddr);
   assert.equal(plan.method, "resolve");
 });
 
-test("planMarketAction enforces known actions and target presence", () => {
-  assert.throws(() => planMarketAction("unknownAction", {}), /Unsupported action/);
+test("planWagerAction enforces known actions and target presence", () => {
+  assert.throws(() => planWagerAction("unknownAction", {}), /Unsupported action/);
   assert.throws(
-    () => planMarketAction("claim", { resolutionMarketAddress: "", claimsMarketAddress: "", activeMarketAddress: "" }),
+    () => planWagerAction("claim", { resolutionWagerAddress: "", claimsWagerAddress: "", activeWagerAddress: "" }),
     /Select a wager address/
   );
 });

@@ -32,15 +32,15 @@ Recommended MVP chain order from Checkpoint 1: **Base first**, **Arbitrum second
 - Verify contracts and record addresses.
 - Fund at least 6 distinct test accounts (proposers, bettors, resolvers, closers, sweepers).
 
-## 4) Multi-market scenario matrix (ADR-0003)
+## 4) Multi-wager scenario matrix (ADR-0003)
 
-Run at least 5 concurrent markets:
+Run at least 5 concurrent wagers:
 
 1. finite-window resolved
 2. finite-window retracted
 3. finite-window expired by third party
 4. delegated resolver/closers
-5. no-max closer-managed market (`bettingCloseTime=0`, `resolutionWindow=0`)
+5. no-max closer-managed wager (`bettingCloseTime=0`, `resolutionWindow=0`)
 
 ## 5) Service-layer exercise
 
@@ -54,20 +54,20 @@ Run at least 5 concurrent markets:
 Pass only if all are true:
 
 - zero failed contract interactions due to invalid lifecycle choreography
-- all candidate markets end in valid terminal states (`RESOLVED` or `RETRACTED`)
-- no market remains "stuck open" contrary to configured roles/windows
+- all candidate wagers end in valid terminal states (`RESOLVED` or `RETRACTED`)
+- no wager remains "stuck open" contrary to configured roles/windows
 - fee accrual + withdrawal matches expected accounting
 - service logs show successful retry/idempotency behavior
 
 Fail if any are true:
 
-- unresolved market cannot be progressed despite available role keys and configured lifecycle
-- indexer/explorer show contradictory market state
+- unresolved wager cannot be progressed despite available role keys and configured lifecycle
+- indexer/explorer show contradictory wager state
 - sweeper repeatedly fails same valid candidate without alert
 
 ## 7) Two-run certification
 
-- Run rehearsal twice on separate days with fresh markets.
+- Run rehearsal twice on separate days with fresh wagers.
 - Capture incident notes and remediation between runs.
 - Declare launch readiness only after second clean pass.
 

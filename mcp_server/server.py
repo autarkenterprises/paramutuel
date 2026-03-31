@@ -74,7 +74,7 @@ def _load_abi(name: str) -> list[dict]:
 
 
 FACTORY_ABI = _load_abi("ParamutuelFactory")
-MARKET_ABI = _load_abi("ParamutuelMarket")
+WAGER_ABI = _load_abi("ParamutuelWager")
 
 # ── ABI encoding helpers ───────────────────────────────────────────
 
@@ -170,7 +170,7 @@ mcp_server = FastMCP(
 
 
 @mcp_server.tool()
-async def list_markets(
+async def list_wagers(
     state: str | None = None,
     limit: int = 100,
 ) -> str:
@@ -183,18 +183,18 @@ async def list_markets(
     params = f"?limit={limit}"
     if state:
         params += f"&state={state.upper()}"
-    data = await _indexer_get(f"/markets{params}")
+    data = await _indexer_get(f"/wagers{params}")
     return json.dumps(data, indent=2)
 
 
 @mcp_server.tool()
-async def get_market(market_address: str) -> str:
+async def get_wager(wager_address: str) -> str:
     """Get full details for a specific wager including totals, outcomes, and event history.
 
     Args:
-        market_address: The wager contract address (0x...).
+        wager_address: The wager contract address (0x...).
     """
-    data = await _indexer_get(f"/markets/{market_address}")
+    data = await _indexer_get(f"/wagers/{wager_address}")
     return json.dumps(data, indent=2)
 
 
@@ -218,9 +218,9 @@ async def get_protocol_info() -> str:
         for e in FACTORY_ABI
         if e.get("type") == "function"
     ]
-    market_functions = [
+    wager_functions = [
         e["name"]
-        for e in MARKET_ABI
+        for e in WAGER_ABI
         if e.get("type") == "function"
     ]
     return json.dumps(
@@ -229,7 +229,7 @@ async def get_protocol_info() -> str:
             "chain_id": CHAIN_ID,
             "indexer_url": INDEXER_URL,
             "factory_functions": sorted(set(factory_functions)),
-            "market_functions": sorted(set(market_functions)),
+            "wager_functions": sorted(set(wager_functions)),
             "constants": {
                 "BPS_DENOMINATOR": 10_000,
                 "MAX_TOTAL_FEE_BPS": 1_000,
@@ -270,9 +270,9 @@ async def calculate_odds(
 
 
 @mcp_server.tool()
-async def encode_create_market(
+async def encode_create_wager(
     collateral_token: str,
-    question: str,
+    proposition: str,
     outcomes: list[str],
     betting_close_time: int = 0,
     resolution_window: int = 0,
@@ -292,7 +292,7 @@ async def encode_create_market(
 
     Args:
         collateral_token: ERC-20 token address for bets.
-        question: Human-readable wager proposition.
+        proposition: Human-readable wager proposition.
         outcomes: List of outcome labels (minimum 2, max 64).
         betting_close_time: Absolute unix timestamp for betting close (0 = no time cap, requires betting_closer).
         resolution_window: Seconds after betting close for resolver to act (0 = no time cap, requires resolution_closer).
@@ -310,27 +310,27 @@ async def encode_create_market(
     seeds_amt = seed_amounts or []
 
     if seeds_idx or seeds_amt:
-        sig = "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])"
+        sig = "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])"
         types = [
             "address", "string", "string[]", "uint64", "uint64",
             "address", "address", "address",
             "address[]", "uint16[]", "uint256[]", "uint256[]",
         ]
         values = [
-            collateral_token, question, outcomes,
+            collateral_token, proposition, outcomes,
             betting_close_time, resolution_window,
             resolver, betting_closer, resolution_closer,
             fee_recipients, fee_bps, seeds_idx, seeds_amt,
         ]
     else:
-        sig = "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])"
+        sig = "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])"
         types = [
             "address", "string", "string[]", "uint64", "uint64",
             "address", "address", "address",
             "address[]", "uint16[]",
         ]
         values = [
-            collateral_token, question, outcomes,
+            collateral_token, proposition, outcomes,
             betting_close_time, resolution_window,
             resolver, betting_closer, resolution_closer,
             fee_recipients, fee_bps,
@@ -342,7 +342,7 @@ async def encode_create_market(
     result: dict[str, Any] = {
         "to": FACTORY_ADDRESS,
         "calldata": calldata,
-        "description": f"Create wager: '{question}' with {len(outcomes)} outcomes",
+        "description": f"Create wager: '{proposition}' with {len(outcomes)} outcomes",
     }
     if total_seed > 0:
         result["approval_required"] = {
@@ -356,7 +356,7 @@ async def encode_create_market(
 
 @mcp_server.tool()
 async def encode_place_bet(
-    market_address: str,
+    wager_address: str,
     collateral_token: str,
     outcome_index: int,
     amount: int,
@@ -366,7 +366,7 @@ async def encode_place_bet(
     The caller must first approve the wager to spend the collateral token.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
         collateral_token: The ERC-20 collateral token address.
         outcome_index: Index of the outcome to bet on (0-based).
         amount: Bet amount in raw token units.
@@ -378,14 +378,14 @@ async def encode_place_bet(
     )
     return json.dumps(
         {
-            "to": market_address,
+            "to": wager_address,
             "calldata": calldata,
             "description": f"Bet {amount} on outcome {outcome_index}",
             "approval_required": {
                 "token": collateral_token,
-                "spender": market_address,
+                "spender": wager_address,
                 "amount": amount,
-                "approve_calldata": _encode_erc20_approve(market_address, amount),
+                "approve_calldata": _encode_erc20_approve(wager_address, amount),
             },
         },
         indent=2,
@@ -394,7 +394,7 @@ async def encode_place_bet(
 
 @mcp_server.tool()
 async def encode_place_bets(
-    market_address: str,
+    wager_address: str,
     collateral_token: str,
     outcome_indices: list[int],
     amounts: list[int],
@@ -402,7 +402,7 @@ async def encode_place_bets(
     """Encode calldata for placing multiple bets across outcomes in one transaction.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
         collateral_token: The ERC-20 collateral token address.
         outcome_indices: List of outcome indices to bet on.
         amounts: List of bet amounts in raw token units (aligned with outcome_indices).
@@ -415,14 +415,14 @@ async def encode_place_bets(
     )
     return json.dumps(
         {
-            "to": market_address,
+            "to": wager_address,
             "calldata": calldata,
             "description": f"Batch bet on {len(outcome_indices)} outcomes, total {total}",
             "approval_required": {
                 "token": collateral_token,
-                "spender": market_address,
+                "spender": wager_address,
                 "amount": total,
-                "approve_calldata": _encode_erc20_approve(market_address, total),
+                "approve_calldata": _encode_erc20_approve(wager_address, total),
             },
         },
         indent=2,
@@ -430,13 +430,13 @@ async def encode_place_bets(
 
 
 @mcp_server.tool()
-async def encode_resolve(market_address: str, winning_outcome_index: int) -> str:
+async def encode_resolve(wager_address: str, winning_outcome_index: int) -> str:
     """Encode calldata for resolving a wager to a winning outcome.
 
     Only the wager's resolver can submit this transaction.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
         winning_outcome_index: Index of the winning outcome.
     """
     calldata = _encode_call(
@@ -444,7 +444,7 @@ async def encode_resolve(market_address: str, winning_outcome_index: int) -> str
     )
     return json.dumps(
         {
-            "to": market_address,
+            "to": wager_address,
             "calldata": calldata,
             "description": f"Resolve wager to outcome {winning_outcome_index}",
         },
@@ -453,50 +453,50 @@ async def encode_resolve(market_address: str, winning_outcome_index: int) -> str
 
 
 @mcp_server.tool()
-async def encode_retract(market_address: str) -> str:
+async def encode_retract(wager_address: str) -> str:
     """Encode calldata for retracting (invalidating) a wager.
 
     Only the wager's resolver can submit this. Bettors get refunds minus fees.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
     """
     calldata = _encode_call("retract()", [], [])
     return json.dumps(
-        {"to": market_address, "calldata": calldata, "description": "Retract wager"},
+        {"to": wager_address, "calldata": calldata, "description": "Retract wager"},
         indent=2,
     )
 
 
 @mcp_server.tool()
-async def encode_expire(market_address: str) -> str:
+async def encode_expire(wager_address: str) -> str:
     """Encode calldata for expiring a wager past its resolution deadline.
 
     Anyone can submit this transaction. Moves wager to Retracted state.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
     """
     calldata = _encode_call("expire()", [], [])
     return json.dumps(
-        {"to": market_address, "calldata": calldata, "description": "Expire wager"},
+        {"to": wager_address, "calldata": calldata, "description": "Expire wager"},
         indent=2,
     )
 
 
 @mcp_server.tool()
-async def encode_close_betting(market_address: str) -> str:
+async def encode_close_betting(wager_address: str) -> str:
     """Encode calldata for closing the betting window early.
 
     Only the wager's bettingCloser can submit this.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
     """
     calldata = _encode_call("closeBetting()", [], [])
     return json.dumps(
         {
-            "to": market_address,
+            "to": wager_address,
             "calldata": calldata,
             "description": "Close betting (authority)",
         },
@@ -505,19 +505,19 @@ async def encode_close_betting(market_address: str) -> str:
 
 
 @mcp_server.tool()
-async def encode_close_resolution_window(market_address: str) -> str:
+async def encode_close_resolution_window(wager_address: str) -> str:
     """Encode calldata for closing the resolution window early.
 
     Only the wager's resolutionCloser can submit this, and only after
     betting is closed.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
     """
     calldata = _encode_call("closeResolutionWindow()", [], [])
     return json.dumps(
         {
-            "to": market_address,
+            "to": wager_address,
             "calldata": calldata,
             "description": "Close resolution window (authority)",
         },
@@ -526,35 +526,35 @@ async def encode_close_resolution_window(market_address: str) -> str:
 
 
 @mcp_server.tool()
-async def encode_claim(market_address: str) -> str:
+async def encode_claim(wager_address: str) -> str:
     """Encode calldata for claiming payout or refund after wager finalization.
 
     For resolved wagers: winners get pro-rata payout from net pot.
     For retracted/expired wagers: all bettors get pro-rata refund minus fees.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
     """
     calldata = _encode_call("claim()", [], [])
     return json.dumps(
-        {"to": market_address, "calldata": calldata, "description": "Claim payout"},
+        {"to": wager_address, "calldata": calldata, "description": "Claim payout"},
         indent=2,
     )
 
 
 @mcp_server.tool()
-async def encode_withdraw_fees(market_address: str) -> str:
+async def encode_withdraw_fees(wager_address: str) -> str:
     """Encode calldata for withdrawing accrued fee balance.
 
     Only addresses listed as fee recipients can withdraw.
 
     Args:
-        market_address: The wager contract address.
+        wager_address: The wager contract address.
     """
     calldata = _encode_call("withdrawFees()", [], [])
     return json.dumps(
         {
-            "to": market_address,
+            "to": wager_address,
             "calldata": calldata,
             "description": "Withdraw accrued fees",
         },

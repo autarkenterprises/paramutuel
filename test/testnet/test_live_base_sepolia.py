@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-MARKET_CREATED_TOPIC = "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388"
+WAGER_CREATED_TOPIC = "0x142b571a3c036b6753710f2ec81868c8ee6e9b3fffc642f94783cf8778ea7388"
 
 
 def _env(name: str, default: str = "") -> str:
@@ -157,7 +157,7 @@ def _topic_to_address(topic_word: str) -> str:
     return "0x" + cleaned[-40:]
 
 
-def _extract_created_market_from_receipt(tx_hash: str, factory_address: str) -> str:
+def _extract_created_wager_from_receipt(tx_hash: str, factory_address: str) -> str:
     payload = _receipt(tx_hash)
     for log in payload.get("logs", []):
         if str(log.get("address", "")).lower() != factory_address.lower():
@@ -165,10 +165,10 @@ def _extract_created_market_from_receipt(tx_hash: str, factory_address: str) -> 
         topics = log.get("topics") or []
         if len(topics) < 2:
             continue
-        if str(topics[0]).lower() != MARKET_CREATED_TOPIC:
+        if str(topics[0]).lower() != WAGER_CREATED_TOPIC:
             continue
         return _topic_to_address(str(topics[1]))
-    raise AssertionError(f"MarketCreated event not found in receipt for tx {tx_hash}")
+    raise AssertionError(f"WagerCreated event not found in receipt for tx {tx_hash}")
 
 
 def _as_int(value: str) -> int:
@@ -187,16 +187,16 @@ def _as_bool(value: str) -> bool:
     raise ValueError(f"Expected bool-like value, got: {value}")
 
 
-def _wait_for_markets_count(factory_address: str, min_expected: int, timeout_seconds: int = 45) -> int:
+def _wait_for_wagers_count(factory_address: str, min_expected: int, timeout_seconds: int = 45) -> int:
     deadline = time.time() + timeout_seconds
     last_seen = -1
     while time.time() < deadline:
-        last_seen = _as_int(_call(factory_address, "marketsCount()(uint256)"))
+        last_seen = _as_int(_call(factory_address, "wagersCount()(uint256)"))
         if last_seen >= min_expected:
             return last_seen
         time.sleep(2)
     raise AssertionError(
-        f"Timed out waiting for marketsCount >= {min_expected}; last observed {last_seen}"
+        f"Timed out waiting for wagersCount >= {min_expected}; last observed {last_seen}"
     )
 
 
@@ -254,7 +254,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         cls.rpc = _rpc_url()
         cls.factory = _env("FACTORY_ADDRESS") or _default_factory_address()
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
-        cls.market_address = _env("TESTNET_MARKET_ADDRESS")
+        cls.wager_address = _env("TESTNET_WAGER_ADDRESS")
         cls.private_key = _env("PRIVATE_KEY")
         cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
         cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
@@ -278,27 +278,27 @@ class TestBaseSepoliaLive(unittest.TestCase):
         protocol_fee_bps = _as_int(_call(self.factory, "protocolFeeBps()(uint16)"))
         min_betting_window = _as_int(_call(self.factory, "minBettingWindow()(uint64)"))
         min_resolution_window = _as_int(_call(self.factory, "minResolutionWindow()(uint64)"))
-        markets_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
+        wagers_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
 
         self.assertNotEqual(treasury.lower(), ZERO_ADDRESS)
         self.assertGreaterEqual(protocol_fee_bps, 0)
         self.assertLessEqual(protocol_fee_bps, 1000)
         self.assertGreaterEqual(min_betting_window, 0)
         self.assertGreaterEqual(min_resolution_window, 0)
-        self.assertGreaterEqual(markets_count, 0)
+        self.assertGreaterEqual(wagers_count, 0)
 
-    def test_existing_market_views(self) -> None:
-        if not self.market_address:
-            self.skipTest("Set TESTNET_MARKET_ADDRESS to run market read checks")
+    def test_existing_wager_views(self) -> None:
+        if not self.wager_address:
+            self.skipTest("Set TESTNET_WAGER_ADDRESS to run wager read checks")
 
-        factory_on_market = _call(self.market_address, "factory()(address)")
-        betting_close_time = _as_int(_call(self.market_address, "bettingCloseTime()(uint64)"))
-        resolution_window = _as_int(_call(self.market_address, "resolutionWindow()(uint64)"))
-        resolution_deadline = _as_int(_call(self.market_address, "resolutionDeadline()(uint64)"))
-        state = _as_int(_call(self.market_address, "state()(uint8)"))
-        outcomes_count = _as_int(_call(self.market_address, "outcomesCount()(uint256)"))
+        factory_on_wager = _call(self.wager_address, "factory()(address)")
+        betting_close_time = _as_int(_call(self.wager_address, "bettingCloseTime()(uint64)"))
+        resolution_window = _as_int(_call(self.wager_address, "resolutionWindow()(uint64)"))
+        resolution_deadline = _as_int(_call(self.wager_address, "resolutionDeadline()(uint64)"))
+        state = _as_int(_call(self.wager_address, "state()(uint8)"))
+        outcomes_count = _as_int(_call(self.wager_address, "outcomesCount()(uint256)"))
 
-        self.assertEqual(factory_on_market.lower(), self.factory.lower())
+        self.assertEqual(factory_on_wager.lower(), self.factory.lower())
         self.assertGreaterEqual(betting_close_time, 0)
         self.assertGreaterEqual(resolution_window, 0)
         self.assertGreaterEqual(resolution_deadline, 0)
@@ -311,14 +311,14 @@ class TestBaseSepoliaLive(unittest.TestCase):
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY to run transaction lifecycle checks")
 
-        before_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-        question = f"live-suite-{int(time.time())}"
+        before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
+        proposition = f"live-suite-{int(time.time())}"
 
         create_tx = _send(
             self.factory,
-            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             "0x0000000000000000000000000000000000000001",
-            question,
+            proposition,
             '["YES","NO"]',
             "0",
             "0",
@@ -329,14 +329,14 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "[]",
         )
 
-        after_count = _wait_for_markets_count(self.factory, before_count + 1)
+        after_count = _wait_for_wagers_count(self.factory, before_count + 1)
         self.assertGreaterEqual(after_count, before_count + 1)
 
-        new_market = _extract_created_market_from_receipt(create_tx, self.factory)
-        proposer = _call(new_market, "proposer()(address)")
-        resolver = _call(new_market, "resolver()(address)")
-        betting_closer = _call(new_market, "bettingCloser()(address)")
-        resolution_closer = _call(new_market, "resolutionCloser()(address)")
+        new_wager = _extract_created_wager_from_receipt(create_tx, self.factory)
+        proposer = _call(new_wager, "proposer()(address)")
+        resolver = _call(new_wager, "resolver()(address)")
+        betting_closer = _call(new_wager, "bettingCloser()(address)")
+        resolution_closer = _call(new_wager, "resolutionCloser()(address)")
 
         # Resolver defaults to proposer when zero is passed.
         # Closers are explicitly set to sender for no-max windows.
@@ -345,20 +345,20 @@ class TestBaseSepoliaLive(unittest.TestCase):
         self.assertEqual(betting_closer.lower(), self.sender.lower())
         self.assertEqual(resolution_closer.lower(), self.sender.lower())
 
-        _send(new_market, "closeBetting()")
-        betting_closed = _wait_for_bool_value(new_market, "bettingClosedByAuthority()(bool)", True)
+        _send(new_wager, "closeBetting()")
+        betting_closed = _wait_for_bool_value(new_wager, "bettingClosedByAuthority()(bool)", True)
         self.assertTrue(betting_closed)
 
-        _send(new_market, "closeResolutionWindow()")
+        _send(new_wager, "closeResolutionWindow()")
         resolution_closed = _wait_for_bool_value(
-            new_market,
+            new_wager,
             "resolutionWindowClosedByAuthority()(bool)",
             True,
         )
         self.assertTrue(resolution_closed)
 
-        _send(new_market, "expire()")
-        state = _wait_for_state(new_market, 2)
+        _send(new_wager, "expire()")
+        state = _wait_for_state(new_wager, 2)
         self.assertEqual(state, 2)  # Retracted
 
     def test_funded_tx_lifecycle_and_claims(self) -> None:
@@ -380,7 +380,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
                 f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
             )
 
-        before_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
+        before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
         protocol_fee_bps = _as_int(_call(self.factory, "protocolFeeBps()(uint16)"))
         extra_bps = 1 if protocol_fee_bps < 1000 else 0
         extra_recipients = f"[{self.sender}]" if extra_bps > 0 else "[]"
@@ -389,7 +389,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         # Resolve branch with real collateral + claim + fee withdrawal.
         create_tx_resolve = _send(
             self.factory,
-            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             self.collateral_token,
             f"funded-resolve-{int(time.time())}",
             '["YES","NO"]',
@@ -401,12 +401,12 @@ class TestBaseSepoliaLive(unittest.TestCase):
             extra_recipients,
             extra_bps_json,
         )
-        after_count = _wait_for_markets_count(self.factory, before_count + 1)
+        after_count = _wait_for_wagers_count(self.factory, before_count + 1)
         self.assertGreaterEqual(after_count, before_count + 1)
-        resolve_market = _extract_created_market_from_receipt(create_tx_resolve, self.factory)
+        resolve_wager = _extract_created_wager_from_receipt(create_tx_resolve, self.factory)
 
-        _send(self.collateral_token, "approve(address,uint256)", resolve_market, str(amount_raw))
-        _send(resolve_market, "placeBet(uint256,uint256)", "0", str(amount_raw))
+        _send(self.collateral_token, "approve(address,uint256)", resolve_wager, str(amount_raw))
+        _send(resolve_wager, "placeBet(uint256,uint256)", "0", str(amount_raw))
 
         if self.secondary_private_key:
             secondary_balance = _as_int(
@@ -417,32 +417,32 @@ class TestBaseSepoliaLive(unittest.TestCase):
                     self.secondary_private_key,
                     self.collateral_token,
                     "approve(address,uint256)",
-                    resolve_market,
+                    resolve_wager,
                     str(amount_raw),
                 )
                 _send_with_key(
                     self.secondary_private_key,
-                    resolve_market,
+                    resolve_wager,
                     "placeBet(uint256,uint256)",
                     "1",
                     str(amount_raw),
                 )
 
-        _send(resolve_market, "closeBetting()")
-        _send(resolve_market, "resolve(uint256)", "0")
-        _send(resolve_market, "claim()")
-        _wait_for_state(resolve_market, 1)
+        _send(resolve_wager, "closeBetting()")
+        _send(resolve_wager, "resolve(uint256)", "0")
+        _send(resolve_wager, "claim()")
+        _wait_for_state(resolve_wager, 1)
         if extra_bps > 0:
             sender_fee_balance = _as_int(
-                _call(resolve_market, "feeBalances(address)(uint256)", self.sender)
+                _call(resolve_wager, "feeBalances(address)(uint256)", self.sender)
             )
             if sender_fee_balance > 0:
-                _send(resolve_market, "withdrawFees()")
+                _send(resolve_wager, "withdrawFees()")
 
         # Retract branch with funded bet + claim.
         create_tx_retract = _send(
             self.factory,
-            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             self.collateral_token,
             f"funded-retract-{int(time.time())}",
             '["YES","NO"]',
@@ -454,19 +454,19 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "[]",
             "[]",
         )
-        _wait_for_markets_count(self.factory, before_count + 2)
-        retract_market = _extract_created_market_from_receipt(create_tx_retract, self.factory)
-        _send(self.collateral_token, "approve(address,uint256)", retract_market, str(amount_raw))
-        _send(retract_market, "placeBet(uint256,uint256)", "1", str(amount_raw))
-        _send(retract_market, "closeBetting()")
-        _send(retract_market, "retract()")
-        _wait_for_state(retract_market, 2)
-        _send(retract_market, "claim()")
+        _wait_for_wagers_count(self.factory, before_count + 2)
+        retract_wager = _extract_created_wager_from_receipt(create_tx_retract, self.factory)
+        _send(self.collateral_token, "approve(address,uint256)", retract_wager, str(amount_raw))
+        _send(retract_wager, "placeBet(uint256,uint256)", "1", str(amount_raw))
+        _send(retract_wager, "closeBetting()")
+        _send(retract_wager, "retract()")
+        _wait_for_state(retract_wager, 2)
+        _send(retract_wager, "claim()")
 
         # Expire branch with funded bet + claim.
         create_tx_expire = _send(
             self.factory,
-            "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
             self.collateral_token,
             f"funded-expire-{int(time.time())}",
             '["YES","NO"]',
@@ -478,21 +478,21 @@ class TestBaseSepoliaLive(unittest.TestCase):
             "[]",
             "[]",
         )
-        _wait_for_markets_count(self.factory, before_count + 3)
-        expire_market = _extract_created_market_from_receipt(create_tx_expire, self.factory)
-        _send(self.collateral_token, "approve(address,uint256)", expire_market, str(amount_raw))
-        _send(expire_market, "placeBet(uint256,uint256)", "0", str(amount_raw))
-        _send(expire_market, "closeBetting()")
-        _send(expire_market, "closeResolutionWindow()")
-        _send(expire_market, "expire()")
-        _wait_for_state(expire_market, 2)
-        _send(expire_market, "claim()")
+        _wait_for_wagers_count(self.factory, before_count + 3)
+        expire_wager = _extract_created_wager_from_receipt(create_tx_expire, self.factory)
+        _send(self.collateral_token, "approve(address,uint256)", expire_wager, str(amount_raw))
+        _send(expire_wager, "placeBet(uint256,uint256)", "0", str(amount_raw))
+        _send(expire_wager, "closeBetting()")
+        _send(expire_wager, "closeResolutionWindow()")
+        _send(expire_wager, "expire()")
+        _wait_for_state(expire_wager, 2)
+        _send(expire_wager, "claim()")
 
         # Optional negative-role checks from a non-authorized key.
         if self.unauthorized_private_key:
             create_tx_unauth = _send(
                 self.factory,
-                "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+                "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
                 self.collateral_token,
                 f"funded-unauth-{int(time.time())}",
                 '["YES","NO"]',
@@ -504,10 +504,10 @@ class TestBaseSepoliaLive(unittest.TestCase):
                 "[]",
                 "[]",
             )
-            _wait_for_markets_count(self.factory, before_count + 4)
-            unauth_market = _extract_created_market_from_receipt(create_tx_unauth, self.factory)
-            _send_expect_failure(self.unauthorized_private_key, unauth_market, "closeBetting()")
-            _send_expect_failure(self.unauthorized_private_key, unauth_market, "resolve(uint256)", "0")
+            _wait_for_wagers_count(self.factory, before_count + 4)
+            unauth_wager = _extract_created_wager_from_receipt(create_tx_unauth, self.factory)
+            _send_expect_failure(self.unauthorized_private_key, unauth_wager, "closeBetting()")
+            _send_expect_failure(self.unauthorized_private_key, unauth_wager, "resolve(uint256)", "0")
 
 
 if __name__ == "__main__":

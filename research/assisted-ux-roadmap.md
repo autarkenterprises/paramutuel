@@ -26,7 +26,7 @@ This roadmap operationalizes:
   - `submitIntent`
   - `intentStatus`
 - Canonical intent schema:
-  - chain id, market address, method, args hash, token, amount, signer, expiry, nonce
+  - chain id, wager address, method, args hash, token, amount, signer, expiry, nonce
 - Sponsorship policy spec:
   - per-user/day cap
   - per-token cap
@@ -78,7 +78,7 @@ This roadmap operationalizes:
   - signer management
   - replay protection and nonce discipline
 - Settlement accounting:
-  - sponsorship spend by token/user/market
+  - sponsorship spend by token/user/wager
   - fee recovery model hooks
 - Security controls:
   - per-IP and per-wallet rate limits
@@ -99,7 +99,7 @@ This roadmap operationalizes:
 
 - Website flow:
   - wallet connect
-  - choose market
+  - choose wager
   - collateral selector with Tier 1 defaults
   - "platform-sponsored" transaction path messaging
 - UX rails:

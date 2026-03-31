@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from .commands import build_create_market_command, build_market_action_command
+from .commands import build_create_wager_command, build_wager_action_command
 
 
 def _split_csv(s: str) -> list[str]:
@@ -33,10 +33,10 @@ def main() -> int:
     parser.add_argument("--execute", action="store_true", help="Execute cast command. Default prints command only.")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    c = sub.add_parser("create-market")
+    c = sub.add_parser("create-wager")
     c.add_argument("--factory", required=True)
     c.add_argument("--collateral", required=True)
-    c.add_argument("--question", required=True)
+    c.add_argument("--proposition", required=True)
     c.add_argument("--outcomes", required=True, help="Comma-separated outcomes")
     c.add_argument("--betting-close-time", type=int, required=True, help="Unix ts or 0")
     c.add_argument("--resolution-window", type=int, required=True, help="seconds or 0")
@@ -48,8 +48,8 @@ def main() -> int:
     c.add_argument("--seed-outcome-indices", default="", help="Comma-separated uint256 outcome indices")
     c.add_argument("--seed-amounts", default="", help="Comma-separated raw token amounts (uint256)")
 
-    a = sub.add_parser("market-action")
-    a.add_argument("--market", required=True)
+    a = sub.add_parser("wager-action")
+    a.add_argument("--wager", required=True)
     a.add_argument(
         "--action",
         required=True,
@@ -71,11 +71,11 @@ def main() -> int:
         return 2
 
     try:
-        if args.cmd == "create-market":
-            cmd = build_create_market_command(
+        if args.cmd == "create-wager":
+            cmd = build_create_wager_command(
                 factory=args.factory,
                 collateral=args.collateral,
-                question=args.question,
+                proposition=args.proposition,
                 outcomes=_split_csv(args.outcomes),
                 betting_close_time=args.betting_close_time,
                 resolution_window=args.resolution_window,
@@ -91,8 +91,8 @@ def main() -> int:
             )
             return _run_or_print(cmd.command, args.execute)
 
-        cmd = build_market_action_command(
-            market=args.market,
+        cmd = build_wager_action_command(
+            wager=args.wager,
             action=args.action,
             outcome_index=args.outcome_index,
             rpc_url=args.rpc_url,

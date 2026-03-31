@@ -7,54 +7,54 @@
 
 The protocol thesis requires:
 
-- permissionless market creation
-- arbitrary proposition markets
+- permissionless wager creation
+- arbitrary proposition wagers
 - configurable/decentralizable resolution
 - minimal long-term dependence on protocol upgrades
 
-Current markets already store a `resolver` address and only accept `resolve/retract` from that address.
+Current wagers already store a `resolver` address and only accept `resolve/retract` from that address.
 
 Open question: is this sufficient for service-agnostic, secure delegation to future resolver systems (including oracle contracts)?
 
 ## Decision
 
-1. **Treat market contracts as immutable settlement primitives.**
-   - Each market has immutable `proposer` and `resolver`.
-   - Resolver delegation is configured at market creation.
+1. **Treat wager contracts as immutable settlement primitives.**
+   - Each wager has immutable `proposer` and `resolver`.
+   - Resolver delegation is configured at wager creation.
 
-2. **Resolver systems evolve externally, not inside the core market contract.**
+2. **Resolver systems evolve externally, not inside the core wager contract.**
    - A resolver may be:
      - the proposer EOA (default),
      - a multisig/service address,
      - a dedicated oracle/dispute contract.
 
-3. **Pairing between markets and resolver authority is performed by the proposer at creation time.**
+3. **Pairing between wagers and resolver authority is performed by the proposer at creation time.**
    - This is done via dApp, service UI, script, or direct contract call.
    - dApp mediation does **not** reduce permissionlessness because direct calls remain available.
 
 4. **For oracle-style resolution, pairing workflow is explicit and event-driven.**
-   - Resolver/oracle watches factory `MarketCreated` events where `resolver == oracleAddress`.
-   - Oracle indexes candidate markets and applies its own policy/spec to decide whether to resolve.
-   - Oracle sends `resolve/retract` transaction to the specific market address when conditions are met.
+   - Resolver/oracle watches factory `WagerCreated` events where `resolver == oracleAddress`.
+   - Oracle indexes candidate wagers and applies its own policy/spec to decide whether to resolve.
+   - Oracle sends `resolve/retract` transaction to the specific wager address when conditions are met.
 
 5. **No additional core protocol coupling is required for delegation itself.**
-   - The market already needs only one trust anchor: authorized resolver address.
+   - The wager already needs only one trust anchor: authorized resolver address.
 
 ## Security and Non-Exploitation Workflow
 
 ### Baseline (EOA/service resolver)
 
 1. Proposer chooses resolver address.
-2. Market is created with immutable resolver.
+2. Wager is created with immutable resolver.
 3. Only resolver can finalize in window.
 4. Anyone can `expire()` after deadline to prevent stuck funds.
 
 ### Oracle-style resolver (recommended pattern)
 
 1. Proposer chooses oracle contract address as resolver.
-2. Proposer optionally registers market metadata with oracle module (off-chain or on-chain policy registry).
-3. Oracle tracks market state and external data feed.
-4. Oracle finalizes market by calling `resolve/retract`.
+2. Proposer optionally registers wager metadata with oracle module (off-chain or on-chain policy registry).
+3. Oracle tracks wager state and external data feed.
+4. Oracle finalizes wager by calling `resolve/retract`.
 
 ## Consequences
 
@@ -62,7 +62,7 @@ Open question: is this sufficient for service-agnostic, secure delegation to fut
 
 - Core protocol remains stable and minimal.
 - Resolver innovation can iterate independently.
-- Supports heterogeneous trust models per market.
+- Supports heterogeneous trust models per wager.
 
 ### Tradeoffs
 
@@ -77,14 +77,14 @@ Open question: is this sufficient for service-agnostic, secure delegation to fut
 - service policy transparency:
   - publish resolver standards and SLA
 - indexer/explorer visibility:
-  - prominently display proposer/resolver per market
+  - prominently display proposer/resolver per wager
 
 ## Future-Proofing Notes
 
-If future resolver modules need richer deterministic matching, add this outside the core market via:
+If future resolver modules need richer deterministic matching, add this outside the core wager via:
 
 - resolver module registry contracts, and/or
-- market metadata URIs/hashes indexed off-chain
+- wager metadata URIs/hashes indexed off-chain
 
-without changing the settlement logic of deployed markets.
+without changing the settlement logic of deployed wagers.
 

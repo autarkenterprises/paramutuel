@@ -1,7 +1,7 @@
 ## Research
 
-- `market-viability.md`: market landscape, direct/indirect competitors, protocol thesis (permissionless creation + decentralizable resolution), MVP rationale (Manifold-like proposer-as-resolver), organizational strategy, configurable resolver direction, and naming notes for the permissionless parimutuel prop-betting protocol.
-- `adr/README.md`: architecture decision records covering immutable core + delegated resolver workflows, governance/treasury Safe, multi-market testnet certification, and custom indexer + odds calculator requirements.
+- `market-viability.md`: wager landscape, direct/indirect competitors, protocol thesis (permissionless creation + decentralizable resolution), MVP rationale (Manifold-like proposer-as-resolver), organizational strategy, configurable resolver direction, and naming notes for the permissionless parimutuel prop-betting protocol.
+- `adr/README.md`: architecture decision records covering immutable core + delegated resolver workflows, governance/treasury Safe, multi-wager testnet certification, and custom indexer + odds calculator requirements.
 - `adr/ADR-0008-multi-winner-and-settlement-generalization.md`: proposed v2 direction for multi-winner resolution and policy-based settlement semantics (any-of, exact-set, threshold/weighted future extensions).
 - `execution-roadmap.md`: concrete checkpoint-based execution plan across governance, chain/fee viability, protocol hardening, indexer, dApp, service entity, testnet certification, and launch. Checkpoint statuses updated 2026-03-30.
 - `assisted-ux-roadmap.md`: phased build plan for website-level gas abstraction and assisted transaction flows (happy-path stablecoins first, generic ERC-20 expansion next).
@@ -12,7 +12,7 @@
 - `checkpoint-4-indexer-spec.md`: minimal custom indexer schema, API scope, and reorg/replay/testing requirements.
 - `checkpoint-5-odds-calculator-spec.md`: formulas, edge-case policy, and test vectors for odds/payout preview in dApp and service layers.
 - `go-to-market-strategy.md`: comprehensive GTM strategy covering positioning, audience segmentation, phased launch plan, machine distribution via MCP/AI agents, creator partnerships, and key metrics.
-- `investor-pitch-outline.md`: investor pitch framework covering market opportunity, competitive positioning, business model, and funding ask.
-- `outreach-targets.md`: prioritized outreach target list (38+ targets across 6 tiers) scored by relevance, receptivity, and market size, with competitive landscape analysis and phased outreach sequence.
+- `investor-pitch-outline.md`: investor pitch framework covering wager opportunity, competitive positioning, business model, and funding ask.
+- `outreach-targets.md`: prioritized outreach target list (38+ targets across 6 tiers) scored by relevance, receptivity, and wager size, with competitive landscape analysis and phased outreach sequence.
 - `paramutuel-pitch-deck.pptx`: presentation deck for investor and partnership conversations.
 

@@ -23,7 +23,7 @@ It has three modes:
 
 Optional:
 
-- `TESTNET_MARKET_ADDRESS` (to run additional read checks on a known wager)
+- `TESTNET_WAGER_ADDRESS` (to run additional read checks on a known wager)
 - `TESTNET_MODE=minimal-tx` (for transaction checks)
 - `PRIVATE_KEY` (required for `minimal-tx`)
 - `TESTNET_MODE=funded-tx` (for funded lifecycle checks)
@@ -56,7 +56,7 @@ RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 Read-only + existing wager checks:
 
 ```bash
-TESTNET_MARKET_ADDRESS=0x... \
+TESTNET_WAGER_ADDRESS=0x... \
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 ./script/testnet/run_live_suite.sh
 ```

@@ -10,7 +10,7 @@ On-chain contracts cannot observe off-chain “event start” or “grading done
 
 ## Decision
 
-1. **`bettingCloser`** (immutable, default **proposer** when `address(0)` at `createMarket`):
+1. **`bettingCloser`** (immutable, default **proposer** when `address(0)` at `createWager`):
    - May call `closeBetting()` to set `bettingClosedByAuthority`.
    - `placeBet` reverts when `_bettingClosed()` is true: authority **or** `block.timestamp >= bettingCloseTime`.
 
@@ -20,9 +20,9 @@ On-chain contracts cannot observe off-chain “event start” or “grading done
 
 3. **Events**: `BettingClosedByAuthority`, `ResolutionWindowClosedByAuthority` for indexers and tooling.
 
-4. **Factory** `MarketCreated` includes `bettingCloser` and `resolutionCloser` (resolved addresses) in the log data.
+4. **Factory** `WagerCreated` includes `bettingCloser` and `resolutionCloser` (resolved addresses) in the log data.
 
 ## Consequences
 
-- Breaking change to `createMarket` and `MarketCreated` topic.
+- Breaking change to `createWager` and `WagerCreated` topic.
 - Indexer schema gains `betting_closer`, `resolution_closer`, flags for authority closures, and sweeper logic must treat early-closed resolution windows as expire-eligible.

@@ -19,11 +19,11 @@ def _json_arg(items: list[str] | list[int]) -> str:
     return json.dumps(items, separators=(",", ":"))
 
 
-def build_create_market_command(
+def build_create_wager_command(
     *,
     factory: str,
     collateral: str,
-    question: str,
+    proposition: str,
     outcomes: list[str],
     betting_close_time: int,
     resolution_window: int,
@@ -59,9 +59,9 @@ def build_create_market_command(
         "cast",
         "send",
         factory,
-        "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
+        "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
         collateral,
-        question,
+        proposition,
         _json_arg(outcomes),
         str(betting_close_time),
         str(resolution_window),
@@ -80,9 +80,9 @@ def build_create_market_command(
     return CastCommand(cmd)
 
 
-def build_market_action_command(
+def build_wager_action_command(
     *,
-    market: str,
+    wager: str,
     action: str,
     rpc_url: str,
     private_key: str,
@@ -110,7 +110,7 @@ def build_market_action_command(
     cmd = [
         "cast",
         "send",
-        market,
+        wager,
         sig,
         *args,
         "--rpc-url",
@@ -122,7 +122,7 @@ def build_market_action_command(
 
 
 def lifecycle_workflow(*, no_max_betting: bool, no_max_resolution: bool) -> list[str]:
-    steps = ["createMarket", "placeBet"]
+    steps = ["createWager", "placeBet"]
     if no_max_betting:
         steps.append("closeBetting")
     if no_max_resolution:

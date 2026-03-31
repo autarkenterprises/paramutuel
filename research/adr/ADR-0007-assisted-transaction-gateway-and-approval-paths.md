@@ -15,7 +15,7 @@ Website users need reduced friction (ideally no ETH requirement) while interacti
 Gas abstraction introduces multiple moving parts:
 
 - user operation execution (relayer/bundler/paymaster stack)
-- allowance setup for market contracts
+- allowance setup for wager contracts
 - fee recovery and abuse controls
 
 Asset behavior varies:
@@ -51,7 +51,7 @@ The system needs a generalized flow that works across many ERC-20 assets, plus s
    - per-user and per-asset sponsorship limits
    - nonce/replay protections
    - max fee/slippage policy for sponsored actions
-   - audit logs and cost attribution per market/user/collateral
+   - audit logs and cost attribution per wager/user/collateral
 
 ## Consequences
 

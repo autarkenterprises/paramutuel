@@ -8,7 +8,7 @@ The lightest setup in this repo is Render free tier using `render.yaml`.
 - Web service entrypoint: `service.indexer.live_api`
 - Behavior:
   - runs the log sync loop continuously against your RPC
-  - serves the HTTP API (`/health`, `/markets`, `/markets/:address`) on the same process
+  - serves the HTTP API (`/health`, `/wagers`, `/wagers/:address`) on the same process
 
 ## Render setup
 

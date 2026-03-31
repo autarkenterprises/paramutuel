@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .commands import build_create_market_command, build_market_action_command
+from .commands import build_create_wager_command, build_wager_action_command
 from .security import token_authorized
 
 
@@ -65,11 +65,11 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(int(self.headers.get("Content-Length", "0")) or 0)
         payload = json.loads(raw.decode() or "{}")
         try:
-            if path == "/api/preview/create-market":
-                cmd = build_create_market_command(
+            if path == "/api/preview/create-wager":
+                cmd = build_create_wager_command(
                     factory=payload["factory"],
                     collateral=payload["collateral"],
-                    question=payload["question"],
+                    proposition=payload["proposition"],
                     outcomes=payload["outcomes"],
                     betting_close_time=int(payload["bettingCloseTime"]),
                     resolution_window=int(payload["resolutionWindow"]),
@@ -84,8 +84,8 @@ class Handler(BaseHTTPRequestHandler):
                     private_key=self.private_key,
                 )
             elif path == "/api/preview/action":
-                cmd = build_market_action_command(
-                    market=payload["market"],
+                cmd = build_wager_action_command(
+                    wager=payload["wager"],
                     action=payload["action"],
                     outcome_index=payload.get("outcomeIndex"),
                     rpc_url=self.rpc_url,

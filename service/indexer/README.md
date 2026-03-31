@@ -33,8 +33,8 @@ python3 service/indexer/api.py \
 ### API endpoints
 
 - `GET /health`
-- `GET /markets?state=OPEN|RESOLVED|RETRACTED&limit=100`
-- `GET /markets/<market_address>`
+- `GET /wagers?state=OPEN|RESOLVED|RETRACTED&limit=100`
+- `GET /wagers/<wager_address>`
 - `GET /sweeper/expire-candidates`
 
 ### Notes

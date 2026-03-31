@@ -42,7 +42,7 @@ jobs:
           # Extract ABIs from build output
           python3 -c "
           import json
-          for name in ['ParamutuelFactory', 'ParamutuelMarket']:
+          for name in ['ParamutuelFactory', 'ParamutuelWager']:
               data = json.load(open(f'out/{name}.sol/{name}.json'))
               with open(f'_site/dapp/abi/{name}.json', 'w') as f:
                   json.dump({'abi': data['abi']}, f, indent=2)

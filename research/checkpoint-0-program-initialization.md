@@ -17,10 +17,10 @@ Fill in named owners before Checkpoint 1 starts:
 | Track | Primary owner | Backup owner | Notes |
 |------|----------------|--------------|-------|
 | Protocol contracts | TBD | TBD | Foundry code/tests, deployment prep |
-| dApp | TBD | TBD | UX, multi-market explorer, odds preview |
+| dApp | TBD | TBD | UX, multi-wager explorer, odds preview |
 | Service entity | TBD | TBD | Proposal/resolution ops + sweeper |
 | Governance/Treasury | TBD | TBD | Safe ops, signer policy, fee governance |
-| Data/Indexer | TBD | TBD | Event ingestion, market state API |
+| Data/Indexer | TBD | TBD | Event ingestion, wager state API |
 | Security/Audit coordination | TBD | TBD | Threat model, audit vendor, fixes |
 
 ### 2) Operating cadence

@@ -1,8 +1,8 @@
-"""Multi-market, multi-actor stress tests against deployed Base Sepolia contracts.
+"""Multi-wager, multi-actor stress tests against deployed Base Sepolia contracts.
 
 Modes (STRESS_MODE env):
-  - readonly (default): eth_call only; samples latest markets from the factory.
-  - tx: creates STRESS_MARKET_COUNT markets with distinct delegated roles per market.
+  - readonly (default): eth_call only; samples latest wagers from the factory.
+  - tx: creates STRESS_WAGER_COUNT wagers with distinct delegated roles per wager.
   - funded-tx: tx mode plus real collateral approve/placeBet/claim flows.
 
 See docs/TESTNET-STRESS-SUITE.md for wallet pool generation and funding.
@@ -150,16 +150,16 @@ def _parse_units(amount: str, decimals: int) -> int:
     return int(whole) * (10 ** decimals) + int(frac_scaled)
 
 
-def _wait_for_markets_count(factory_address: str, min_expected: int, timeout_seconds: int = 45) -> int:
+def _wait_for_wagers_count(factory_address: str, min_expected: int, timeout_seconds: int = 45) -> int:
     deadline = time.time() + timeout_seconds
     last_seen = -1
     while time.time() < deadline:
-        last_seen = _as_int(_call(factory_address, "marketsCount()(uint256)"))
+        last_seen = _as_int(_call(factory_address, "wagersCount()(uint256)"))
         if last_seen >= min_expected:
             return last_seen
         time.sleep(2)
     raise AssertionError(
-        f"Timed out waiting for marketsCount >= {min_expected}; last observed {last_seen}"
+        f"Timed out waiting for wagersCount >= {min_expected}; last observed {last_seen}"
     )
 
 
@@ -193,8 +193,8 @@ class TestBaseSepoliaStress(unittest.TestCase):
         cls.rpc = _rpc_url()
         cls.factory = _env("FACTORY_ADDRESS") or _default_factory_address()
         cls.mode = _env("STRESS_MODE", "readonly").lower()
-        cls.sample_markets = int(_env("STRESS_SAMPLE_MARKETS", "12"))
-        cls.market_count = int(_env("STRESS_MARKET_COUNT", "3"))
+        cls.sample_wagers = int(_env("STRESS_SAMPLE_WAGERS", "12"))
+        cls.wager_count = int(_env("STRESS_WAGER_COUNT", "3"))
         cls.pool_path = _env("STRESS_WALLET_POOL_PATH")
         cls.funder_key = _env("STRESS_FUNDER_PRIVATE_KEY") or _env("PRIVATE_KEY")
         cls.collateral_token = _env("STRESS_COLLATERAL_TOKEN")
@@ -206,32 +206,32 @@ class TestBaseSepoliaStress(unittest.TestCase):
         if not cls.factory:
             raise unittest.SkipTest("Set FACTORY_ADDRESS or config/deployments.json baseSepolia.factoryAddress")
 
-    def test_readonly_sample_markets(self) -> None:
+    def test_readonly_sample_wagers(self) -> None:
         if self.mode != "readonly":
             self.skipTest("Set STRESS_MODE=readonly (default) for this test")
 
-        total = _as_int(_call(self.factory, "marketsCount()(uint256)"))
+        total = _as_int(_call(self.factory, "wagersCount()(uint256)"))
         if total == 0:
-            self.skipTest("No markets on factory yet; run tx mode once or deploy markets first")
+            self.skipTest("No wagers on factory yet; run tx mode once or deploy wagers first")
 
-        n = min(total, self.sample_markets)
+        n = min(total, self.sample_wagers)
         for k in range(n):
             idx = total - 1 - k
-            market = _call(self.factory, "markets(uint256)(address)", str(idx))
-            factory_on_market = _call(market, "factory()(address)")
-            self.assertEqual(factory_on_market.lower(), self.factory.lower())
-            state = _as_int(_call(market, "state()(uint8)"))
+            wager = _call(self.factory, "wagers(uint256)(address)", str(idx))
+            factory_on_wager = _call(wager, "factory()(address)")
+            self.assertEqual(factory_on_wager.lower(), self.factory.lower())
+            state = _as_int(_call(wager, "state()(uint8)"))
             self.assertIn(state, (0, 1, 2))
-            proposer = _call(market, "proposer()(address)").lower()
-            resolver = _call(market, "resolver()(address)").lower()
-            bc = _call(market, "bettingCloser()(address)").lower()
-            rc = _call(market, "resolutionCloser()(address)").lower()
+            proposer = _call(wager, "proposer()(address)").lower()
+            resolver = _call(wager, "resolver()(address)").lower()
+            bc = _call(wager, "bettingCloser()(address)").lower()
+            rc = _call(wager, "resolutionCloser()(address)").lower()
             self.assertTrue(proposer.startswith("0x"))
             self.assertTrue(resolver.startswith("0x"))
             self.assertTrue(bc.startswith("0x"))
             self.assertTrue(rc.startswith("0x"))
 
-    def test_tx_multi_market_distinct_roles(self) -> None:
+    def test_tx_multi_wager_distinct_roles(self) -> None:
         if self.mode != "tx":
             self.skipTest("Set STRESS_MODE=tx to run on-chain stress creation")
 
@@ -241,30 +241,30 @@ class TestBaseSepoliaStress(unittest.TestCase):
             self.skipTest("Set STRESS_FUNDER_PRIVATE_KEY or PRIVATE_KEY for expire() and gas")
 
         pool = _load_wallet_pool(self.pool_path)
-        need = self.market_count * 4
+        need = self.wager_count * 4
         if len(pool) < need:
-            self.skipTest(f"Pool has {len(pool)} wallets; need at least {need} (4 per market)")
+            self.skipTest(f"Pool has {len(pool)} wallets; need at least {need} (4 per wager)")
 
         min_res = _as_int(_call(self.factory, "minResolutionWindow()(uint64)"))
 
-        for i in range(self.market_count):
+        for i in range(self.wager_count):
             base = i * 4
             w_prop = pool[base]
             w_res = pool[base + 1]
             w_bet_close = pool[base + 2]
             w_res_close = pool[base + 3]
 
-            before = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-            question = f"stress-{int(time.time())}-{i}"
+            before = _as_int(_call(self.factory, "wagersCount()(uint256)"))
+            proposition = f"stress-{int(time.time())}-{i}"
             # Rotate resolution window: 0 (no max), min_res, min_res — all closable via authority + expire
             res_win = (0, min_res, min_res)[i % 3]
 
             _send_key(
                 w_prop["private_key"],
                 self.factory,
-                "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+                "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
                 DUMMY_COLLATERAL,
-                question,
+                proposition,
                 '["A","B"]',
                 "0",
                 str(res_win),
@@ -275,41 +275,41 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 "[]",
             )
 
-            after = _wait_for_markets_count(self.factory, before + 1)
+            after = _wait_for_wagers_count(self.factory, before + 1)
             self.assertGreaterEqual(after, before + 1)
 
-            market = _call(self.factory, "markets(uint256)(address)", str(before))
-            self.assertEqual(_call(market, "proposer()(address)").lower(), w_prop["address"].lower())
-            self.assertEqual(_call(market, "resolver()(address)").lower(), w_res["address"].lower())
-            self.assertEqual(_call(market, "bettingCloser()(address)").lower(), w_bet_close["address"].lower())
-            self.assertEqual(_call(market, "resolutionCloser()(address)").lower(), w_res_close["address"].lower())
+            wager = _call(self.factory, "wagers(uint256)(address)", str(before))
+            self.assertEqual(_call(wager, "proposer()(address)").lower(), w_prop["address"].lower())
+            self.assertEqual(_call(wager, "resolver()(address)").lower(), w_res["address"].lower())
+            self.assertEqual(_call(wager, "bettingCloser()(address)").lower(), w_bet_close["address"].lower())
+            self.assertEqual(_call(wager, "resolutionCloser()(address)").lower(), w_res_close["address"].lower())
 
-            _send_key(w_bet_close["private_key"], market, "closeBetting()")
+            _send_key(w_bet_close["private_key"], wager, "closeBetting()")
 
             branch = i % 3
             if branch == 0:
-                _send_key(w_res_close["private_key"], market, "closeResolutionWindow()")
-                _send_key(self.funder_key, market, "expire()")
-                self.assertEqual(_wait_for_state(market, 2), 2)
+                _send_key(w_res_close["private_key"], wager, "closeResolutionWindow()")
+                _send_key(self.funder_key, wager, "expire()")
+                self.assertEqual(_wait_for_state(wager, 2), 2)
             elif branch == 1:
-                _send_key(w_res["private_key"], market, "resolve(uint256)", "0")
-                self.assertEqual(_wait_for_state(market, 1), 1)
+                _send_key(w_res["private_key"], wager, "resolve(uint256)", "0")
+                self.assertEqual(_wait_for_state(wager, 1), 1)
             else:
-                _send_key(w_res["private_key"], market, "retract()")
-                self.assertEqual(_wait_for_state(market, 2), 2)
+                _send_key(w_res["private_key"], wager, "retract()")
+                self.assertEqual(_wait_for_state(wager, 2), 2)
 
-    def test_funded_tx_multi_market_roles_and_claims(self) -> None:
+    def test_funded_tx_multi_wager_roles_and_claims(self) -> None:
         if self.mode != "funded-tx":
-            self.skipTest("Set STRESS_MODE=funded-tx to run funded multi-market stress")
+            self.skipTest("Set STRESS_MODE=funded-tx to run funded multi-wager stress")
         if not self.pool_path:
             self.skipTest("Set STRESS_WALLET_POOL_PATH to a JSON pool from gen_stress_wallet_pool.py")
         if not self.collateral_token:
             self.skipTest("Set STRESS_COLLATERAL_TOKEN for funded-tx mode")
 
         pool = _load_wallet_pool(self.pool_path)
-        need = self.market_count * 6
+        need = self.wager_count * 6
         if len(pool) < need:
-            self.skipTest(f"Pool has {len(pool)} wallets; need at least {need} (6 per market)")
+            self.skipTest(f"Pool has {len(pool)} wallets; need at least {need} (6 per wager)")
 
         decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
         amount_raw = _parse_units(self.bet_amount, decimals)
@@ -317,10 +317,10 @@ class TestBaseSepoliaStress(unittest.TestCase):
             self.skipTest("STRESS_BET_AMOUNT must parse to a positive amount")
 
         min_res = _as_int(_call(self.factory, "minResolutionWindow()(uint64)"))
-        before_count = _as_int(_call(self.factory, "marketsCount()(uint256)"))
-        first_market = ""
+        before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
+        first_wager = ""
 
-        for i in range(self.market_count):
+        for i in range(self.wager_count):
             base = i * 6
             w_prop = pool[base]
             w_res = pool[base + 1]
@@ -337,19 +337,19 @@ class TestBaseSepoliaStress(unittest.TestCase):
             )
             if yes_balance < amount_raw or no_balance < amount_raw:
                 self.skipTest(
-                    f"Insufficient collateral balances for funded-tx on market {i}: "
+                    f"Insufficient collateral balances for funded-tx on wager {i}: "
                     f"need {amount_raw} on both bettor wallets"
                 )
 
-            question = f"stress-funded-{int(time.time())}-{i}"
+            proposition = f"stress-funded-{int(time.time())}-{i}"
             res_win = (0, min_res, min_res)[i % 3]
 
             _send_key(
                 w_prop["private_key"],
                 self.factory,
-                "createMarket(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+                "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
                 self.collateral_token,
-                question,
+                proposition,
                 '["YES","NO"]',
                 "0",
                 str(res_win),
@@ -361,26 +361,26 @@ class TestBaseSepoliaStress(unittest.TestCase):
             )
 
             created_index = before_count + i
-            _wait_for_markets_count(self.factory, created_index + 1)
-            market = _call(self.factory, "markets(uint256)(address)", str(created_index))
-            if not first_market:
-                first_market = market
+            _wait_for_wagers_count(self.factory, created_index + 1)
+            wager = _call(self.factory, "wagers(uint256)(address)", str(created_index))
+            if not first_wager:
+                first_wager = wager
 
-            self.assertEqual(_call(market, "proposer()(address)").lower(), w_prop["address"].lower())
-            self.assertEqual(_call(market, "resolver()(address)").lower(), w_res["address"].lower())
-            self.assertEqual(_call(market, "bettingCloser()(address)").lower(), w_bet_close["address"].lower())
-            self.assertEqual(_call(market, "resolutionCloser()(address)").lower(), w_res_close["address"].lower())
+            self.assertEqual(_call(wager, "proposer()(address)").lower(), w_prop["address"].lower())
+            self.assertEqual(_call(wager, "resolver()(address)").lower(), w_res["address"].lower())
+            self.assertEqual(_call(wager, "bettingCloser()(address)").lower(), w_bet_close["address"].lower())
+            self.assertEqual(_call(wager, "resolutionCloser()(address)").lower(), w_res_close["address"].lower())
 
             _send_key(
                 w_bettor_yes["private_key"],
                 self.collateral_token,
                 "approve(address,uint256)",
-                market,
+                wager,
                 str(amount_raw),
             )
             _send_key(
                 w_bettor_yes["private_key"],
-                market,
+                wager,
                 "placeBet(uint256,uint256)",
                 "0",
                 str(amount_raw),
@@ -389,41 +389,41 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 w_bettor_no["private_key"],
                 self.collateral_token,
                 "approve(address,uint256)",
-                market,
+                wager,
                 str(amount_raw),
             )
             _send_key(
                 w_bettor_no["private_key"],
-                market,
+                wager,
                 "placeBet(uint256,uint256)",
                 "1",
                 str(amount_raw),
             )
 
-            _send_key(w_bet_close["private_key"], market, "closeBetting()")
+            _send_key(w_bet_close["private_key"], wager, "closeBetting()")
             branch = i % 3
             if branch == 0:
-                _send_key(w_res["private_key"], market, "resolve(uint256)", "0")
-                self.assertEqual(_wait_for_state(market, 1), 1)
-                _send_key(w_bettor_yes["private_key"], market, "claim()")
+                _send_key(w_res["private_key"], wager, "resolve(uint256)", "0")
+                self.assertEqual(_wait_for_state(wager, 1), 1)
+                _send_key(w_bettor_yes["private_key"], wager, "claim()")
             elif branch == 1:
-                _send_key(w_res["private_key"], market, "retract()")
-                self.assertEqual(_wait_for_state(market, 2), 2)
-                _send_key(w_bettor_yes["private_key"], market, "claim()")
-                _send_key(w_bettor_no["private_key"], market, "claim()")
+                _send_key(w_res["private_key"], wager, "retract()")
+                self.assertEqual(_wait_for_state(wager, 2), 2)
+                _send_key(w_bettor_yes["private_key"], wager, "claim()")
+                _send_key(w_bettor_no["private_key"], wager, "claim()")
             else:
-                _send_key(w_res_close["private_key"], market, "closeResolutionWindow()")
-                _send_key(w_prop["private_key"], market, "expire()")
-                self.assertEqual(_wait_for_state(market, 2), 2)
-                _send_key(w_bettor_yes["private_key"], market, "claim()")
-                _send_key(w_bettor_no["private_key"], market, "claim()")
+                _send_key(w_res_close["private_key"], wager, "closeResolutionWindow()")
+                _send_key(w_prop["private_key"], wager, "expire()")
+                self.assertEqual(_wait_for_state(wager, 2), 2)
+                _send_key(w_bettor_yes["private_key"], wager, "claim()")
+                _send_key(w_bettor_no["private_key"], wager, "claim()")
 
-        after_count = _wait_for_markets_count(self.factory, before_count + self.market_count)
-        self.assertGreaterEqual(after_count, before_count + self.market_count)
+        after_count = _wait_for_wagers_count(self.factory, before_count + self.wager_count)
+        self.assertGreaterEqual(after_count, before_count + self.wager_count)
 
-        if self.unauthorized_private_key and first_market:
-            _send_expect_failure(self.unauthorized_private_key, first_market, "closeBetting()")
-            _send_expect_failure(self.unauthorized_private_key, first_market, "resolve(uint256)", "0")
+        if self.unauthorized_private_key and first_wager:
+            _send_expect_failure(self.unauthorized_private_key, first_wager, "closeBetting()")
+            _send_expect_failure(self.unauthorized_private_key, first_wager, "resolve(uint256)", "0")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 // Shared pure logic for the browser dApp and Node tests.
 (function initParamutuelLogic(globalScope) {
-  const MARKET_TEMPLATES = {
+  const WAGER_TEMPLATES = {
     custom: {
       bettingCloseMode: "relative",
       resolutionWindowMode: "relative",
@@ -70,7 +70,7 @@
   };
 
   function getTemplate(name) {
-    return MARKET_TEMPLATES[name] || MARKET_TEMPLATES.custom;
+    return WAGER_TEMPLATES[name] || WAGER_TEMPLATES.custom;
   }
 
   function computeAbsoluteTemplateClose(nowSec, rule) {
@@ -208,7 +208,7 @@
     return { outcomeIndices, amountNumbers };
   }
 
-  const MARKET_ACTION_CONFIG = {
+  const WAGER_ACTION_CONFIG = {
     closeBetting: { section: "resolution", method: "closeBetting" },
     closeResolutionWindow: { section: "resolution", method: "closeResolutionWindow" },
     resolve: { section: "resolution", method: "resolve" },
@@ -218,14 +218,14 @@
     withdrawFees: { section: "claims", method: "withdrawFees" },
   };
 
-  function planMarketAction(
+  function planWagerAction(
     actionName,
-    { resolutionMarketAddress = "", claimsMarketAddress = "", activeMarketAddress = "" } = {}
+    { resolutionWagerAddress = "", claimsWagerAddress = "", activeWagerAddress = "" } = {}
   ) {
-    const config = MARKET_ACTION_CONFIG[actionName];
+    const config = WAGER_ACTION_CONFIG[actionName];
     if (!config) throw new Error(`Unsupported action: ${actionName}`);
-    const selected = config.section === "resolution" ? resolutionMarketAddress : claimsMarketAddress;
-    const targetAddress = String(selected || "").trim() || String(activeMarketAddress || "").trim();
+    const selected = config.section === "resolution" ? resolutionWagerAddress : claimsWagerAddress;
+    const targetAddress = String(selected || "").trim() || String(activeWagerAddress || "").trim();
     if (!targetAddress) {
       throw new Error("Select a wager address in this section, or load an active wager above.");
     }
@@ -238,15 +238,15 @@
   }
 
   const api = {
-    MARKET_TEMPLATES,
+    WAGER_TEMPLATES,
     getTemplate,
     computeWindowArgs,
     validateWindowMins,
     parseMultiBetInputs,
     computeAbsoluteTemplateClose,
     resolveTemplate,
-    MARKET_ACTION_CONFIG,
-    planMarketAction,
+    WAGER_ACTION_CONFIG,
+    planWagerAction,
   };
 
   if (typeof module !== "undefined" && module.exports) {

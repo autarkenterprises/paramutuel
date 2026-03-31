@@ -16,8 +16,8 @@ class SweeperTests(unittest.TestCase):
         init_db(conn)
         conn.execute(
             """
-            INSERT INTO markets(
-              market_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+            INSERT INTO wagers(
+              wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
               collateral_token, betting_close_time, resolution_window, resolution_deadline,
               betting_closed_by_authority, betting_closed_at, resolution_window_closed, state, created_block, created_tx_hash
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)

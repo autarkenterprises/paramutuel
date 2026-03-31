@@ -41,8 +41,8 @@ Print (dry-run) command:
 python3 -m service.control_panel.cli \
   --rpc-url "$RPC_URL" \
   --private-key "$PRIVATE_KEY" \
-  market-action \
-  --market "$MARKET" \
+  wager-action \
+  --wager "$WAGER" \
   --action close-betting
 ```
 
@@ -53,12 +53,12 @@ python3 -m service.control_panel.cli \
   --rpc-url "$RPC_URL" \
   --private-key "$PRIVATE_KEY" \
   --execute \
-  market-action \
-  --market "$MARKET" \
+  wager-action \
+  --wager "$WAGER" \
   --action close-betting
 ```
 
-`create-market` is also supported in CLI with full role and fee fields.
+`create-wager` is also supported in CLI with full role and fee fields.
 
 ## Control panel (web)
 

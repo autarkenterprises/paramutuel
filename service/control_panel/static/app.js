@@ -1,8 +1,8 @@
 async function previewAction() {
-  const market = document.getElementById("market").value.trim();
+  const wager = document.getElementById("wager").value.trim();
   const action = document.getElementById("action").value;
   const outcomeRaw = document.getElementById("outcomeIndex").value;
-  const body = { market, action };
+  const body = { wager, action };
   if (action === "resolve" && outcomeRaw !== "") body.outcomeIndex = Number(outcomeRaw);
 
   const res = await fetch("/api/preview/action", {

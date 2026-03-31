@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
-def classify_market_state(market: dict) -> str:
-    state = market.get("state", "OPEN")
+def classify_wager_state(wager: dict) -> str:
+    state = wager.get("state", "OPEN")
     if state == "RESOLVED":
         return "resolved"
     if state == "RETRACTED":

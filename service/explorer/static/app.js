@@ -11,9 +11,9 @@ let exhausted = false;
 let includeRowDetails = true;
 
 const FIELD_DEFS = [
-  { key: "market_address", label: "Wager", core: true },
+  { key: "wager_address", label: "Wager", core: true },
   { key: "state", label: "State", core: true },
-  { key: "question", label: "Proposition", core: true },
+  { key: "proposition", label: "Proposition", core: true },
   { key: "outcomes_json", label: "Outcomes", core: true },
   { key: "proposer", label: "Proposer", core: true },
   { key: "resolver", label: "Resolver", core: true },
@@ -42,7 +42,7 @@ function apiUrl(path) {
   return `${API_BASE_NORMALIZED}${path}`;
 }
 
-function buildMarketsPath(prefix, { queryText = "", limit = PAGE_SIZE, offset = 0, order = "desc" } = {}) {
+function buildWagersPath(prefix, { queryText = "", limit = PAGE_SIZE, offset = 0, order = "desc" } = {}) {
   const search = String(queryText || "").trim();
   const params = new URLSearchParams({
     limit: String(limit),
@@ -50,13 +50,13 @@ function buildMarketsPath(prefix, { queryText = "", limit = PAGE_SIZE, offset = 
     order,
   });
   if (search) params.set("q", search);
-  return `${prefix}/markets?${params.toString()}`;
+  return `${prefix}/wagers?${params.toString()}`;
 }
 
-async function fetchMarkets(options) {
+async function fetchWagers(options) {
   const candidates = [
-    buildMarketsPath("/api", options),
-    buildMarketsPath("", options),
+    buildWagersPath("/api", options),
+    buildWagersPath("", options),
   ];
   let lastResponse = null;
   for (const path of candidates) {
@@ -90,6 +90,10 @@ function selectedFields() {
   return FIELD_DEFS.filter((f) => selectedFieldKeys.has(f.key));
 }
 
+function getFieldValue(record, key) {
+  return record[key];
+}
+
 function formatFieldValue(key, value) {
   if (value === null || value === undefined || value === "") return '<span class="muted">—</span>';
   if (key === "outcomes_json") {
@@ -110,7 +114,7 @@ function formatFieldValue(key, value) {
 }
 
 function renderHeader() {
-  const headerRow = document.getElementById("marketHeader");
+  const headerRow = document.getElementById("wagerHeader") || document.querySelector("thead tr");
   if (!headerRow) return;
   const fields = selectedFields();
   headerRow.innerHTML = fields.map((f) => `<th>${f.label}</th>`).join("");
@@ -147,23 +151,23 @@ function setupFieldPicker() {
       selectedFieldKeys.delete(target.value);
     }
     if (selectedFieldKeys.size === 0) {
-      selectedFieldKeys.add("market_address");
+      selectedFieldKeys.add("wager_address");
     }
     renderHeader();
-    loadMarkets({ append: false }).catch((e) => console.error(e));
+    loadWagers({ append: false }).catch((e) => console.error(e));
   });
 
   document.getElementById("fieldsCore")?.addEventListener("click", () => {
     applyFieldPreset(CORE_FIELD_KEYS);
-    loadMarkets({ append: false }).catch((e) => console.error(e));
+    loadWagers({ append: false }).catch((e) => console.error(e));
   });
   document.getElementById("fieldsAll")?.addEventListener("click", () => {
     applyFieldPreset(FIELD_DEFS.map((f) => f.key));
-    loadMarkets({ append: false }).catch((e) => console.error(e));
+    loadWagers({ append: false }).catch((e) => console.error(e));
   });
   document.getElementById("includeRowDetails")?.addEventListener("change", (ev) => {
     includeRowDetails = !!ev.target.checked;
-    loadMarkets({ append: false }).catch((e) => console.error(e));
+    loadWagers({ append: false }).catch((e) => console.error(e));
   });
 }
 
@@ -189,16 +193,18 @@ async function loadConfiguredFactoryAddress() {
   }
 }
 
-function renderMarkets(markets, { append = false } = {}) {
-  const tbody = document.getElementById("markets");
+function renderWagers(wagers, { append = false } = {}) {
+  const tbody = document.getElementById("wagers");
   const fields = selectedFields();
   const colspan = Math.max(1, fields.length);
   if (!append) {
     tbody.innerHTML = "";
   }
-  for (const m of markets) {
+  for (const m of wagers) {
     const tr = document.createElement("tr");
-    tr.innerHTML = fields.map((f) => `<td>${formatFieldValue(f.key, m[f.key])}</td>`).join("");
+    tr.innerHTML = fields
+      .map((f) => `<td>${formatFieldValue(f.key, getFieldValue(m, f.key))}</td>`)
+      .join("");
     tbody.appendChild(tr);
     if (includeRowDetails) {
       const detailsRow = document.createElement("tr");
@@ -214,16 +220,16 @@ function renderMarkets(markets, { append = false } = {}) {
       tbody.appendChild(detailsRow);
     }
   }
-  if (!append && markets.length === 0) {
+  if (!append && wagers.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${colspan}">No wagers found.</td></tr>`;
   }
 }
 
-async function loadMarkets({ append = false } = {}) {
-  const tbody = document.getElementById("markets");
+async function loadWagers({ append = false } = {}) {
+  const tbody = document.getElementById("wagers");
   const apiNode = document.getElementById("apiBaseDisplay");
-  const queryText = (document.getElementById("marketSearch")?.value || "").trim();
-  const order = document.getElementById("marketOrder")?.value || "desc";
+  const queryText = (document.getElementById("wagerSearch")?.value || "").trim();
+  const order = document.getElementById("wagerOrder")?.value || "desc";
   if (!append) {
     currentOffset = 0;
     exhausted = false;
@@ -236,7 +242,7 @@ async function loadMarkets({ append = false } = {}) {
   setLoadMoreEnabled(false);
   let res;
   try {
-    res = await fetchMarkets({
+    res = await fetchWagers({
       queryText: lastQueryText,
       order: lastOrder,
       limit: PAGE_SIZE,
@@ -259,46 +265,46 @@ async function loadMarkets({ append = false } = {}) {
     return;
   }
   const data = await res.json();
-  const markets = data.markets || [];
-  renderMarkets(markets, { append });
-  currentOffset += markets.length;
-  exhausted = markets.length < PAGE_SIZE;
+  const wagers = data.wagers || [];
+  renderWagers(wagers, { append });
+  currentOffset += wagers.length;
+  exhausted = wagers.length < PAGE_SIZE;
   setLoadMoreEnabled(!exhausted);
   updateResultMeta();
 }
 
 document.getElementById("refresh").addEventListener("click", () => {
-  loadMarkets({ append: false }).catch((e) => {
+  loadWagers({ append: false }).catch((e) => {
     console.error(e);
   });
 });
 document.getElementById("searchBtn").addEventListener("click", () => {
-  loadMarkets({ append: false }).catch((e) => {
+  loadWagers({ append: false }).catch((e) => {
     console.error(e);
   });
 });
-document.getElementById("marketOrder").addEventListener("change", () => {
-  loadMarkets({ append: false }).catch((e) => {
+document.getElementById("wagerOrder").addEventListener("change", () => {
+  loadWagers({ append: false }).catch((e) => {
     console.error(e);
   });
 });
 document.getElementById("loadMore").addEventListener("click", () => {
   if (exhausted) return;
-  loadMarkets({ append: true }).catch((e) => {
+  loadWagers({ append: true }).catch((e) => {
     console.error(e);
   });
 });
-document.getElementById("marketSearch").addEventListener("keydown", (ev) => {
+document.getElementById("wagerSearch").addEventListener("keydown", (ev) => {
   if (ev.key !== "Enter") return;
   ev.preventDefault();
-  loadMarkets({ append: false }).catch((e) => {
+  loadWagers({ append: false }).catch((e) => {
     console.error(e);
   });
 });
 
 setupFieldPicker();
 renderHeader();
-loadMarkets({ append: false }).catch((e) => {
+loadWagers({ append: false }).catch((e) => {
   console.error(e);
 });
 

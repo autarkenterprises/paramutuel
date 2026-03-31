@@ -7,10 +7,10 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 ## Guiding constraints
 
-- Core market protocol should remain as immutable as practical.
-- Resolution must stay **configurable** per market (`resolver` address), enabling independent resolver evolution.
+- Core wager protocol should remain as immutable as practical.
+- Resolution must stay **configurable** per wager (`resolver` address), enabling independent resolver evolution.
 - Governance is required at launch for fee policy and treasury custody.
-- Testnet certification must include **multiple markets in all lifecycle states**.
+- Testnet certification must include **multiple wagers in all lifecycle states**.
 - dApp and service must include an odds/payout preview capability.
 - Indexing should start as a **minimal custom indexer** with strong tests and low dependency footprint.
 
@@ -49,7 +49,7 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 **Deliverables**
 - Chain comparison memo (L2s + candidate chains):
-  - tx cost profile for `createMarket`, `placeBet`, `resolve`, `claim`, `expire`
+  - tx cost profile for `createWager`, `placeBet`, `resolve`, `claim`, `expire`
   - wallet/UX ecosystem
   - stablecoin liquidity and on/off-ramp availability
   - indexer/data tooling maturity
@@ -113,18 +113,18 @@ This roadmap implements the architecture and governance decisions in `research/a
 
 **Status:** Complete (indexer, API, reorg-safe replay, all event types, hosted on Render)
 
-**Goal:** Provide deterministic market state querying for dApp and service.
+**Goal:** Provide deterministic wager state querying for dApp and service.
 
 **Deliverables**
 - Event ingestion for:
-  - `MarketCreated`, `BetPlaced`, `Resolved`, `Retracted`, `Expired`, `Claimed`, `FeeAccrued`, `FeeWithdrawn`
+  - `WagerCreated`, `BetPlaced`, `Resolved`, `Retracted`, `Expired`, `Claimed`, `FeeAccrued`, `FeeWithdrawn`
 - Derived state:
   - active/resolved/retracted
-  - overdue unresolved markets (`expire` candidates)
+  - overdue unresolved wagers (`expire` candidates)
   - totals and resolver/proposer metadata
 - API endpoints (minimal):
-  - list markets by state
-  - market details
+  - list wagers by state
+  - wager details
   - sweep targets for expiry bot
 
 **Exit criteria**
@@ -147,7 +147,7 @@ This roadmap implements the architecture and governance decisions in `research/a
   - current implied payout multiple per outcome
   - expected payout for entered bet
   - post-bet odds impact preview
-- Multi-market explorer view powered by indexer.
+- Multi-wager explorer view powered by indexer.
 
 **Exit criteria**
 - Usability pass with testnet users on all major flows.
@@ -166,15 +166,15 @@ This roadmap implements the architecture and governance decisions in `research/a
   - proposition standards
   - resolution policy/SLA
   - transparency dashboard
-- Operator console for creating/resolving markets.
+- Operator console for creating/resolving wagers.
 - Automated sweeper:
-  - scans overdue unresolved markets
+  - scans overdue unresolved wagers
   - calls `expire()` as a network courtesy
   - idempotent and monitored
 
 **Exit criteria**
 - Service demonstrates repeated propose/resolve cycles.
-- Sweeper successfully expires overdue markets across multiple test markets.
+- Sweeper successfully expires overdue wagers across multiple test wagers.
 
 ---
 
@@ -185,7 +185,7 @@ This roadmap implements the architecture and governance decisions in `research/a
 **Goal:** Validate end-to-end behavior with realistic concurrency.
 
 **Required scenario matrix**
-- At least 5+ concurrent markets:
+- At least 5+ concurrent wagers:
   - open, resolved, retracted, expired, delegated-resolver
 - Flows:
   - create -> bet -> resolve -> claim
@@ -210,12 +210,12 @@ This roadmap implements the architecture and governance decisions in `research/a
 - dApp release with chain/address registry.
 - Service entity live with sweep automation.
 - Monitoring dashboards:
-  - market counts by state
+  - wager counts by state
   - unresolved-overdue count
   - fee flows
 
 **Exit criteria**
-- First production markets complete full lifecycle successfully.
+- First production wagers complete full lifecycle successfully.
 - Post-launch incident window passes with no critical regressions.
 
 ---
@@ -230,10 +230,10 @@ This roadmap implements the architecture and governance decisions in `research/a
 - Resolver module interface and prototype(s):
   - optimistic/challenge model and/or
   - bonded dispute model
-- Pilot markets using delegated module resolvers.
+- Pilot wagers using delegated module resolvers.
 
 **Exit criteria**
-- Module can resolve real markets via delegated resolver path.
+- Module can resolve real wagers via delegated resolver path.
 - Formal migration/positioning plan for expanded decentralization.
 
 ---

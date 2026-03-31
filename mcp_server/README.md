@@ -48,8 +48,8 @@ paramutuel-mcp
 | Tool | Description |
 |------|-------------|
 | `get_protocol_info` | Factory address, chain ID, indexer URL, ABI summaries, protocol constants |
-| `list_markets` | List wagers from the indexer, filterable by state (OPEN/RESOLVED/RETRACTED) |
-| `get_market` | Full wager details: outcomes, totals, event history |
+| `list_wagers` | List wagers from the indexer, filterable by state (OPEN/RESOLVED/RETRACTED) |
+| `get_wager` | Full wager details: outcomes, totals, event history |
 | `get_expire_candidates` | Wagers past their resolution deadline, callable by anyone via `expire()` |
 
 ### Analysis
@@ -64,7 +64,7 @@ All write tools return ABI-encoded calldata. The caller signs and submits the tr
 
 | Tool | Description |
 |------|-------------|
-| `encode_create_market` | Create a new wager (with optional seed liquidity) |
+| `encode_create_wager` | Create a new wager (with optional seed liquidity) |
 | `encode_place_bet` | Bet on a single outcome |
 | `encode_place_bets` | Batch bet across multiple outcomes in one tx |
 | `encode_resolve` | Resolve a wager to a winning outcome (resolver only) |
