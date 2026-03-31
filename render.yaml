@@ -14,5 +14,7 @@ services:
         value: "15"
       - key: INDEXER_FROM_BLOCK
         value: "39608044"
+      - key: INDEXER_CHUNK_SIZE
+        value: "120"
       - key: INDEXER_DB_PATH
         value: /tmp/indexer.db
