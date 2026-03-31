@@ -53,7 +53,15 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
 
 def rpc_call(rpc_url: str, method: str, params: List[Any]) -> Any:
     payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    req = request.Request(rpc_url, data=payload, headers={"Content-Type": "application/json"})
+    req = request.Request(
+        rpc_url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            # Base Sepolia public RPC can reject default urllib requests without a UA header.
+            "User-Agent": "paramutuel-indexer/1.0",
+        },
+    )
     with request.urlopen(req, timeout=30) as resp:
         body = json.loads(resp.read().decode())
     if "error" in body:
