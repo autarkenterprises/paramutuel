@@ -9,6 +9,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Live testnet integration suite:** see [`docs/TESTNET-LIVE-SUITE.md`](docs/TESTNET-LIVE-SUITE.md).
 **Testnet stress suite (multi-wager / multi-actor):** see [`docs/TESTNET-STRESS-SUITE.md`](docs/TESTNET-STRESS-SUITE.md).
 **Live indexer hosting (Cloud Run):** see [`docs/INDEXER-HOSTING.md`](docs/INDEXER-HOSTING.md) and [`docs/CLOUD-RUN-HOSTING.md`](docs/CLOUD-RUN-HOSTING.md).
+**Resolution Service (delegated resolver ops):** see [`docs/RESOLUTION-SERVICE.md`](docs/RESOLUTION-SERVICE.md).
 **Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
 **Service layer modules:** see [`service/README.md`](service/README.md).
 **Hosted dApp & website:** see [GitHub Pages deployment](#hosted-dapp--protocol-website).

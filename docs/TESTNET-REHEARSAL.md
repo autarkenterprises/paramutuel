@@ -16,6 +16,7 @@ Recommended MVP chain order from Checkpoint 1: **Base first**, **Arbitrum second
   - indexer API (`service.indexer.api`)
   - explorer (`service.explorer.server`)
   - control panel web (`service.control_panel.web`)
+  - resolution service (`service.resolution.service`)
   - sweeper daemon (`service.indexer.sweeper --loop`)
 - TLS reverse proxy + DNS (if public URLs are used).
 - Logs retained for all services.

@@ -1,0 +1,8 @@
+{
+  "_comment": "Map wager address -> decision. action: resolve|retract. For resolve include outcomeIndex.",
+  "0x0000000000000000000000000000000000000000": {
+    "action": "resolve",
+    "outcomeIndex": 0,
+    "note": "example only; replace with real wagers"
+  }
+}

@@ -5,6 +5,7 @@ Service layer components:
 - `indexer/` — deterministic chain event indexer + JSON API.
 - `explorer/` — web explorer for wager status, backed by indexer API.
 - `control_panel/` — operator controls (CLI + web) for full wager lifecycle roles.
+- `resolution/` — delegated resolver service (decision-file driven resolve/retract operations).
 
 ## Explorer
 
@@ -101,6 +102,25 @@ python3 -m service.indexer.sweeper \
   --interval-seconds 60
 ```
 
+## Resolution service
+
+Run locally:
+
+```bash
+PYTHONPATH=. python3 -m service.resolution.service \
+  --indexer-base-url "http://127.0.0.1:8090" \
+  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
+  --private-key "$PRIVATE_KEY" \
+  --resolver-address "0xYourResolverAddress" \
+  --port 8093
+```
+
+Then:
+
+- `GET /candidates` to inspect actionable wagers for this resolver.
+- `POST /run-once` with `{"execute":false}` for dry-run previews.
+- `POST /run-once` with `{"execute":true}` to broadcast.
+
 ## Launch shortcut
 
 Use the full launch helper from repo root:
@@ -123,4 +143,5 @@ PYTHONPATH=. python3 -m unittest discover -s service/indexer/tests -p "test_*.py
 PYTHONPATH=. python3 -m unittest discover -s service/explorer/tests -p "test_*.py" -q
 PYTHONPATH=. python3 -m unittest discover -s service/control_panel/tests -p "test_*.py" -q
 PYTHONPATH=. python3 -m unittest discover -s service/indexer/tests -p "test_sweeper.py" -q
+PYTHONPATH=. python3 -m unittest discover -s service/resolution/tests -p "test_*.py" -q
 ```
