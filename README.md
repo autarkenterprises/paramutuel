@@ -26,6 +26,8 @@ This section is for an arbitrary user who clones the repo and wants to interact 
 - Base Sepolia test ETH
 - Base Sepolia test USDC (for funded bet flows)
 
+**Wallets (browser UIs):** The static dApp (`dapp/`) and the simplified **Place a bet** page (`site/bet.html`) connect through **EIP-1193**: they use `ethers.BrowserProvider` with an injected provider (`window.ethereum`). Any wallet that exposes a compliant provider works (for example MetaMask, Rabby, Coinbase Wallet, Brave Wallet, Frame). If several extensions register under `ethereum.providers[]`, the app prefers the first entry that implements `request`. **WalletConnect** and other non-injected flows are not included in the default static build; add a connector library if you need those. At the protocol level, anything that can sign transactions against the deployed contracts (Foundry `cast`, multisigs, automated services) is supported.
+
 ### 2) Clone and build
 
 ```bash

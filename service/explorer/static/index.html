@@ -24,6 +24,7 @@
         <button id="searchBtn">Search</button>
         <button id="refresh">Refresh</button>
         <button id="loadMore">Load More</button>
+        <label class="auto-refresh-label"><input type="checkbox" id="autoRefresh" checked /> Auto-refresh 45s</label>
       </div>
       <details class="field-controls">
         <summary>Field visibility and details</summary>
@@ -39,7 +40,10 @@
           </label>
         </div>
       </details>
-      <div id="resultMeta" class="muted"></div>
+      <div class="indexer-status-row">
+        <div id="resultMeta" class="muted"></div>
+        <div id="indexerBusy" class="indexer-busy" role="status" aria-live="polite"></div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel — Place a bet</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav>
+    <span class="logo">Paramutuel</span>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="app.html">App</a>
+      <a href="bet.html" class="active">Place a bet</a>
+      <a href="explorer.html">Explorer</a>
+      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+    </div>
+  </nav>
+
+  <div class="container bet-page">
+    <section class="card" id="betIntro">
+      <h1>Place a bet</h1>
+      <p class="muted" id="betIntroText">
+        Open this page from the home ticker or Explorer (wager link) with <code>?wager=0x…</code>, or paste an address below.
+      </p>
+      <div class="bet-paste-row">
+        <label class="bet-paste-label">
+          Wager contract address
+          <input type="text" id="wagerAddressInput" placeholder="0x…" autocomplete="off" spellcheck="false" />
+        </label>
+        <button type="button" class="btn btn-primary" id="loadWagerBtn">Load wager</button>
+      </div>
+    </section>
+
+    <div id="betLoadPanel" class="card bet-load-panel" hidden>
+      <div class="load-indicator-block" id="betLoadingBlock" role="status" aria-live="polite">
+        <span class="load-spinner" aria-hidden="true"></span>
+        <span id="betLoadingText">Fetching wager from indexer…</span>
+      </div>
+    </div>
+
+    <section class="card" id="betError" hidden>
+      <h2>Could not load wager</h2>
+      <p id="betErrorText" class="muted"></p>
+    </section>
+
+    <section class="card" id="betSummary" hidden>
+      <h2>Wager</h2>
+      <p id="betProposition" class="bet-proposition"></p>
+      <dl class="network-info bet-summary-dl">
+        <div><dt>State</dt><dd id="betState"></dd></div>
+        <div><dt>Collateral (ERC-20)</dt><dd><code id="betCollateral"></code></dd></div>
+        <div><dt>Total pot (raw)</dt><dd id="betPot"></dd></div>
+        <div><dt>Contract</dt><dd><a id="betBasescan" href="#" target="_blank" rel="noopener noreferrer">Basescan</a></dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="betFormSection" hidden>
+      <h2>Your stakes</h2>
+      <p class="muted">
+        Enter a token amount next to each outcome you want to back (human units, e.g. <code>10</code> USDC). At least one positive amount is required. Uses the same <code>placeBets</code> batch call as the full dApp.
+      </p>
+      <div class="bet-wallet-row">
+        <button type="button" class="btn btn-primary" id="betConnectBtn">Connect wallet</button>
+        <span id="betWalletAddr" class="muted">Not connected</span>
+      </div>
+      <p id="betNetworkStatus" class="muted"></p>
+
+      <div class="bet-decimals-row">
+        <label class="bet-check">
+          <input type="checkbox" id="betDecimalsManual" />
+          Manual token decimals
+        </label>
+        <input type="number" id="betDecimals" min="0" max="77" value="6" class="bet-decimals-input" />
+      </div>
+      <p id="betDecimalsHint" class="muted"></p>
+
+      <div id="betOutcomeRows" class="bet-outcome-rows"></div>
+
+      <div class="bet-actions">
+        <button type="button" class="btn btn-primary" id="betSubmitBtn" disabled>Approve &amp; place bets</button>
+      </div>
+      <p id="betTxStatus" class="muted" role="status" aria-live="polite"></p>
+      <p class="muted bet-more">
+        <a href="app.html">Full dApp</a> for create, resolve, claim, and odds preview.
+      </p>
+    </section>
+  </div>
+
+  <footer>
+    Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="bet-page.js" defer></script>
+</body>
+</html>

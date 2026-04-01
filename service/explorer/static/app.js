@@ -11,6 +11,9 @@ let exhausted = false;
 let includeRowDetails = true;
 let lastIndexerHint = "";
 
+let loadGeneration = 0;
+let pollTimer = null;
+
 const FIELD_DEFS = [
   { key: "wager_address", label: "Wager", core: true },
   { key: "state", label: "State", core: true },
@@ -194,6 +197,22 @@ async function loadConfiguredFactoryAddress() {
   }
 }
 
+function renderWagerCells(m, fields) {
+  return fields
+    .map((f) => {
+      const v = getFieldValue(m, f.key);
+      if (f.key === "wager_address" && v) {
+        const addr = String(v).trim();
+        const enc = encodeURIComponent(addr);
+        return `<td class="wager-cell"><a class="bet-link" href="../bet.html?wager=${enc}" title="Open simplified bet page">Bet</a> <code>${escapeHtml(
+          addr
+        )}</code></td>`;
+      }
+      return `<td>${formatFieldValue(f.key, v)}</td>`;
+    })
+    .join("");
+}
+
 function renderWagers(wagers, { append = false } = {}) {
   const tbody = document.getElementById("wagers");
   const fields = selectedFields();
@@ -203,9 +222,7 @@ function renderWagers(wagers, { append = false } = {}) {
   }
   for (const m of wagers) {
     const tr = document.createElement("tr");
-    tr.innerHTML = fields
-      .map((f) => `<td>${formatFieldValue(f.key, getFieldValue(m, f.key))}</td>`)
-      .join("");
+    tr.innerHTML = renderWagerCells(m, fields);
     tbody.appendChild(tr);
     if (includeRowDetails) {
       const detailsRow = document.createElement("tr");
@@ -226,11 +243,32 @@ function renderWagers(wagers, { append = false } = {}) {
   }
 }
 
+function setIndexerBusy(message) {
+  const el = document.getElementById("indexerBusy");
+  if (el) el.textContent = message || "";
+}
+
+function syncAutoRefresh() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  const el = document.getElementById("autoRefresh");
+  if (!el || !el.checked) return;
+  pollTimer = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      loadWagers({ append: false }).catch((e) => console.error(e));
+    }
+  }, 45000);
+}
+
 async function loadWagers({ append = false } = {}) {
+  const gen = ++loadGeneration;
   const tbody = document.getElementById("wagers");
   const apiNode = document.getElementById("apiBaseDisplay");
   const queryText = (document.getElementById("wagerSearch")?.value || "").trim();
   const order = document.getElementById("wagerOrder")?.value || "desc";
+  const colspan = Math.max(1, selectedFields().length);
   if (!append) {
     currentOffset = 0;
     exhausted = false;
@@ -241,6 +279,10 @@ async function loadWagers({ append = false } = {}) {
     apiNode.textContent = API_BASE_NORMALIZED || "same origin";
   }
   setLoadMoreEnabled(false);
+  if (!append) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}"><span class="load-indicator"><span class="load-spinner" aria-hidden="true"></span> Fetching from indexer…</span></td></tr>`;
+    setIndexerBusy("Loading…");
+  }
   let res;
   try {
     res = await fetchWagers({
@@ -250,24 +292,27 @@ async function loadWagers({ append = false } = {}) {
       offset: currentOffset,
     });
   } catch (e) {
+    if (gen !== loadGeneration) return;
     lastIndexerHint = "";
-    tbody.innerHTML = `<tr><td colspan="${Math.max(
-      1,
-      selectedFields().length
-    )}">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>`;
+    if (!append) {
+      tbody.innerHTML = `<tr><td colspan="${colspan}">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>`;
+    }
+    setIndexerBusy("");
     updateResultMeta();
     return;
   }
   if (!res.ok) {
+    if (gen !== loadGeneration) return;
     lastIndexerHint = "";
-    tbody.innerHTML = `<tr><td colspan="${Math.max(
-      1,
-      selectedFields().length
-    )}">Indexer returned ${res.status}.</td></tr>`;
+    if (!append) {
+      tbody.innerHTML = `<tr><td colspan="${colspan}">Indexer returned ${res.status}.</td></tr>`;
+    }
+    setIndexerBusy("");
     updateResultMeta();
     return;
   }
   const data = await res.json();
+  if (gen !== loadGeneration) return;
   const wagers = data.wagers || [];
   lastIndexerHint = "";
   if (!append && wagers.length === 0 && API_BASE_NORMALIZED) {
@@ -305,13 +350,24 @@ async function loadWagers({ append = false } = {}) {
   currentOffset += wagers.length;
   exhausted = wagers.length < PAGE_SIZE;
   setLoadMoreEnabled(!exhausted);
+  setIndexerBusy("");
   updateResultMeta();
 }
+
+document.getElementById("autoRefresh")?.addEventListener("change", () => syncAutoRefresh());
 
 document.getElementById("refresh").addEventListener("click", () => {
   loadWagers({ append: false }).catch((e) => {
     console.error(e);
   });
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  const el = document.getElementById("autoRefresh");
+  if (el?.checked) {
+    loadWagers({ append: false }).catch((e) => console.error(e));
+  }
 });
 document.getElementById("searchBtn").addEventListener("click", () => {
   loadWagers({ append: false }).catch((e) => {
@@ -342,6 +398,8 @@ renderHeader();
 loadWagers({ append: false }).catch((e) => {
   console.error(e);
 });
+
+syncAutoRefresh();
 
 loadConfiguredFactoryAddress().catch((e) => {
   console.error(e);

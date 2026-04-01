@@ -77,6 +77,79 @@ button {
   margin: 8px 0 10px;
 }
 
+.indexer-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin: 8px 0 10px;
+}
+
+.indexer-busy {
+  font-size: 13px;
+  color: #79b8ff;
+  min-height: 1.2em;
+}
+
+.load-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #97a6c4;
+}
+
+.load-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #2c3a5a;
+  border-top-color: #79b8ff;
+  border-radius: 50%;
+  animation: explorer-spin 0.7s linear infinite;
+}
+
+@keyframes explorer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .load-spinner {
+    animation: none;
+    border-top-color: #2c3a5a;
+  }
+}
+
+.auto-refresh-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #97a6c4;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-refresh-label input {
+  accent-color: #2f6feb;
+}
+
+.bet-link {
+  color: #79b8ff;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.bet-link:hover {
+  text-decoration: underline;
+}
+
+.wager-cell code {
+  font-size: 12px;
+  word-break: break-all;
+}
+
 .field-controls {
   margin: 8px 0 12px;
   border: 1px solid #2c3a5a;

@@ -193,6 +193,54 @@ nav .links a.external {
   gap: 0;
 }
 
+.ticker-viewport.ticker-updating .ticker-track {
+  opacity: 0.82;
+}
+
+.ticker-skeleton-item {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 28px 12px 0;
+  margin-right: 8px;
+  border-right: 1px solid #2a3a58;
+  min-width: 260px;
+}
+
+.ticker-sk-line {
+  display: block;
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #1c2640 0%, #2a3f66 50%, #1c2640 100%);
+  background-size: 200% 100%;
+  animation: ticker-shimmer 1.2s ease-in-out infinite;
+}
+
+.ticker-sk-a {
+  width: 85%;
+}
+
+.ticker-sk-b {
+  width: 60%;
+}
+
+@keyframes ticker-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-sk-line {
+    animation: none;
+    background: #1c2640;
+  }
+}
+
 .ticker-animate .ticker-track {
   animation: ticker-scroll 55s linear infinite;
 }
@@ -220,16 +268,24 @@ nav .links a.external {
   }
 }
 
-.ticker-item {
+.ticker-item-wrap {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px 28px 8px 0;
+  flex-direction: row;
+  align-items: stretch;
   margin-right: 8px;
   border-right: 1px solid #2a3a58;
   min-width: 260px;
-  max-width: 340px;
+  max-width: 360px;
+}
+
+.ticker-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 8px 0;
+  min-width: 0;
   text-decoration: none;
   color: #e6edf3;
   transition: opacity 0.15s;
@@ -237,6 +293,22 @@ nav .links a.external {
 
 .ticker-item:hover {
   opacity: 0.88;
+  text-decoration: none;
+}
+
+.ticker-item-chain {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 14px;
+  color: #6e7a94;
+  text-decoration: none;
+  border-left: 1px solid #23304a;
+}
+
+.ticker-item-chain:hover {
+  color: #79b8ff;
   text-decoration: none;
 }
 
@@ -307,10 +379,203 @@ nav .links a.external {
     mask-image: none;
     -webkit-mask-image: none;
   }
-  .ticker-item {
+  .ticker-item-wrap {
     min-width: 220px;
-    max-width: 280px;
+    max-width: 300px;
   }
+}
+
+/* ── Advantages / use cases ── */
+
+.advantages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.advantages-grid h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.advantages-grid ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #97a6c4;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.advantages-grid li {
+  margin-bottom: 8px;
+}
+
+/* ── Place a bet page ── */
+
+.bet-page .card {
+  margin-bottom: 16px;
+}
+
+.bet-paste-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+
+.bet-paste-label {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: #97a6c4;
+}
+
+.bet-paste-label input {
+  background: #0b0f19;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.bet-proposition {
+  font-size: 17px;
+  line-height: 1.5;
+  color: #e6edf3;
+  margin: 0 0 12px;
+}
+
+.bet-summary-dl {
+  margin: 0;
+}
+
+.bet-load-panel {
+  padding: 20px 16px;
+}
+
+.load-indicator-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #97a6c4;
+  font-size: 14px;
+}
+
+.load-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #2c3a5a;
+  border-top-color: #79b8ff;
+  border-radius: 50%;
+  animation: site-spin 0.75s linear infinite;
+}
+
+@keyframes site-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .load-spinner {
+    animation: none;
+    border-top-color: #2c3a5a;
+  }
+}
+
+.bet-wallet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 8px;
+}
+
+.bet-decimals-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.bet-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #97a6c4;
+  cursor: pointer;
+}
+
+.bet-decimals-input {
+  width: 72px;
+  background: #0b0f19;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.bet-outcome-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.bet-outcome-row {
+  background: #0b0f19;
+  border: 1px solid #23304a;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.bet-outcome-label {
+  display: grid;
+  grid-template-columns: 1fr auto minmax(120px, 160px);
+  gap: 12px;
+  align-items: center;
+  font-size: 15px;
+  color: #e6edf3;
+}
+
+@media (max-width: 640px) {
+  .bet-outcome-label {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bet-outcome-name {
+  font-weight: 600;
+}
+
+.bet-amount-input {
+  background: #121a2a;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 15px;
+}
+
+.bet-actions {
+  margin-top: 8px;
+}
+
+.bet-more {
+  margin-top: 16px;
+}
+
+.bet-more a {
+  color: #79b8ff;
 }
 
 /* ── Onboarding ── */

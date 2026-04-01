@@ -3,6 +3,21 @@
 // The UMD bundle exposes `ethers` on `globalThis`.
 const ethers = globalThis.ethers;
 
+/**
+ * Prefer a single EIP-1193 provider. Some browsers aggregate multiple wallets under
+ * `ethereum.providers[]`; we pick the first entry that implements `request`.
+ * Any wallet that injects a standards-compliant provider works with this dApp.
+ */
+function resolveEip1193Provider() {
+  const eth = globalThis.ethereum;
+  if (!eth) return null;
+  if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+    const withRequest = eth.providers.find((p) => p && typeof p.request === "function");
+    return withRequest || eth.providers[0];
+  }
+  return eth;
+}
+
 const FACTORY_ABI_URL = "abi/ParamutuelFactory.json";
 const FACTORY_ABI_FALLBACK = "../out/ParamutuelFactory.sol/ParamutuelFactory.json";
 const WAGER_ABI_URL = "abi/ParamutuelWager.json";
@@ -500,9 +515,14 @@ async function loadAbi() {
 }
 
 async function connectWallet() {
-  if (!window.ethereum) throw new Error("No window.ethereum found (install MetaMask).");
+  const eip1193 = resolveEip1193Provider();
+  if (!eip1193 || typeof eip1193.request !== "function") {
+    throw new Error(
+      "No EIP-1193 wallet found. Use a browser extension (MetaMask, Rabby, Coinbase Wallet, Frame, …) or any wallet that injects a compliant `window.ethereum` provider."
+    );
+  }
 
-  provider = new ethers.BrowserProvider(window.ethereum);
+  provider = new ethers.BrowserProvider(eip1193);
   await provider.send("eth_requestAccounts", []);
   signer = await provider.getSigner();
   userAddress = await signer.getAddress();
@@ -512,15 +532,16 @@ async function connectWallet() {
   $("walletStatus").textContent = "Connected.";
   await tryDetectDecimalsFromCollateralField();
 
-  if (!walletListenersAttached && window.ethereum && window.ethereum.on) {
-    window.ethereum.on("chainChanged", async () => {
-      provider = new ethers.BrowserProvider(window.ethereum);
+  if (!walletListenersAttached && typeof eip1193.on === "function") {
+    eip1193.on("chainChanged", async () => {
+      const next = resolveEip1193Provider() || eip1193;
+      provider = new ethers.BrowserProvider(next);
       signer = await provider.getSigner();
       await refreshConnectedNetwork();
       $("walletStatus").textContent = "Network changed. Review factory/token before transacting.";
       await tryDetectDecimalsFromCollateralField();
     });
-    window.ethereum.on("accountsChanged", async () => {
+    eip1193.on("accountsChanged", async () => {
       if (!provider) return;
       signer = await provider.getSigner();
       userAddress = await signer.getAddress();
@@ -638,7 +659,7 @@ async function createWager() {
       throw new Error(
         `Selected token preset is for ${chainName(preset.chainId)}, but wallet is on ${chainName(
           currentChainId
-        )}. Switch MetaMask to ${chainName(preset.chainId)} and retry.`
+        )}. Switch your wallet to ${chainName(preset.chainId)} and retry.`
       );
     }
   }

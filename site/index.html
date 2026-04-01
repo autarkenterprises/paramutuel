@@ -12,6 +12,7 @@
     <div class="links">
       <a href="index.html" class="active">Home</a>
       <a href="app.html">App</a>
+      <a href="bet.html">Place a bet</a>
       <a href="explorer.html">Explorer</a>
       <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
     </div>
@@ -52,12 +53,12 @@
           <span>Fund the wallet with Sepolia ETH on Base for gas. For betting, use the ERC-20 shown in the app for each wager (USDC-style presets exist in the dApp). Amounts in the feed are <strong>raw token units</strong> (smallest decimals).</span>
         </li>
         <li>
-          <strong>Open the app</strong>
-          <span><a href="app.html">Launch App</a> &rarr; connect your wallet &rarr; create a wager or stake on an open market. Batch bets and odds preview are in the dApp.</span>
+          <strong>Stake on a market</strong>
+          <span>Use the <a href="bet.html">Place a bet</a> page (from the live feed or Explorer) for a short path: connect wallet, enter amounts per outcome, approve once, and submit <code>placeBets</code>. Or use the full <a href="app.html">dApp</a> for create, odds preview, resolve, and claim.</span>
         </li>
         <li>
           <strong>Inspect &amp; verify</strong>
-          <span>Use <a href="explorer.html">Explorer</a> against the indexer to search propositions and contract fields. Use <a href="https://sepolia.basescan.org">Basescan (Base Sepolia)</a> to verify contract code and transactions.</span>
+          <span>Use <a href="explorer.html">Explorer</a> (auto-refreshes while the tab is visible) to search propositions and open the bet page from any wager row. Use <a href="https://sepolia.basescan.org">Basescan (Base Sepolia)</a> to verify contract code and transactions.</span>
         </li>
         <li>
           <strong>Risks</strong>
@@ -80,6 +81,35 @@
         <p>Wagers resolve to a winning outcome, retract (refund minus fees), or expire if unresolved. Winners claim pro-rata payouts from the net pot.</p>
       </div>
     </div>
+
+    <section class="card" style="margin-top: 32px;">
+      <h2>Why Paramutuel</h2>
+      <p class="onboarding-lead" style="margin-bottom: 16px;">
+        Transparent pools and clear rules on-chain: suitable whenever you want verifiable stakes, moving odds, and settlement without a centralized book.
+      </p>
+      <div class="advantages-grid">
+        <div>
+          <h3>Advantages</h3>
+          <ul>
+            <li><strong>Parimutuel math</strong> &mdash; all stakes go into one pot per market; implied odds reflect aggregate sentiment, not a house line.</li>
+            <li><strong>ERC-20 collateral</strong> &mdash; use standard tokens (e.g. USDC) per wager; amounts are enforced by contract logic.</li>
+            <li><strong>Composable lifecycle</strong> &mdash; factory-deployed wagers with configurable closers, resolution windows, and fee recipients (treasury + extras).</li>
+            <li><strong>Indexer + explorer</strong> &mdash; HTTP APIs and tables for bots, operators, and UIs; no bespoke scraping.</li>
+            <li><strong>Base-first</strong> &mdash; low-friction L2 environment aligned with retail and builder tooling (see repo research memos on chain choice).</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Use cases</h3>
+          <ul>
+            <li><strong>Prop and event markets</strong> &mdash; sports, elections, product launches, KPI bets between teams or communities.</li>
+            <li><strong>Long-horizon forecasts</strong> &mdash; templates for extended betting and resolution windows.</li>
+            <li><strong>Closer-managed windows</strong> &mdash; authority-driven close when fixed deadlines are a poor fit.</li>
+            <li><strong>Charity or beneficiary splits</strong> &mdash; fee configuration supports directing a share of the pot to treasuries or named recipients (within protocol caps).</li>
+            <li><strong>Integration &amp; automation</strong> &mdash; MCP/CLI workflows and resolution services for operators (see <code>docs/MACHINE.md</code>, <code>docs/WORKFLOWS.md</code>).</li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
     <div class="card" style="margin-top: 32px;">
       <h3>Network</h3>

@@ -2,9 +2,18 @@
   "use strict";
 
   const CONFIG_URL = "config/deployments.json";
-  const REFRESH_MS = 90_000;
+  const REFRESH_MS = 45_000;
   const LIST_LIMIT = 14;
   const OPEN_DETAIL_CAP = 8;
+
+  let runGeneration = 0;
+  let refreshTimer = null;
+
+  function betPageHref(wagerAddress) {
+    const a = String(wagerAddress || "").trim();
+    if (!a) return "#";
+    return `bet.html?wager=${encodeURIComponent(a)}`;
+  }
 
   function blockExplorerAddress(chainId, address) {
     const a = String(address || "").trim();
@@ -113,27 +122,52 @@
     }
   }
 
+  function showSkeleton(track) {
+    track.innerHTML = "";
+    for (let i = 0; i < 5; i++) {
+      const d = document.createElement("div");
+      d.className = "ticker-skeleton-item";
+      d.setAttribute("aria-hidden", "true");
+      d.innerHTML = '<span class="ticker-sk-line ticker-sk-a"></span><span class="ticker-sk-line ticker-sk-b"></span>';
+      track.appendChild(d);
+    }
+  }
+
   function renderItem(w, detailByAddr, chainId) {
     const labels = parseOutcomes(w.outcomes_json);
     const prop = truncate(w.proposition || "(no proposition)", 80);
     const state = String(w.state || "—").toLowerCase();
     const meta = stateMeta(w, detailByAddr, labels);
     const shortAddr = String(w.wager_address || "").slice(0, 10);
-    const href = blockExplorerAddress(chainId, w.wager_address);
+    const href = betPageHref(w.wager_address);
+    const bs = blockExplorerAddress(chainId, w.wager_address);
     const stateClass = (state.replace(/[^a-z0-9_-]/g, "") || "unknown").slice(0, 24);
 
-    const el = document.createElement("a");
-    el.className = "ticker-item";
-    el.href = href;
-    el.target = "_blank";
-    el.rel = "noopener noreferrer";
-    el.innerHTML = `
+    const wrap = document.createElement("div");
+    wrap.className = "ticker-item-wrap";
+
+    const main = document.createElement("a");
+    main.className = "ticker-item";
+    main.href = href;
+    main.innerHTML = `
       <span class="ticker-item-prop">${escapeHtml(prop)}</span>
       <span class="ticker-item-badge ticker-state-${escapeHtml(stateClass)}">${escapeHtml(state)}</span>
       <span class="ticker-item-meta">${escapeHtml(meta)}</span>
-      <span class="ticker-item-addr">${escapeHtml(shortAddr)}…</span>
+      <span class="ticker-item-addr">${escapeHtml(shortAddr)}… · Place a bet →</span>
     `;
-    return el;
+
+    const ext = document.createElement("a");
+    ext.className = "ticker-item-chain";
+    ext.href = bs;
+    ext.target = "_blank";
+    ext.rel = "noopener noreferrer";
+    ext.title = "View contract on block explorer";
+    ext.setAttribute("aria-label", "Block explorer");
+    ext.textContent = "↗";
+
+    wrap.appendChild(main);
+    wrap.appendChild(ext);
+    return wrap;
   }
 
   function escapeHtml(s) {
@@ -144,7 +178,16 @@
       .replace(/"/g, "&quot;");
   }
 
-  let refreshTimer = null;
+  function startRefreshLoop() {
+    if (refreshTimer != null) return;
+    refreshTimer = setInterval(() => {
+      if (document.visibilityState === "visible") run();
+    }, REFRESH_MS);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") run();
+  });
 
   async function run() {
     const track = document.getElementById("tickerTrack");
@@ -152,20 +195,37 @@
     const status = document.getElementById("tickerStatus");
     if (!track || !status || !viewport) return;
 
-    status.textContent = "Loading wagers…";
-    track.innerHTML = "";
+    const gen = ++runGeneration;
+
+    const hasLiveContent =
+      track.childElementCount > 0 && !track.querySelector(".ticker-skeleton-item");
     viewport.classList.remove("ticker-animate");
+    if (!hasLiveContent) {
+      showSkeleton(track);
+      status.textContent = "Contacting indexer…";
+    } else {
+      viewport.classList.add("ticker-updating");
+      status.textContent = "Refreshing odds and pool data…";
+    }
 
     let cfg;
     try {
       cfg = await loadDeployments();
     } catch {
+      if (gen !== runGeneration) return;
+      viewport.classList.remove("ticker-updating");
+      if (!hasLiveContent) track.innerHTML = "";
       status.textContent = "Add explorerApiBase in config/deployments.json to show live wagers.";
+      startRefreshLoop();
       return;
     }
 
     if (!cfg.apiBase) {
+      if (gen !== runGeneration) return;
+      viewport.classList.remove("ticker-updating");
+      if (!hasLiveContent) track.innerHTML = "";
       status.textContent = "No indexer URL configured for this network.";
+      startRefreshLoop();
       return;
     }
 
@@ -173,13 +233,21 @@
     try {
       body = await fetchJson(`${cfg.apiBase}/wagers?limit=${LIST_LIMIT}&order=desc`);
     } catch {
-      status.textContent = "Could not reach the indexer. Try again later.";
+      if (gen !== runGeneration) return;
+      viewport.classList.remove("ticker-updating");
+      if (!hasLiveContent) track.innerHTML = "";
+      status.textContent = "Indexer unreachable. Retrying on a timer while this tab is visible.";
+      startRefreshLoop();
       return;
     }
 
     const wagers = body?.wagers || [];
     if (!wagers.length) {
+      if (gen !== runGeneration) return;
+      viewport.classList.remove("ticker-updating");
+      track.innerHTML = "";
       status.textContent = "No wagers indexed yet. Create one in the app.";
+      startRefreshLoop();
       return;
     }
 
@@ -194,6 +262,10 @@
       if (details[i]) detailByAddr[a] = details[i];
     });
 
+    if (gen !== runGeneration) return;
+
+    viewport.classList.remove("ticker-updating");
+    track.innerHTML = "";
     wagers.forEach((w) => track.appendChild(renderItem(w, detailByAddr, cfg.chainId)));
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -203,11 +275,11 @@
       viewport.classList.add("ticker-animate");
     }
 
-    status.textContent = `${wagers.length} recent · open a row for Basescan · raw = token smallest units`;
+    status.textContent = `${wagers.length} recent · click a card to bet · ↗ block explorer · raw = smallest token units · auto-refresh ~${Math.round(
+      REFRESH_MS / 1000
+    )}s`;
 
-    if (!refreshTimer) {
-      refreshTimer = setInterval(run, REFRESH_MS);
-    }
+    startRefreshLoop();
   }
 
   if (document.readyState === "loading") {
