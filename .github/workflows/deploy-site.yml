@@ -51,7 +51,7 @@ jobs:
           "
 
           # Copy website shell
-          cp site/index.html site/app.html site/explorer.html site/style.css _site/
+          cp site/index.html site/app.html site/explorer.html site/style.css site/home-ticker.js _site/
           cp config/deployments.json _site/config/deployments.json
 
           # Copy dApp files

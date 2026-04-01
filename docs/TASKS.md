@@ -46,6 +46,12 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 
 ---
 
+## Return later: Resolution Service
+
+**Note:** Revisit Resolution Service follow-ups (auth hardening, automation/scheduling, integration tests, and operator runbooks) documented in `docs/RESOLUTION-SERVICE.md`.
+
+---
+
 ## Website-assisted UX (post-ADR-0006/0007)
 
 **Goal:** Ship a centralized assisted transaction path for non-power users without changing protocol contracts or regressing the advanced dApp.

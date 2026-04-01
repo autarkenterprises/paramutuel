@@ -26,7 +26,46 @@
     </div>
   </div>
 
+  <section class="ticker-section" aria-label="Recent wagers from the indexer">
+    <div class="ticker-bar">
+      <div class="ticker-label">Live feed</div>
+      <div class="ticker-viewport" id="tickerViewport">
+        <div class="ticker-track" id="tickerTrack"></div>
+      </div>
+    </div>
+    <p class="ticker-status" id="tickerStatus">Loading wagers…</p>
+  </section>
+
   <div class="container">
+    <section class="onboarding card">
+      <h2 class="onboarding-title">Get started</h2>
+      <p class="onboarding-lead">
+        Paramutuel is on-chain parimutuel betting: one pool per wager, odds move as people stake on outcomes, then the resolver settles and winners claim pro-rata.
+      </p>
+      <ol class="onboarding-steps">
+        <li>
+          <strong>Wallet &amp; network</strong>
+          <span>Install a browser wallet (e.g. MetaMask or Coinbase Wallet). Add <strong>Base Sepolia</strong> (chain ID 84532) so it matches the deployment shown below.</span>
+        </li>
+        <li>
+          <strong>Gas &amp; collateral</strong>
+          <span>Fund the wallet with Sepolia ETH on Base for gas. For betting, use the ERC-20 shown in the app for each wager (USDC-style presets exist in the dApp). Amounts in the feed are <strong>raw token units</strong> (smallest decimals).</span>
+        </li>
+        <li>
+          <strong>Open the app</strong>
+          <span><a href="app.html">Launch App</a> &rarr; connect your wallet &rarr; create a wager or stake on an open market. Batch bets and odds preview are in the dApp.</span>
+        </li>
+        <li>
+          <strong>Inspect &amp; verify</strong>
+          <span>Use <a href="explorer.html">Explorer</a> against the indexer to search propositions and contract fields. Use <a href="https://sepolia.basescan.org">Basescan (Base Sepolia)</a> to verify contract code and transactions.</span>
+        </li>
+        <li>
+          <strong>Risks</strong>
+          <span>Smart contracts and resolver decisions carry risk; only use funds you can afford to lose. Double-check factory and wager addresses before depositing.</span>
+        </li>
+      </ol>
+    </section>
+
     <div class="features">
       <div class="card">
         <h3>Create Wagers</h3>
@@ -78,6 +117,7 @@
   <footer>
     Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
   </footer>
+  <script src="home-ticker.js" defer></script>
   <script>
     (async () => {
       try {
