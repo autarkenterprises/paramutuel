@@ -16,7 +16,7 @@ contract DeployFactory is Script {
 
         // Configure these as desired for your deployment
         address treasury = vm.envAddress("TREASURY_ADDRESS");
-        uint16 protocolFeeBps = uint16(vm.envOr("PROTOCOL_FEE_BPS", uint256(200))); // default 2%
+        uint16 protocolFeeBps = uint16(vm.envOr("PROTOCOL_FEE_BPS", uint256(100))); // default 1% (see research/chain-and-fee-review.md)
         uint64 minBettingWindow = uint64(vm.envOr("MIN_BETTING_WINDOW", uint256(3600))); // 1 hour
         uint64 minResolutionWindow = uint64(vm.envOr("MIN_RESOLUTION_WINDOW", uint256(3600))); // 1 hour
 

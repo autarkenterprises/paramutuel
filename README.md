@@ -324,7 +324,7 @@ This MVP isolates resolution logic to per-wager functions so it can later be ext
 
   - Constructor parameters:
     - `treasury_`: address to receive protocol fees (e.g. DAO multisig).
-    - `protocolFeeBps_`: protocol fee in basis points (e.g. `200` = 2%).
+    - `protocolFeeBps_`: protocol fee in basis points (e.g. `100` = 1%; default in `DeployFactory.s.sol` / `launch_testnet.sh`).
     - `minBettingWindow_`: minimum seconds between creation and `bettingCloseTime`.
     - `minResolutionWindow_`: minimum resolution window length in seconds.
 

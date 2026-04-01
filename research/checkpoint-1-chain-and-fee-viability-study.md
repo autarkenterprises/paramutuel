@@ -46,7 +46,7 @@ Decision rule: pick chain with best weighted score that satisfies liquidity + UX
 
 ## B) Fee recommendation framework
 
-Initial protocol fee BPS candidates: `100`, `200`, `300` (or alternatives).
+**Adopted protocol fee default:** **100 bps** everywhere in-repo (`DeployFactory.s.sol`, `launch_testnet.sh`, tests). Sensitivity tables in `chain-and-fee-review.md` may reference other **total** fee bundles or competitor benchmarks; they are not alternate protocol defaults.
 
 For each candidate fee:
 

@@ -90,7 +90,7 @@ contract ParamutuelTest is Test {
     address extraFeeRecipient = address(0x5000);
     address delegatedResolver = address(0x8888);
 
-    uint16 protocolFeeBps = 200; // 2%
+    uint16 protocolFeeBps = 100; // 1% treasury protocol fee (aligns with chain-and-fee-review default)
     uint64 minBettingWindow = 1 hours;
     uint64 minResolutionWindow = 1 hours;
 
@@ -119,7 +119,7 @@ contract ParamutuelTest is Test {
         address[] memory extraRecipients = new address[](1);
         extraRecipients[0] = extraFeeRecipient;
         uint16[] memory extraBps = new uint16[](1);
-        extraBps[0] = 300; // 3%, combined with 2% protocol => 5% total
+        extraBps[0] = 300; // 3%, combined with 1% protocol => 4% total
 
         vm.prank(proposer);
         address wagerAddr = factory.createWager(
@@ -386,24 +386,23 @@ contract ParamutuelTest is Test {
         wager.resolve(1);
 
         // total pot = 400
-        // total fee = 5% = 20
-        // net pot = 380, all to NO bettors (bettor2 with 300 stake)
+        // total fee = 4% (1% protocol + 3% extra) = 16
+        // net pot = 384, all to NO bettors (bettor2 with 300 stake)
         uint256 before = token.balanceOf(bettor2);
         vm.prank(bettor2);
         uint256 paid = wager.claim();
         uint256 afterBal = token.balanceOf(bettor2);
 
-        assertEq(paid, 380 ether, "paid");
-        assertEq(afterBal - before, 380 ether, "balance delta");
+        assertEq(paid, 384 ether, "paid");
+        assertEq(afterBal - before, 384 ether, "balance delta");
 
         // Bettor1 loses and gets nothing
         vm.expectRevert(ParamutuelWager.NothingToClaim.selector);
         vm.prank(bettor1);
         wager.claim();
 
-        // Fees: 20 total, split 2:3 between treasury and extraFeeRecipient
-        // Protocol (2/5 of 20 = 8), extra (12)
-        assertEq(wager.feeBalances(treasury), 8 ether, "treasury fee balance");
+        // Fees: 16 total, split 1:3 between treasury and extraFeeRecipient (same ratio as bps)
+        assertEq(wager.feeBalances(treasury), 4 ether, "treasury fee balance");
         assertEq(wager.feeBalances(extraFeeRecipient), 12 ether, "extra fee balance");
     }
 
@@ -428,9 +427,9 @@ contract ParamutuelTest is Test {
         vm.prank(proposer);
         wager.retract();
 
-        // total pot = 400, total fee 5% = 20
-        // bettor1 stake 100 -> fee 5 = refund 95
-        // bettor2 stake 300 -> fee 15 = refund 285
+        // total pot = 400, total fee 4% = 16
+        // bettor1 stake 100 -> fee 4 = refund 96
+        // bettor2 stake 300 -> fee 12 = refund 288
         vm.startPrank(bettor1);
         uint256 before1 = token.balanceOf(bettor1);
         uint256 paid1 = wager.claim();
@@ -443,19 +442,20 @@ contract ParamutuelTest is Test {
         uint256 after2 = token.balanceOf(bettor2);
         vm.stopPrank();
 
-        assertEq(paid1, 95 ether);
-        assertEq(after1 - before1, 95 ether);
+        assertEq(paid1, 96 ether);
+        assertEq(after1 - before1, 96 ether);
 
-        assertEq(paid2, 285 ether);
-        assertEq(after2 - before2, 285 ether);
+        assertEq(paid2, 288 ether);
+        assertEq(after2 - before2, 288 ether);
     }
 
     function testRetractRoundingCannotOverpayAndBreakFeeWithdrawals() public {
         ParamutuelWager wager = _createBasicWager();
 
-        // 5% fee wager, low-denomination stakes expose floor-rounding edge cases.
+        // 4% fee wager (1% protocol + 3% extra); low-denomination stakes expose floor-rounding edge cases.
+        // Total stake must be >= 25 wei so pot * 400 bps >= 1 wei fee accrual.
         uint256 amount1 = 1;
-        uint256 amount2 = 19;
+        uint256 amount2 = 24;
 
         vm.startPrank(bettor1);
         token.approve(address(wager), amount1);
@@ -510,15 +510,15 @@ contract ParamutuelTest is Test {
         vm.prank(address(0xDEAD));
         wager.expire();
 
-        // Single bettor receives refund minus fee (5)
+        // Single bettor receives refund minus fee (4% of 100)
         vm.startPrank(bettor1);
         uint256 before = token.balanceOf(bettor1);
         uint256 paid = wager.claim();
         uint256 afterBal = token.balanceOf(bettor1);
         vm.stopPrank();
 
-        assertEq(paid, 95 ether);
-        assertEq(afterBal - before, 95 ether);
+        assertEq(paid, 96 ether);
+        assertEq(afterBal - before, 96 ether);
     }
 
     function testCannotBetAfterCloseOrResolveBeforeClose() public {
@@ -704,7 +704,7 @@ contract ParamutuelTest is Test {
         address[] memory extraRecipients = new address[](1);
         extraRecipients[0] = extraFeeRecipient;
         uint16[] memory extraBps = new uint16[](1);
-        extraBps[0] = 300; // 3% extra, 2% protocol -> 5% total
+        extraBps[0] = 300; // 3% extra, 1% protocol -> 4% total
 
         vm.prank(proposer);
         address wagerAddr = factory.createWager(
@@ -733,13 +733,13 @@ contract ParamutuelTest is Test {
         // outcome1 = 50
         // outcome2 = 200
         // totalPot = 350
-        // fees = 5% => 17.5
-        // netPot = 332.5
+        // fees = 4% => 14
+        // netPot = 336
         //
         // Suppose outcome2 wins:
         // totalWinningStake = 200
-        // bettor3 stake 150 -> 150/200 * 332.5 = 249.375
-        // bettor4 stake 50  -> 50/200 * 332.5 = 83.125
+        // bettor3 stake 150 -> 150/200 * 336 = 252
+        // bettor4 stake 50  -> 50/200 * 336 = 84
 
         vm.startPrank(bettor1);
         token.approve(address(wager), 100 ether);
@@ -783,13 +783,11 @@ contract ParamutuelTest is Test {
         uint256 b4After = token.balanceOf(bettor4);
         vm.stopPrank();
 
-        // Use approximate checks due to fractional payouts (forge-std's assertApproxEqAbs)
-        // Expected: 249.375 and 83.125
-        assertApproxEqAbs(paid3, 249.375 ether, 1 wei, "bettor3 payout");
-        assertApproxEqAbs(b3After - b3Before, 249.375 ether, 1 wei, "bettor3 balance delta");
+        assertApproxEqAbs(paid3, 252 ether, 1 wei, "bettor3 payout");
+        assertApproxEqAbs(b3After - b3Before, 252 ether, 1 wei, "bettor3 balance delta");
 
-        assertApproxEqAbs(paid4, 83.125 ether, 1 wei, "bettor4 payout");
-        assertApproxEqAbs(b4After - b4Before, 83.125 ether, 1 wei, "bettor4 balance delta");
+        assertApproxEqAbs(paid4, 84 ether, 1 wei, "bettor4 payout");
+        assertApproxEqAbs(b4After - b4Before, 84 ether, 1 wei, "bettor4 balance delta");
 
         // Losing bettors get NothingToClaim
         vm.expectRevert(ParamutuelWager.NothingToClaim.selector);
@@ -953,11 +951,11 @@ contract ParamutuelTest is Test {
         uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
         uint64 resolutionWindow = 2 hours;
 
-        // protocolFeeBps = 200; extra 9900 => 10100 > MAX_TOTAL_FEE_BPS (10000)
+        // protocolFeeBps = 100; extra 9901 => 10001 > MAX_TOTAL_FEE_BPS (10000)
         address[] memory extraRecipients = new address[](1);
         extraRecipients[0] = extraFeeRecipient;
         uint16[] memory extraBps = new uint16[](1);
-        extraBps[0] = 9900;
+        extraBps[0] = 9901;
 
         vm.expectRevert(ParamutuelFactory.BadFeeConfig.selector);
         vm.prank(proposer);
@@ -989,11 +987,11 @@ contract ParamutuelTest is Test {
         uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
         uint64 resolutionWindow = 2 hours;
 
-        // protocolFeeBps = 200, extra 9800 => 10000 total (100%).
+        // protocolFeeBps = 100, extra 9900 => 10000 total (100%).
         address[] memory extraRecipients = new address[](1);
         extraRecipients[0] = extraFeeRecipient;
         uint16[] memory extraBps = new uint16[](1);
-        extraBps[0] = 9800;
+        extraBps[0] = 9900;
 
         vm.prank(proposer);
         address wagerAddr = factory.createWager(
@@ -1030,20 +1028,20 @@ contract ParamutuelTest is Test {
         uint256 winnerAfter = token.balanceOf(bettor1);
         assertEq(winnerAfter - winnerBefore, 0, "winner payout must be zero at 100% fees");
 
-        assertEq(wager.feeBalances(treasury), 3 ether, "treasury gets 2%");
-        assertEq(wager.feeBalances(extraFeeRecipient), 147 ether, "beneficiary gets 98%");
+        assertEq(wager.feeBalances(treasury), 1.5 ether, "treasury gets 1% of pot");
+        assertEq(wager.feeBalances(extraFeeRecipient), 148.5 ether, "beneficiary gets remainder of 100% fees");
 
         uint256 treasuryBefore = token.balanceOf(treasury);
         vm.prank(treasury);
         wager.withdrawFees();
         uint256 treasuryAfter = token.balanceOf(treasury);
-        assertEq(treasuryAfter - treasuryBefore, 3 ether);
+        assertEq(treasuryAfter - treasuryBefore, 1.5 ether);
 
         uint256 beneficiaryBefore = token.balanceOf(extraFeeRecipient);
         vm.prank(extraFeeRecipient);
         wager.withdrawFees();
         uint256 beneficiaryAfter = token.balanceOf(extraFeeRecipient);
-        assertEq(beneficiaryAfter - beneficiaryBefore, 147 ether);
+        assertEq(beneficiaryAfter - beneficiaryBefore, 148.5 ether);
 
         assertEq(token.balanceOf(address(wager)), 0, "all funds disbursed");
     }
@@ -1059,7 +1057,7 @@ contract ParamutuelTest is Test {
         address[] memory extraRecipients = new address[](1);
         extraRecipients[0] = extraFeeRecipient;
         uint16[] memory extraBps = new uint16[](1);
-        extraBps[0] = 9800;
+        extraBps[0] = 9900;
 
         vm.prank(proposer);
         address wagerAddr = factory.createWager(
@@ -1100,8 +1098,8 @@ contract ParamutuelTest is Test {
         wager.claim();
         assertEq(token.balanceOf(bettor2) - b2Before, 0, "retract claim must be zero at 100% fees");
 
-        assertEq(wager.feeBalances(treasury), 2 ether, "treasury gets 2%");
-        assertEq(wager.feeBalances(extraFeeRecipient), 98 ether, "beneficiary gets 98%");
+        assertEq(wager.feeBalances(treasury), 1 ether, "treasury gets 1% of pot");
+        assertEq(wager.feeBalances(extraFeeRecipient), 99 ether, "beneficiary gets remainder of 100% fees");
     }
 
     function testTooManyOutcomesReverts() public {
@@ -1252,8 +1250,8 @@ contract ParamutuelTest is Test {
         vm.startPrank(bettor1);
         uint256 paid = wager.claim();
         vm.stopPrank();
-        // Protocol fee 2% on factory => net pot 49 ether to sole winner
-        assertEq(paid, 49 ether);
+        // Protocol fee 1% on factory => net pot 49.5 ether to sole winner (50 - 0.5 fee)
+        assertEq(paid, 49.5 ether);
     }
 
     function testAlreadyFinalizedRevertsForResolveRetractExpire() public {
@@ -1315,14 +1313,14 @@ contract ParamutuelTest is Test {
         vm.prank(proposer);
         wager.resolve(1);
 
-        assertEq(wager.feeBalances(treasury), 4 ether);
+        assertEq(wager.feeBalances(treasury), 2 ether);
 
         vm.startPrank(treasury);
         uint256 before = token.balanceOf(treasury);
         uint256 withdrawn = wager.withdrawFees();
         uint256 afterBal = token.balanceOf(treasury);
-        assertEq(withdrawn, 4 ether);
-        assertEq(afterBal - before, 4 ether);
+        assertEq(withdrawn, 2 ether);
+        assertEq(afterBal - before, 2 ether);
 
         vm.expectRevert(ParamutuelWager.NothingToClaim.selector);
         wager.withdrawFees();

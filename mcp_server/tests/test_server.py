@@ -85,22 +85,22 @@ class TestOdds(unittest.TestCase):
         result = _compute_odds(
             total_pot=1_000_000,
             outcome_total=400_000,
-            total_fee_bps=200,
+            total_fee_bps=100,
             bet_amount=100_000,
         )
         self.assertEqual(result["total_pot_after"], 1_100_000)
-        self.assertEqual(result["net_pot_after"], 1_078_000)
-        self.assertEqual(result["expected_payout_raw"], 215_600)
-        self.assertEqual(result["expected_profit_raw"], 115_600)
-        self.assertAlmostEqual(result["post_bet_payout_multiple"], 2.156, places=3)
+        self.assertEqual(result["net_pot_after"], 1_089_000)
+        self.assertEqual(result["expected_payout_raw"], 217_800)
+        self.assertEqual(result["expected_profit_raw"], 117_800)
+        self.assertAlmostEqual(result["post_bet_payout_multiple"], 2.178, places=3)
 
     def test_zero_outcome_total(self):
         result = _compute_odds(
-            total_pot=0, outcome_total=0, total_fee_bps=200, bet_amount=100_000
+            total_pot=0, outcome_total=0, total_fee_bps=100, bet_amount=100_000
         )
         self.assertIsNone(result["current_payout_multiple"])
-        self.assertAlmostEqual(result["post_bet_payout_multiple"], 0.98, places=2)
-        self.assertEqual(result["expected_payout_raw"], 98_000)
+        self.assertAlmostEqual(result["post_bet_payout_multiple"], 0.99, places=2)
+        self.assertEqual(result["expected_payout_raw"], 99_000)
 
     def test_zero_fee(self):
         result = _compute_odds(
@@ -124,7 +124,7 @@ class TestTools(unittest.TestCase):
 
     def test_calculate_odds(self):
         result = json.loads(
-            _run(calculate_odds(1_000_000, 400_000, 200, 100_000))
+            _run(calculate_odds(1_000_000, 400_000, 100, 100_000))
         )
         self.assertIn("expected_payout_raw", result)
 
