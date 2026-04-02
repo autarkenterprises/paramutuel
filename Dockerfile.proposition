@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY service /app/service
+COPY config /app/config
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV PORT=8094
+ENV HOST=0.0.0.0
+
+EXPOSE 8094
+
+# Requires PROPOSITION_PANEL_TOKEN at runtime. Dispatch needs cast on PATH — use a custom image or host-side execution.
+# Uses PORT from the environment (defaults to 8094 in server.py).
+CMD ["python3", "-m", "service.proposition.server", "--host", "0.0.0.0"]

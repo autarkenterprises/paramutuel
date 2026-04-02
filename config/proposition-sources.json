@@ -1,0 +1,53 @@
+{
+  "sources": [
+    {
+      "id": "bbc-world",
+      "type": "rss",
+      "enabled": true,
+      "label": "BBC News — World",
+      "category": "news",
+      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "default_cadence": "event"
+    },
+    {
+      "id": "guardian-world",
+      "type": "rss",
+      "enabled": true,
+      "label": "The Guardian — World",
+      "category": "news",
+      "url": "https://www.theguardian.com/world/rss",
+      "default_cadence": "event"
+    },
+    {
+      "id": "coindesk",
+      "type": "rss",
+      "enabled": true,
+      "label": "CoinDesk",
+      "category": "crypto",
+      "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+      "default_cadence": "rolling"
+    },
+    {
+      "id": "hackernews",
+      "type": "hackernews",
+      "enabled": true,
+      "label": "Hacker News — top",
+      "category": "tech",
+      "limit": 15,
+      "default_cadence": "event"
+    },
+    {
+      "id": "polymarket-active",
+      "type": "json_array",
+      "enabled": true,
+      "label": "Polymarket — active markets",
+      "category": "prediction_markets",
+      "url": "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=12",
+      "title_key": "question",
+      "id_key": "id",
+      "link_key": "slug",
+      "link_prefix": "https://polymarket.com/event/",
+      "default_cadence": "rolling"
+    }
+  ]
+}

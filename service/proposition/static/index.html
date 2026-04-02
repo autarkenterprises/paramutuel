@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paramutuel — Proposition Service</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>Proposition Service</h1>
+    <p class="muted">Review source-linked wager drafts, approve, then dispatch to the factory.</p>
+  </header>
+
+  <section class="card">
+    <h2>Session</h2>
+    <label>Panel token <input id="token" type="password" autocomplete="off" placeholder="Bearer token" /></label>
+    <button type="button" id="saveToken">Save token (local)</button>
+    <span id="sessionStatus" class="muted"></span>
+  </section>
+
+  <section class="card">
+    <h2>Ingest</h2>
+    <p class="muted">Pull from configured RSS / JSON sources. Optional calendar templates: <code>?calendar=1</code>.</p>
+    <label class="inline"><input type="checkbox" id="calendarFlag" /> Include daily/weekly calendar templates</label>
+    <button type="button" id="runIngest">Run ingest now</button>
+    <pre id="ingestOut" class="log"></pre>
+  </section>
+
+  <section class="card">
+    <h2>Proposals</h2>
+    <div class="row">
+      <label>Status
+        <select id="statusFilter">
+          <option value="">all</option>
+          <option value="pending" selected>pending</option>
+          <option value="approved">approved</option>
+          <option value="rejected">rejected</option>
+          <option value="dispatched">dispatched</option>
+          <option value="dispatch_failed">dispatch_failed</option>
+        </select>
+      </label>
+      <button type="button" id="reload">Reload</button>
+    </div>
+    <div id="list" class="list"></div>
+  </section>
+
+  <footer class="muted">
+    API: <code>/api/proposals</code>, <code>POST /api/ingest</code>, <code>POST /api/proposals/{id}/approve|reject|dispatch</code>
+  </footer>
+  <script src="/app.js"></script>
+</body>
+</html>

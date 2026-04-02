@@ -6,6 +6,7 @@ Service layer components:
 - `explorer/` — web explorer for wager status, backed by indexer API.
 - `control_panel/` — operator controls (CLI + web) for full wager lifecycle roles.
 - `resolution/` — delegated resolver service (decision-file driven resolve/retract operations).
+- `proposition/` — ingest news/market feeds into draft wagers, operator panel, optional `cast` dispatch to the factory.
 
 ## Explorer
 
@@ -102,6 +103,17 @@ python3 -m service.indexer.sweeper \
   --interval-seconds 60
 ```
 
+## Proposition service
+
+Ingest configured RSS / Hacker News / JSON sources into SQLite drafts, review in a token-gated panel, approve, then dispatch with Foundry `cast` when execute is enabled.
+
+```bash
+export PROPOSITION_PANEL_TOKEN='...'
+PYTHONPATH=. python3 -m service.proposition.server --port 8094
+```
+
+See [`docs/PROPOSITION-SERVICE.md`](../docs/PROPOSITION-SERVICE.md) for source config, env vars, API, and Docker.
+
 ## Resolution service
 
 Run locally:
@@ -144,4 +156,5 @@ PYTHONPATH=. python3 -m unittest discover -s service/explorer/tests -p "test_*.p
 PYTHONPATH=. python3 -m unittest discover -s service/control_panel/tests -p "test_*.py" -q
 PYTHONPATH=. python3 -m unittest discover -s service/indexer/tests -p "test_sweeper.py" -q
 PYTHONPATH=. python3 -m unittest discover -s service/resolution/tests -p "test_*.py" -q
+PYTHONPATH=. python3 -m unittest discover -s service/proposition/tests -p "test_*.py" -q
 ```
