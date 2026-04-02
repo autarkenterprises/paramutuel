@@ -295,8 +295,8 @@ Operator transaction workflows are documented in `docs/WORKFLOWS.md`.
 
 A ready-to-use MCP (Model Context Protocol) server is available at `mcp_server/`. It exposes 16 tools across three categories:
 
-- **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`
-- **Analysis:** `calculate_odds`
+- **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`, `get_indexer_health`
+- **Analysis:** `calculate_odds`, `quote_place_bet`, `quote_place_bets`
 - **Transaction encoding:** `encode_create_wager`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
 Run with:

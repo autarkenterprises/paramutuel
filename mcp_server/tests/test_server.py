@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from mcp_server.server import (
     _compute_odds,
+    _compute_batch_odds,
     _encode_call,
     _encode_erc20_approve,
     _selector,
@@ -110,6 +111,33 @@ class TestOdds(unittest.TestCase):
             bet_amount=100_000,
         )
         self.assertEqual(result["net_pot_after"], 1_100_000)
+
+
+class TestBatchOdds(unittest.TestCase):
+    def test_batch_odds(self):
+        result = _compute_batch_odds(
+            total_pot=1_000_000,
+            outcome_totals=[400_000, 600_000],
+            total_fee_bps=100,
+            bet_amounts=[100_000, 200_000],
+        )
+
+        # Fees are charged once on the total pot after all bets.
+        self.assertEqual(result["total_pot_after"], 1_300_000)
+        self.assertEqual(result["net_pot_after"], 1_287_000)
+
+        legs = result["legs"]
+        self.assertEqual(len(legs), 2)
+
+        # Leg 0: outcome_after = 500_000
+        self.assertEqual(legs[0]["expected_payout_raw"], 257_400)
+        self.assertEqual(legs[0]["expected_profit_raw"], 157_400)
+        self.assertAlmostEqual(legs[0]["post_bet_payout_multiple"], 2.574, places=3)
+
+        # Leg 1: outcome_after = 800_000
+        self.assertEqual(legs[1]["expected_payout_raw"], 321_750)
+        self.assertEqual(legs[1]["expected_profit_raw"], 121_750)
+        self.assertAlmostEqual(legs[1]["post_bet_payout_multiple"], 1.60875, places=3)
 
 
 class TestTools(unittest.TestCase):

@@ -51,12 +51,15 @@ paramutuel-mcp
 | `list_wagers` | List wagers from the indexer, filterable by state (OPEN/RESOLVED/RETRACTED) |
 | `get_wager` | Full wager details: outcomes, totals, event history |
 | `get_expire_candidates` | Wagers past their resolution deadline, callable by anyone via `expire()` |
+| `get_indexer_health` | Indexer liveness/sync indicators (`/health`) |
 
 ### Analysis
 
 | Tool | Description |
 |------|-------------|
 | `calculate_odds` | Compute pre/post-bet payout multiples and expected returns for a hypothetical bet |
+| `quote_place_bet` | Fetch wager, compute odds, and return `placeBet` calldata + approval details |
+| `quote_place_bets` | Fetch wager, compute batch odds, and return `placeBets` calldata + approval details |
 
 ### Transaction encoding
 

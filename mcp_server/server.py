@@ -140,6 +140,83 @@ def _compute_odds(
     }
 
 
+def _compute_batch_odds(
+    total_pot: int,
+    outcome_totals: list[int],
+    total_fee_bps: int,
+    bet_amounts: list[int],
+) -> dict:
+    """Compute odds for a multi-outcome batch bet.
+
+    In a single tx, the net pot after fees depends on the *sum* of all bet
+    amounts. This differs from per-leg single-bet math.
+    """
+    if len(outcome_totals) != len(bet_amounts):
+        raise ValueError("outcome_totals and bet_amounts length mismatch")
+
+    bps_denom = 10_000
+    net_before = total_pot - (total_pot * total_fee_bps // bps_denom)
+
+    total_bet = sum(bet_amounts)
+    pot_after = total_pot + total_bet
+    net_after = pot_after - (pot_after * total_fee_bps // bps_denom)
+
+    legs: list[dict[str, Any]] = []
+    for outcome_total, bet_amount in zip(outcome_totals, bet_amounts):
+        current_multiple = (
+            round(net_before / outcome_total, 4) if outcome_total > 0 else None
+        )
+        outcome_after = outcome_total + bet_amount
+        post_multiple = round(net_after / outcome_after, 4) if outcome_after > 0 else None
+        expected_payout = (bet_amount * net_after) // outcome_after if outcome_after > 0 else 0
+        expected_profit = expected_payout - bet_amount
+        legs.append(
+            {
+                "current_payout_multiple": current_multiple,
+                "post_bet_payout_multiple": post_multiple,
+                "expected_payout_raw": expected_payout,
+                "expected_profit_raw": expected_profit,
+            }
+        )
+
+    return {
+        "net_pot_after": net_after,
+        "total_pot_after": pot_after,
+        "legs": legs,
+    }
+
+
+def _is_betting_open(wager_row: dict[str, Any], now_ts: int) -> bool:
+    """Best-effort client-side betting-open check (avoid obvious reverts)."""
+    return _betting_open_status(wager_row, now_ts=now_ts)[0]
+
+
+def _betting_open_status(wager_row: dict[str, Any], now_ts: int) -> tuple[bool, str]:
+    """Return (is_open, revert_hint) using indexer fields.
+
+    This is a best-effort client-side check: between quote-time and tx
+    submission, state can change. The caller should still handle reverts.
+    """
+    state = str(wager_row.get("state", "")).upper()
+    if state != "OPEN":
+        return False, "wager.state != OPEN"
+
+    betting_closed_by_authority = int(
+        wager_row.get("betting_closed_by_authority", 0) or 0
+    )
+    if betting_closed_by_authority == 1:
+        return False, "betting was closed by authority"
+
+    betting_close_time = int(wager_row.get("betting_close_time", 0) or 0)
+    if betting_close_time == 0:
+        return True, ""
+
+    if now_ts >= betting_close_time:
+        return False, "betting_close_time has passed"
+
+    return True, ""
+
+
 # ── HTTP helpers ──────────────────────────────────────────────────
 
 
@@ -211,6 +288,13 @@ async def get_expire_candidates() -> str:
 
 
 @mcp_server.tool()
+async def get_indexer_health() -> str:
+    """Return indexer /health information (sync indicators, wager counts, errors)."""
+    data = await _indexer_get("/health")
+    return json.dumps(data, indent=2)
+
+
+@mcp_server.tool()
 async def get_protocol_info() -> str:
     """Get protocol configuration: factory address, chain, indexer URL, and ABI summaries."""
     factory_functions = [
@@ -264,6 +348,173 @@ async def calculate_odds(
     """
     result = _compute_odds(total_pot, outcome_total, total_fee_bps, bet_amount)
     return json.dumps(result, indent=2)
+
+
+@mcp_server.tool()
+async def quote_place_bet(
+    wager_address: str,
+    outcome_index: int,
+    amount: int,
+    require_open: bool = False,
+) -> str:
+    """Quote odds + return placeBet calldata + approval instructions.
+
+    All amounts are in raw token units.
+    """
+    import time
+
+    if amount <= 0:
+        raise ValueError("amount must be > 0")
+
+    data = await _indexer_get(f"/wagers/{wager_address}")
+    wager = data.get("wager") or {}
+    totals = data.get("totals") or {}
+    outcomes = data.get("outcomes") or []
+
+    if not wager:
+        raise ValueError("Indexer returned no wager payload")
+
+    now_ts = int(time.time())
+    betting_open, revert_hint = _betting_open_status(wager, now_ts=now_ts)
+    if require_open and not betting_open:
+        raise ValueError(revert_hint or "wager betting is not open")
+
+    collateral_token = str(wager.get("collateral_token") or "").strip()
+    total_pot = int(totals.get("total_pot", 0) or 0)
+    total_fee_bps = int(totals.get("total_fee_bps", 0) or 0)
+
+    outcome_total = None
+    for o in outcomes:
+        if int(o.get("outcome_index")) == int(outcome_index):
+            outcome_total = int(o.get("outcome_total", 0) or 0)
+            break
+    if outcome_total is None:
+        raise ValueError(f"Outcome index {outcome_index} not found in this wager.")
+
+    odds = _compute_odds(
+        total_pot=total_pot,
+        outcome_total=outcome_total,
+        total_fee_bps=total_fee_bps,
+        bet_amount=amount,
+    )
+
+    calldata = _encode_call(
+        "placeBet(uint256,uint256)",
+        ["uint256", "uint256"],
+        [outcome_index, amount],
+    )
+
+    return json.dumps(
+        {
+            "wager_address": wager_address,
+            "collateral_token": collateral_token,
+            "outcome_index": outcome_index,
+            "amount": amount,
+            "betting_open": betting_open,
+            "execution_allowed": betting_open,
+            "revert_hint": revert_hint,
+            "odds": odds,
+            "placeBet": {
+                "to": wager_address,
+                "calldata": calldata,
+                "approval_required": {
+                    "token": collateral_token,
+                    "spender": wager_address,
+                    "amount": amount,
+                    "approve_calldata": _encode_erc20_approve(wager_address, amount),
+                },
+            },
+        },
+        indent=2,
+    )
+
+
+@mcp_server.tool()
+async def quote_place_bets(
+    wager_address: str,
+    outcome_indices: list[int],
+    amounts: list[int],
+    require_open: bool = False,
+) -> str:
+    """Quote odds + return placeBets calldata + approval instructions.
+
+    outcome_indices/amounts are aligned arrays. All amounts are in raw token units.
+    """
+    import time
+
+    if len(outcome_indices) != len(amounts):
+        raise ValueError("outcome_indices and amounts length mismatch")
+    if not amounts:
+        raise ValueError("amounts must be non-empty")
+    if any(a <= 0 for a in amounts):
+        raise ValueError("all amounts must be > 0")
+
+    data = await _indexer_get(f"/wagers/{wager_address}")
+    wager = data.get("wager") or {}
+    totals = data.get("totals") or {}
+    outcomes = data.get("outcomes") or []
+
+    if not wager:
+        raise ValueError("Indexer returned no wager payload")
+
+    now_ts = int(time.time())
+    betting_open, revert_hint = _betting_open_status(wager, now_ts=now_ts)
+    if require_open and not betting_open:
+        raise ValueError(revert_hint or "wager betting is not open")
+
+    collateral_token = str(wager.get("collateral_token") or "").strip()
+
+    total_pot = int(totals.get("total_pot", 0) or 0)
+    total_fee_bps = int(totals.get("total_fee_bps", 0) or 0)
+
+    totals_by_outcome: dict[int, int] = {}
+    for o in outcomes:
+        idx = int(o.get("outcome_index"))
+        totals_by_outcome[idx] = int(o.get("outcome_total", 0) or 0)
+
+    outcome_totals: list[int] = []
+    for idx in outcome_indices:
+        if idx not in totals_by_outcome:
+            raise ValueError(f"Outcome index {idx} not found in this wager.")
+        outcome_totals.append(totals_by_outcome[idx])
+
+    odds = _compute_batch_odds(
+        total_pot=total_pot,
+        outcome_totals=outcome_totals,
+        total_fee_bps=total_fee_bps,
+        bet_amounts=amounts,
+    )
+
+    total_bet = sum(amounts)
+    calldata = _encode_call(
+        "placeBets(uint256[],uint256[])",
+        ["uint256[]", "uint256[]"],
+        [outcome_indices, amounts],
+    )
+
+    return json.dumps(
+        {
+            "wager_address": wager_address,
+            "collateral_token": collateral_token,
+            "outcome_indices": outcome_indices,
+            "amounts": amounts,
+            "betting_open": betting_open,
+            "execution_allowed": betting_open,
+            "revert_hint": revert_hint,
+            "odds": odds,
+            "placeBets": {
+                "to": wager_address,
+                "calldata": calldata,
+                "approval_required": {
+                    "token": collateral_token,
+                    "spender": wager_address,
+                    "amount": total_bet,
+                    "approve_calldata": _encode_erc20_approve(wager_address, total_bet),
+                },
+            },
+        },
+        indent=2,
+    )
 
 
 # ── Transaction encoding tools ────────────────────────────────────
