@@ -316,6 +316,8 @@ The server reads factory address and chain ID from `config/deployments.json` (ov
 
 Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittest mcp_server/tests/test_server.py`).
 
+Agent loop integration guide: [`docs/AGENT-LOOP.md`](AGENT-LOOP.md).
+
 ## Versioning
 
 Changing `createWager` or event layouts is an **ABI break**. Bump deployed factory version or document migration when upgrading.
