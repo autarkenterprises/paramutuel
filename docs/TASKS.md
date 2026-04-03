@@ -85,11 +85,13 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 
 **Goal:** Enable wagers where multiple options can be true simultaneously, without requiring subset enumeration as explicit outcomes.
 
-- [ ] Specify canonical payout policies and formulas (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`; with extension hooks for threshold/weighted variants).
-- [ ] Define compact winner-set and ticket-selection encoding (bitset or equivalent) with strict bounds.
-- [ ] Draft v2 factory/wager interfaces for policy-bound creation and winner-set resolution.
-- [ ] Define claim accounting invariants for multi-winner settlement and add exhaustive property tests.
-- [ ] Add indexer schema/API changes for winner-set + policy metadata and policy-aware claimability views.
-- [ ] Update dApp/explorer UX copy and controls for policy selection, selection tickets, and resolver set submission.
-- [ ] Extend service/control/MCP command surfaces for policy-aware create/resolve workflows.
-- [ ] Produce gas/safety analysis for option count and policy complexity limits before implementation sign-off.
+**Branch (prototype):** `experiment/adr-0008-multi-winner-v2` — `ParamutuelFactoryV2` + `ParamutuelWagerV2`, tests, and [`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md).
+
+- [x] Specify canonical payoff policies and formulas (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`) — see implementation doc.
+- [x] Define compact winner-set and ticket-selection encoding (`uint256` bitset, `MAX_DISTINCT_TICKETS`, factory `MAX_OUTCOMES = 64`).
+- [x] Draft v2 factory/wager contracts for policy-bound creation and `resolve(winningMask)`.
+- [x] Claim accounting + Foundry tests (including fuzz conservation on `ANY_OF`).
+- [ ] Add indexer schema/API changes for `winning_mask`, policy metadata, and ticket masks on bets.
+- [ ] Update dApp/explorer UX for policy + bitmask tickets + resolver set UI.
+- [ ] Extend service/control/MCP for v2 create/resolve encodings.
+- [ ] Gas/safety audit pass and formal limits sign-off before mainnet v2 factory.

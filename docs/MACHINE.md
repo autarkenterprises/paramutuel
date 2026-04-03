@@ -237,6 +237,10 @@ event FeeAccrued(address indexed recipient, uint256 amount);
 event FeeWithdrawn(address indexed recipient, uint256 amount);
 ```
 
+### ParamutuelWagerV2 (experimental, ADR-0008)
+
+A separate deployable on branch **`experiment/adr-0008-multi-winner-v2`**: bitmask **tickets**, `resolve(uint256 winningMask)`, and **`PayoffPolicy`** (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`). v1 bytecode and deployments are unaffected. Full math, limits, and indexer follow-ups: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md).
+
 ### Error reference
 
 | Error | Thrown by |

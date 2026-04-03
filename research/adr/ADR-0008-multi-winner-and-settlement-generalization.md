@@ -1,7 +1,7 @@
 # ADR-0008: Multi-winner resolution and generalized settlement semantics
 
 Date: 2026-03-31  
-Status: Proposed
+Status: Proposed (reference); **prototype contracts** on git branch `experiment/adr-0008-multi-winner-v2` — see [`docs/ADR-0008-IMPLEMENTATION.md`](../../docs/ADR-0008-IMPLEMENTATION.md)
 
 ## Context
 

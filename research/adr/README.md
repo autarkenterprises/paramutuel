@@ -15,5 +15,5 @@
 - `ADR-0007-assisted-transaction-gateway-and-approval-paths.md`
   - Upper-layer gas abstraction via an assisted transaction gateway and pluggable permit/approval paths.
 - `ADR-0008-multi-winner-and-settlement-generalization.md`
-  - Versioned path for multi-winner resolution and policy-driven payout semantics (any-of, exact-set, and beyond) without mutating v1 deployments.
+  - Versioned path for multi-winner resolution and policy-driven payout semantics (any-of, exact-set, and beyond) without mutating v1 deployments. **Prototype:** branch `experiment/adr-0008-multi-winner-v2`, doc `docs/ADR-0008-IMPLEMENTATION.md`.
 
