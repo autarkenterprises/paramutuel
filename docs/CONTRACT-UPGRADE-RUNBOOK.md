@@ -6,7 +6,7 @@ This runbook is the canonical checklist for factory/wager contract upgrades and 
 
 - Confirm scope: ABI break vs. parameter-only change.
 - Update ADR/docs first for intentional behavior changes.
-- Ensure `.env` has `RPC_URL_BASE_SEPOLIA`, `PRIVATE_KEY`, `TREASURY_ADDRESS`.
+- Ensure `config/service.env` has `RPC_URL_BASE_SEPOLIA`, `PRIVATE_KEY`, `TREASURY_ADDRESS` (loaded via `script/lib/load_service_env.sh`).
 - Record current deployed factory from `config/deployments.json`.
 
 ## 2) Local verification gates
@@ -28,8 +28,7 @@ If any fail, do not deploy.
 
 ## 4) Deploy new factory
 
-- `set -a && source .env && set +a`
-- `./script/testnet/launch_testnet.sh`
+- `./script/testnet/launch_testnet.sh` (sources `config/service.env` via `script/lib/load_service_env.sh`; ensure that file exists — copy from `config/service.env.example`).
 
 Expected outcomes:
 - New on-chain factory deployed.

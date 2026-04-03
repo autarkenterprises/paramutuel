@@ -19,6 +19,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ -f "$ROOT_DIR/config/service.env" || -f "$ROOT_DIR/.env" ]]; then
+  source "$ROOT_DIR/script/lib/load_service_env.sh"
+fi
+
 source "$ROOT_DIR/script/lib/deployments.sh"
 if [[ -z "${FACTORY_ADDRESS:-}" ]]; then
   ensure_factory_address "base-sepolia" "$ROOT_DIR/config/deployments.json" || true

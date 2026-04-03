@@ -108,7 +108,8 @@ python3 -m service.indexer.sweeper \
 Ingest configured RSS / Hacker News / JSON sources into SQLite drafts, review in a token-gated panel, approve, then dispatch with Foundry `cast` when execute is enabled (`PROPOSITION_ALLOW_EXECUTE` or `--allow-execute`; use `--no-allow-execute` to force preview-only).
 
 ```bash
-export PROPOSITION_PANEL_TOKEN='...'
+# from repo root
+source script/lib/load_service_env.sh
 PYTHONPATH=. python3 -m service.proposition.server --port 8094
 ```
 
@@ -139,7 +140,9 @@ Use the full launch helper from repo root:
 
 ```bash
 chmod +x script/testnet/launch_testnet.sh
-RPC_URL_BASE_SEPOLIA=... PRIVATE_KEY=... TREASURY_ADDRESS=... ./script/testnet/launch_testnet.sh
+cp config/service.env.example config/service.env
+# edit config/service.env with your keys
+./script/testnet/launch_testnet.sh
 ```
 
 ## MCP server

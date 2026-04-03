@@ -20,7 +20,9 @@ The Proposition Service ingests headlines and market listings from configurable 
 From the repo root (token is **required**):
 
 ```bash
-export PROPOSITION_PANEL_TOKEN='your-long-random-secret'
+cp config/service.env.example config/service.env
+# edit config/service.env with your values
+source script/lib/load_service_env.sh
 PYTHONPATH=. python3 -m service.proposition.server --port 8094
 ```
 
@@ -62,7 +64,7 @@ Open `http://127.0.0.1:8094`, paste the same token, click **Save token (local)**
 - `GET /api/sources` — parsed sources config.
 - `GET /api/proposals?status=pending&limit=100`
 - `PATCH /api/proposals/{id}` — body `{ "proposition", "outcomes": ["Yes","No",...] }` (**pending** only).
-- `POST /api/ingest?calendar=0|1`
+- `POST /api/ingest?calendar=0|1` — JSON body includes `new_source_rows`, `new_proposals`, `calendar_skipped_duplicates`, `errors[]`.
 - `POST /api/proposals/{id}/approve|reject|dispatch` — dispatch requires approved row + execute enabled + env.
 
 ## Docker

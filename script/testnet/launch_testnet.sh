@@ -3,10 +3,18 @@ set -euo pipefail
 
 # Full testnet launch helper.
 # Usage:
-#   RPC_URL_BASE_SEPOLIA=... PRIVATE_KEY=... TREASURY_ADDRESS=... ./script/testnet/launch_testnet.sh
+#   cp config/service.env.example config/service.env   # once, then edit
+#   ./script/testnet/launch_testnet.sh
+#
+# Required keys in config/service.env (or legacy .env): PRIVATE_KEY, TREASURY_ADDRESS,
+# RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA). Loaded via script/lib/load_service_env.sh.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
+
+# Load centralized env (exports vars into this shell; must use return-safe loader).
+# shellcheck disable=SC1091
+source "$ROOT_DIR/script/lib/load_service_env.sh"
 
 require_env() {
   local name="$1"
@@ -47,7 +55,6 @@ node --check dapp/app.js
 node --test dapp/tests/logic.test.js >/dev/null
 
 echo "==> Deploying factory to testnet"
-export PRIVATE_KEY TREASURY_ADDRESS PROTOCOL_FEE_BPS MIN_BETTING_WINDOW MIN_RESOLUTION_WINDOW
 forge script script/DeployFactory.s.sol \
   --rpc-url "$RPC_URL" \
   --broadcast

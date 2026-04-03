@@ -308,7 +308,15 @@ This MVP isolates resolution logic to per-wager functions so it can later be ext
   - RPC URL for the target network (for MVP recommendation: **Base Sepolia** testnet first).
 
 - **1. Configure environment**
-  - Create a `.env` in the repo root (already ignored by `.gitignore`):
+  - Prefer the shared template **`config/service.env`** (gitignored via `*.env`); copy from `config/service.env.example` and `source script/lib/load_service_env.sh` before `forge` / scripts. A legacy repo-root **`.env`** is still supported by the loader if `config/service.env` is missing.
+
+    ```bash
+    cp config/service.env.example config/service.env
+    # edit config/service.env
+    source script/lib/load_service_env.sh
+    ```
+
+    Minimum variables for deploy scripts:
 
     ```bash
     RPC_URL_BASE_SEPOLIA="https://sepolia.base.org"
