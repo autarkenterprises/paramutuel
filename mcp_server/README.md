@@ -4,6 +4,8 @@ MCP server for the [Paramutuel](https://github.com/autarkenterprises/paramutuel)
 
 Exposes 16 tools that let LLM agents discover wagers, analyze odds, and prepare transactions — no private keys required on the server side.
 
+**Adoption complement:** the repo also ships a tiny **bet scout agent** (`agents/paramutuel_bettor`, see `docs/BET-AGENT.md`) suitable for subagent delegation; use MCP for final `quote_place_bet` / calldata right before signing.
+
 ## Quick start
 
 ```bash

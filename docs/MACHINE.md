@@ -318,6 +318,10 @@ Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittes
 
 Agent loop integration guide: [`docs/AGENT-LOOP.md`](AGENT-LOOP.md).
 
+## Bet scout agent (adoption)
+
+A minimal **stdlib** process for indexer-backed discovery and ranked bet ideas lives under `agents/paramutuel_bettor/`. It is meant for **frontier-model subagents** and scripted delegation; pair it with the MCP server for authoritative `quote_place_bet` calldata before signing. See [`docs/BET-AGENT.md`](BET-AGENT.md) and the Cursor skill `.cursor/skills/paramutuel-bettor/SKILL.md`.
+
 ## Versioning
 
 Changing `createWager` or event layouts is an **ABI break**. Bump deployed factory version or document migration when upgrading.

@@ -1,5 +1,7 @@
 # Agent Betting Loop (MCP)
 
+**See also:** [`docs/BET-AGENT.md`](BET-AGENT.md) for the small **bet scout agent** (`agents.paramutuel_bettor`) that can run as a subprocess / subagent and complements these MCP tools.
+
 This doc is a practical integration guide for any MCP-capable agent or bot that wants to place bets programmatically.
 
 The goal is to make this loop:

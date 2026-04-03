@@ -180,11 +180,11 @@ cast send "0xWAGER" "withdrawFees()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private
 
 ### 6) Optional: full local service stack (explorer + control panel + sweeper)
 
-Create `.env` from template and run:
+Create `config/service.env` from template and run:
 
 ```bash
-cp .env.example .env
-set -a && source .env && set +a
+cp config/service.env.example config/service.env
+source script/lib/load_service_env.sh
 ./script/testnet/launch_testnet.sh
 ```
 
@@ -223,7 +223,7 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 
 **Agents & automation:** see [`docs/MACHINE.md`](docs/MACHINE.md) for JSON HTTP API shapes, ABI locations, MCP server, and a concise on-chain state machine for bots.
 
-**MCP server:** A 16-tool MCP server for LLM agent integration is available at `mcp_server/`. Run with `python -m mcp_server`. See [`docs/MACHINE.md`](docs/MACHINE.md) for details.
+**MCP server:** A 16-tool MCP server for LLM agent integration is available at `mcp_server/`. Run with `python -m mcp_server`. See [`docs/MACHINE.md`](docs/MACHINE.md) for details. A small **bet scout agent** for subagent-style workflows lives under `agents/paramutuel_bettor/` ([`docs/BET-AGENT.md`](docs/BET-AGENT.md)).
 
 ### Actors and relationships (MVP)
 
