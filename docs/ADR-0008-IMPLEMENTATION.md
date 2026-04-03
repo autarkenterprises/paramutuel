@@ -56,3 +56,9 @@ Planned fields (for a follow-up PR):
 ## Related
 
 - [`research/adr/ADR-0008-multi-winner-and-settlement-generalization.md`](../research/adr/ADR-0008-multi-winner-and-settlement-generalization.md)
+- [`ADR-0008-GAS.md`](ADR-0008-GAS.md) — gas profile and how to regenerate
+- [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md) — product templates + `WagerV2Masks` helpers
+- `src/libraries/WagerV2Masks.sol` — bitmask utilities for tickets
+- `test/ParamutuelV2Extensive.t.sol` — lifecycle / policy matrix tests
+- `test/ParamutuelV2Gas.t.sol` — `gasleft()` logs + scaling check
+- `script/profile_v2_gas.sh` — `forge test ... --gas-report` wrapper
