@@ -1,5 +1,7 @@
 # Service Layer
 
+The public **operator hub** on GitHub Pages (`site/operator.html`) links to indexer endpoints from `config/deployments.json` and optional hosted URLs in `config/operator-hub.json` — see [`docs/WEBSITE.md`](../docs/WEBSITE.md).
+
 Service layer components:
 
 - `indexer/` — deterministic chain event indexer + JSON API.

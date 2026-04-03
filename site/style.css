@@ -663,6 +663,165 @@ nav .links a.external {
   word-break: break-all;
 }
 
+/* ── Deployment banner (testnet / mainnet) ── */
+
+#networkBannerSlot:empty {
+  display: none;
+}
+
+.network-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 24px;
+  font-size: 13px;
+  border-bottom: 1px solid #23304a;
+}
+
+.network-banner__badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.network-banner__text {
+  color: #c8d4e8;
+  flex: 1 1 200px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.network-banner__links {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.network-banner__links a {
+  color: #8ab4ff;
+}
+
+.network-banner__sep {
+  color: #4a5568;
+  margin: 0 6px;
+}
+
+.network-banner--testnet {
+  background: linear-gradient(90deg, #1a1508 0%, #121a2a 40%);
+  border-bottom-color: #5c4a1a;
+}
+
+.network-banner--testnet .network-banner__badge {
+  background: #3d3510;
+  color: #f0d060;
+  border: 1px solid #6b5a1a;
+}
+
+.network-banner--mainnet {
+  background: #0f1628;
+  border-bottom-color: #1e3a2f;
+}
+
+.network-banner--mainnet .network-banner__badge {
+  background: #143028;
+  color: #5eead4;
+  border: 1px solid #1e4a3d;
+}
+
+.network-banner--warn {
+  background: #1a1210;
+  border-bottom-color: #5a3020;
+}
+
+.network-banner--warn .network-banner__badge {
+  background: #3d2018;
+  color: #fca5a5;
+  border: 1px solid #7c2d12;
+}
+
+.deployment-context {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 24px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.deployment-context--hero {
+  text-align: center;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* ── Operator hub ── */
+
+.operator-hub-body {
+  min-height: 100vh;
+}
+
+.operator-hub-header h1 {
+  margin-bottom: 8px;
+}
+
+.operator-hub-status {
+  margin-top: 12px;
+}
+
+.operator-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.operator-card h2 {
+  font-size: 17px;
+  margin-bottom: 8px;
+}
+
+.operator-card-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.operator-card-actions .btn {
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+a.operator-link--disabled,
+a.btn.operator-link--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.operator-explorer-card h2 {
+  margin-bottom: 8px;
+}
+
+.operator-explorer-frame-wrap {
+  margin-top: 12px;
+  border: 1px solid #23304a;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0f19;
+  min-height: 420px;
+}
+
+.operator-explorer-frame-wrap iframe {
+  width: 100%;
+  min-height: 480px;
+  height: 55vh;
+  border: none;
+  display: block;
+}
+
 /* ── Iframe pages ── */
 
 .iframe-page {
@@ -676,6 +835,10 @@ nav .links a.external {
   border: none;
   width: 100%;
   min-height: calc(100vh - 56px);
+}
+
+body.site-has-banner .iframe-page iframe {
+  min-height: calc(100vh - 56px - 48px);
 }
 
 .iframe-config {

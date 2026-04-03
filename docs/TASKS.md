@@ -46,6 +46,22 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 
 ---
 
+## Release engineering (PyPI bet scout)
+
+**Status:** Git tag `bettor-agent-v0.2.0` is pushed; workflows **Publish bet scout agent (PyPI)** and **(GHCR)** run on `bettor-agent-v*` tags.
+
+**If PyPI upload fails in Actions:**
+
+- [ ] In [pypi.org](https://pypi.org) create project **`paramutuel-bettor-agent`** (if it does not exist).
+- [ ] Project → **Publishing** → **Add a new pending publisher** → GitHub → select this repo and workflow **Publish bet scout agent (PyPI)**.
+- [ ] Re-run the failed workflow or push a new tag after fixing version alignment (`__version__` must match tag suffix).
+
+**Optional:** Add a GitHub **Environment** named `pypi` with required reviewers and add `environment: { name: pypi }` to the publish job for manual approval gates.
+
+**GHCR:** Ensure GitHub Actions is allowed to publish packages for the org/user; image is `ghcr.io/<lowercase-owner>/paramutuel-bettor-agent:<semver>`.
+
+---
+
 ## Return later: Resolution Service
 
 **Note:** Revisit Resolution Service follow-ups (auth hardening, automation/scheduling, integration tests, and operator runbooks) documented in `docs/RESOLUTION-SERVICE.md`.

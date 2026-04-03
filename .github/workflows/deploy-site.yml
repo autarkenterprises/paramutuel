@@ -10,6 +10,7 @@ on:
       - 'service/explorer/static/**'
       - 'site/**'
       - 'config/deployments.json'
+      - 'config/operator-hub.json'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
@@ -51,8 +52,8 @@ jobs:
           "
 
           # Copy website shell
-          cp site/index.html site/app.html site/explorer.html site/bet.html site/style.css site/home-ticker.js site/bet-page.js _site/
-          cp config/deployments.json _site/config/deployments.json
+          cp site/index.html site/app.html site/explorer.html site/bet.html site/operator.html site/style.css site/home-ticker.js site/bet-page.js site/network-banner.js site/operator-hub.js _site/
+          cp config/deployments.json config/operator-hub.json _site/config/
 
           # Copy dApp files
           cp dapp/index.html dapp/app.js dapp/logic.js dapp/style.css _site/dapp/

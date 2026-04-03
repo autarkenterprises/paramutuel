@@ -415,10 +415,14 @@ The dApp and a protocol website are deployed to GitHub Pages via CI. On every pu
 The website (`site/`) is a navigation shell that embeds the dApp and explorer as iframes — no code duplication. When component files change, the website automatically stays current.
 
 Pages:
-- `/` — Landing page with protocol overview and network info
-- `/app.html` — Full dApp (embedded iframe)
+- `/` — Landing page with protocol overview, deployment banner, and live ticker
+- `/app.html` — Full dApp (embedded iframe; dApp remains a separate static bundle under `/dapp/`)
+- `/bet.html` — Short place-a-bet flow
 - `/explorer.html` — Wager explorer with configurable indexer URL
+- `/operator.html` — Operator hub (indexer links, embedded explorer, optional service URLs)
 - `/dapp/` — Standalone dApp (also accessible directly)
+
+Details: [`docs/WEBSITE.md`](docs/WEBSITE.md). Product/engineering gap review: [`docs/PROJECT-REVIEW.md`](docs/PROJECT-REVIEW.md).
 
 Runtime defaults for these surfaces are read from `config/deployments.json`:
 - `defaultNetwork` selects which network config to use by default

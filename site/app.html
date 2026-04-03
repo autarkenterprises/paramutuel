@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Paramutuel full dApp: create wagers, bet, resolve, and claim (embedded self-custody UI)." />
   <title>Paramutuel - App</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,9 +15,12 @@
       <a href="app.html" class="active">App</a>
       <a href="bet.html">Place a bet</a>
       <a href="explorer.html">Explorer</a>
+      <a href="operator.html">Operators</a>
       <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
     </div>
   </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
   <iframe src="dapp/index.html" title="Paramutuel dApp" allow="clipboard-write"></iframe>
 </body>
 </html>

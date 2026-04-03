@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Paramutuel operator hub: indexer health, embedded explorer, and links to control, proposition, and resolution services." />
+  <title>Paramutuel — Operator hub</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="operator-hub-body">
+  <nav>
+    <span class="logo">Paramutuel</span>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="app.html">App</a>
+      <a href="bet.html">Place a bet</a>
+      <a href="explorer.html">Explorer</a>
+      <a href="operator.html" class="active">Operators</a>
+      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+    </div>
+  </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
+
+  <div class="container operator-hub">
+    <header class="operator-hub-header card">
+      <h1>Operator hub</h1>
+      <p class="muted">
+        Consolidated entry for <strong>service operators</strong> (indexer-backed reads, lifecycle tooling, ingest, resolution).
+        The public dApp stays embedded separately from this shell; panels below are either same-origin (explorer) or open in a new tab when you configure hosted URLs.
+      </p>
+      <p id="operatorHubStatus" class="operator-hub-status muted" role="status">Loading configuration…</p>
+      <p class="muted" style="margin-top: 12px;">
+        <strong>Network:</strong> <span id="operatorHubNetwork">—</span>
+        · See <a href="https://github.com/autarkenterprises/paramutuel/blob/master/service/README.md">service/README.md</a>
+        and <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WEBSITE.md">docs/WEBSITE.md</a>.
+      </p>
+    </header>
+
+    <div class="operator-hub-grid">
+      <section class="card operator-card">
+        <h2>Indexer API</h2>
+        <p class="muted">JSON HTTP API (wagers list, detail, health). Base URL comes from <code>config/deployments.json</code> for the active <code>defaultNetwork</code>.</p>
+        <p class="operator-card-actions">
+          <a id="operatorIndexerHealthLink" class="btn btn-secondary" href="#">Health</a>
+          <a id="operatorIndexerWagersLink" class="btn btn-secondary" href="#">Sample wagers</a>
+        </p>
+      </section>
+
+      <section class="card operator-card">
+        <h2>Control panel</h2>
+        <p class="muted">CLI or token-gated web API for wager lifecycle actions. Host privately; set the public base URL in <code>config/operator-hub.json</code>.</p>
+        <p class="operator-card-actions">
+          <a id="operatorControlPanelLink" class="btn btn-primary" href="#">Not configured</a>
+        </p>
+      </section>
+
+      <section class="card operator-card">
+        <h2>Proposition service</h2>
+        <p class="muted">Draft wagers from feeds; operator review and optional <code>cast</code> dispatch. See <code>docs/PROPOSITION-SERVICE.md</code>.</p>
+        <p class="operator-card-actions">
+          <a id="operatorPropositionLink" class="btn btn-primary" href="#">Not configured</a>
+        </p>
+      </section>
+
+      <section class="card operator-card">
+        <h2>Resolution service</h2>
+        <p class="muted">Decision-file driven resolve/retract. See <code>docs/RESOLUTION-SERVICE.md</code>.</p>
+        <p class="operator-card-actions">
+          <a id="operatorResolutionLink" class="btn btn-primary" href="#">Not configured</a>
+        </p>
+      </section>
+    </div>
+
+    <section class="card operator-explorer-card">
+      <h2>Explorer (embedded)</h2>
+      <p id="operatorExplorerNote" class="muted">—</p>
+      <div class="operator-explorer-frame-wrap">
+        <iframe
+          id="operatorExplorerFrame"
+          title="Paramutuel Explorer"
+          src="explorer/index.html"
+        ></iframe>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
+  </footer>
+
+  <script src="operator-hub.js" defer></script>
+</body>
+</html>

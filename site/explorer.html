@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Paramutuel wager explorer: browse indexer-backed markets and open the bet flow." />
   <title>Paramutuel - Explorer</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,9 +15,12 @@
       <a href="app.html">App</a>
       <a href="bet.html">Place a bet</a>
       <a href="explorer.html" class="active">Explorer</a>
+      <a href="operator.html">Operators</a>
       <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
     </div>
   </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
   <div class="iframe-config">
     <label for="indexerUrl">Indexer API URL:</label>
     <input id="indexerUrl" type="text" placeholder="http://127.0.0.1:8090" />

@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Paramutuel — on-chain parimutuel wagers on Base. Public testnet deployment; switch to mainnet via a single config change when ready." />
+  <meta property="og:title" content="Paramutuel" />
+  <meta property="og:description" content="Parimutuel pools on Base: create wagers, stake on outcomes, resolve and claim. Modular website + self-custody dApp." />
+  <meta property="og:type" content="website" />
   <title>Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,9 +18,12 @@
       <a href="app.html">App</a>
       <a href="bet.html">Place a bet</a>
       <a href="explorer.html">Explorer</a>
+      <a href="operator.html">Operators</a>
       <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
     </div>
   </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
 
   <div class="hero">
     <h1>Paramutuel</h1>
@@ -26,6 +33,8 @@
       <a href="https://github.com/autarkenterprises/paramutuel" class="btn btn-secondary">View Source</a>
     </div>
   </div>
+
+  <p id="deploymentContext" class="deployment-context deployment-context--hero muted" hidden></p>
 
   <section class="ticker-section" aria-label="Recent wagers from the indexer">
     <div class="ticker-bar">
@@ -46,7 +55,7 @@
       <ol class="onboarding-steps">
         <li>
           <strong>Wallet &amp; network</strong>
-          <span>Install a browser wallet (e.g. MetaMask or Coinbase Wallet). Add <strong>Base Sepolia</strong> (chain ID 84532) so it matches the deployment shown below.</span>
+          <span>Install a browser wallet (e.g. MetaMask or Coinbase Wallet). Match the <strong>chain shown in the top banner</strong> (today: Base Sepolia testnet unless you changed <code>config/deployments.json</code>).</span>
         </li>
         <li>
           <strong>Gas &amp; collateral</strong>
@@ -58,7 +67,7 @@
         </li>
         <li>
           <strong>Inspect &amp; verify</strong>
-          <span>Use <a href="explorer.html">Explorer</a> (auto-refreshes while the tab is visible) to search propositions and open the bet page from any wager row. Use <a href="https://sepolia.basescan.org">Basescan (Base Sepolia)</a> to verify contract code and transactions.</span>
+          <span>Use <a href="explorer.html">Explorer</a> (auto-refreshes while the tab is visible) to search propositions and open the bet page from any wager row. Use the <strong>block explorer</strong> link in the top banner to verify contract code and transactions for the active chain.</span>
         </li>
         <li>
           <strong>Risks</strong>
@@ -127,8 +136,8 @@
           <dd>Wager-configured ERC-20 (USDC presets available in dApp)</dd>
         </div>
         <div>
-          <dt>Explorer</dt>
-          <dd><a href="https://sepolia.basescan.org">sepolia.basescan.org</a></dd>
+          <dt>Block explorer</dt>
+          <dd><a id="homeExplorerLink" href="https://sepolia.basescan.org">sepolia.basescan.org</a></dd>
         </div>
       </dl>
     </div>

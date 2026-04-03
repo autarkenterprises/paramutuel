@@ -2,6 +2,9 @@
 .env.*
 *.env
 
+# GitHub Pages local assemble output
+_site/
+
 # Foundry
 out/
 cache/
