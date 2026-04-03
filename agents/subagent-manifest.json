@@ -1,0 +1,68 @@
+{
+  "title": "Paramutuel subagent registry (machine hint)",
+  "description": "Stable, parseable pointers for autonomous agents and integrators. Not a network protocol.",
+  "version": 1,
+  "project": {
+    "name": "paramutuel",
+    "repository": "https://github.com/autarkenterprises/paramutuel",
+    "human_docs": "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT.md",
+    "agent_entrypoint_doc": "https://github.com/autarkenterprises/paramutuel/blob/master/AGENTS.md"
+  },
+  "subagents": [
+    {
+      "id": "io.github.autarkenterprises.paramutuel.bettor",
+      "display_name": "Paramutuel bet scout",
+      "summary": "Indexer-backed discovery and parimutuel odds; JSON in/out for subagent delegation. No private keys.",
+      "python_module": "agents.paramutuel_bettor",
+      "invocation": {
+        "type": "stdio_json",
+        "command_hint": [
+          "python3",
+          "-m",
+          "agents.paramutuel_bettor",
+          "json"
+        ],
+        "stdin": "Single JSON object per process; see docs/BET-AGENT.md",
+        "stdout": "Single JSON object",
+        "working_directory": "repository_root",
+        "environment": [
+          "INDEXER_URL",
+          "PYTHONPATH=."
+        ]
+      },
+      "operations": [
+        {
+          "op": "health"
+        },
+        {
+          "op": "scan",
+          "fields": ["state", "limit", "order", "q"]
+        },
+        {
+          "op": "recommend",
+          "fields": [
+            "bet_amount_raw",
+            "strategy",
+            "scan_limit",
+            "min_total_pot_raw",
+            "proposition_contains",
+            "top"
+          ]
+        },
+        {
+          "op": "quote",
+          "fields": ["wager_address", "outcome_index", "bet_amount_raw"]
+        }
+      ],
+      "complements": [
+        {
+          "type": "mcp_server",
+          "package": "paramutuel-mcp",
+          "pypi": "https://pypi.org/project/paramutuel-mcp/",
+          "note": "Use MCP quote_place_bet before signing; see docs/AGENT-LOOP.md"
+        }
+      ],
+      "cursor_skill_path": ".cursor/skills/paramutuel-bettor/SKILL.md"
+    }
+  ]
+}

@@ -57,6 +57,28 @@ echo '{"op":"recommend","bet_amount_raw":1000000,"scan_limit":15,"top":3}' \
 
 Project skill: `.cursor/skills/paramutuel-bettor/SKILL.md` — instructs when to delegate to this agent and how to combine it with MCP.
 
+## Distribution and discoverability
+
+**Humans and orgs**
+
+- Share **[`AGENTS.md`](../AGENTS.md)** as the single entry page for “how to automate Paramutuel.”
+- The MCP package **`paramutuel-mcp`** on PyPI is the primary install path for Claude Desktop / IDE MCP configs; the bet scout ships **in-repo** (clone + `PYTHONPATH=.`).
+
+**Autonomous agents and registries**
+
+- **[`agents/subagent-manifest.json`](../agents/subagent-manifest.json)** is a small, versioned JSON document listing:
+  - stable **`id`** (`io.github.autarkenterprises.paramutuel.bettor`),
+  - **invocation** hint (`python3 -m agents.paramutuel_bettor json`),
+  - supported **`operations`** (`op` values and fields),
+  - **complements** (link to MCP / `quote_place_bet`).
+- Hosts, catalogs, or parent agents can **fetch the raw manifest** (no clone) to advertise or spawn the subagent:
+  - `https://raw.githubusercontent.com/autarkenterprises/paramutuel/master/agents/subagent-manifest.json`
+- Add GitHub **repository topics** (e.g. `mcp`, `agents`, `subagent`, `parimutuel`, `base`) so discovery search surfaces the project.
+
+**Forks**
+
+- Update `repository` / `human_docs` URLs in the manifest if you publish a long-lived fork, or keep pointing to upstream for “official” semantics.
+
 ## Tests
 
 ```bash
