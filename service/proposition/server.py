@@ -86,6 +86,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_static("app.js")
         if path == "/style.css":
             return self._send_static("style.css")
+        if path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
         if path == "/health":
             return _json_response(
                 self,
@@ -305,10 +309,17 @@ def main() -> None:
     parser.add_argument("--rpc-url", default=_env("RPC_URL_BASE_SEPOLIA") or _env("RPC_URL"))
     parser.add_argument("--private-key", default=_env("PRIVATE_KEY") or _env("PROPOSITION_PRIVATE_KEY"))
     _ae = _env("PROPOSITION_ALLOW_EXECUTE").lower()
-    parser.add_argument(
+    _env_execute = _ae in ("1", "true", "yes")
+    exec_grp = parser.add_mutually_exclusive_group()
+    exec_grp.add_argument(
         "--allow-execute",
         action="store_true",
-        default=_ae in ("1", "true", "yes"),
+        help="Allow POST .../dispatch regardless of PROPOSITION_ALLOW_EXECUTE",
+    )
+    exec_grp.add_argument(
+        "--no-allow-execute",
+        action="store_true",
+        help="Disable dispatch even if PROPOSITION_ALLOW_EXECUTE is set",
     )
     parser.add_argument("--betting-close-offset", type=int, default=int(_env("PROPOSITION_BETTING_CLOSE_OFFSET_SEC", str(7 * 24 * 3600))))
     parser.add_argument("--resolution-window", type=int, default=int(_env("PROPOSITION_RESOLUTION_WINDOW_SEC", str(3 * 24 * 3600))))
@@ -316,6 +327,13 @@ def main() -> None:
     parser.add_argument("--betting-closer", default=_env("PROPOSITION_BETTING_CLOSER"))
     parser.add_argument("--resolution-closer", default=_env("PROPOSITION_RESOLUTION_CLOSER"))
     args = parser.parse_args()
+
+    if args.allow_execute:
+        allow_execute = True
+    elif args.no_allow_execute:
+        allow_execute = False
+    else:
+        allow_execute = _env_execute
 
     factory = args.factory.strip() or _load_deployments_factory(root)
     auth = (args.auth_token or "").strip()
@@ -339,7 +357,7 @@ def main() -> None:
     Handler.resolver = args.resolver.strip()
     Handler.betting_closer = args.betting_closer.strip()
     Handler.resolution_closer = args.resolution_closer.strip()
-    Handler.allow_execute = bool(args.allow_execute)
+    Handler.allow_execute = allow_execute
 
     er = _env("PROPOSITION_EXTRA_FEE_RECIPIENTS")
     eb = _env("PROPOSITION_EXTRA_FEE_BPS")

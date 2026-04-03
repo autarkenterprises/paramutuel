@@ -20,6 +20,9 @@ class TestRss(unittest.TestCase):
         self.assertEqual(items[0].link, "https://example.com/a")
         self.assertEqual(items[0].external_id, "g1")
 
+    def test_published_ts_epoch_ms(self) -> None:
+        self.assertEqual(rss.published_ts("1700000000000"), 1700000000)
+
     def test_parse_atom_minimal(self) -> None:
         xml = b"""<?xml version="1.0"?>
         <feed xmlns="http://www.w3.org/2005/Atom">

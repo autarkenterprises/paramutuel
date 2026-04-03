@@ -162,9 +162,13 @@ def run_ingest(
         except Exception as exc:
             errors.append(f"{sid}: {exc}")
 
+    calendar_skipped_duplicates = 0
     if include_calendar:
         for kind in ("daily", "weekly"):
             for prop, outs, rationale, refs in synthesize.template_calendar_propositions(kind=kind):
+                if dbm.proposition_exists(conn, proposition=prop):
+                    calendar_skipped_duplicates += 1
+                    continue
                 dbm.insert_proposal(
                     conn,
                     cadence=kind,
@@ -182,6 +186,7 @@ def run_ingest(
         "sources": len(sources),
         "new_source_rows": created_items,
         "new_proposals": created_proposals,
+        "calendar_skipped_duplicates": calendar_skipped_duplicates,
         "errors": errors,
     }
 

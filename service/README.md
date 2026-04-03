@@ -105,7 +105,7 @@ python3 -m service.indexer.sweeper \
 
 ## Proposition service
 
-Ingest configured RSS / Hacker News / JSON sources into SQLite drafts, review in a token-gated panel, approve, then dispatch with Foundry `cast` when execute is enabled.
+Ingest configured RSS / Hacker News / JSON sources into SQLite drafts, review in a token-gated panel, approve, then dispatch with Foundry `cast` when execute is enabled (`PROPOSITION_ALLOW_EXECUTE` or `--allow-execute`; use `--no-allow-execute` to force preview-only).
 
 ```bash
 export PROPOSITION_PANEL_TOKEN='...'

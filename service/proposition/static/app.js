@@ -1,5 +1,20 @@
 const tokenKey = "propositionPanelToken";
 
+let serverAllowExecute = false;
+
+async function refreshServerConfig() {
+  const el = document.getElementById("executeHint");
+  try {
+    const cfg = await api("/api/config");
+    serverAllowExecute = !!cfg.allow_execute;
+    el.textContent = serverAllowExecute
+      ? "On-chain dispatch is enabled on this server."
+      : "On-chain dispatch is disabled (set PROPOSITION_ALLOW_EXECUTE=1 or start with --allow-execute).";
+  } catch (e) {
+    el.textContent = "";
+  }
+}
+
 function getToken() {
   return (document.getElementById("token").value || localStorage.getItem(tokenKey) || "").trim();
 }
@@ -35,6 +50,18 @@ function esc(s) {
 }
 
 function renderProposal(p) {
+  const pending = p.status === "pending";
+  const approved = p.status === "approved";
+  const canDispatch = approved && serverAllowExecute;
+  const disSave = pending ? "" : " disabled";
+  const disApr = pending ? "" : " disabled";
+  const disDispatch = canDispatch ? "" : " disabled";
+  const meta = [];
+  if (p.created_at != null) meta.push(`created: ${p.created_at}`);
+  if (p.updated_at != null) meta.push(`updated: ${p.updated_at}`);
+  if (p.tx_hint) meta.push(`tx/log: ${p.tx_hint}`);
+  if (p.dispatch_error) meta.push(`error: ${p.dispatch_error}`);
+  const metaBlock = meta.length ? `<pre class="meta">${esc(meta.join("\n"))}</pre>` : "";
   const refs = (p.source_refs || []).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.label)}</a>`).join(" · ");
   const outs = JSON.stringify(p.outcomes || []);
   return `
@@ -47,17 +74,18 @@ function renderProposal(p) {
       <p class="muted">Outcomes: <code>${esc(outs)}</code></p>
       <p class="muted">${esc(p.rationale || "")}</p>
       <p class="links">Sources: ${refs || "<span class='muted'>—</span>"}</p>
+      ${metaBlock}
       <label>Edit proposition (pending only)
-        <textarea class="propEdit">${esc(p.proposition)}</textarea>
+        <textarea class="propEdit"${disSave ? " readonly" : ""}>${esc(p.proposition)}</textarea>
       </label>
       <label>Edit outcomes JSON array
-        <textarea class="outEdit">${esc(JSON.stringify(p.outcomes || []))}</textarea>
+        <textarea class="outEdit"${disSave ? " readonly" : ""}>${esc(JSON.stringify(p.outcomes || []))}</textarea>
       </label>
       <div>
-        <button type="button" class="secondary saveBtn">Save edits</button>
-        <button type="button" class="approveBtn">Approve</button>
-        <button type="button" class="danger rejectBtn">Reject</button>
-        <button type="button" class="dispatchBtn">Dispatch</button>
+        <button type="button" class="secondary saveBtn"${disSave}>Save edits</button>
+        <button type="button" class="approveBtn"${disApr}>Approve</button>
+        <button type="button" class="danger rejectBtn"${disApr}>Reject</button>
+        <button type="button" class="dispatchBtn"${disDispatch}>Dispatch</button>
       </div>
       <p class="err itemErr"></p>
     </div>
@@ -78,6 +106,7 @@ async function loadList() {
     throw e;
   }
   sess.textContent = getToken() ? "Authenticated." : "";
+  await refreshServerConfig();
   const host = document.getElementById("list");
   host.innerHTML = (data.proposals || []).map(renderProposal).join("") || "<p class='muted'>No proposals.</p>";
 
@@ -137,10 +166,12 @@ async function loadList() {
   });
 }
 
-document.getElementById("saveToken").addEventListener("click", () => {
+document.getElementById("saveToken").addEventListener("click", async () => {
   const t = document.getElementById("token").value.trim();
   localStorage.setItem(tokenKey, t);
   document.getElementById("sessionStatus").textContent = t ? "Token saved locally." : "Cleared.";
+  await refreshServerConfig();
+  loadList().catch(() => {});
 });
 
 document.getElementById("reload").addEventListener("click", () => loadList().catch((e) => alert(e.message)));

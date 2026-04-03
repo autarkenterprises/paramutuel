@@ -37,6 +37,22 @@ class TestDb(unittest.TestCase):
         self.assertEqual(rows[0]["id"], pid)
         self.assertEqual(json.loads(rows[0]["outcomes_json"]), ["Yes", "No"])
 
+    def test_proposition_exists(self) -> None:
+        conn = dbm.connect(self.db_path)
+        self.assertFalse(dbm.proposition_exists(conn, proposition="Unique text"))
+        dbm.insert_proposal(
+            conn,
+            cadence="event",
+            category="news",
+            proposition="Unique text",
+            outcomes=["Yes", "No"],
+            rationale="r",
+            source_refs=[],
+            source_item_ids=[],
+        )
+        self.assertTrue(dbm.proposition_exists(conn, proposition="Unique text"))
+        conn.close()
+
     def test_edit_pending_only(self) -> None:
         conn = dbm.connect(self.db_path)
         pid = dbm.insert_proposal(

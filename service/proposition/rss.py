@@ -115,10 +115,10 @@ def published_ts(pub: str | None) -> int | None:
     if re.fullmatch(r"\d+", pub.strip()):
         try:
             v = int(pub.strip())
-            if v > 1_000_000_000:
-                return v
-            if v > 1_000_000_00:
+            if v > 1_000_000_000_000:  # milliseconds since epoch
+                return v // 1000
+            if v > 1_000_000_000:  # seconds since epoch
                 return v
         except ValueError:
-            pass
+            return None
     return None

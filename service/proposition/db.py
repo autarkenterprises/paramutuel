@@ -94,6 +94,11 @@ def insert_proposal(
     return int(cur.lastrowid)
 
 
+def proposition_exists(conn: sqlite3.Connection, *, proposition: str) -> bool:
+    row = conn.execute("SELECT 1 FROM proposals WHERE proposition = ? LIMIT 1", (proposition,)).fetchone()
+    return row is not None
+
+
 def get_proposal(conn: sqlite3.Connection, proposal_id: int) -> dict[str, Any] | None:
     row = conn.execute("SELECT * FROM proposals WHERE id = ?", (proposal_id,)).fetchone()
     return dict(row) if row else None

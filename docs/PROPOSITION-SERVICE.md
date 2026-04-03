@@ -37,7 +37,7 @@ Open `http://127.0.0.1:8094`, paste the same token, click **Save token (local)**
 | `PROPOSITION_COLLATERAL_TOKEN` | Collateral `address` for `createWager` |
 | `RPC_URL_BASE_SEPOLIA` / `RPC_URL` | RPC for `cast send` |
 | `PRIVATE_KEY` / `PROPOSITION_PRIVATE_KEY` | Hot key for dispatch |
-| `PROPOSITION_ALLOW_EXECUTE` | `1` / `true` to allow `POST .../dispatch` (or pass `--allow-execute`) |
+| `PROPOSITION_ALLOW_EXECUTE` | `1` / `true` to allow `POST .../dispatch`; override with `--allow-execute` or `--no-allow-execute` |
 | `PROPOSITION_BETTING_CLOSE_OFFSET_SEC` | Seconds from “now” to betting close at dispatch (default 7 days) |
 | `PROPOSITION_RESOLUTION_WINDOW_SEC` | Resolution window passed to factory (default 3 days) |
 | `PROPOSITION_RESOLVER`, `PROPOSITION_BETTING_CLOSER`, `PROPOSITION_RESOLUTION_CLOSER` | Role addresses (optional; `0x0` if omitted) |
@@ -53,7 +53,7 @@ Open `http://127.0.0.1:8094`, paste the same token, click **Save token (local)**
 - **`id`**: Stable id for deduplication (`source_items.source_id` + `external_id`).
 - **`category`**, **`label`**, **`enabled`**, **`default_cadence`**: Passed through to synthesis and stored on proposals.
 
-`POST /api/ingest` accepts `?calendar=1` to append neutral **daily/weekly** calendar drafts. Re-running with `calendar=1` can create duplicate calendar rows; use sparingly or clear the DB.
+`POST /api/ingest` accepts `?calendar=1` to append neutral **daily/weekly** calendar drafts. Identical calendar proposition text is **skipped** if it already exists (response includes `calendar_skipped_duplicates`).
 
 ## API (all authenticated except `/health`)
 

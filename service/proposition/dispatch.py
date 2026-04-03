@@ -50,6 +50,8 @@ def dispatch_proposal(
 
 
 def proposal_to_preview_dict(row: dict[str, Any]) -> dict[str, Any]:
+    tx = str(row["tx_hint"] or "")
+    err = str(row["dispatch_error"] or "")
     return {
         "id": row["id"],
         "proposition": row["proposition"],
@@ -59,4 +61,8 @@ def proposal_to_preview_dict(row: dict[str, Any]) -> dict[str, Any]:
         "rationale": row["rationale"],
         "source_refs": json.loads(row["source_refs_json"] or "[]"),
         "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "tx_hint": (tx[:2000] + "…") if len(tx) > 2000 else tx,
+        "dispatch_error": (err[:2000] + "…") if len(err) > 2000 else err,
     }
