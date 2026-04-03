@@ -3,7 +3,9 @@
 This document describes how **collateral token amounts** are computed when a wager finalizes, for:
 
 1. **Protocol v1** — `ParamutuelWager` (single winning **outcome index**).
-2. **Protocol v2** — `ParamutuelWagerV2` (bitmask **tickets** and **payoff policies**; see ADR-0008).
+2. **Protocol v2** — `ParamutuelWagerV2` (bitmask **tickets** and **payoff policies**; ADR-0008).
+
+**Source layout:** v1 is on `master`. The v2 contract may live on branch `experiment/adr-0008-multi-winner-v2` until merged; the Part B formulas match that implementation.
 
 All amounts are in the wager’s **ERC-20 raw units** (wei of that token). Arithmetic uses **integer division**; rounding favors staying **at or below** the true rational value, so a few wei of collateral can remain in the contract after all claims.
 
@@ -84,6 +86,8 @@ After **`retract()`** or **`expire()`**, state is **Retracted**. Every bettor wi
 ---
 
 ## Part B — v2 (`ParamutuelWagerV2`)
+
+*(Contract: `src/ParamutuelWagerV2.sol` — on `experiment/adr-0008-multi-winner-v2` until merged to `master`.)*
 
 ### Tickets and winning set
 
@@ -175,4 +179,5 @@ Identical formula to **v1**:
 
 - Contracts: `src/ParamutuelWager.sol`, `src/ParamutuelWagerV2.sol`
 - Machine / API context: [`MACHINE.md`](MACHINE.md)
-- v2 policies and limits: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)
+- v2 policies, gas, templates: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)
+- ADR: `research/adr/ADR-0008-multi-winner-and-settlement-generalization.md`
