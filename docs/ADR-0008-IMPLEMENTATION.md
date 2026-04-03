@@ -55,6 +55,7 @@ Planned fields (for a follow-up PR):
 
 ## Related
 
+- [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) — human-readable fee + claim formulas (v1 and v2)
 - [`research/adr/ADR-0008-multi-winner-and-settlement-generalization.md`](../research/adr/ADR-0008-multi-winner-and-settlement-generalization.md)
 - [`ADR-0008-GAS.md`](ADR-0008-GAS.md) — gas profile and how to regenerate
 - [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md) — product templates + `WagerV2Masks` helpers

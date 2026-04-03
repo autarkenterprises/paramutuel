@@ -202,6 +202,8 @@ function withdrawFees() external returns (uint256 amount);
 
 ### Payout math
 
+Full prose spec (v1 + v2): [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md).
+
 Fees are charged once at finalization:
 
 ```
