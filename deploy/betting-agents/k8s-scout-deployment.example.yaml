@@ -1,0 +1,41 @@
+# Example: many independent scout pods (read-only). Tune replicas, resources, and INDEXER_URL.
+# Apply: kubectl apply -f k8s-scout-deployment.example.yaml
+# Image: build/push via .github/workflows/bettor-agent-publish-ghcr.yml or local docker build.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paramutuel-bettor-scout
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: paramutuel-bettor-scout
+  template:
+    metadata:
+      labels:
+        app: paramutuel-bettor-scout
+    spec:
+      containers:
+        - name: scout
+          image: ghcr.io/REPLACE_OWNER/paramutuel-bettor-agent:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: INDEXER_URL
+              value: "https://your-indexer.example"
+            - name: SCOUT_INTERVAL_SECONDS
+              value: "240"
+            - name: BETTOR_STRATEGY
+              value: "best_post_multiple"
+            - name: BET_AMOUNT_RAW
+              value: "1000000"
+            - name: SCOUT_SCAN_LIMIT
+              value: "40"
+            - name: SCOUT_TOP
+              value: "5"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"

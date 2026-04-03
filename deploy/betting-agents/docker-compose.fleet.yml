@@ -1,0 +1,21 @@
+# Fleet of read-only scout containers (logs JSON to stdout / docker logs).
+# Scale:  docker compose -f deploy/betting-agents/docker-compose.fleet.yml up --scale bettor-scout=20
+#
+# Required: INDEXER_URL (or rely on defaults inside image — still set explicitly in prod).
+#
+# See EXECUTOR-PATTERN.md for placing real on-chain bets at scale.
+
+services:
+  bettor-scout:
+    build:
+      context: ../..
+      dockerfile: deploy/betting-agents/Dockerfile
+    environment:
+      INDEXER_URL: ${INDEXER_URL:-}
+      SCOUT_INTERVAL_SECONDS: ${SCOUT_INTERVAL_SECONDS:-300}
+      BETTOR_STRATEGY: ${BETTOR_STRATEGY:-best_post_multiple}
+      BET_AMOUNT_RAW: ${BET_AMOUNT_RAW:-1000000}
+      SCOUT_SCAN_LIMIT: ${SCOUT_SCAN_LIMIT:-30}
+      SCOUT_TOP: ${SCOUT_TOP:-3}
+      MIN_TOTAL_POT_RAW: ${MIN_TOTAL_POT_RAW:-0}
+    restart: unless-stopped

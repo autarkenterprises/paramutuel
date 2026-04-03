@@ -1,0 +1,40 @@
+name: Bet scout agent (CI)
+
+on:
+  pull_request:
+    paths:
+      - "agents/**"
+      - "pyproject.toml"
+      - ".github/workflows/bettor-agent-ci.yml"
+      - "deploy/betting-agents/**"
+  push:
+    branches: [master]
+    paths:
+      - "agents/**"
+      - "pyproject.toml"
+      - ".github/workflows/bettor-agent-ci.yml"
+      - "deploy/betting-agents/**"
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        run: |
+          PYTHONPATH=. python3 -m unittest discover -s agents/paramutuel_bettor/tests -p "test_*.py" -v
+
+      - name: Build sdist/wheel
+        run: |
+          python3 -m pip install -q build
+          python3 -m build
+
+      - name: Smoke install wheel
+        run: |
+          python3 -m pip install dist/paramutuel_bettor_agent-*-py3-none-any.whl
+          paramutuel-bettor --help | head -5

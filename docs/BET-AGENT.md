@@ -13,6 +13,16 @@ This complements the MCP server (`mcp_server/`): MCP remains the canonical **too
 
 ## CLI
 
+From PyPI (console script `paramutuel-bettor`):
+
+```bash
+pip install paramutuel-bettor-agent
+paramutuel-bettor health
+paramutuel-bettor scan --state OPEN --limit 20
+paramutuel-bettor recommend --bet-amount-raw 1000000 --scan-limit 30 --top 5
+paramutuel-bettor quote --wager 0x... --outcome-index 0 --bet-amount-raw 1000000
+```
+
 From repo root:
 
 ```bash
@@ -62,7 +72,8 @@ Project skill: `.cursor/skills/paramutuel-bettor/SKILL.md` — instructs when to
 **Humans and orgs**
 
 - Share **[`AGENTS.md`](../AGENTS.md)** as the single entry page for “how to automate Paramutuel.”
-- The MCP package **`paramutuel-mcp`** on PyPI is the primary install path for Claude Desktop / IDE MCP configs; the bet scout ships **in-repo** (clone + `PYTHONPATH=.`).
+- The MCP package **`paramutuel-mcp`** on PyPI is the primary install path for Claude Desktop / IDE MCP configs; the bet scout is **`paramutuel-bettor-agent`** on PyPI (CLI **`paramutuel-bettor`**) or **in-repo** (clone + `PYTHONPATH=.`).
+- Full channel list, CI/CD, and fleet rollout: **[`BET-AGENT-DISTRIBUTION.md`](BET-AGENT-DISTRIBUTION.md)**.
 
 **Autonomous agents and registries**
 

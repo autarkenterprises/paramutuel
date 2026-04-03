@@ -223,7 +223,7 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 
 **Agents & automation:** see [`AGENTS.md`](AGENTS.md) (entry for AI agents and subagents), [`docs/MACHINE.md`](docs/MACHINE.md) for JSON HTTP API shapes, ABI locations, MCP server, and a concise on-chain state machine for bots.
 
-**MCP server:** A 16-tool MCP server for LLM agent integration is available at `mcp_server/`. Run with `python -m mcp_server`. See [`docs/MACHINE.md`](docs/MACHINE.md) for details. A small **bet scout agent** for subagent-style workflows lives under `agents/paramutuel_bettor/` ([`docs/BET-AGENT.md`](docs/BET-AGENT.md)).
+**MCP server:** A 16-tool MCP server for LLM agent integration is available at `mcp_server/`. Run with `python -m mcp_server`. See [`docs/MACHINE.md`](docs/MACHINE.md) for details. A small **bet scout agent** for subagent-style workflows is on PyPI as **`paramutuel-bettor-agent`** (CLI `paramutuel-bettor`) and in-repo under `agents/paramutuel_bettor/` ([`docs/BET-AGENT.md`](docs/BET-AGENT.md), [`docs/BET-AGENT-DISTRIBUTION.md`](docs/BET-AGENT-DISTRIBUTION.md)).
 
 ### Actors and relationships (MVP)
 

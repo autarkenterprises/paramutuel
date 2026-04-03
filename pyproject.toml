@@ -1,0 +1,54 @@
+# Standalone distribution of the Paramutuel bet scout agent (`agents.paramutuel_bettor`).
+# The MCP server remains installable separately from `mcp_server/pyproject.toml`.
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paramutuel-bettor-agent"
+dynamic = ["version"]
+description = "Small stdlib bet scout for Paramutuel parimutuel wagers (indexer + JSON subagent bridge)."
+readme = "agents/paramutuel_bettor/README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Autark Enterprises" }]
+keywords = [
+    "paramutuel",
+    "parimutuel",
+    "betting",
+    "prediction-markets",
+    "base",
+    "llm",
+    "agents",
+    "subagent",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/autarkenterprises/paramutuel"
+Repository = "https://github.com/autarkenterprises/paramutuel"
+Documentation = "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT.md"
+"Distribution & rollout" = "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT-DISTRIBUTION.md"
+"Agent index" = "https://github.com/autarkenterprises/paramutuel/blob/master/AGENTS.md"
+"Subagent manifest" = "https://raw.githubusercontent.com/autarkenterprises/paramutuel/master/agents/subagent-manifest.json"
+
+[project.scripts]
+paramutuel-bettor = "agents.paramutuel_bettor.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "agents.paramutuel_bettor.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agents*"]
+exclude = ["agents.paramutuel_bettor.tests*"]
+
+[tool.setuptools.package-data]
+agents = ["subagent-manifest.json"]

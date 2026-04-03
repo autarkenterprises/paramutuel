@@ -1,0 +1,46 @@
+# Publish paramutuel-bettor-agent to PyPI when a release tag is pushed.
+#
+# Tag format: bettor-agent-v0.2.0
+#
+# Preferred: PyPI "Trusted Publishing" (OIDC) for this workflow — see:
+#   https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-pypi
+#
+# Fallback: set repository secret PYPI_API_TOKEN (classic upload token).
+name: Publish bet scout agent (PyPI)
+
+on:
+  push:
+    tags:
+      - "bettor-agent-v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#bettor-agent-v}"
+          VER=$(python3 -c "import re; print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', open('agents/paramutuel_bettor/__init__.py').read()).group(1))")
+          test "$TAG" = "$VER" || { echo "error: tag $GITHUB_REF_NAME does not match __version__ $VER"; exit 1; }
+
+      - name: Build
+        run: |
+          python3 -m pip install -q build
+          python3 -m build
+
+      # Trusted Publishing (OIDC): configure PyPI project → Publishing → GitHub Actions.
+      # If you must use a classic API token instead, add:
+      #   with:
+      #     password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

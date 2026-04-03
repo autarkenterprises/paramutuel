@@ -6,7 +6,8 @@
     "name": "paramutuel",
     "repository": "https://github.com/autarkenterprises/paramutuel",
     "human_docs": "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT.md",
-    "agent_entrypoint_doc": "https://github.com/autarkenterprises/paramutuel/blob/master/AGENTS.md"
+    "agent_entrypoint_doc": "https://github.com/autarkenterprises/paramutuel/blob/master/AGENTS.md",
+    "distribution_guide": "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT-DISTRIBUTION.md"
   },
   "subagents": [
     {
@@ -54,6 +55,14 @@
           "fields": ["wager_address", "outcome_index", "bet_amount_raw"]
         }
       ],
+      "distribution": {
+        "pypi_package": "paramutuel-bettor-agent",
+        "pypi_project_url": "https://pypi.org/project/paramutuel-bettor-agent/",
+        "console_script": "paramutuel-bettor",
+        "pip_install": ["pip", "install", "paramutuel-bettor-agent"],
+        "oci_image_template": "ghcr.io/<github-owner-lowercase>/paramutuel-bettor-agent:<semver>",
+        "release_git_tag_template": "bettor-agent-v<semver>"
+      },
       "complements": [
         {
           "type": "mcp_server",

@@ -7,7 +7,7 @@ This repository is built for **bots, indexers, and LLM-driven workflows**. If yo
 | Surface | Purpose | Where |
 |--------|---------|--------|
 | **MCP server** | Full protocol tools: discovery, odds, ABI calldata (`quote_place_bet`, encoders). | `mcp_server/`, PyPI package **`paramutuel-mcp`**, [`docs/MACHINE.md`](docs/MACHINE.md) |
-| **Bet scout subagent** | Small **stdlib** process: scan / recommend / quote with **JSON stdin → JSON stdout** for delegation. No private keys. | `agents/paramutuel_bettor/`, [`docs/BET-AGENT.md`](docs/BET-AGENT.md) |
+| **Bet scout subagent** | Small **stdlib** process: scan / recommend / quote with **JSON stdin → JSON stdout** for delegation. No private keys. | PyPI **`paramutuel-bettor-agent`** (CLI `paramutuel-bettor`), `agents/paramutuel_bettor/`, [`docs/BET-AGENT.md`](docs/BET-AGENT.md), [`docs/BET-AGENT-DISTRIBUTION.md`](docs/BET-AGENT-DISTRIBUTION.md) |
 | **Machine manifest** | Stable JSON listing subagent id, ops, and complementing MCP. For registries and automated discovery. | [`agents/subagent-manifest.json`](agents/subagent-manifest.json) |
 
 ## Recommended execution loop (betting)
@@ -17,6 +17,14 @@ This repository is built for **bots, indexers, and LLM-driven workflows**. If yo
 3. A separate **wallet / signer** submits `approve` and `placeBet`. Do not embed private keys in the scout or MCP server.
 
 Details: [`docs/AGENT-LOOP.md`](docs/AGENT-LOOP.md).
+
+## Running the bet scout (pip install)
+
+```bash
+pip install paramutuel-bettor-agent
+paramutuel-bettor health
+echo '{"op":"recommend","bet_amount_raw":1000000,"top":3}' | paramutuel-bettor json
+```
 
 ## Running the bet scout (from a clone)
 
@@ -29,6 +37,8 @@ echo '{"op":"recommend","bet_amount_raw":1000000,"top":3}' | python3 -m agents.p
 ```
 
 `INDEXER_URL` overrides the default from `config/deployments.json` (see [`docs/BET-AGENT.md`](docs/BET-AGENT.md)).
+
+Release channels, GHCR fleet images, and rollout steps: [`docs/BET-AGENT-DISTRIBUTION.md`](docs/BET-AGENT-DISTRIBUTION.md).
 
 ## Claude Code / Cursor
 
