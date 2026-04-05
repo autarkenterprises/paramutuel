@@ -41,21 +41,19 @@
 
     let variant = "network-banner--testnet";
     let badge = "Testnet";
-    let line = `${chainLabel} · factory ${factory || "—"} · indexer ${apiBase ? "connected" : "not set"}`;
+    let line = `${chainLabel} · ${apiBase ? "Markets connected" : "Market list offline"} · practice tokens only`;
 
     if (isMainnet) {
       variant = mainnetIncomplete ? "network-banner--warn" : "network-banner--mainnet";
-      badge = mainnetIncomplete ? "Mainnet (incomplete)" : "Mainnet";
+      badge = mainnetIncomplete ? "Mainnet (setup)" : "Mainnet";
       if (mainnetIncomplete) {
-        line = `${chainLabel} — set factoryAddress and explorerApiBase in config/deployments.json before go-live.`;
+        line = `${chainLabel} — not ready for real funds yet. Prefer a testnet deployment for practice.`;
       } else {
-        line = `${chainLabel} · production configuration loaded.`;
+        line = `${chainLabel} · ${apiBase ? "Markets connected" : "Market list offline"} · real funds — check your wallet matches this network`;
       }
     }
 
     const root = blockExplorerRoot(chainId);
-    const docsSwitch =
-      "https://github.com/autarkenterprises/paramutuel/blob/master/docs/WEBSITE.md#switching-testnet--mainnet";
 
     slot.innerHTML = `
       <div class="network-banner ${variant}" role="status">
@@ -63,8 +61,6 @@
         <span class="network-banner__text">${escapeHtml(line)}</span>
         <span class="network-banner__links">
           <a href="${root}" target="_blank" rel="noopener noreferrer">Block explorer</a>
-          <span class="network-banner__sep">·</span>
-          <a href="${docsSwitch}" class="external">Network switch (docs)</a>
         </span>
       </div>
     `.trim();
@@ -75,15 +71,15 @@
     if (ctx) {
       if (isTestnet) {
         ctx.textContent =
-          "This site build targets Base Sepolia (testnet). Funds are for testing only; contracts and APIs may reset.";
+          "You are on Base Sepolia (testnet). Tokens are for practice only — nothing here is a real-money offer.";
         ctx.hidden = false;
       } else if (isMainnet && factory && apiBase) {
         ctx.textContent =
-          "This site build targets Base mainnet. Verify factory and indexer URLs before moving real funds.";
+          "You are on Base mainnet. Only continue if you intend to use real funds and you trust this deployment.";
         ctx.hidden = false;
       } else if (isMainnet) {
         ctx.textContent =
-          "Mainnet is selected in deployments.json but configuration is incomplete — see banner and docs.";
+          "Mainnet is selected but this site is not fully configured — do not use real funds here until the banner shows a complete setup.";
         ctx.hidden = false;
       } else {
         ctx.hidden = true;

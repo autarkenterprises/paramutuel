@@ -92,6 +92,67 @@ nav .links a.external {
   margin-bottom: 20px;
 }
 
+/* ── About page ── */
+
+.about-page {
+  padding-top: 28px;
+  padding-bottom: 48px;
+}
+
+.about-hero {
+  margin-bottom: 24px;
+}
+
+.about-hero h1 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.about-lead {
+  font-size: 16px;
+  line-height: 1.55;
+  max-width: 720px;
+}
+
+.about-page .card + .card {
+  margin-top: 20px;
+}
+
+.about-dev-links {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: #97a6c4;
+}
+
+.about-dev-links a {
+  word-break: break-all;
+}
+
+/* ── Thin footers on app / explorer shells ── */
+
+.app-shell-footer {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 12px 24px;
+  font-size: 13px;
+  color: #6e7a94;
+  border-top: 1px solid #23304a;
+  background: #121a2a;
+}
+
+.app-shell-footer a {
+  color: #97a6c4;
+}
+
+body > footer:not(.app-shell-footer) {
+  /* index, bet, operator full-page footers */
+  text-align: center;
+  padding: 20px 24px 28px;
+  font-size: 13px;
+  color: #6e7a94;
+  margin-top: auto;
+}
+
 /* ── Hero ── */
 
 .hero {

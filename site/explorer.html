@@ -12,11 +12,10 @@
     <span class="logo">Paramutuel</span>
     <div class="links">
       <a href="index.html">Home</a>
-      <a href="app.html">App</a>
       <a href="index.html#place-a-bet">Place a bet</a>
       <a href="explorer.html" class="active">Explorer</a>
-      <a href="operator.html">Operators</a>
-      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+      <a href="app.html">App</a>
+      <a href="about.html">About</a>
     </div>
   </nav>
   <div id="networkBannerSlot"></div>
@@ -25,7 +24,7 @@
     <label for="indexerUrl">Indexer API URL:</label>
     <input id="indexerUrl" type="text" placeholder="http://127.0.0.1:8090" />
     <button id="loadExplorer">Connect</button>
-    <span id="indexerHint" style="color: #6e7a94;">Leave empty for default. Requires a running indexer service.</span>
+    <span id="indexerHint" class="muted">Leave blank to use this site’s default market API.</span>
   </div>
   <iframe id="explorerFrame" src="explorer/index.html" title="Paramutuel Explorer"></iframe>
   <script>
@@ -58,5 +57,9 @@
 
     applyDefaultIndexerFromConfig().finally(setExplorerFrameFromInput);
   </script>
+  <footer class="app-shell-footer">
+    <a href="about.html">About</a>
+    · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+  </footer>
 </body>
 </html>

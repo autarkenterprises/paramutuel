@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel — on-chain parimutuel wagers on Base. Public testnet deployment; switch to mainnet via a single config change when ready." />
+  <meta name="description" content="Paramutuel — parimutuel markets on Base. Search markets, place bets with your wallet, explore live wagers (testnet and mainnet)." />
   <meta property="og:title" content="Paramutuel" />
-  <meta property="og:description" content="Parimutuel pools on Base: create wagers, stake on outcomes, resolve and claim. Modular website + self-custody dApp." />
+  <meta property="og:description" content="Parimutuel pools on Base: search markets, stake on outcomes with a wallet, resolve and claim on-chain." />
   <meta property="og:type" content="website" />
   <title>Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
@@ -15,11 +15,10 @@
     <span class="logo">Paramutuel</span>
     <div class="links">
       <a href="index.html" class="active">Home</a>
-      <a href="app.html">App</a>
       <a href="index.html#place-a-bet">Place a bet</a>
       <a href="explorer.html">Explorer</a>
-      <a href="operator.html">Operators</a>
-      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+      <a href="app.html">App</a>
+      <a href="about.html">About</a>
     </div>
   </nav>
   <div id="networkBannerSlot"></div>
@@ -30,9 +29,9 @@
     <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel wagers on Base</p>
 
     <div class="actions">
-      <a href="app.html" class="btn btn-primary">Launch App</a>
+      <a href="index.html#place-a-bet" class="btn btn-primary">Place a bet</a>
       <a href="bet.html" class="btn btn-secondary">Bet page</a>
-      <a href="https://github.com/autarkenterprises/paramutuel" class="btn btn-secondary">View Source</a>
+      <a href="app.html" class="btn btn-secondary">Full app</a>
     </div>
   </div>
 
@@ -81,7 +80,7 @@
       <ol class="onboarding-steps">
         <li>
           <strong>Wallet &amp; network</strong>
-          <span>Install a browser wallet (e.g. MetaMask or Coinbase Wallet). Match the <strong>chain shown in the top banner</strong> (today: Base Sepolia testnet unless you changed <code>config/deployments.json</code>).</span>
+          <span>Install a browser wallet (e.g. MetaMask or Coinbase Wallet). Use the <strong>same network as the strip under the navigation</strong> (often Base Sepolia for practice, or Base mainnet when this site is configured for production).</span>
         </li>
         <li>
           <strong>Gas &amp; collateral</strong>
@@ -129,8 +128,8 @@
             <li><strong>Parimutuel math</strong> &mdash; all stakes go into one pot per market; implied odds reflect aggregate sentiment, not a house line.</li>
             <li><strong>ERC-20 collateral</strong> &mdash; use standard tokens (e.g. USDC) per wager; amounts are enforced by contract logic.</li>
             <li><strong>Composable lifecycle</strong> &mdash; factory-deployed wagers with configurable closers, resolution windows, and fee recipients (treasury + extras).</li>
-            <li><strong>Indexer + explorer</strong> &mdash; HTTP APIs and tables for bots, operators, and UIs; no bespoke scraping.</li>
-            <li><strong>Base-first</strong> &mdash; low-friction L2 environment aligned with retail and builder tooling (see repo research memos on chain choice).</li>
+            <li><strong>Live market list</strong> &mdash; search and explore wagers without scraping the chain yourself.</li>
+            <li><strong>Base-first</strong> &mdash; low-friction L2 for everyday wallet use.</li>
           </ul>
         </div>
         <div>
@@ -140,7 +139,7 @@
             <li><strong>Long-horizon forecasts</strong> &mdash; templates for extended betting and resolution windows.</li>
             <li><strong>Closer-managed windows</strong> &mdash; authority-driven close when fixed deadlines are a poor fit.</li>
             <li><strong>Charity or beneficiary splits</strong> &mdash; fee configuration supports directing a share of the pot to treasuries or named recipients (within protocol caps).</li>
-            <li><strong>Integration &amp; automation</strong> &mdash; MCP/CLI workflows and resolution services for operators (see <code>docs/MACHINE.md</code>, <code>docs/WORKFLOWS.md</code>).</li>
+            <li><strong>Integrators</strong> &mdash; builders can use the same public market data that powers this site; see <a href="about.html#developers">About → Developers</a>.</li>
           </ul>
         </div>
       </div>
@@ -151,11 +150,11 @@
       <dl class="network-info">
         <div>
           <dt>Chain</dt>
-          <dd id="networkDisplay">Configured in deployments.json</dd>
+          <dd id="networkDisplay">Same as the banner above</dd>
         </div>
         <div>
           <dt>Factory</dt>
-          <dd id="factoryAddressDisplay">Configured in deployments.json</dd>
+          <dd id="factoryAddressDisplay">Shown when this deployment publishes it</dd>
         </div>
         <div>
           <dt>Collateral</dt>
@@ -180,7 +179,8 @@
   </div>
 
   <footer>
-    Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
+    Paramutuel &mdash; <a href="about.html">About</a>
+    · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
   </footer>
   <script src="home-bet-search.js" defer></script>
   <script src="home-ticker.js" defer></script>

@@ -56,7 +56,7 @@
     try {
       deployments = await loadJson(DEPLOYMENTS_URL);
     } catch (e) {
-      setText("operatorHubStatus", "Could not load deployments.json: " + e.message);
+      setText("operatorHubStatus", "Could not load deployment configuration: " + e.message);
       return;
     }
     try {
@@ -81,7 +81,10 @@
         ? "explorer/index.html?api=" + encodeURIComponent(apiBase)
         : "explorer/index.html";
     }
-    setText("operatorExplorerNote", apiBase ? "Indexer API prefilled from deployments.json." : "Set explorerApiBase in deployments.json.");
+    setText(
+      "operatorExplorerNote",
+      apiBase ? "Explorer uses this deployment’s indexer URL." : "Configure an indexer URL for this deployment to enable the embedded explorer."
+    );
 
     const cp = String(hub.controlPanelBaseUrl || "").trim().replace(/\/$/, "");
     const prop = String(hub.propositionBaseUrl || "").trim().replace(/\/$/, "");
@@ -93,9 +96,7 @@
 
     setText(
       "operatorHubStatus",
-      "Loaded deployments for " +
-        netKey +
-        ". Hosted panels (control / proposition / resolution) use operator-hub.json when you deploy them."
+      "Loaded network " + netKey + ". Optional control / ingest / resolution links appear when your deployment provides them."
     );
   }
 

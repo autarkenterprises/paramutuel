@@ -52,7 +52,7 @@ jobs:
           "
 
           # Copy website shell
-          cp site/index.html site/app.html site/explorer.html site/bet.html site/operator.html site/style.css site/home-ticker.js site/home-bet-search.js site/bet-page.js site/network-banner.js site/operator-hub.js _site/
+          cp site/index.html site/about.html site/app.html site/explorer.html site/bet.html site/operator.html site/style.css site/home-ticker.js site/home-bet-search.js site/bet-page.js site/network-banner.js site/operator-hub.js _site/
           cp config/deployments.json config/operator-hub.json _site/config/
 
           # Copy dApp files
