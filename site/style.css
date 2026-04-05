@@ -117,6 +117,161 @@ nav .links a.external {
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* ── Home: Place a bet search (hero) ── */
+
+.hero .home-bet-search {
+  max-width: 720px;
+  margin: 0 auto 28px;
+  text-align: left;
+}
+
+.home-bet-search-title {
+  font-size: 1.35rem;
+  margin-bottom: 8px;
+  color: #e6edf3;
+}
+
+.home-bet-search-hint {
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+.home-bet-search-field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-bet-search-input {
+  flex: 1;
+  min-width: 0;
+  background: #0b0f19;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.home-bet-search-input:focus {
+  outline: none;
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+.home-bet-search-spinner {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 2px solid #2c3a5a;
+  border-top-color: #79b8ff;
+  border-radius: 50%;
+  animation: site-spin 0.75s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-bet-search-spinner {
+    animation: none;
+    border-top-color: #2c3a5a;
+  }
+}
+
+.home-bet-search-status {
+  margin-top: 10px;
+  min-height: 1.3em;
+  font-size: 13px;
+}
+
+.home-bet-search-results {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  border: 1px solid #23304a;
+  border-radius: 10px;
+  background: #0b0f19;
+}
+
+.home-bet-search-item {
+  border-bottom: 1px solid #1c2640;
+}
+
+.home-bet-search-item:last-child {
+  border-bottom: none;
+}
+
+.home-bet-search-link {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "prop badge"
+    "meta meta"
+    "addr addr";
+  gap: 4px 12px;
+  padding: 12px 14px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+
+.home-bet-search-link:hover {
+  background: #121a2a;
+  text-decoration: none;
+}
+
+.home-bet-search-prop {
+  grid-area: prop;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+  line-height: 1.35;
+}
+
+.home-bet-search-badge {
+  grid-area: badge;
+  align-self: start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #1c2640;
+  color: #97a6c4;
+}
+
+.home-bet-search-badge--open {
+  background: #1a3d2e;
+  color: #7ee787;
+}
+
+.home-bet-search-badge--resolved {
+  background: #2d2a1a;
+  color: #d4a72c;
+}
+
+.home-bet-search-badge--retracted {
+  background: #3d1a1a;
+  color: #ff7b72;
+}
+
+.home-bet-search-meta {
+  grid-area: meta;
+  font-size: 13px;
+  color: #97a6c4;
+  line-height: 1.4;
+}
+
+.home-bet-search-addr {
+  grid-area: addr;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
 }
 
 .btn {
@@ -180,9 +335,16 @@ nav .links a.external {
 .ticker-viewport {
   flex: 1;
   min-width: 0;
+  min-height: 52px;
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+
+/* Before JS runs the track is empty; avoid a collapsed strip on first paint. */
+.ticker-viewport:has(.ticker-track:empty) {
+  min-height: 64px;
+  background: linear-gradient(90deg, transparent, rgba(30, 42, 74, 0.35) 40%, rgba(30, 42, 74, 0.35) 60%, transparent);
 }
 
 .ticker-track {
@@ -411,6 +573,24 @@ nav .links a.external {
   margin-bottom: 8px;
 }
 
+.app-embed-share-hint {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 24px 12px;
+  border-bottom: 1px solid #23304a;
+  background: #121a2a;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.app-embed-share-hint code {
+  font-size: 12px;
+  padding: 2px 6px;
+  background: #0b0f19;
+  border-radius: 4px;
+}
+
 /* ── Place a bet page ── */
 
 .bet-page .card {
@@ -454,6 +634,79 @@ nav .links a.external {
 
 .bet-summary-dl {
   margin: 0;
+}
+
+.bet-wager-id-dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bet-wager-id-dd code {
+  word-break: break-all;
+}
+
+.bet-mono-wrap {
+  word-break: break-all;
+  font-size: 12px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.bet-outcomes-table-title {
+  margin: 24px 0 8px;
+  font-size: 1.05rem;
+  color: #e6edf3;
+}
+
+.bet-odds-footnote {
+  font-size: 13px;
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.bet-outcomes-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #23304a;
+  border-radius: 10px;
+}
+
+.bet-outcomes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bet-outcomes-table th,
+.bet-outcomes-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #1c2640;
+}
+
+.bet-outcomes-table th {
+  color: #97a6c4;
+  font-weight: 600;
+  background: #121a2a;
+}
+
+.bet-outcomes-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.bet-outcomes-table td {
+  color: #e6edf3;
+  vertical-align: top;
+}
+
+.bet-outcomes-table .bet-outcome-name-cell {
+  font-weight: 500;
+  max-width: 280px;
 }
 
 .bet-load-panel {
@@ -839,6 +1092,15 @@ a.btn.operator-link--disabled {
 
 body.site-has-banner .iframe-page iframe {
   min-height: calc(100vh - 56px - 48px);
+}
+
+/* app.html: share hint row above dApp iframe */
+.iframe-page--with-embed-hint iframe {
+  min-height: calc(100vh - 56px - 52px);
+}
+
+body.site-has-banner .iframe-page--with-embed-hint iframe {
+  min-height: calc(100vh - 56px - 48px - 52px);
 }
 
 .iframe-config {

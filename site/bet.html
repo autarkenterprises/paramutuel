@@ -26,7 +26,7 @@
     <section class="card" id="betIntro">
       <h1>Place a bet</h1>
       <p class="muted" id="betIntroText">
-        Open this page from the home ticker or Explorer (wager link) with <code>?wager=0x…</code>, or paste an address below.
+        Open from the home search, live feed, or Explorer, or use <code>?wager=0x…</code>. You can also paste a wager contract address below.
       </p>
       <div class="bet-paste-row">
         <label class="bet-paste-label">
@@ -53,11 +53,46 @@
       <h2>Wager</h2>
       <p id="betProposition" class="bet-proposition"></p>
       <dl class="network-info bet-summary-dl">
+        <div>
+          <dt>Wager contract</dt>
+          <dd class="bet-wager-id-dd">
+            <code id="betWagerAddress"></code>
+            <button type="button" class="btn btn-small btn-secondary" id="betCopyAddressBtn">Copy</button>
+          </dd>
+        </div>
         <div><dt>State</dt><dd id="betState"></dd></div>
+        <div><dt>Factory</dt><dd><code id="betFactory" class="bet-mono-wrap"></code></dd></div>
+        <div><dt>Proposer</dt><dd><code id="betProposer" class="bet-mono-wrap"></code></dd></div>
+        <div><dt>Resolver</dt><dd><code id="betResolver" class="bet-mono-wrap"></code></dd></div>
         <div><dt>Collateral (ERC-20)</dt><dd><code id="betCollateral"></code></dd></div>
         <div><dt>Total pot (raw)</dt><dd id="betPot"></dd></div>
-        <div><dt>Contract</dt><dd><a id="betBasescan" href="#" target="_blank" rel="noopener noreferrer">Basescan</a></dd></div>
+        <div><dt>Total fee (basis points)</dt><dd id="betFeeBps"></dd></div>
+        <div><dt>Betting closes (UTC)</dt><dd id="betBettingClose"></dd></div>
+        <div><dt>Resolution deadline (UTC)</dt><dd id="betResolutionDeadline"></dd></div>
+        <div><dt>Resolution window (seconds)</dt><dd id="betResolutionWindow"></dd></div>
+        <div id="betWinningRow" hidden><dt>Winning outcome</dt><dd id="betWinningOutcome"></dd></div>
+        <div><dt>Created</dt><dd id="betCreatedMeta"></dd></div>
+        <div><dt>Block explorer</dt><dd><a id="betBasescan" href="#" target="_blank" rel="noopener noreferrer">Basescan</a></dd></div>
       </dl>
+
+      <h3 class="bet-outcomes-table-title">Outcomes &amp; implied odds</h3>
+      <p class="muted bet-odds-footnote">
+        Pool share uses on-chain stake totals. <strong>Implied multiple</strong> is the approximate payout per 1 unit staked on that outcome if it wins, <em>after</em> protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).
+      </p>
+      <div class="bet-outcomes-table-wrap">
+        <table class="bet-outcomes-table" id="betOutcomesTable">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Outcome</th>
+              <th scope="col">Stake (raw)</th>
+              <th scope="col">Of pool</th>
+              <th scope="col">Implied multiple</th>
+            </tr>
+          </thead>
+          <tbody id="betOutcomesTableBody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section class="card" id="betFormSection" hidden>

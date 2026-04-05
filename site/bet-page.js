@@ -21,6 +21,8 @@
   let wagerContract = null;
   let collateralTokenAddr = "";
   let outcomeLabels = [];
+  /** Checksum address of the wager currently shown (for copy / reload). */
+  let loadedWagerAddress = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -105,6 +107,7 @@
 
   function showError(msg) {
     clearLoading();
+    loadedWagerAddress = null;
     showEl("betError", true);
     showEl("betSummary", false);
     showEl("betFormSection", false);
@@ -120,11 +123,91 @@
     return r.json();
   }
 
+  /** Refresh summary/odds after a successful tx without toggling the loading panel. */
+  async function refreshWagerFromIndexerSilently() {
+    if (!loadedWagerAddress) return;
+    try {
+      await loadDeployments();
+      if (!wagerAbi) await loadWagerAbi();
+      const detail = await fetchWagerFromIndexer(loadedWagerAddress);
+      await applyWagerDetail(loadedWagerAddress, detail);
+    } catch (e) {
+      console.warn("Could not refresh wager from indexer:", e);
+    }
+  }
+
   function formatPot(raw) {
     try {
       return BigInt(String(raw || "0")).toLocaleString("en-US");
     } catch {
       return String(raw || "0");
+    }
+  }
+
+  function formatUtcSeconds(sec) {
+    const n = Number(sec);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    try {
+      return new Date(n * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+    } catch {
+      return String(sec);
+    }
+  }
+
+  function netPotAfterFees(totalPotBn, feeBpsBn) {
+    return totalPotBn - (totalPotBn * feeBpsBn) / 10000n;
+  }
+
+  function formatRatioBig(numerator, denominator, precision) {
+    if (denominator === 0n) return "N/A";
+    const p = BigInt(precision);
+    const scale = 10n ** p;
+    const scaled = (numerator * scale) / denominator;
+    const whole = scaled / scale;
+    const frac = (scaled % scale).toString().padStart(Number(precision), "0");
+    return `${whole}.${frac}`;
+  }
+
+  function outcomeTotalsByIndex(outcomesArr) {
+    const map = {};
+    for (const o of outcomesArr || []) {
+      map[Number(o.outcome_index)] = BigInt(String(o.outcome_total || "0"));
+    }
+    return map;
+  }
+
+  function renderOutcomesOddsTable(labels, outcomesArr, totalPotRaw, feeBpsRaw) {
+    const tbody = $("betOutcomesTableBody");
+    if (!tbody) return;
+
+    const totalPot = BigInt(String(totalPotRaw || "0"));
+    const feeBps = BigInt(String(feeBpsRaw || "0"));
+    const net = netPotAfterFees(totalPot, feeBps);
+    const byIdx = outcomeTotalsByIndex(outcomesArr);
+
+    let sumStakes = 0n;
+    for (let i = 0; i < labels.length; i++) {
+      sumStakes += byIdx[i] ?? 0n;
+    }
+
+    tbody.innerHTML = "";
+    for (let i = 0; i < labels.length; i++) {
+      const label = labels[i] || `#${i}`;
+      const stake = byIdx[i] ?? 0n;
+      const poolPct =
+        sumStakes > 0n ? Number((stake * 10000n) / sumStakes) / 100 : 0;
+      const mult =
+        stake > 0n ? `${formatRatioBig(net, stake, 4)}x` : "—";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i}</td>
+        <td class="bet-outcome-name-cell">${escapeHtml(label)}</td>
+        <td>${formatPot(stake)}</td>
+        <td>${poolPct.toFixed(1)}%</td>
+        <td>${escapeHtml(mult)}</td>
+      `;
+      tbody.appendChild(tr);
     }
   }
 
@@ -157,6 +240,8 @@
     const w = detail.wager;
     if (!w) throw new Error("Indexer response missing wager.");
 
+    loadedWagerAddress = address;
+
     const state = String(w.state || "").toUpperCase();
     const proposition = String(w.proposition || "").trim() || "(empty proposition)";
     collateralTokenAddr = String(w.collateral_token || "").trim();
@@ -174,6 +259,8 @@
 
     outcomeLabels = labels;
     const totals = detail.totals || {};
+    const totalPotVal = totals.total_pot ?? "0";
+    const feeBpsVal = totals.total_fee_bps ?? w.total_fee_bps ?? "0";
 
     clearLoading();
     showEl("betError", false);
@@ -182,12 +269,51 @@
 
     $("betProposition").textContent = proposition;
     $("betState").textContent = state;
+    $("betWagerAddress").textContent = address;
+    $("betFactory").textContent = String(w.factory_address || "").trim() || "—";
+    $("betProposer").textContent = String(w.proposer || "").trim() || "—";
+    $("betResolver").textContent = String(w.resolver || "").trim() || "—";
     $("betCollateral").textContent = collateralTokenAddr || "—";
-    $("betPot").textContent = formatPot(totals.total_pot ?? w.total_pot ?? "0");
+    $("betPot").textContent = formatPot(totalPotVal);
+    $("betFeeBps").textContent = String(feeBpsVal);
+    $("betBettingClose").textContent = formatUtcSeconds(w.betting_close_time);
+    $("betResolutionDeadline").textContent = formatUtcSeconds(w.resolution_deadline);
+    $("betResolutionWindow").textContent =
+      w.resolution_window != null && w.resolution_window !== "" ? String(w.resolution_window) : "—";
+
+    const winRow = $("betWinningRow");
+    const winOut = $("betWinningOutcome");
+    if (
+      state === "RESOLVED" &&
+      totals &&
+      totals.winning_outcome != null &&
+      totals.winning_outcome !== ""
+    ) {
+      const wi = Number(totals.winning_outcome);
+      const winLabel =
+        !Number.isNaN(wi) && labels[wi] != null ? `${labels[wi]} (#${wi})` : `#${totals.winning_outcome}`;
+      const winStake = formatPot(totals.total_winning_stake ?? "0");
+      winOut.textContent = `${winLabel} · winning stake ${winStake} (raw)`;
+      if (winRow) winRow.hidden = false;
+    } else {
+      if (winRow) winRow.hidden = true;
+      if (winOut) winOut.textContent = "—";
+    }
+
+    const txShort = String(w.created_tx_hash || "").trim();
+    const txDisp = txShort.length > 18 ? `${txShort.slice(0, 10)}…${txShort.slice(-6)}` : txShort;
+    $("betCreatedMeta").textContent =
+      w.created_block != null && txDisp
+        ? `Block ${w.created_block} · ${txDisp}`
+        : w.created_block != null
+          ? `Block ${w.created_block}`
+          : txDisp || "—";
 
     const scan = $("betBasescan");
     scan.href = basescanUrl(address);
     scan.textContent = "View on Basescan";
+
+    renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal);
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
@@ -196,10 +322,10 @@
     const open = state === "OPEN";
     $("betSubmitBtn").disabled = !open || !signer;
     if (!open) {
-      $("betTxStatus").textContent =
-        state === "RESOLVED"
-          ? "This wager is resolved; staking is closed."
-          : "This wager is retracted; staking is closed.";
+      let msg = "This wager is not open for new stakes.";
+      if (state === "RESOLVED") msg = "Resolved — staking is closed. Winners can claim from the full dApp if applicable.";
+      else if (state === "RETRACTED") msg = "Retracted — staking is closed.";
+      $("betTxStatus").textContent = msg;
     } else {
       $("betTxStatus").textContent = "";
     }
@@ -351,6 +477,27 @@
     const tx = await c.placeBets(indices, amounts);
     await tx.wait();
     $("betTxStatus").textContent = "Bets placed successfully.";
+    await refreshWagerFromIndexerSilently();
+  }
+
+  async function copyLoadedWagerAddress() {
+    if (!loadedWagerAddress || !navigator.clipboard?.writeText) {
+      $("betTxStatus").textContent = "Copy not supported in this browser.";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(loadedWagerAddress);
+      const btn = $("betCopyAddressBtn");
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => {
+          btn.textContent = prev;
+        }, 2000);
+      }
+    } catch (e) {
+      $("betTxStatus").textContent = e.message || String(e);
+    }
   }
 
   async function init() {
@@ -360,6 +507,10 @@
     } catch (e) {
       console.warn(e);
     }
+
+    $("betCopyAddressBtn")?.addEventListener("click", () => {
+      copyLoadedWagerAddress().catch((e) => console.error(e));
+    });
 
     $("loadWagerBtn").addEventListener("click", () => loadWager($("wagerAddressInput").value));
     $("wagerAddressInput").addEventListener("keydown", (ev) => {

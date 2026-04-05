@@ -37,6 +37,9 @@ let currentChainId = null;
 let walletListenersAttached = false;
 let deploymentsConfig = null;
 
+/** Optional `?wager=0x…` deep link: pre-fills the active wager field; loads after wallet connect. */
+let wagerAddressFromUrl = null;
+
 const CHAIN_INFO = {
   1: { name: "Ethereum Mainnet" },
   8453: { name: "Base Mainnet" },
@@ -531,6 +534,15 @@ async function connectWallet() {
   $("walletAddr").textContent = userAddress;
   $("walletStatus").textContent = "Connected.";
   await tryDetectDecimalsFromCollateralField();
+
+  if (wagerAddressFromUrl) {
+    try {
+      await setActiveWager(wagerAddressFromUrl);
+      $("betStatus").textContent = "Loaded wager from URL.";
+    } catch (e) {
+      $("betStatus").textContent = `Could not load wager from link: ${e.message}`;
+    }
+  }
 
   if (!walletListenersAttached && typeof eip1193.on === "function") {
     eip1193.on("chainChanged", async () => {
@@ -1103,6 +1115,21 @@ async function main() {
 
   // Load ABIs for factory/wager
   await loadAbi();
+
+  const wagerParam = new URLSearchParams(window.location.search).get("wager");
+  if (wagerParam) {
+    const normalized = normalizeAddressInput(wagerParam);
+    if (normalized) {
+      wagerAddressFromUrl = normalized;
+      $("activeWagerAddress").value = normalized;
+      history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}?wager=${encodeURIComponent(normalized)}`
+      );
+    }
+  }
+
   clearOddsPreview("Create a wager first to preview odds.");
   $("walletStatus").textContent = "Ready.";
 }
