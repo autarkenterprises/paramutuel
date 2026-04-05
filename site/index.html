@@ -29,6 +29,26 @@
     <h1>Paramutuel</h1>
     <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel wagers on Base</p>
 
+    <div class="actions">
+      <a href="app.html" class="btn btn-primary">Launch App</a>
+      <a href="bet.html" class="btn btn-secondary">Bet page</a>
+      <a href="https://github.com/autarkenterprises/paramutuel" class="btn btn-secondary">View Source</a>
+    </div>
+  </div>
+
+  <p id="deploymentContext" class="deployment-context deployment-context--hero muted" hidden></p>
+
+  <section class="ticker-section" aria-label="Recent wagers from the indexer">
+    <div class="ticker-bar">
+      <div class="ticker-label">Live feed</div>
+      <div class="ticker-viewport" id="tickerViewport">
+        <div class="ticker-track" id="tickerTrack"></div>
+      </div>
+    </div>
+    <p class="ticker-status" id="tickerStatus">Loading wagers…</p>
+  </section>
+
+  <div class="container home-bet-search-below-feed">
     <section class="card home-bet-search" id="place-a-bet" aria-label="Place a bet">
       <h2 class="home-bet-search-title">Place a bet</h2>
       <p class="muted home-bet-search-hint">
@@ -50,25 +70,7 @@
       <p class="home-bet-search-status muted" id="homeBetSearchStatus" role="status" aria-live="polite"></p>
       <ul class="home-bet-search-results" id="homeBetSearchResults"></ul>
     </section>
-
-    <div class="actions">
-      <a href="app.html" class="btn btn-primary">Launch App</a>
-      <a href="bet.html" class="btn btn-secondary">Bet page</a>
-      <a href="https://github.com/autarkenterprises/paramutuel" class="btn btn-secondary">View Source</a>
-    </div>
   </div>
-
-  <p id="deploymentContext" class="deployment-context deployment-context--hero muted" hidden></p>
-
-  <section class="ticker-section" aria-label="Recent wagers from the indexer">
-    <div class="ticker-bar">
-      <div class="ticker-label">Live feed</div>
-      <div class="ticker-viewport" id="tickerViewport">
-        <div class="ticker-track" id="tickerTrack"></div>
-      </div>
-    </div>
-    <p class="ticker-status" id="tickerStatus">Loading wagers…</p>
-  </section>
 
   <div class="container">
     <section class="onboarding card">
@@ -87,7 +89,7 @@
         </li>
         <li>
           <strong>Stake on a market</strong>
-          <span>Use <strong>Place a bet</strong> at the top of this page (search), the live feed below, the dedicated <a href="bet.html">bet page</a>, or <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
+          <span>Skim the <strong>live feed</strong>, then use <strong>Place a bet</strong> (search just below it), the dedicated <a href="bet.html">bet page</a>, or <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
         </li>
         <li>
           <strong>Inspect &amp; verify</strong>

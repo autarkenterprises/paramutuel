@@ -120,11 +120,15 @@ nav .links a.external {
   margin-top: 8px;
 }
 
-/* ── Home: Place a bet search (hero) ── */
+/* ── Home: Place a bet search (below live feed) ── */
 
-.hero .home-bet-search {
-  max-width: 720px;
-  margin: 0 auto 28px;
+.home-bet-search-below-feed {
+  padding-top: 20px;
+  padding-bottom: 4px;
+}
+
+.home-bet-search-below-feed .home-bet-search {
+  margin-bottom: 0;
   text-align: left;
 }
 
