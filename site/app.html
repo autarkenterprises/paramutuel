@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="iframe-page iframe-page--with-embed-hint">
+  <script src="network-context.js"></script>
   <nav>
     <span class="logo">Paramutuel</span>
     <div class="links">
@@ -22,7 +23,30 @@
   <div id="networkBannerSlot"></div>
   <script src="network-banner.js" defer></script>
   <p class="muted app-embed-share-hint" id="appEmbedShareHint"></p>
-  <iframe src="dapp/index.html" title="Paramutuel dApp" allow="clipboard-write"></iframe>
+  <iframe id="paramutuelDappFrame" title="Paramutuel dApp" allow="clipboard-write"></iframe>
+  <script>
+    (function () {
+      const frame = document.getElementById("paramutuelDappFrame");
+      const PSN = window.ParamutuelSiteNetwork;
+      if (frame && PSN) {
+        const k = localStorage.getItem(PSN.STORAGE_KEY);
+        let url = "dapp/index.html";
+        if (k === "baseMainnet" || k === "baseSepolia") {
+          url += "?siteNetwork=" + encodeURIComponent(k);
+        }
+        frame.src = url;
+      } else if (frame) {
+        frame.src = "dapp/index.html";
+      }
+      if (PSN && frame) {
+        window.addEventListener(PSN.EVENT, (ev) => {
+          const nk = ev.detail && ev.detail.networkKey;
+          if (!nk) return;
+          frame.src = "dapp/index.html?siteNetwork=" + encodeURIComponent(nk);
+        });
+      }
+    })();
+  </script>
   <script>
     (function () {
       const el = document.getElementById("appEmbedShareHint");

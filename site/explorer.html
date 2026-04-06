@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="iframe-page">
+  <script src="network-context.js"></script>
   <nav>
     <span class="logo">Paramutuel</span>
     <div class="links">
@@ -37,18 +38,20 @@
       frame.src = url ? "explorer/index.html?api=" + encodeURIComponent(url) : "explorer/index.html";
     }
 
+    const PSN = window.ParamutuelSiteNetwork;
+
     async function applyDefaultIndexerFromConfig() {
       try {
         const response = await fetch(configUrl);
         if (!response.ok) return;
         const data = await response.json();
-        const defaultNetwork = String((data?.defaultNetwork || "baseSepolia")).trim();
-        const apiBase = String((data?.[defaultNetwork]?.explorerApiBase || "")).trim();
+        const netKey = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
+        const apiBase = String(data?.[netKey]?.explorerApiBase || "").trim();
         if (!apiBase) return;
         const input = document.getElementById("indexerUrl");
         input.value = apiBase;
         const hint = document.getElementById("indexerHint");
-        hint.textContent = "Default from deployments config. You can still override manually.";
+        hint.textContent = "Default from deployments config (matches site network toggle). You can still override manually.";
       } catch (_) {
         // Keep manual-only mode if config is unavailable.
       }
@@ -57,6 +60,25 @@
     document.getElementById("loadExplorer").addEventListener("click", setExplorerFrameFromInput);
 
     applyDefaultIndexerFromConfig().finally(setExplorerFrameFromInput);
+
+    if (PSN) {
+      window.addEventListener(PSN.EVENT, (ev) => {
+        const cfg = ev.detail && ev.detail.config;
+        const nk = ev.detail && ev.detail.networkKey;
+        if (!cfg || !nk) return;
+        const apiBase = String(cfg[nk]?.explorerApiBase || "").trim();
+        const input = document.getElementById("indexerUrl");
+        const hint = document.getElementById("indexerHint");
+        if (apiBase) {
+          input.value = apiBase;
+          hint.textContent = "Switched with site network toggle. Override manually if needed.";
+        } else {
+          input.value = "";
+          hint.textContent = "No indexer URL for this network in deployments.json.";
+        }
+        setExplorerFrameFromInput();
+      });
+    }
   </script>
   <footer class="app-shell-footer">
     <a href="about.html">About</a>

@@ -2,6 +2,7 @@
   "use strict";
 
   const CONFIG_URL = "config/deployments.json";
+  const PSN = window.ParamutuelSiteNetwork;
   const DEBOUNCE_MS = 320;
   const SEARCH_LIMIT = 15;
   const OPEN_DETAIL_CAP = 15;
@@ -94,8 +95,8 @@
     const response = await fetch(CONFIG_URL);
     if (!response.ok) throw new Error("deployments config unavailable");
     const data = await response.json();
-    const defaultNetwork = String(data?.defaultNetwork || "baseSepolia").trim();
-    const net = data?.[defaultNetwork] || {};
+    const netKey = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
+    const net = (PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey]) || {};
     apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const cid = net.chainId;
     chainId = typeof cid === "number" ? cid : Number(cid);
@@ -306,6 +307,14 @@
 
     syncSearchPlaceholder();
     await runSearch();
+
+    if (PSN) {
+      window.addEventListener(PSN.EVENT, () => {
+        loadDeployments()
+          .then(() => runSearch())
+          .catch((e) => console.error(e));
+      });
+    }
   }
 
   if (document.readyState === "loading") {

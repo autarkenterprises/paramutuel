@@ -1080,6 +1080,65 @@ body > footer:not(.app-shell-footer) {
   margin: 0 6px;
 }
 
+.network-banner__switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  flex-shrink: 0;
+}
+
+.network-banner__switch-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6e7a94;
+  margin-right: 2px;
+}
+
+.network-banner__switch-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #2c3a5a;
+  background: #121a2a;
+  color: #97a6c4;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.network-banner__switch-btn:hover {
+  color: #e6edf3;
+  border-color: #3d4f73;
+}
+
+.network-banner__switch-btn--active {
+  background: #1c2640;
+  color: #e6edf3;
+  border-color: #3d5a8a;
+}
+
+.network-banner--mainnet .network-banner__switch-btn--active {
+  border-color: #1e4a3d;
+  background: #142820;
+  color: #5eead4;
+}
+
+.network-banner--testnet .network-banner__switch-btn--active {
+  border-color: #6b5a1a;
+  background: #2a2410;
+  color: #f0d060;
+}
+
+.network-banner--warn .network-banner__switch-btn--active {
+  border-color: #7c2d12;
+  background: #2a1814;
+  color: #fca5a5;
+}
+
 .network-banner--testnet {
   background: linear-gradient(90deg, #1a1508 0%, #121a2a 40%);
   border-bottom-color: #5c4a1a;

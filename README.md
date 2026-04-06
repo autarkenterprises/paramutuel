@@ -418,7 +418,7 @@ The dApp and a protocol website are deployed to GitHub Pages via CI. On every pu
 The website (`site/`) is a navigation shell that embeds the dApp and explorer as iframes — no code duplication. When component files change, the website automatically stays current.
 
 Pages:
-- `/` — Landing page with protocol overview, deployment banner, and live ticker
+- `/` — Landing page with protocol overview, testnet/mainnet toggle (banner), and live ticker
 - `/app.html` — Full dApp (embedded iframe; dApp remains a separate static bundle under `/dapp/`)
 - `/bet.html` — Short place-a-bet flow
 - `/explorer.html` — Wager explorer with configurable indexer URL

@@ -87,8 +87,11 @@
   async function loadDeployments() {
     const data = await loadJson(CONFIG_URL);
     deployments = data;
-    const netKey = String(data?.defaultNetwork || "baseSepolia").trim();
-    const net = data?.[netKey] || {};
+    const PSN = globalThis.ParamutuelSiteNetwork;
+    const netKey = PSN
+      ? PSN.getActiveNetworkKey(data)
+      : String(data?.defaultNetwork || "baseSepolia").trim();
+    const net = PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey] || {};
     indexerBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const cid = net.chainId;
     expectedChainId = typeof cid === "number" ? cid : Number(cid);
@@ -629,6 +632,21 @@
     if (fromQuery) {
       $("wagerAddressInput").value = fromQuery;
       loadWager(fromQuery);
+    }
+
+    const PSN = globalThis.ParamutuelSiteNetwork;
+    if (PSN) {
+      window.addEventListener(PSN.EVENT, () => {
+        loadDeployments()
+          .then(async () => {
+            const st = $("betNetworkStatus");
+            if (st) st.textContent = "Site network changed — confirm your wallet matches, then reload the wager if needed.";
+            if (loadedWagerAddress) {
+              await loadWager(loadedWagerAddress);
+            }
+          })
+          .catch((e) => console.warn(e));
+      });
     }
   }
 

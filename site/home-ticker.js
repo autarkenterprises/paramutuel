@@ -2,6 +2,7 @@
   "use strict";
 
   const CONFIG_URL = "config/deployments.json";
+  const PSN = window.ParamutuelSiteNetwork;
   const REFRESH_MS = 45_000;
   const LIST_LIMIT = 14;
   const OPEN_DETAIL_CAP = 8;
@@ -100,11 +101,15 @@
     const response = await fetch(CONFIG_URL);
     if (!response.ok) throw new Error("deployments config unavailable");
     const data = await response.json();
-    const defaultNetwork = String(data?.defaultNetwork || "baseSepolia").trim();
-    const net = data?.[defaultNetwork] || {};
+    const netKey = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
+    const net = (PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey]) || {};
     const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const chainId = net.chainId;
-    return { apiBase, chainId: typeof chainId === "number" ? chainId : Number(chainId), defaultNetwork };
+    return {
+      apiBase,
+      chainId: typeof chainId === "number" ? chainId : Number(chainId),
+      networkKey: netKey,
+    };
   }
 
   async function fetchJson(url) {
@@ -229,6 +234,7 @@
   });
 
   function paintTickerTrack(wagers, detailByAddr, cfg, viewport, track, statusMessage) {
+    const statusEl = document.getElementById("tickerStatus");
     viewport.classList.remove("ticker-updating");
     track.innerHTML = "";
     wagers.forEach((w) => track.appendChild(renderItem(w, detailByAddr, cfg.chainId)));
@@ -242,7 +248,7 @@
       viewport.classList.remove("ticker-animate");
     }
 
-    if (status) status.textContent = statusMessage;
+    if (statusEl) statusEl.textContent = statusMessage;
   }
 
   async function run() {
@@ -339,9 +345,21 @@
     startRefreshLoop();
   }
 
+  function bindNetworkRefresh() {
+    if (!PSN) return;
+    window.addEventListener(PSN.EVENT, () => {
+      runGeneration += 1;
+      run();
+    });
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run);
+    document.addEventListener("DOMContentLoaded", () => {
+      bindNetworkRefresh();
+      run();
+    });
   } else {
+    bindNetworkRefresh();
     run();
   }
 })();

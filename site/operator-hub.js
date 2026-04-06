@@ -7,6 +7,7 @@
 
   const DEPLOYMENTS_URL = "config/deployments.json";
   const HUB_URL = "config/operator-hub.json";
+  const PSN = window.ParamutuelSiteNetwork;
 
   function $(id) {
     return document.getElementById(id);
@@ -50,23 +51,11 @@
     return p ? `${b}/${p}` : b;
   }
 
-  async function run() {
-    let deployments;
-    let hub = {};
-    try {
-      deployments = await loadJson(DEPLOYMENTS_URL);
-    } catch (e) {
-      setText("operatorHubStatus", "Could not load deployment configuration: " + e.message);
-      return;
-    }
-    try {
-      hub = await loadJson(HUB_URL);
-    } catch {
-      /* optional file */
-    }
+  let hubCached = {};
 
-    const netKey = String(deployments?.defaultNetwork || "baseSepolia").trim();
-    const net = deployments?.[netKey] || {};
+  function paintOperatorHub(deployments, hub) {
+    const netKey = PSN ? PSN.getActiveNetworkKey(deployments) : String(deployments?.defaultNetwork || "baseSepolia").trim();
+    const net = PSN ? PSN.getNetworkEntry(deployments, netKey) : deployments?.[netKey] || {};
     const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
 
     setText("operatorHubNetwork", netKey + " (chain " + String(net.chainId ?? "—") + ")");
@@ -83,7 +72,7 @@
     }
     setText(
       "operatorExplorerNote",
-      apiBase ? "Explorer uses this deployment’s indexer URL." : "Configure an indexer URL for this deployment to enable the embedded explorer."
+      apiBase ? "Explorer uses the indexer URL for the selected site network." : "Configure an indexer URL for this network in deployments.json to enable the embedded explorer."
     );
 
     const cp = String(hub.controlPanelBaseUrl || "").trim().replace(/\/$/, "");
@@ -96,8 +85,32 @@
 
     setText(
       "operatorHubStatus",
-      "Loaded network " + netKey + ". Optional control / ingest / resolution links appear when your deployment provides them."
+      "Showing " + netKey + ". Use the network toggle in the banner to switch testnet vs mainnet. Optional service links use operator-hub.json."
     );
+  }
+
+  async function run() {
+    let deployments;
+    try {
+      deployments = await loadJson(DEPLOYMENTS_URL);
+    } catch (e) {
+      setText("operatorHubStatus", "Could not load deployment configuration: " + e.message);
+      return;
+    }
+    try {
+      hubCached = await loadJson(HUB_URL);
+    } catch {
+      hubCached = {};
+    }
+
+    paintOperatorHub(deployments, hubCached);
+
+    if (PSN) {
+      window.addEventListener(PSN.EVENT, (ev) => {
+        const cfg = ev.detail && ev.detail.config;
+        if (cfg) paintOperatorHub(cfg, hubCached);
+      });
+    }
   }
 
   if (document.readyState === "loading") {

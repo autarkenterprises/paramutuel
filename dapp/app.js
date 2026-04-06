@@ -36,6 +36,8 @@ let wagerContract; // last-created wager
 let currentChainId = null;
 let walletListenersAttached = false;
 let deploymentsConfig = null;
+/** When embedded from site/app.html with ?siteNetwork=baseMainnet|baseSepolia */
+let siteDeploymentNetworkKey = null;
 
 /** Optional `?wager=0x…` deep link: pre-fills the active wager field; loads after wallet connect. */
 let wagerAddressFromUrl = null;
@@ -135,8 +137,12 @@ function chainName(chainId) {
 }
 
 function deploymentConfigKeyForChain(chainId) {
-  if (chainId !== null && DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId]) {
-    return DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId];
+  const n = chainId == null ? NaN : Number(chainId);
+  if (Number.isFinite(n) && DEPLOYMENTS_KEY_BY_CHAIN_ID[n]) {
+    return DEPLOYMENTS_KEY_BY_CHAIN_ID[n];
+  }
+  if (siteDeploymentNetworkKey && deploymentsConfig && deploymentsConfig[siteDeploymentNetworkKey]) {
+    return siteDeploymentNetworkKey;
   }
   if (deploymentsConfig && typeof deploymentsConfig.defaultNetwork === "string") {
     const configured = deploymentsConfig.defaultNetwork.trim();
@@ -145,6 +151,19 @@ function deploymentConfigKeyForChain(chainId) {
     }
   }
   return "baseSepolia";
+}
+
+function applySiteDeploymentNetworkFromUrl() {
+  siteDeploymentNetworkKey = null;
+  if (!deploymentsConfig) return;
+  try {
+    const raw = new URLSearchParams(window.location.search).get("siteNetwork");
+    if (!raw) return;
+    const k = raw.trim();
+    if (deploymentsConfig[k] && typeof deploymentsConfig[k] === "object") {
+      siteDeploymentNetworkKey = k;
+    }
+  } catch (_) {}
 }
 
 function deploymentFactoryAddressForChain(chainId) {
@@ -564,6 +583,7 @@ async function loadDeploymentsConfig() {
     const response = await fetch(DEPLOYMENTS_CONFIG_URL);
     if (!response.ok) return;
     deploymentsConfig = await response.json();
+    applySiteDeploymentNetworkFromUrl();
   } catch (_) {
     // Optional for local/dev runs; manual factory entry still works.
   }
