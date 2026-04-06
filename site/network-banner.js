@@ -64,10 +64,15 @@
         </div>`
       : "";
 
+    // When the toggle is present, its active button already shows Testnet vs Mainnet — skip the duplicate badge.
+    const badgeHtml = canToggle
+      ? ""
+      : `<span class="network-banner__badge">${escapeHtml(p.badgeText)}</span>`;
+
     slot.innerHTML = `
       <div class="network-banner ${p.bannerVariantClass}" role="status">
         ${switchHtml}
-        <span class="network-banner__badge">${escapeHtml(p.badgeText)}</span>
+        ${badgeHtml}
         <span class="network-banner__text">${escapeHtml(p.bannerLine)}</span>
         <span class="network-banner__links">
           <a href="${escapeHtml(p.explorerRoot)}" target="_blank" rel="noopener noreferrer">Block explorer</a>
