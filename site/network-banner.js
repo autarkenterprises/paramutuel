@@ -47,7 +47,7 @@
   function render(slot, cfg) {
     if (!PSN) {
       slot.innerHTML =
-        '<div class="network-banner network-banner--warn" role="alert"><span class="network-banner__text">network-context.js must load before network-banner.js</span></div>';
+        '<div class="network-banner network-banner--warn" role="alert"><span class="network-banner__badge">Setup</span><span class="network-banner__text">Network selector failed to load (missing network-context.js). Hard-refresh the page; if this persists, the site bundle may be incomplete.</span></div>';
       document.body.classList.add("site-has-banner");
       return;
     }
