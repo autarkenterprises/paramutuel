@@ -104,6 +104,10 @@
   }
 
   function basescanUrl(addr) {
+    const PSN = globalThis.ParamutuelSiteNetwork;
+    if (PSN && typeof PSN.blockExplorerAddress === "function") {
+      return PSN.blockExplorerAddress(expectedChainId, addr);
+    }
     if (expectedChainId === 8453) return `https://basescan.org/address/${addr}`;
     return `https://sepolia.basescan.org/address/${addr}`;
   }
@@ -640,7 +644,7 @@
         loadDeployments()
           .then(async () => {
             const st = $("betNetworkStatus");
-            if (st) st.textContent = "Site network changed — confirm your wallet matches, then reload the wager if needed.";
+            if (st && PSN.copy) st.textContent = PSN.copy.betSiteNetworkChanged;
             if (loadedWagerAddress) {
               await loadWager(loadedWagerAddress);
             }

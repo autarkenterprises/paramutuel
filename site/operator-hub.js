@@ -72,7 +72,13 @@
     }
     setText(
       "operatorExplorerNote",
-      apiBase ? "Explorer uses the indexer URL for the selected site network." : "Configure an indexer URL for this network in deployments.json to enable the embedded explorer."
+      PSN && PSN.copy
+        ? apiBase
+          ? PSN.copy.operatorExplorerWithIndexer
+          : PSN.copy.operatorExplorerNoIndexer
+        : apiBase
+          ? "Explorer uses the indexer URL for the selected site network."
+          : "Configure an indexer URL for this network in deployments.json to enable the embedded explorer."
     );
 
     const cp = String(hub.controlPanelBaseUrl || "").trim().replace(/\/$/, "");
@@ -83,10 +89,7 @@
     setHref("operatorPropositionLink", prop || "", prop ? "Open proposition service" : "");
     setHref("operatorResolutionLink", res || "", res ? "Open resolution service" : "");
 
-    setText(
-      "operatorHubStatus",
-      "Showing " + netKey + ". Use the network toggle in the banner to switch testnet vs mainnet. Optional service links use operator-hub.json."
-    );
+    setText("operatorHubStatus", PSN && PSN.copy ? PSN.copy.operatorHubStatus(netKey) : "Showing " + netKey + ".");
   }
 
   async function run() {

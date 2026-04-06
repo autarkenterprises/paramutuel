@@ -238,26 +238,14 @@
   <script>
     (function () {
       const PSN = window.ParamutuelSiteNetwork;
-      const networkNames = {
-        baseSepolia: "Base Sepolia",
-        baseMainnet: "Base Mainnet",
-      };
 
       function paintHomeNetworkCard(data) {
-        const key = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
-        const chainId = data?.[key]?.chainId;
+        if (!PSN) return;
+        const p = PSN.getSiteNetworkPresentation(data);
         const networkNode = document.getElementById("networkDisplay");
-        if (networkNode) {
-          const networkLabel = networkNames[key] || key;
-          networkNode.textContent =
-            chainId !== undefined ? `${networkLabel} (chain ID ${chainId})` : networkLabel;
-        }
-
-        const addr = (data?.[key]?.factoryAddress || "").trim();
+        if (networkNode) networkNode.textContent = p.homeNetworkSummaryLine;
         const factoryNode = document.getElementById("factoryAddressDisplay");
-        if (factoryNode) {
-          factoryNode.textContent = addr || "Not published for this network in this build";
-        }
+        if (factoryNode) factoryNode.textContent = p.homeFactorySummaryText;
       }
 
       (async () => {

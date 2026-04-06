@@ -17,6 +17,9 @@
   }
 
   function blockExplorerAddress(chainId, address) {
+    if (PSN && typeof PSN.blockExplorerAddress === "function") {
+      return PSN.blockExplorerAddress(chainId, address);
+    }
     const a = String(address || "").trim();
     if (!a) return "#";
     if (chainId === 8453) return `https://basescan.org/address/${a}`;

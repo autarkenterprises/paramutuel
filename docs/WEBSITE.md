@@ -19,7 +19,7 @@ Runtime configuration is read from `config/deployments.json` (copied to `_site/c
 
 **Visitors** use the **Network** control in the banner (`Testnet` = Base Sepolia, `Mainnet` = Base). The choice is stored in the browser as `localStorage.paramutuel_site_network` and drives the home ticker, bet search, bet page indexer URL, explorer default API field, embedded dApp (`?siteNetwork=…`), and operator hub indexer links.
 
-Shared helpers live in **`site/network-context.js`**; the banner UI is **`site/network-banner.js`**.
+**`site/network-context.js`** holds selection helpers, **`getSiteNetworkPresentation()`** (banner badge, banner line, hero caption, home “Network” card lines, explorer root), shared **`blockExplorerAddress`**, and static **`copy`** strings so the toggle only swaps data-driven text and endpoints — **one page layout, no duplicated shells**. **`site/network-banner.js`** only fetches `deployments.json` and renders the existing banner DOM using that presentation.
 
 **`defaultNetwork`** in **`config/deployments.json`** is still used for:
 
