@@ -52,7 +52,10 @@
     return `bet.html?wager=${encodeURIComponent(a)}`;
   }
 
-  function buildWagersPath(prefix, { queryText = "", limit = SEARCH_LIMIT, offset = 0, order = "desc" } = {}) {
+  function buildWagersPath(
+    prefix,
+    { queryText = "", limit = SEARCH_LIMIT, offset = 0, order = "desc", openOnly = true } = {}
+  ) {
     const search = String(queryText || "").trim();
     const params = new URLSearchParams({
       limit: String(limit),
@@ -60,6 +63,7 @@
       order,
     });
     if (search) params.set("q", search);
+    if (openOnly) params.set("state", "OPEN");
     return `${prefix}/wagers?${params.toString()}`;
   }
 
@@ -149,22 +153,27 @@
     return map;
   }
 
-  function renderResults(wagers, detailByAddr) {
+  function renderResults(wagers, detailByAddr, { openOnly } = { openOnly: true }) {
     const ul = $("homeBetSearchResults");
     const status = $("homeBetSearchStatus");
     if (!ul) return;
 
     ul.innerHTML = "";
     if (!wagers.length) {
-      if (status) status.textContent = "No matching wagers.";
+      if (status) {
+        status.textContent = openOnly
+          ? "No open wagers match. Try a different search or include resolved and retracted."
+          : "No matching wagers.";
+      }
       return;
     }
 
     if (status) {
       const q = ($("homeBetSearchInput")?.value || "").trim();
+      const scope = openOnly ? "open" : "all states";
       status.textContent = q
-        ? `${wagers.length} match${wagers.length === 1 ? "" : "es"} · click to open bet page`
-        : `Showing ${wagers.length} recent wager${wagers.length === 1 ? "" : "s"} · click to bet`;
+        ? `${wagers.length} match${wagers.length === 1 ? "" : "es"} (${scope}) · click to open bet page`
+        : `Showing ${wagers.length} recent ${openOnly ? "open " : ""}wager${wagers.length === 1 ? "" : "s"} · click to bet`;
     }
 
     for (const w of wagers) {
@@ -206,6 +215,8 @@
     const status = $("homeBetSearchStatus");
     const ul = $("homeBetSearchResults");
     const q = ($("homeBetSearchInput")?.value || "").trim();
+    const includeAll = $("homeBetSearchIncludeAll")?.checked === true;
+    const openOnly = !includeAll;
 
     if (!apiBase) {
       if (status) status.textContent = "No indexer URL in config/deployments.json for this network.";
@@ -219,7 +230,13 @@
 
     let res;
     try {
-      res = await fetchWagersList({ queryText: q, order: "desc", limit: SEARCH_LIMIT, offset: 0 });
+      res = await fetchWagersList({
+        queryText: q,
+        order: "desc",
+        limit: SEARCH_LIMIT,
+        offset: 0,
+        openOnly,
+      });
     } catch {
       if (gen !== fetchGen) return;
       if (status) status.textContent = "Indexer unreachable.";
@@ -250,7 +267,7 @@
     if (gen !== fetchGen) return;
 
     if (spinner) spinner.hidden = true;
-    renderResults(wagers, detailByAddr);
+    renderResults(wagers, detailByAddr, { openOnly });
   }
 
   function scheduleSearch() {
@@ -259,6 +276,12 @@
       debounceTimer = null;
       runSearch().catch((e) => console.error(e));
     }, DEBOUNCE_MS);
+  }
+
+  function syncSearchPlaceholder() {
+    const input = $("homeBetSearchInput");
+    if (!input) return;
+    input.placeholder = $("homeBetSearchIncludeAll")?.checked ? "Search wagers…" : "Search open wagers…";
   }
 
   async function init() {
@@ -276,6 +299,12 @@
     input.addEventListener("input", () => scheduleSearch());
     input.addEventListener("search", () => scheduleSearch());
 
+    $("homeBetSearchIncludeAll")?.addEventListener("change", () => {
+      syncSearchPlaceholder();
+      runSearch().catch((e) => console.error(e));
+    });
+
+    syncSearchPlaceholder();
     await runSearch();
   }
 

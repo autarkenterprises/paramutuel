@@ -51,14 +51,14 @@
     <section class="card home-bet-search" id="place-a-bet" aria-label="Place a bet">
       <h2 class="home-bet-search-title">Place a bet</h2>
       <p class="muted home-bet-search-hint">
-        Search the indexer by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the betting page.
+        By default only <strong>open</strong> markets are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the betting page.
       </p>
       <div class="home-bet-search-field-row">
         <input
           type="search"
           id="homeBetSearchInput"
           class="home-bet-search-input"
-          placeholder="Search wagers…"
+          placeholder="Search open wagers…"
           autocomplete="off"
           spellcheck="false"
           enterkeyhint="search"
@@ -66,6 +66,10 @@
         />
         <span class="home-bet-search-spinner" id="homeBetSearchSpinner" hidden aria-hidden="true"></span>
       </div>
+      <label class="home-bet-search-filter">
+        <input type="checkbox" id="homeBetSearchIncludeAll" />
+        Include retracted and resolved wagers
+      </label>
       <p class="home-bet-search-status muted" id="homeBetSearchStatus" role="status" aria-live="polite"></p>
       <ul class="home-bet-search-results" id="homeBetSearchResults"></ul>
     </section>

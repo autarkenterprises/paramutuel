@@ -211,6 +211,24 @@ body > footer:not(.app-shell-footer) {
   gap: 12px;
 }
 
+.home-bet-search-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: #97a6c4;
+  cursor: pointer;
+  user-select: none;
+}
+
+.home-bet-search-filter input {
+  width: 16px;
+  height: 16px;
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+
 .home-bet-search-input {
   flex: 1;
   min-width: 0;
