@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel — parimutuel markets on Base. Search markets, place bets with your wallet, explore live wagers (testnet and mainnet)." />
+  <meta name="description" content="Paramutuel — parimutuel markets on Base. Propose wagers, place bets, live markets, and open protocol docs." />
   <meta property="og:title" content="Paramutuel" />
-  <meta property="og:description" content="Parimutuel pools on Base: search markets, stake on outcomes with a wallet, resolve and claim on-chain." />
+  <meta property="og:description" content="Parimutuel pools on Base: propose markets, stake on outcomes, resolve and claim on-chain." />
   <meta property="og:type" content="website" />
   <title>Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
@@ -16,7 +16,8 @@
     <span class="logo">Paramutuel</span>
     <div class="links">
       <a href="index.html" class="active">Home</a>
-      <a href="index.html#place-a-bet">Place a bet</a>
+      <a href="propose-a-wager.html">Propose a Wager</a>
+      <a href="place-a-bet.html">Place a Bet</a>
       <a href="bet.html">Bet page</a>
       <a href="explorer.html">Explorer</a>
       <a href="app.html">App</a>
@@ -30,10 +31,9 @@
     <h1>Paramutuel</h1>
     <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel wagers on Base</p>
 
-    <div class="actions">
-      <a href="index.html#place-a-bet" class="btn btn-primary">Place a bet</a>
-      <a href="bet.html" class="btn btn-secondary">Bet page</a>
-      <a href="app.html" class="btn btn-secondary">Full app</a>
+    <div class="actions actions--dual">
+      <a href="propose-a-wager.html" class="btn btn-primary">Propose a Wager</a>
+      <a href="place-a-bet.html" class="btn btn-secondary">Place a Bet</a>
     </div>
   </div>
 
@@ -49,43 +49,60 @@
     <p class="ticker-status" id="tickerStatus">Loading wagers…</p>
   </section>
 
-  <div class="container home-bet-search-below-feed">
-    <section class="card home-bet-search" id="place-a-bet" aria-label="Place a bet">
-      <h2 class="home-bet-search-title">Place a bet</h2>
-      <p class="home-bet-search-betpage-line">
-        <a href="bet.html" class="btn btn-secondary btn-inline">Bet page</a>
-        <span class="muted">Open the standalone page to paste a wager address or follow a shared link.</span>
+  <div class="container home-lifecycle-after-feed">
+    <section class="card home-lifecycle" id="how-wagers-work" aria-labelledby="home-lifecycle-heading">
+      <h2 id="home-lifecycle-heading" class="home-lifecycle-title">How wagers move from idea to payout</h2>
+      <p class="home-lifecycle-lead muted">
+        Each market is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle.
       </p>
-      <p class="muted home-bet-search-hint">
-        By default only <strong>open</strong> markets are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the betting page.
+      <ol class="home-lifecycle-steps">
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">1</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Create</h3>
+            <p>A <strong>proposer</strong> deploys a wager through the factory: the question, outcome labels, collateral token, fee split, and time rules. The <strong>resolver</strong> (who picks the winner or cancels) defaults to the proposer unless another address is set.</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">2</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Open betting</h3>
+            <p>Anyone with the right token stakes on one or more outcomes. All stakes sit in one pot; implied odds shift as the pool grows.</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">3</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Close betting</h3>
+            <p>New bets stop when the <strong>scheduled time</strong> is reached <em>or</em> a designated <strong>betting closer</strong> ends the window early&mdash;whichever comes first.</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">4</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Settle</h3>
+            <p>During the <strong>resolution window</strong>, the resolver either names the winning outcome, <strong>retracts</strong> (invalidates the market), or does nothing until the window ends. If the window ends without a winner, <strong>anyone</strong> can call <strong>expire</strong> so participants can recover stakes (fees may still apply).</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">5</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Claim</h3>
+            <p>After settlement, winners withdraw pro-rata payouts; on retract or expire, refunds follow the contract rules. Fee recipients claim their configured share.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="home-lifecycle-footnote muted">
+        Full state machine, role permissions, and timer vs authority behavior: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WAGER-LIFECYCLE.md" class="external">docs/WAGER-LIFECYCLE.md</a> in the open-source repo.
       </p>
-      <div class="home-bet-search-field-row">
-        <input
-          type="search"
-          id="homeBetSearchInput"
-          class="home-bet-search-input"
-          placeholder="Search open wagers…"
-          autocomplete="off"
-          spellcheck="false"
-          enterkeyhint="search"
-          aria-label="Search wagers"
-        />
-        <span class="home-bet-search-spinner" id="homeBetSearchSpinner" hidden aria-hidden="true"></span>
-      </div>
-      <label class="home-bet-search-filter">
-        <input type="checkbox" id="homeBetSearchIncludeAll" />
-        Include retracted and resolved wagers
-      </label>
-      <p class="home-bet-search-status muted" id="homeBetSearchStatus" role="status" aria-live="polite"></p>
-      <ul class="home-bet-search-results" id="homeBetSearchResults"></ul>
     </section>
   </div>
 
   <div class="container">
     <section class="onboarding card">
-      <h2 class="onboarding-title">Get started</h2>
+      <h2 class="onboarding-title">Protocol &amp; getting started</h2>
       <p class="onboarding-lead">
-        Paramutuel is on-chain parimutuel betting: one pool per wager, odds move as people stake on outcomes, then the resolver settles and winners claim pro-rata.
+        Paramutuel is on-chain parimutuel betting: one pool per wager, odds move as people stake on outcomes, then the resolver settles and winners claim pro-rata. Use <a href="propose-a-wager.html">Propose a Wager</a> or <a href="place-a-bet.html">Place a Bet</a> above for the main flows; the sections below are for orientation and deeper links.
       </p>
       <ol class="onboarding-steps">
         <li>
@@ -102,11 +119,15 @@
         </li>
         <li>
           <strong>Stake on a market</strong>
-          <span>Skim the <strong>live feed</strong>, then use <strong>Place a bet</strong> (search just below it), the dedicated <a href="bet.html">bet page</a>, or <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
+          <span>Use <a href="place-a-bet.html">Place a Bet</a> to search markets, skim the <strong>live feed</strong> on the home page, the dedicated <a href="bet.html">bet page</a>, or <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
         </li>
         <li>
           <strong>Inspect &amp; verify</strong>
           <span>Use <a href="explorer.html">Explorer</a> (auto-refreshes while the tab is visible) to search propositions and open the bet page from any wager row. Use the <strong>block explorer</strong> link in the top banner to verify contract code and transactions for the active chain.</span>
+        </li>
+        <li>
+          <strong>Power users &amp; builders</strong>
+          <span>See <a href="about.html#developers">About → Developers</a> for agents, MCP, indexer API, and the open-source repo. Contract lifecycle reference: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WAGER-LIFECYCLE.md" class="external">WAGER-LIFECYCLE.md</a>.</span>
         </li>
         <li>
           <strong>Risks</strong>
@@ -159,53 +180,6 @@
       </div>
     </section>
 
-    <section class="card home-lifecycle" id="how-wagers-work" aria-labelledby="home-lifecycle-heading">
-      <h2 id="home-lifecycle-heading" class="home-lifecycle-title">How wagers move from idea to payout</h2>
-      <p class="home-lifecycle-lead muted">
-        Each market is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle.
-      </p>
-      <ol class="home-lifecycle-steps">
-        <li class="home-lifecycle-step">
-          <span class="home-lifecycle-step-num" aria-hidden="true">1</span>
-          <div class="home-lifecycle-step-body">
-            <h3 class="home-lifecycle-step-title">Create</h3>
-            <p>A <strong>proposer</strong> deploys a wager through the factory: the question, outcome labels, collateral token, fee split, and time rules. The <strong>resolver</strong> (who picks the winner or cancels) defaults to the proposer unless another address is set.</p>
-          </div>
-        </li>
-        <li class="home-lifecycle-step">
-          <span class="home-lifecycle-step-num" aria-hidden="true">2</span>
-          <div class="home-lifecycle-step-body">
-            <h3 class="home-lifecycle-step-title">Open betting</h3>
-            <p>Anyone with the right token stakes on one or more outcomes. All stakes sit in one pot; implied odds shift as the pool grows.</p>
-          </div>
-        </li>
-        <li class="home-lifecycle-step">
-          <span class="home-lifecycle-step-num" aria-hidden="true">3</span>
-          <div class="home-lifecycle-step-body">
-            <h3 class="home-lifecycle-step-title">Close betting</h3>
-            <p>New bets stop when the <strong>scheduled time</strong> is reached <em>or</em> a designated <strong>betting closer</strong> ends the window early&mdash;whichever comes first.</p>
-          </div>
-        </li>
-        <li class="home-lifecycle-step">
-          <span class="home-lifecycle-step-num" aria-hidden="true">4</span>
-          <div class="home-lifecycle-step-body">
-            <h3 class="home-lifecycle-step-title">Settle</h3>
-            <p>During the <strong>resolution window</strong>, the resolver either names the winning outcome, <strong>retracts</strong> (invalidates the market), or does nothing until the window ends. If the window ends without a winner, <strong>anyone</strong> can call <strong>expire</strong> so participants can recover stakes (fees may still apply).</p>
-          </div>
-        </li>
-        <li class="home-lifecycle-step">
-          <span class="home-lifecycle-step-num" aria-hidden="true">5</span>
-          <div class="home-lifecycle-step-body">
-            <h3 class="home-lifecycle-step-title">Claim</h3>
-            <p>After settlement, winners withdraw pro-rata payouts; on retract or expire, refunds follow the contract rules. Fee recipients claim their configured share.</p>
-          </div>
-        </li>
-      </ol>
-      <p class="home-lifecycle-footnote muted">
-        Full state machine, role permissions, and timer vs authority behavior: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WAGER-LIFECYCLE.md" class="external">docs/WAGER-LIFECYCLE.md</a> in the open-source repo.
-      </p>
-    </section>
-
     <div class="card" style="margin-top: 32px;">
       <h3>Network</h3>
       <dl class="network-info">
@@ -233,7 +207,6 @@
     Paramutuel &mdash; <a href="about.html">About</a>
     · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
   </footer>
-  <script src="home-bet-search.js" defer></script>
   <script src="home-ticker.js" defer></script>
   <script>
     (function () {

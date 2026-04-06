@@ -181,6 +181,32 @@ body > footer:not(.app-shell-footer) {
   margin-top: 8px;
 }
 
+.hero .actions--dual .btn {
+  min-width: 188px;
+}
+
+/* Homepage: lifecycle block directly under live feed */
+.home-lifecycle-after-feed {
+  padding-top: 28px;
+  padding-bottom: 8px;
+}
+
+.home-lifecycle-after-feed .home-lifecycle {
+  margin-top: 0;
+}
+
+.propose-wager-page {
+  padding-top: 28px;
+  padding-bottom: 40px;
+}
+
+.propose-wager-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
 /* ── Home: Place a bet search (below live feed) ── */
 
 .home-bet-search-below-feed {

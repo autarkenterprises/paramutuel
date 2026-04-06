@@ -418,9 +418,11 @@ The dApp and a protocol website are deployed to GitHub Pages via CI. On every pu
 The website (`site/`) is a navigation shell that embeds the dApp and explorer as iframes — no code duplication. When component files change, the website automatically stays current.
 
 Pages:
-- `/` — Landing page with protocol overview, testnet/mainnet toggle (banner), and live ticker
+- `/` — Landing: propose/bet CTAs, live ticker, wager lifecycle, then protocol/network orientation
+- `/propose-a-wager.html` — Create path (links into full app for factory deploy)
+- `/place-a-bet.html` — Bet path (indexer search + link to wallet bet page)
 - `/app.html` — Full dApp (embedded iframe; dApp remains a separate static bundle under `/dapp/`)
-- `/bet.html` — Short place-a-bet flow
+- `/bet.html` — Short wallet `placeBets` flow
 - `/explorer.html` — Wager explorer with configurable indexer URL
 - `/operator.html` — Operator hub (indexer links, embedded explorer, optional service URLs)
 - `/dapp/` — Standalone dApp (also accessible directly)

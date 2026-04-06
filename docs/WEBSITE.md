@@ -6,9 +6,11 @@ The static site under `site/` is a **thin shell**: marketing copy, a testnet/mai
 
 | Path | Role |
 |------|------|
-| `/` | Landing, live ticker, onboarding |
+| `/` | Landing: primary CTAs (propose / bet), live ticker, wager lifecycle, then protocol orientation + network |
+| `/propose-a-wager.html` | Create path — copy + link into embedded dApp for factory deploy |
+| `/place-a-bet.html` | Bet path — indexer search (same module as former home section) + link to `bet.html` |
 | `/app.html` | Full dApp embedded via iframe |
-| `/bet.html` | Short “place a bet” flow (standalone JS + ethers) |
+| `/bet.html` | Short wallet bet flow (`placeBets`; paste address or `?wager=`) |
 | `/explorer.html` | Explorer UI with optional indexer URL override |
 | `/operator.html` | **Operator hub** — indexer links, embedded explorer, outbound URLs for other services |
 | `/dapp/` | Same dApp as embedded, for direct links and debugging |
@@ -17,7 +19,7 @@ Runtime configuration is read from `config/deployments.json` (copied to `_site/c
 
 ## Testnet vs mainnet on the public site
 
-**Visitors** use the **Network** control in the banner (`Testnet` = Base Sepolia, `Mainnet` = Base). The choice is stored in the browser as `localStorage.paramutuel_site_network` and drives the home ticker, bet search, bet page indexer URL, explorer default API field, embedded dApp (`?siteNetwork=…`), and operator hub indexer links.
+**Visitors** use the **Network** control in the banner (`Testnet` = Base Sepolia, `Mainnet` = Base). The choice is stored in the browser as `localStorage.paramutuel_site_network` and drives the home ticker, **Place a Bet** search (`place-a-bet.html`), bet page indexer URL, explorer default API field, embedded dApp (`?siteNetwork=…`), and operator hub indexer links.
 
 **`site/network-context.js`** holds selection helpers, **`getSiteNetworkPresentation()`** (banner badge, banner line, hero caption, home “Network” card lines, explorer root), shared **`blockExplorerAddress`**, and static **`copy`** strings so the toggle only swaps data-driven text and endpoints — **one page layout, no duplicated shells**. **`site/network-banner.js`** only fetches `deployments.json` and renders the existing banner DOM using that presentation.
 

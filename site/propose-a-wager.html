@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Propose a Paramutuel wager on Base: deploy a market through the factory with the self-custody app." />
+  <title>Propose a Wager — Paramutuel</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <script src="network-context.js"></script>
+  <nav>
+    <span class="logo">Paramutuel</span>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="propose-a-wager.html" class="active">Propose a Wager</a>
+      <a href="place-a-bet.html">Place a Bet</a>
+      <a href="bet.html">Bet page</a>
+      <a href="explorer.html">Explorer</a>
+      <a href="app.html">App</a>
+      <a href="about.html">About</a>
+    </div>
+  </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
+
+  <div class="container propose-wager-page">
+    <section class="card">
+      <h1>Propose a Wager</h1>
+      <p class="onboarding-lead" style="margin-bottom: 20px;">
+        Create a new on-chain parimutuel market: define the proposition, outcome labels, collateral token, betting and resolution windows, resolver (defaults to you), optional closers, and fee recipients. The factory deploys a dedicated <code>ParamutuelWager</code> contract.
+      </p>
+      <div class="propose-wager-actions">
+        <a href="app.html" class="btn btn-primary">Open app — create wager</a>
+        <a href="explorer.html" class="btn btn-secondary">Browse existing markets</a>
+      </div>
+      <p class="muted" style="margin-top: 20px; line-height: 1.6;">
+        Use the <strong>same chain</strong> as the network strip under the navigation. The app fills the factory address from this site&rsquo;s deployment config when available; you can override it if needed.
+      </p>
+      <p class="muted" style="margin-top: 12px; line-height: 1.6;">
+        <strong>Developers / integrators:</strong> lifecycle and roles are documented in
+        <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WAGER-LIFECYCLE.md" class="external">docs/WAGER-LIFECYCLE.md</a>;
+        ABI and HTTP surfaces in
+        <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/MACHINE.md" class="external">docs/MACHINE.md</a>
+        and <a href="about.html#developers">About → Developers</a>.
+      </p>
+    </section>
+  </div>
+
+  <footer>
+    Paramutuel &mdash; <a href="index.html">Home</a>
+    · <a href="about.html">About</a>
+    · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+  </footer>
+</body>
+</html>
