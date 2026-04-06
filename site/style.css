@@ -735,6 +735,12 @@ body > footer:not(.app-shell-footer) {
   font-size: 12px;
 }
 
+.token-human-name {
+  font-weight: 600;
+  color: #e6edf3;
+  margin-right: 6px;
+}
+
 .btn-small {
   padding: 6px 12px;
   font-size: 13px;

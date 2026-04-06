@@ -10,7 +10,23 @@
     84532: "Base Sepolia",
   };
 
+  /** Base / Base Sepolia presets (aligned with dApp TOKEN_PRESETS). */
+  const KNOWN_COLLATERAL_SYMBOLS = {
+    84532: {
+      "0x036cbd53842c5426634e7929541ec2318f3dcf7e": "USDC",
+      "0x4200000000000000000000000000000000000006": "WETH",
+    },
+    8453: {
+      "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": "USDC",
+      "0x4200000000000000000000000000000000000006": "WETH",
+      "0x50c5725949a6f0c72e6c4a641f24049a917db0cb": "DAI",
+      "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf": "cbBTC",
+    },
+  };
+
   const ERC20_DECIMALS_ABI = ["function decimals() view returns (uint8)"];
+  const ERC20_SYMBOL_STRING_ABI = ["function symbol() view returns (string)"];
+  const ERC20_SYMBOL_BYTES32_ABI = ["function symbol() view returns (bytes32)"];
 
   let deployments = null;
   let expectedChainId = null;
@@ -236,6 +252,67 @@
       .replace(/"/g, "&quot;");
   }
 
+  function knownCollateralSymbol(addr) {
+    if (!addr || expectedChainId == null) return null;
+    const m = KNOWN_COLLATERAL_SYMBOLS[expectedChainId];
+    return m ? m[String(addr).toLowerCase()] || null : null;
+  }
+
+  async function fetchCollateralSymbolFromChain(addr) {
+    if (!provider || !ethers.isAddress(addr)) return null;
+    const cStr = new ethers.Contract(addr, ERC20_SYMBOL_STRING_ABI, provider);
+    try {
+      const s = await cStr.symbol();
+      if (typeof s === "string") {
+        const t = s.trim();
+        if (t) return t.slice(0, 32);
+      }
+    } catch (_) {}
+    try {
+      const cB = new ethers.Contract(addr, ERC20_SYMBOL_BYTES32_ABI, provider);
+      const b = await cB.symbol();
+      if (b != null && typeof ethers.decodeBytes32String === "function") {
+        const t = ethers.decodeBytes32String(b).trim();
+        if (t) return t.slice(0, 32);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function updateBetCollateralDisplay() {
+    const human = $("betCollateralHuman");
+    const code = $("betCollateral");
+    if (!code) return;
+    const addr = collateralTokenAddr;
+    if (!addr || !ethers.isAddress(addr)) {
+      code.textContent = "—";
+      if (human) {
+        human.hidden = true;
+        human.textContent = "";
+      }
+      return;
+    }
+    const checksum = ethers.getAddress(addr);
+    code.textContent = checksum;
+    let sym = knownCollateralSymbol(addr);
+    if (!sym && provider) {
+      try {
+        sym = await fetchCollateralSymbolFromChain(addr);
+      } catch (_) {
+        sym = null;
+      }
+    }
+    if (human) {
+      if (sym) {
+        human.hidden = false;
+        human.textContent = `${sym} ·`;
+      } else {
+        human.hidden = true;
+        human.textContent = "";
+      }
+    }
+  }
+
   async function applyWagerDetail(address, detail) {
     const w = detail.wager;
     if (!w) throw new Error("Indexer response missing wager.");
@@ -273,7 +350,7 @@
     $("betFactory").textContent = String(w.factory_address || "").trim() || "—";
     $("betProposer").textContent = String(w.proposer || "").trim() || "—";
     $("betResolver").textContent = String(w.resolver || "").trim() || "—";
-    $("betCollateral").textContent = collateralTokenAddr || "—";
+    await updateBetCollateralDisplay();
     $("betPot").textContent = formatPot(totalPotVal);
     $("betFeeBps").textContent = String(feeBpsVal);
     $("betBettingClose").textContent = formatUtcSeconds(w.betting_close_time);
@@ -398,6 +475,7 @@
       $("betSubmitBtn").disabled = st !== "OPEN";
       await refreshDecimals();
     }
+    await updateBetCollateralDisplay();
     syncDecimalsReadonly();
   }
 

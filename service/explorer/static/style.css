@@ -36,6 +36,11 @@ code {
   color: #c9d8f2;
 }
 
+.token-symbol-label {
+  font-weight: 600;
+  color: #e6edf3;
+}
+
 .controls {
   margin: 12px 0;
   display: flex;

@@ -14,6 +14,21 @@ let lastIndexerHint = "";
 let loadGeneration = 0;
 let pollTimer = null;
 
+/** Used to label known ERC-20 collateral on Base / Base Sepolia (matches dApp presets). */
+let explorerChainId = 84532;
+const KNOWN_COLLATERAL_SYMBOLS = {
+  84532: {
+    "0x036cbd53842c5426634e7929541ec2318f3dcf7e": "USDC",
+    "0x4200000000000000000000000000000000000006": "WETH",
+  },
+  8453: {
+    "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": "USDC",
+    "0x4200000000000000000000000000000000000006": "WETH",
+    "0x50c5725949a6f0c72e6c4a641f24049a917db0cb": "DAI",
+    "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf": "cbBTC",
+  },
+};
+
 const FIELD_DEFS = [
   { key: "wager_address", label: "Wager", core: true },
   { key: "state", label: "State", core: true },
@@ -21,7 +36,7 @@ const FIELD_DEFS = [
   { key: "outcomes_json", label: "Outcomes", core: true },
   { key: "proposer", label: "Proposer", core: true },
   { key: "resolver", label: "Resolver", core: true },
-  { key: "collateral_token", label: "Collateral", core: true },
+  { key: "collateral_token", label: "Collateral token", core: true },
   { key: "total_pot", label: "Total Pot (raw)", core: true },
   { key: "total_fee_bps", label: "Total Fee BPS", core: false },
   { key: "winning_outcome", label: "Winning Outcome", core: false },
@@ -90,6 +105,17 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function formatCollateralTokenCell(addr) {
+  const raw = String(addr || "").trim();
+  if (!raw) return '<span class="muted">—</span>';
+  const sym = KNOWN_COLLATERAL_SYMBOLS[explorerChainId]?.[raw.toLowerCase()];
+  const code = `<code>${escapeHtml(raw)}</code>`;
+  if (sym) {
+    return `<span class="token-symbol-label">${escapeHtml(sym)}</span> · ${code}`;
+  }
+  return code;
+}
+
 function selectedFields() {
   return FIELD_DEFS.filter((f) => selectedFieldKeys.has(f.key));
 }
@@ -100,6 +126,9 @@ function getFieldValue(record, key) {
 
 function formatFieldValue(key, value) {
   if (value === null || value === undefined || value === "") return '<span class="muted">—</span>';
+  if (key === "collateral_token") {
+    return formatCollateralTokenCell(value);
+  }
   if (key === "outcomes_json") {
     try {
       const parsed = typeof value === "string" ? JSON.parse(value) : value;
@@ -183,15 +212,17 @@ function setLoadMoreEnabled(enabled) {
 
 async function loadConfiguredFactoryAddress() {
   const node = document.getElementById("factoryAddressDisplay");
-  if (!node) return;
   try {
     const response = await fetch(DEPLOYMENTS_CONFIG_URL);
     if (!response.ok) return;
     const data = await response.json();
     const defaultNetwork = String((data?.defaultNetwork || "baseSepolia")).trim();
-    const addr = String((data?.[defaultNetwork]?.factoryAddress || "")).trim();
-    if (!addr) return;
-    node.textContent = addr;
+    const net = data?.[defaultNetwork] || {};
+    const cid = net.chainId;
+    const parsed = typeof cid === "number" ? cid : Number(cid);
+    if (!Number.isNaN(parsed)) explorerChainId = parsed;
+    const addr = String((net.factoryAddress || "")).trim();
+    if (node && addr) node.textContent = addr;
   } catch (_) {
     // Optional when explorer is served standalone without deployments config.
   }
