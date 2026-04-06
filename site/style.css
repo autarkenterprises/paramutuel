@@ -207,6 +207,118 @@ body > footer:not(.app-shell-footer) {
   align-items: center;
 }
 
+.propose-wager-actions--header {
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.propose-wager-header {
+  text-align: center;
+  padding: 28px 0 8px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.propose-wager-header h1 {
+  margin-bottom: 12px;
+}
+
+.propose-wager-lead {
+  text-align: left;
+  max-width: none;
+}
+
+.propose-section-title {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  color: #e6edf3;
+}
+
+.propose-assisted-callout {
+  border-color: #2c4a6e;
+  background: linear-gradient(165deg, #121a2a 0%, #0f1522 100%);
+}
+
+.propose-assisted-callout__text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #c8d4e8;
+  margin-bottom: 12px;
+}
+
+.propose-assisted-callout__text:last-of-type {
+  margin-bottom: 0;
+}
+
+.propose-assisted-callout__meta {
+  margin-top: 14px;
+  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.propose-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.propose-template-card {
+  background: #0b0f19;
+  border: 1px solid #2c3a5a;
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.propose-template-card__title {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #e6edf3;
+}
+
+.propose-template-card__desc {
+  font-size: 14px;
+  color: #97a6c4;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.propose-template-card__fields {
+  font-size: 13px;
+  color: #97a6c4;
+  padding-left: 18px;
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.propose-template-card__status {
+  font-size: 12px;
+  color: #f0d060;
+  margin: 0;
+}
+
+.propose-streamlined-steps {
+  font-size: 14px;
+  color: #97a6c4;
+  line-height: 1.65;
+  padding-left: 22px;
+  margin-bottom: 18px;
+}
+
+.propose-streamlined-steps li {
+  margin-bottom: 8px;
+}
+
+.propose-streamlined-placeholder {
+  margin: 0;
+  padding: 14px 16px;
+  background: #1a1508;
+  border: 1px solid #5c4a1a;
+  border-radius: 8px;
+  color: #f0d060;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 /* ── Home: Place a bet search (below live feed) ── */
 
 .home-bet-search-below-feed {

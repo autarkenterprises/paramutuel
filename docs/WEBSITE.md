@@ -7,7 +7,7 @@ The static site under `site/` is a **thin shell**: marketing copy, a testnet/mai
 | Path | Role |
 |------|------|
 | `/` | Landing: primary CTAs (propose / bet), live ticker, wager lifecycle, then protocol orientation + network |
-| `/propose-a-wager.html` | Create path — copy + link into embedded dApp for factory deploy |
+| `/propose-a-wager.html` | Facilitated create — templates + streamlined flow (assisted TX per ADR-0006/7; full dApp linked for power users) |
 | `/place-a-bet.html` | Betting entry — indexer search + CTA into wallet staking (`bet.html`) |
 | `/app.html` | Full dApp embedded via iframe |
 | `/bet.html` | Wallet staking (`placeBets`; not in nav — reached from Place a Bet, feed, Explorer, or `?wager=`) |

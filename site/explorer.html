@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel wager explorer: browse indexer-backed markets and open the bet flow." />
+  <meta name="description" content="Paramutuel wager explorer: browse indexer-backed wagers and open the staking flow." />
   <title>Paramutuel - Explorer</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -43,7 +43,7 @@
     if (hintEl) {
       hintEl.textContent = PSN
         ? PSN.copy.explorerLeaveBlank
-        : "Leave blank to use this site’s default market API.";
+        : "Leave blank to use this site’s default wager indexer URL.";
     }
 
     async function applyDefaultIndexerFromConfig() {

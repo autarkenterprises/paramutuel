@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel — parimutuel markets on Base. Propose wagers, place bets, live markets, and open protocol docs." />
+  <meta name="description" content="Paramutuel — parimutuel wagers on Base. Propose wagers, place bets, live feed, and open protocol docs." />
   <meta property="og:title" content="Paramutuel" />
-  <meta property="og:description" content="Parimutuel pools on Base: propose markets, stake on outcomes, resolve and claim on-chain." />
+  <meta property="og:description" content="Parimutuel pools on Base: propose wagers, stake on outcomes, resolve and claim on-chain." />
   <meta property="og:type" content="website" />
   <title>Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
@@ -52,7 +52,7 @@
     <section class="card home-lifecycle" id="how-wagers-work" aria-labelledby="home-lifecycle-heading">
       <h2 id="home-lifecycle-heading" class="home-lifecycle-title">How wagers move from idea to payout</h2>
       <p class="home-lifecycle-lead muted">
-        Each market is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle.
+        Each wager is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle.
       </p>
       <ol class="home-lifecycle-steps">
         <li class="home-lifecycle-step">
@@ -80,7 +80,7 @@
           <span class="home-lifecycle-step-num" aria-hidden="true">4</span>
           <div class="home-lifecycle-step-body">
             <h3 class="home-lifecycle-step-title">Settle</h3>
-            <p>During the <strong>resolution window</strong>, the resolver either names the winning outcome, <strong>retracts</strong> (invalidates the market), or does nothing until the window ends. If the window ends without a winner, <strong>anyone</strong> can call <strong>expire</strong> so participants can recover stakes (fees may still apply).</p>
+            <p>During the <strong>resolution window</strong>, the resolver either names the winning outcome, <strong>retracts</strong> (invalidates the wager), or does nothing until the window ends. If the window ends without a winner, <strong>anyone</strong> can call <strong>expire</strong> so participants can recover stakes (fees may still apply).</p>
           </div>
         </li>
         <li class="home-lifecycle-step">
@@ -117,8 +117,8 @@
           <span>Fund the wallet with Sepolia ETH on Base for gas. For betting, use the ERC-20 shown in the app for each wager (USDC-style presets exist in the dApp). Amounts in the feed are <strong>raw token units</strong> (smallest decimals).</span>
         </li>
         <li>
-          <strong>Stake on a market</strong>
-          <span>Use <a href="place-a-bet.html">Place a Bet</a> to search markets and open the wallet staking flow, skim the <strong>live feed</strong> on the home page, or use <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
+          <strong>Stake on a wager</strong>
+          <span>Use <a href="place-a-bet.html">Place a Bet</a> to search open wagers and open the wallet staking flow, skim the <strong>live feed</strong> on the home page, or use <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
         </li>
         <li>
           <strong>Inspect &amp; verify</strong>
@@ -159,21 +159,21 @@
         <div>
           <h3>Advantages</h3>
           <ul>
-            <li><strong>Parimutuel math</strong> &mdash; all stakes go into one pot per market; implied odds reflect aggregate sentiment, not a house line.</li>
+            <li><strong>Parimutuel math</strong> &mdash; all stakes go into one pot per wager; implied odds reflect aggregate sentiment, not a house line.</li>
             <li><strong>ERC-20 collateral</strong> &mdash; use standard tokens (e.g. USDC) per wager; amounts are enforced by contract logic.</li>
             <li><strong>Composable lifecycle</strong> &mdash; factory-deployed wagers with configurable closers, resolution windows, and fee recipients (treasury + extras).</li>
-            <li><strong>Live market list</strong> &mdash; search and explore wagers without scraping the chain yourself.</li>
+            <li><strong>Live wager list</strong> &mdash; search and explore wagers without scraping the chain yourself.</li>
             <li><strong>Base-first</strong> &mdash; low-friction L2 for everyday wallet use.</li>
           </ul>
         </div>
         <div>
           <h3>Use cases</h3>
           <ul>
-            <li><strong>Prop and event markets</strong> &mdash; sports, elections, product launches, KPI bets between teams or communities.</li>
+            <li><strong>Prop and event wagers</strong> &mdash; sports, elections, product launches, KPI bets between teams or communities.</li>
             <li><strong>Long-horizon forecasts</strong> &mdash; templates for extended betting and resolution windows.</li>
             <li><strong>Closer-managed windows</strong> &mdash; authority-driven close when fixed deadlines are a poor fit.</li>
             <li><strong>Charity or beneficiary splits</strong> &mdash; fee configuration supports directing a share of the pot to treasuries or named recipients (within protocol caps).</li>
-            <li><strong>Integrators</strong> &mdash; builders can use the same public market data that powers this site; see <a href="about.html#developers">About → Developers</a>.</li>
+            <li><strong>Integrators</strong> &mdash; builders can use the same public wager data that powers this site; see <a href="about.html#developers">About → Developers</a>.</li>
           </ul>
         </div>
       </div>

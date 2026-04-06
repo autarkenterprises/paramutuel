@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Find a Paramutuel market and place a bet: search indexer-backed wagers or open the wallet bet flow." />
+  <meta name="description" content="Find a Paramutuel wager and place a bet: search the indexer or open the wallet staking flow. Assisted signing (in development) per ADR-0007." />
   <title>Place a Bet — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -24,6 +24,16 @@
   <script src="network-banner.js" defer></script>
 
   <div class="container home-bet-search-below-feed">
+    <section class="card propose-assisted-callout" aria-labelledby="place-assisted-heading">
+      <h2 id="place-assisted-heading" class="propose-section-title">Assisted betting (in development)</h2>
+      <p class="propose-assisted-callout__text">
+        The goal here is the same as on <a href="propose-a-wager.html">Propose a Wager</a>: you should not have to coordinate <strong>ETH for gas</strong> and <strong>ERC-20 allowance</strong> as separate mental models for every bet. <a href="https://github.com/autarkenterprises/paramutuel/blob/master/research/adr/ADR-0006-surface-separation-self-custody-vs-assisted-ux.md" class="external">ADR-0006</a> / <a href="https://github.com/autarkenterprises/paramutuel/blob/master/research/adr/ADR-0007-assisted-transaction-gateway-and-approval-paths.md" class="external">ADR-0007</a> describe assisted execution and permit paths on top of unchanged contracts.
+      </p>
+      <p class="muted propose-assisted-callout__meta">
+        Today, search results and <strong>Stake with wallet</strong> use a standard wallet flow (gas + <code>approve</code> where required) until the gateway ships. See <a href="https://github.com/autarkenterprises/paramutuel/blob/master/research/assisted-ux-roadmap.md" class="external">assisted-ux-roadmap.md</a>.
+      </p>
+    </section>
+
     <section class="card home-bet-search" id="place-a-bet" aria-label="Place a Bet">
       <h1 class="home-bet-search-title">Place a Bet</h1>
       <p class="home-bet-search-betpage-line">
@@ -31,7 +41,7 @@
         <span class="muted">Paste a wager address or open a shared <code>?wager=0x…</code> link.</span>
       </p>
       <p class="muted home-bet-search-hint">
-        By default only <strong>open</strong> markets are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the betting page.
+        By default only <strong>open</strong> wagers are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the staking flow.
       </p>
       <div class="home-bet-search-field-row">
         <input

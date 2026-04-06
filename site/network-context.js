@@ -24,7 +24,7 @@
       "Default from deployments config (matches site network toggle). You can still override manually.",
     explorerIndexerAfterToggle: "Switched with site network toggle. Override manually if needed.",
     explorerIndexerMissing: "No indexer URL for this network in deployments.json.",
-    explorerLeaveBlank: "Leave blank to use this site’s default market API.",
+    explorerLeaveBlank: "Leave blank to use this site’s default wager indexer URL.",
     operatorHubStatus(netKey) {
       return `Showing ${netKey}. Use the network toggle in the banner to switch testnet vs mainnet. Optional service links use operator-hub.json.`;
     },
@@ -97,7 +97,7 @@
 
     let bannerVariantClass = "network-banner--testnet";
     let badgeText = "Testnet";
-    let bannerLine = `${meta.label} · ${apiBase ? "Markets connected" : "Market list offline"} · practice tokens only`;
+    let bannerLine = `${meta.label} · ${apiBase ? "Wagers indexed" : "No wager indexer"} · practice tokens only`;
 
     if (isMainnetChain) {
       bannerVariantClass = mainnetIncomplete ? "network-banner--warn" : "network-banner--mainnet";
@@ -105,7 +105,7 @@
       if (mainnetIncomplete) {
         bannerLine = `${meta.label} — contracts not published in this build yet. Use testnet for live demos; fill baseMainnet in deployments.json when ready.`;
       } else {
-        bannerLine = `${meta.label} · ${apiBase ? "Markets connected" : "Market list offline"} · real funds — match your wallet to this network`;
+        bannerLine = `${meta.label} · ${apiBase ? "Wagers indexed" : "No wager indexer"} · real funds — match your wallet to this network`;
       }
     }
 
