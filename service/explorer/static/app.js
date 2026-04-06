@@ -235,7 +235,7 @@ function renderWagerCells(m, fields) {
       if (f.key === "wager_address" && v) {
         const addr = String(v).trim();
         const enc = encodeURIComponent(addr);
-        return `<td class="wager-cell"><a class="bet-link" href="../bet.html?wager=${enc}" title="Open simplified bet page">Bet</a> <code>${escapeHtml(
+        return `<td class="wager-cell"><a class="bet-link" href="../bet.html?wager=${enc}" title="Open wallet staking">Bet</a> <code>${escapeHtml(
           addr
         )}</code></td>`;
       }
