@@ -1257,6 +1257,120 @@ body.site-has-banner .iframe-page--with-embed-hint iframe {
   font-weight: 600;
 }
 
+/* ── Homepage: wager lifecycle ── */
+
+.home-lifecycle {
+  margin-top: 32px;
+}
+
+.home-lifecycle-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+}
+
+.home-lifecycle-lead {
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 24px;
+  max-width: 52rem;
+}
+
+.home-lifecycle-steps {
+  list-style: none;
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 900px) {
+  .home-lifecycle-steps {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .home-lifecycle-step {
+    flex-direction: column;
+    text-align: left;
+    padding: 16px 14px;
+    min-height: 100%;
+    border-right: 1px solid #23304a;
+  }
+
+  .home-lifecycle-step:last-child {
+    border-right: none;
+  }
+
+  .home-lifecycle-step-num {
+    margin-bottom: 10px;
+  }
+}
+
+.home-lifecycle-step {
+  display: flex;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid #23304a;
+}
+
+.home-lifecycle-step:last-child {
+  border-bottom: none;
+}
+
+@media (min-width: 900px) {
+  .home-lifecycle-step {
+    border-bottom: none;
+  }
+}
+
+.home-lifecycle-step-num {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #1c2640, #121a2a);
+  border: 1px solid #2c3a5a;
+  font-weight: 700;
+  font-size: 15px;
+  color: #58a6ff;
+}
+
+.home-lifecycle-step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-lifecycle-step-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+  margin: 0 0 6px;
+}
+
+.home-lifecycle-step-body p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #97a6c4;
+}
+
+.home-lifecycle-step-body strong {
+  color: #c9d1d9;
+  font-weight: 600;
+}
+
+.home-lifecycle-footnote {
+  margin-top: 22px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 /* ── Footer ── */
 
 footer {

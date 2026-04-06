@@ -262,6 +262,8 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 
 ### Lifecycle (MVP)
 
+**Technical reference (states, roles, timer vs authority):** [`docs/WAGER-LIFECYCLE.md`](docs/WAGER-LIFECYCLE.md).
+
 1. **Create wager**
    - Proposer supplies:
      - `collateralToken` (ERC20)

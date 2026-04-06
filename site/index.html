@@ -158,6 +158,53 @@
       </div>
     </section>
 
+    <section class="card home-lifecycle" id="how-wagers-work" aria-labelledby="home-lifecycle-heading">
+      <h2 id="home-lifecycle-heading" class="home-lifecycle-title">How wagers move from idea to payout</h2>
+      <p class="home-lifecycle-lead muted">
+        Each market is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle.
+      </p>
+      <ol class="home-lifecycle-steps">
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">1</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Create</h3>
+            <p>A <strong>proposer</strong> deploys a wager through the factory: the question, outcome labels, collateral token, fee split, and time rules. The <strong>resolver</strong> (who picks the winner or cancels) defaults to the proposer unless another address is set.</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">2</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Open betting</h3>
+            <p>Anyone with the right token stakes on one or more outcomes. All stakes sit in one pot; implied odds shift as the pool grows.</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">3</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Close betting</h3>
+            <p>New bets stop when the <strong>scheduled time</strong> is reached <em>or</em> a designated <strong>betting closer</strong> ends the window early&mdash;whichever comes first.</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">4</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Settle</h3>
+            <p>During the <strong>resolution window</strong>, the resolver either names the winning outcome, <strong>retracts</strong> (invalidates the market), or does nothing until the window ends. If the window ends without a winner, <strong>anyone</strong> can call <strong>expire</strong> so participants can recover stakes (fees may still apply).</p>
+          </div>
+        </li>
+        <li class="home-lifecycle-step">
+          <span class="home-lifecycle-step-num" aria-hidden="true">5</span>
+          <div class="home-lifecycle-step-body">
+            <h3 class="home-lifecycle-step-title">Claim</h3>
+            <p>After settlement, winners withdraw pro-rata payouts; on retract or expire, refunds follow the contract rules. Fee recipients claim their configured share.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="home-lifecycle-footnote muted">
+        Full state machine, role permissions, and timer vs authority behavior: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WAGER-LIFECYCLE.md" class="external">docs/WAGER-LIFECYCLE.md</a> in the open-source repo.
+      </p>
+    </section>
+
     <div class="card" style="margin-top: 32px;">
       <h3>Network</h3>
       <dl class="network-info">
@@ -178,16 +225,6 @@
           <dd><a id="homeExplorerLink" href="https://sepolia.basescan.org">sepolia.basescan.org</a></dd>
         </div>
       </dl>
-    </div>
-
-    <div class="card">
-      <h3>How It Works</h3>
-      <ol style="color: #97a6c4; font-size: 14px; line-height: 1.8; padding-left: 20px;">
-        <li><strong style="color: #e6edf3;">Create</strong> &mdash; A proposer deploys a wager with a proposition, outcomes, and time windows via the factory contract.</li>
-        <li><strong style="color: #e6edf3;">Bet</strong> &mdash; Anyone deposits ERC-20 collateral on an outcome during the betting window.</li>
-        <li><strong style="color: #e6edf3;">Resolve</strong> &mdash; The resolver selects the winning outcome (or retracts/expires).</li>
-        <li><strong style="color: #e6edf3;">Claim</strong> &mdash; Winners claim pro-rata payouts; fee recipients withdraw accrued fees.</li>
-      </ol>
     </div>
   </div>
 
