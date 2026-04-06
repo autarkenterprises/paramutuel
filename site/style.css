@@ -959,6 +959,34 @@ body > footer:not(.app-shell-footer) {
   text-decoration: underline;
 }
 
+.onboarding-network-detail {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.onboarding-network-detail code {
+  font-size: 12px;
+  padding: 1px 5px;
+  background: #0b0f19;
+  border-radius: 4px;
+}
+
+.home-bet-search-betpage-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 14px;
+}
+
+.home-bet-search-betpage-line .btn-inline {
+  padding: 8px 16px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
 /* ── Feature grid ── */
 
 .features {

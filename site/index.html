@@ -16,6 +16,7 @@
     <div class="links">
       <a href="index.html" class="active">Home</a>
       <a href="index.html#place-a-bet">Place a bet</a>
+      <a href="bet.html">Bet page</a>
       <a href="explorer.html">Explorer</a>
       <a href="app.html">App</a>
       <a href="about.html">About</a>
@@ -50,6 +51,10 @@
   <div class="container home-bet-search-below-feed">
     <section class="card home-bet-search" id="place-a-bet" aria-label="Place a bet">
       <h2 class="home-bet-search-title">Place a bet</h2>
+      <p class="home-bet-search-betpage-line">
+        <a href="bet.html" class="btn btn-secondary btn-inline">Bet page</a>
+        <span class="muted">Open the standalone page to paste a wager address or follow a shared link.</span>
+      </p>
       <p class="muted home-bet-search-hint">
         By default only <strong>open</strong> markets are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the betting page.
       </p>
@@ -85,6 +90,10 @@
         <li>
           <strong>Wallet &amp; network</strong>
           <span>Install a browser wallet (e.g. MetaMask or Coinbase Wallet). Use the <strong>same network as the strip under the navigation</strong> (often Base Sepolia for practice, or Base mainnet when this site is configured for production).</span>
+          <span class="onboarding-network-detail muted">
+            For <strong>Base Sepolia</strong> testnet: chain ID <code>84532</code>, default public RPC
+            <code>https://sepolia.base.org</code> — add it as a custom network if your wallet does not list Base Sepolia already.
+          </span>
         </li>
         <li>
           <strong>Gas &amp; collateral</strong>
