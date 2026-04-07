@@ -85,7 +85,7 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 
 **Goal:** Enable wagers where multiple options can be true simultaneously, without requiring subset enumeration as explicit outcomes.
 
-**Branch (prototype):** `experiment/adr-0008-multi-winner-v2` — `ParamutuelFactoryV2` + `ParamutuelWagerV2`, tests, and [`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md).
+**Canonical integration branch:** `experiment/adr-0008-multi-winner-v2` — all v2 contract work, Foundry tests, gas docs, and follow-on indexer/dApp/MCP land here first; merge to `master` only after coordinated certification. Contents: `ParamutuelFactoryV2` + `ParamutuelWagerV2`, tests, [`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md).
 
 - [x] Specify canonical payoff policies and formulas (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`) — see implementation doc.
 - [x] Define compact winner-set and ticket-selection encoding (`uint256` bitset, `MAX_DISTINCT_TICKETS`, factory `MAX_OUTCOMES = 64`).

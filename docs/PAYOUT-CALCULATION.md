@@ -5,7 +5,7 @@ This document describes how **collateral token amounts** are computed when a wag
 1. **Protocol v1** — `ParamutuelWager` (single winning **outcome index**).
 2. **Protocol v2** — `ParamutuelWagerV2` (bitmask **tickets** and **payoff policies**; ADR-0008).
 
-**Source layout:** v1 is on `master`. The v2 contract may live on branch `experiment/adr-0008-multi-winner-v2` until merged; the Part B formulas match that implementation.
+**Source layout:** v1 ships from `master`. v2 (`ParamutuelWagerV2`, `ParamutuelFactoryV2`) is developed on **`experiment/adr-0008-multi-winner-v2`** until merged after certification ([`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)). Part B matches `src/ParamutuelWagerV2.sol` on that branch.
 
 All amounts are in the wager’s **ERC-20 raw units** (wei of that token). Arithmetic uses **integer division**; rounding favors staying **at or below** the true rational value, so a few wei of collateral can remain in the contract after all claims.
 

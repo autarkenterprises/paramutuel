@@ -12,6 +12,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Resolution Service (delegated resolver ops):** see [`docs/RESOLUTION-SERVICE.md`](docs/RESOLUTION-SERVICE.md).
 **Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
 **Payout math (v1 + v2):** see [`docs/PAYOUT-CALCULATION.md`](docs/PAYOUT-CALCULATION.md).
+**ADR-0008 (v2 multi-winner / bitmask tickets):** implement on branch **`experiment/adr-0008-multi-winner-v2`**; see [`docs/ADR-0008-IMPLEMENTATION.md`](docs/ADR-0008-IMPLEMENTATION.md). `master` stays v1 until that branch merges after certification.
 **Service layer modules:** see [`service/README.md`](service/README.md).
 **Hosted dApp & website:** see [GitHub Pages deployment](#hosted-dapp--protocol-website).
 

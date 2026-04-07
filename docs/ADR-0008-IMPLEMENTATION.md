@@ -1,7 +1,7 @@
 # ADR-0008 implementation notes (v2 contracts)
 
-**Branch:** `experiment/adr-0008-multi-winner-v2`  
-**Status:** Prototype — Solidity + Foundry tests only. v1 `ParamutuelFactory` / `ParamutuelWager` are unchanged.
+**Branch:** `experiment/adr-0008-multi-winner-v2` (canonical line for all v2 work until merge to `master`)  
+**Status:** Prototype — Solidity + Foundry tests; v1 `ParamutuelFactory` / `ParamutuelWager` on `master` unchanged. This branch is periodically merged **from** `master` for site/dApp/indexer shell updates while v2 contracts and tests live here.
 
 ## Rationale
 
