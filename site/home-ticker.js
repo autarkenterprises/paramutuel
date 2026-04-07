@@ -2,6 +2,7 @@
   "use strict";
 
   const CONFIG_URL = "config/deployments.json";
+  const PSN = window.ParamutuelSiteNetwork;
   const REFRESH_MS = 45_000;
   const LIST_LIMIT = 14;
   const OPEN_DETAIL_CAP = 8;
@@ -16,6 +17,9 @@
   }
 
   function blockExplorerAddress(chainId, address) {
+    if (PSN && typeof PSN.blockExplorerAddress === "function") {
+      return PSN.blockExplorerAddress(chainId, address);
+    }
     const a = String(address || "").trim();
     if (!a) return "#";
     if (chainId === 8453) return `https://basescan.org/address/${a}`;
@@ -100,11 +104,15 @@
     const response = await fetch(CONFIG_URL);
     if (!response.ok) throw new Error("deployments config unavailable");
     const data = await response.json();
-    const defaultNetwork = String(data?.defaultNetwork || "baseSepolia").trim();
-    const net = data?.[defaultNetwork] || {};
+    const netKey = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
+    const net = (PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey]) || {};
     const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const chainId = net.chainId;
-    return { apiBase, chainId: typeof chainId === "number" ? chainId : Number(chainId), defaultNetwork };
+    return {
+      apiBase,
+      chainId: typeof chainId === "number" ? chainId : Number(chainId),
+      networkKey: netKey,
+    };
   }
 
   async function fetchJson(url) {
@@ -113,13 +121,52 @@
     return r.json();
   }
 
-  async function fetchWagerDetail(apiBase, addr) {
-    const url = `${apiBase}/wagers/${encodeURIComponent(addr)}`;
-    try {
-      return await fetchJson(url);
-    } catch {
-      return null;
+  /** Match Explorer / home search: some hosts only expose `/api/wagers`, others `/wagers`. */
+  async function fetchWagersList(apiBase, limit) {
+    const base = String(apiBase || "").replace(/\/$/, "");
+    const q = `limit=${limit}&order=desc`;
+    const paths = [`/api/wagers?${q}`, `/wagers?${q}`];
+    let lastErr = null;
+    for (const p of paths) {
+      try {
+        const r = await fetch(`${base}${p}`);
+        if (r.ok) return r.json();
+        if (r.status !== 404) lastErr = new Error(`HTTP ${r.status}`);
+      } catch (e) {
+        lastErr = e;
+      }
     }
+    throw lastErr || new Error("wagers list unreachable");
+  }
+
+  async function fetchWagerDetail(apiBase, addr) {
+    const base = String(apiBase || "").replace(/\/$/, "");
+    const a = encodeURIComponent(String(addr).toLowerCase());
+    const paths = [`/api/wagers/${a}`, `/wagers/${a}`];
+    for (const p of paths) {
+      try {
+        const r = await fetch(`${base}${p}`);
+        if (r.ok) return r.json();
+      } catch {
+        /* try next */
+      }
+    }
+    return null;
+  }
+
+  async function withRetries(fn, { attempts = 4, delayMs = 500 } = {}) {
+    let last;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        return await fn();
+      } catch (e) {
+        last = e;
+        if (i < attempts - 1) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    }
+    throw last;
   }
 
   function showSkeleton(track) {
@@ -189,6 +236,24 @@
     if (document.visibilityState === "visible") run();
   });
 
+  function paintTickerTrack(wagers, detailByAddr, cfg, viewport, track, statusMessage) {
+    const statusEl = document.getElementById("tickerStatus");
+    viewport.classList.remove("ticker-updating");
+    track.innerHTML = "";
+    wagers.forEach((w) => track.appendChild(renderItem(w, detailByAddr, cfg.chainId)));
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion && track.children.length > 0) {
+      const nodes = [...track.children];
+      nodes.forEach((node) => track.appendChild(node.cloneNode(true)));
+      viewport.classList.add("ticker-animate");
+    } else {
+      viewport.classList.remove("ticker-animate");
+    }
+
+    if (statusEl) statusEl.textContent = statusMessage;
+  }
+
   async function run() {
     const track = document.getElementById("tickerTrack");
     const viewport = document.getElementById("tickerViewport");
@@ -231,12 +296,16 @@
 
     let body;
     try {
-      body = await fetchJson(`${cfg.apiBase}/wagers?limit=${LIST_LIMIT}&order=desc`);
+      body = await withRetries(() => fetchWagersList(cfg.apiBase, LIST_LIMIT), {
+        attempts: hasLiveContent ? 2 : 4,
+        delayMs: 550,
+      });
     } catch {
       if (gen !== runGeneration) return;
       viewport.classList.remove("ticker-updating");
       if (!hasLiveContent) track.innerHTML = "";
-      status.textContent = "Indexer unreachable. Retrying on a timer while this tab is visible.";
+      status.textContent =
+        "Indexer unreachable (cold start can take a few seconds). Retrying automatically…";
       startRefreshLoop();
       return;
     }
@@ -256,6 +325,16 @@
       .slice(0, OPEN_DETAIL_CAP)
       .map((w) => String(w.wager_address || "").toLowerCase());
 
+    const fullStatus = `${wagers.length} recent · click a card to bet · ↗ block explorer · raw = smallest token units · auto-refresh ~${Math.round(
+      REFRESH_MS / 1000
+    )}s`;
+
+    /** First visit: paint list as soon as it returns; enrich odds in a second pass (avoids blank wait during N+1 fetches + cold starts). */
+    if (!hasLiveContent && openAddrs.length > 0) {
+      if (gen !== runGeneration) return;
+      paintTickerTrack(wagers, {}, cfg, viewport, track, `${wagers.length} recent · loading live odds…`);
+    }
+
     const details = await Promise.all(openAddrs.map((a) => fetchWagerDetail(cfg.apiBase, a)));
     const detailByAddr = {};
     openAddrs.forEach((a, i) => {
@@ -264,27 +343,26 @@
 
     if (gen !== runGeneration) return;
 
-    viewport.classList.remove("ticker-updating");
-    track.innerHTML = "";
-    wagers.forEach((w) => track.appendChild(renderItem(w, detailByAddr, cfg.chainId)));
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduceMotion && track.children.length > 0) {
-      const nodes = [...track.children];
-      nodes.forEach((node) => track.appendChild(node.cloneNode(true)));
-      viewport.classList.add("ticker-animate");
-    }
-
-    status.textContent = `${wagers.length} recent · click a card to bet · ↗ block explorer · raw = smallest token units · auto-refresh ~${Math.round(
-      REFRESH_MS / 1000
-    )}s`;
+    paintTickerTrack(wagers, detailByAddr, cfg, viewport, track, fullStatus);
 
     startRefreshLoop();
   }
 
+  function bindNetworkRefresh() {
+    if (!PSN) return;
+    window.addEventListener(PSN.EVENT, () => {
+      runGeneration += 1;
+      run();
+    });
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run);
+    document.addEventListener("DOMContentLoaded", () => {
+      bindNetworkRefresh();
+      run();
+    });
   } else {
+    bindNetworkRefresh();
     run();
   }
 })();

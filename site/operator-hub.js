@@ -7,6 +7,7 @@
 
   const DEPLOYMENTS_URL = "config/deployments.json";
   const HUB_URL = "config/operator-hub.json";
+  const PSN = window.ParamutuelSiteNetwork;
 
   function $(id) {
     return document.getElementById(id);
@@ -50,23 +51,11 @@
     return p ? `${b}/${p}` : b;
   }
 
-  async function run() {
-    let deployments;
-    let hub = {};
-    try {
-      deployments = await loadJson(DEPLOYMENTS_URL);
-    } catch (e) {
-      setText("operatorHubStatus", "Could not load deployments.json: " + e.message);
-      return;
-    }
-    try {
-      hub = await loadJson(HUB_URL);
-    } catch {
-      /* optional file */
-    }
+  let hubCached = {};
 
-    const netKey = String(deployments?.defaultNetwork || "baseSepolia").trim();
-    const net = deployments?.[netKey] || {};
+  function paintOperatorHub(deployments, hub) {
+    const netKey = PSN ? PSN.getActiveNetworkKey(deployments) : String(deployments?.defaultNetwork || "baseSepolia").trim();
+    const net = PSN ? PSN.getNetworkEntry(deployments, netKey) : deployments?.[netKey] || {};
     const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
 
     setText("operatorHubNetwork", netKey + " (chain " + String(net.chainId ?? "—") + ")");
@@ -81,7 +70,16 @@
         ? "explorer/index.html?api=" + encodeURIComponent(apiBase)
         : "explorer/index.html";
     }
-    setText("operatorExplorerNote", apiBase ? "Indexer API prefilled from deployments.json." : "Set explorerApiBase in deployments.json.");
+    setText(
+      "operatorExplorerNote",
+      PSN && PSN.copy
+        ? apiBase
+          ? PSN.copy.operatorExplorerWithIndexer
+          : PSN.copy.operatorExplorerNoIndexer
+        : apiBase
+          ? "Explorer uses the indexer URL for the selected site network."
+          : "Configure an indexer URL for this network in deployments.json to enable the embedded explorer."
+    );
 
     const cp = String(hub.controlPanelBaseUrl || "").trim().replace(/\/$/, "");
     const prop = String(hub.propositionBaseUrl || "").trim().replace(/\/$/, "");
@@ -91,12 +89,31 @@
     setHref("operatorPropositionLink", prop || "", prop ? "Open proposition service" : "");
     setHref("operatorResolutionLink", res || "", res ? "Open resolution service" : "");
 
-    setText(
-      "operatorHubStatus",
-      "Loaded deployments for " +
-        netKey +
-        ". Hosted panels (control / proposition / resolution) use operator-hub.json when you deploy them."
-    );
+    setText("operatorHubStatus", PSN && PSN.copy ? PSN.copy.operatorHubStatus(netKey) : "Showing " + netKey + ".");
+  }
+
+  async function run() {
+    let deployments;
+    try {
+      deployments = await loadJson(DEPLOYMENTS_URL);
+    } catch (e) {
+      setText("operatorHubStatus", "Could not load deployment configuration: " + e.message);
+      return;
+    }
+    try {
+      hubCached = await loadJson(HUB_URL);
+    } catch {
+      hubCached = {};
+    }
+
+    paintOperatorHub(deployments, hubCached);
+
+    if (PSN) {
+      window.addEventListener(PSN.EVENT, (ev) => {
+        const cfg = ev.detail && ev.detail.config;
+        if (cfg) paintOperatorHub(cfg, hubCached);
+      });
+    }
   }
 
   if (document.readyState === "loading") {

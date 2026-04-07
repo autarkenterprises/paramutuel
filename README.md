@@ -27,7 +27,7 @@ This section is for an arbitrary user who clones the repo and wants to interact 
 - Base Sepolia test ETH
 - Base Sepolia test USDC (for funded bet flows)
 
-**Wallets (browser UIs):** The static dApp (`dapp/`) and the simplified **Place a bet** page (`site/bet.html`) connect through **EIP-1193**: they use `ethers.BrowserProvider` with an injected provider (`window.ethereum`). Any wallet that exposes a compliant provider works (for example MetaMask, Rabby, Coinbase Wallet, Brave Wallet, Frame). If several extensions register under `ethereum.providers[]`, the app prefers the first entry that implements `request`. **WalletConnect** and other non-injected flows are not included in the default static build; add a connector library if you need those. At the protocol level, anything that can sign transactions against the deployed contracts (Foundry `cast`, multisigs, automated services) is supported.
+**Wallets (browser UIs):** The static dApp (`dapp/`) and the wallet staking page (`site/bet.html`, linked from **Place a Bet**) connect through **EIP-1193**: they use `ethers.BrowserProvider` with an injected provider (`window.ethereum`). Any wallet that exposes a compliant provider works (for example MetaMask, Rabby, Coinbase Wallet, Brave Wallet, Frame). If several extensions register under `ethereum.providers[]`, the app prefers the first entry that implements `request`. **WalletConnect** and other non-injected flows are not included in the default static build; add a connector library if you need those. At the protocol level, anything that can sign transactions against the deployed contracts (Foundry `cast`, multisigs, automated services) is supported.
 
 ### 2) Clone and build
 
@@ -262,6 +262,8 @@ The purpose of this MVP is to clarify **actors**, their **permissions**, and the
 
 ### Lifecycle (MVP)
 
+**Technical reference (states, roles, timer vs authority):** [`docs/WAGER-LIFECYCLE.md`](docs/WAGER-LIFECYCLE.md).
+
 1. **Create wager**
    - Proposer supplies:
      - `collateralToken` (ERC20)
@@ -416,9 +418,11 @@ The dApp and a protocol website are deployed to GitHub Pages via CI. On every pu
 The website (`site/`) is a navigation shell that embeds the dApp and explorer as iframes — no code duplication. When component files change, the website automatically stays current.
 
 Pages:
-- `/` — Landing page with protocol overview, deployment banner, and live ticker
+- `/` — Landing: propose/bet CTAs, live ticker, wager lifecycle, then protocol/network orientation
+- `/propose-a-wager.html` — Create path (links into full app for factory deploy)
+- `/place-a-bet.html` — Find markets (indexer search) and open wallet staking (`bet.html`)
 - `/app.html` — Full dApp (embedded iframe; dApp remains a separate static bundle under `/dapp/`)
-- `/bet.html` — Short place-a-bet flow
+- `/bet.html` — Wallet `placeBets` flow (same betting path; direct URL for shares / paste address)
 - `/explorer.html` — Wager explorer with configurable indexer URL
 - `/operator.html` — Operator hub (indexer links, embedded explorer, optional service URLs)
 - `/dapp/` — Standalone dApp (also accessible directly)

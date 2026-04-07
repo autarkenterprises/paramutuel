@@ -1,36 +1,43 @@
 # Protocol website (GitHub Pages)
 
-The static site under `site/` is a **thin shell**: marketing copy, a testnet/mainnet **deployment banner**, and **iframes** that embed the self-custody dApp (`dapp/`) and the indexer-backed explorer (`service/explorer/static/`) without merging their codebases.
+The static site under `site/` is a **thin shell**: marketing copy, a testnet/mainnet **banner with an in-browser toggle** (persists in `localStorage`), and **iframes** that embed the self-custody dApp (`dapp/`) and the indexer-backed explorer (`service/explorer/static/`) without merging their codebases.
 
 ## Pages
 
 | Path | Role |
 |------|------|
-| `/` | Landing, live ticker, onboarding |
+| `/` | Landing: primary CTAs (propose / bet), live ticker, wager lifecycle, then protocol orientation + network |
+| `/propose-a-wager.html` | Facilitated create — templates + streamlined flow (assisted TX per ADR-0006/7; full dApp linked for power users) |
+| `/place-a-bet.html` | Betting entry — indexer search + CTA into wallet staking (`bet.html`) |
 | `/app.html` | Full dApp embedded via iframe |
-| `/bet.html` | Short “place a bet” flow (standalone JS + ethers) |
+| `/bet.html` | Wallet staking (`placeBets`; not in nav — reached from Place a Bet, feed, Explorer, or `?wager=`) |
 | `/explorer.html` | Explorer UI with optional indexer URL override |
 | `/operator.html` | **Operator hub** — indexer links, embedded explorer, outbound URLs for other services |
 | `/dapp/` | Same dApp as embedded, for direct links and debugging |
 
 Runtime configuration is read from `config/deployments.json` (copied to `_site/config/` in CI). Optional **`config/operator-hub.json`** supplies public base URLs for hosted operator panels (control, proposition, resolution) when you deploy them outside GitHub Pages.
 
-## Switching testnet → mainnet
+## Testnet vs mainnet on the public site
 
-One switch for the **public site build**:
+**Visitors** use the **Network** control in the banner (`Testnet` = Base Sepolia, `Mainnet` = Base). The choice is stored in the browser as `localStorage.paramutuel_site_network` and drives the home ticker, **Place a Bet** search (`place-a-bet.html`), `bet.html` indexer URL, explorer default API field, embedded dApp (`?siteNetwork=…`), and operator hub indexer links.
+
+**`site/network-context.js`** holds selection helpers, **`getSiteNetworkPresentation()`** (banner badge, banner line, hero caption, home “Network” card lines, explorer root), shared **`blockExplorerAddress`**, and static **`copy`** strings so the toggle only swaps data-driven text and endpoints — **one page layout, no duplicated shells**. **`site/network-banner.js`** only fetches `deployments.json` and renders the existing banner DOM using that presentation.
+
+**`defaultNetwork`** in **`config/deployments.json`** is still used for:
+
+- First-time visitors (no saved toggle yet).
+- Fallback when the saved key is missing from the file.
+
+### Turnkey checklist when Base mainnet is live
 
 1. Edit **`config/deployments.json`**.
-2. Set **`defaultNetwork`** to `"baseMainnet"`.
-3. Fill **`baseMainnet.factoryAddress`** and **`baseMainnet.explorerApiBase`** (and `chainId` / `indexerFromBlock` as needed for your indexer deployment).
-4. Commit and push; the **Deploy to GitHub Pages** workflow rebuilds the site.
+2. Under **`baseMainnet`**, set **`factoryAddress`**, **`explorerApiBase`**, and **`indexerFromBlock`** (for your indexer deployment). Keep **`chainId`** `8453`.
+3. Optionally set **`defaultNetwork`** to `"baseMainnet"` if you want new visitors to land on mainnet by default.
+4. Commit and push; **Deploy to GitHub Pages** rebuilds the site.
 
-The **banner** (`site/network-banner.js`) reflects the active entry:
+Until those fields are filled, the banner shows **Mainnet (stub)** and explains that the build is not ready for real funds.
 
-- **Testnet** styling for Base Sepolia (`chainId` 84532).
-- **Mainnet** styling for Base (`chainId` 8453) when factory and indexer URL are set.
-- **Warning** styling if `defaultNetwork` is mainnet but factory or indexer base URL is missing.
-
-The dApp (`dapp/app.js`) already picks the factory address from the same file keyed by the **wallet’s** chain when possible; keeping `defaultNetwork` aligned with your intended rollout avoids confusing defaults on the marketing site and bet page.
+The **dApp** (`dapp/app.js`) picks the factory address from `deployments.json` using the **connected wallet’s chain** when possible; when the wallet is not connected yet, it uses the **`siteNetwork`** query parameter set by `app.html`, then `defaultNetwork`.
 
 ## Operator hub
 

@@ -117,6 +117,8 @@ enum State { Open, Resolved, Retracted }
 - **Resolved** — winning outcome selected; winners can claim.
 - **Retracted** — invalidated (by resolver retract or expiry); all bettors can claim refund minus fees.
 
+For roles, timers vs authority closers, and a full transition matrix, see [`docs/WAGER-LIFECYCLE.md`](WAGER-LIFECYCLE.md).
+
 ### Read-only state
 
 | Getter | Returns | Description |

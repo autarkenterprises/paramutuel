@@ -7,20 +7,63 @@
   <title>Paramutuel - App</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="iframe-page">
+<body class="iframe-page iframe-page--with-embed-hint">
+  <script src="network-context.js"></script>
   <nav>
     <span class="logo">Paramutuel</span>
     <div class="links">
       <a href="index.html">Home</a>
-      <a href="app.html" class="active">App</a>
-      <a href="bet.html">Place a bet</a>
+      <a href="propose-a-wager.html">Propose a Wager</a>
+      <a href="place-a-bet.html">Place a Bet</a>
       <a href="explorer.html">Explorer</a>
-      <a href="operator.html">Operators</a>
-      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+      <a href="app.html" class="active">App</a>
+      <a href="about.html">About</a>
     </div>
   </nav>
   <div id="networkBannerSlot"></div>
   <script src="network-banner.js" defer></script>
-  <iframe src="dapp/index.html" title="Paramutuel dApp" allow="clipboard-write"></iframe>
+  <p class="muted app-embed-share-hint" id="appEmbedShareHint"></p>
+  <iframe id="paramutuelDappFrame" title="Paramutuel dApp" allow="clipboard-write"></iframe>
+  <script>
+    (function () {
+      const frame = document.getElementById("paramutuelDappFrame");
+      const PSN = window.ParamutuelSiteNetwork;
+      if (frame && PSN) {
+        const k = localStorage.getItem(PSN.STORAGE_KEY);
+        let url = "dapp/index.html";
+        if (k === "baseMainnet" || k === "baseSepolia") {
+          url += "?siteNetwork=" + encodeURIComponent(k);
+        }
+        frame.src = url;
+      } else if (frame) {
+        frame.src = "dapp/index.html";
+      }
+      if (PSN && frame) {
+        window.addEventListener(PSN.EVENT, (ev) => {
+          const nk = ev.detail && ev.detail.networkKey;
+          if (!nk) return;
+          frame.src = "dapp/index.html?siteNetwork=" + encodeURIComponent(nk);
+        });
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      const el = document.getElementById("appEmbedShareHint");
+      if (!el) return;
+      const betBase = new URL("bet.html", window.location.href).href.split(/[?#]/)[0];
+      el.appendChild(document.createTextNode("After you create a wager, share "));
+      const code = document.createElement("code");
+      code.textContent = `${betBase}?wager=WAGER_ADDRESS`;
+      el.appendChild(code);
+      el.appendChild(
+        document.createTextNode(" — replace WAGER_ADDRESS with the wager contract address shown in the app.")
+      );
+    })();
+  </script>
+  <footer class="app-shell-footer">
+    <a href="about.html">About</a>
+    · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+  </footer>
 </body>
 </html>

@@ -1,24 +1,15 @@
 /**
- * Reads config/deployments.json and renders a deployment strip under the main nav.
- * Testnet vs mainnet are visually distinct; warns when mainnet is selected but incomplete.
+ * Renders the deployment strip: same DOM shape every time; content comes from
+ * ParamutuelSiteNetwork.getSiteNetworkPresentation (network-context.js).
  */
 (function () {
   "use strict";
 
   const CONFIG_URL = "config/deployments.json";
-
-  const CHAIN_NAMES = {
-    84532: "Base Sepolia",
-    8453: "Base",
-  };
+  const PSN = window.ParamutuelSiteNetwork;
 
   function el(id) {
     return document.getElementById(id);
-  }
-
-  function blockExplorerRoot(chainId) {
-    if (chainId === 8453) return "https://basescan.org";
-    return "https://sepolia.basescan.org";
   }
 
   async function loadJson(url) {
@@ -27,63 +18,75 @@
     return r.json();
   }
 
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function wireToggle(slot, cfg, activeKey) {
+    const group = slot.querySelector(".network-banner__switch");
+    if (!group || !PSN) return;
+
+    group.querySelectorAll("button[data-network]").forEach((btn) => {
+      const key = btn.getAttribute("data-network");
+      const pressed = key === activeKey;
+      btn.setAttribute("aria-pressed", pressed ? "true" : "false");
+      btn.classList.toggle("network-banner__switch-btn--active", pressed);
+    });
+
+    group.onclick = (ev) => {
+      const t = ev.target.closest("button[data-network]");
+      if (!t || !cfg) return;
+      PSN.setActiveNetworkKey(t.getAttribute("data-network"), cfg);
+    };
+  }
+
   function render(slot, cfg) {
-    const key = String(cfg?.defaultNetwork || "baseSepolia").trim();
-    const net = cfg?.[key] || {};
-    const chainId = Number(net.chainId);
-    const factory = String(net.factoryAddress || "").trim();
-    const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
-    const chainLabel = CHAIN_NAMES[chainId] || `chain ${chainId}`;
-
-    const isTestnet = chainId === 84532;
-    const isMainnet = chainId === 8453;
-    const mainnetIncomplete = isMainnet && (!factory || !apiBase);
-
-    let variant = "network-banner--testnet";
-    let badge = "Testnet";
-    let line = `${chainLabel} · factory ${factory || "—"} · indexer ${apiBase ? "connected" : "not set"}`;
-
-    if (isMainnet) {
-      variant = mainnetIncomplete ? "network-banner--warn" : "network-banner--mainnet";
-      badge = mainnetIncomplete ? "Mainnet (incomplete)" : "Mainnet";
-      if (mainnetIncomplete) {
-        line = `${chainLabel} — set factoryAddress and explorerApiBase in config/deployments.json before go-live.`;
-      } else {
-        line = `${chainLabel} · production configuration loaded.`;
-      }
+    if (!PSN) {
+      slot.innerHTML =
+        '<div class="network-banner network-banner--warn" role="alert"><span class="network-banner__badge">Setup</span><span class="network-banner__text">Network selector failed to load (missing network-context.js). Hard-refresh the page; if this persists, the site bundle may be incomplete.</span></div>';
+      document.body.classList.add("site-has-banner");
+      return;
     }
 
-    const root = blockExplorerRoot(chainId);
-    const docsSwitch =
-      "https://github.com/autarkenterprises/paramutuel/blob/master/docs/WEBSITE.md#switching-testnet--mainnet";
+    const p = PSN.getSiteNetworkPresentation(cfg);
+    const keys = PSN.validKeys(cfg);
+    const canToggle = keys.length > 1;
+
+    const switchHtml = canToggle
+      ? `<div class="network-banner__switch" role="group" aria-label="Site network (saved in this browser)">
+          <span class="network-banner__switch-label">Network</span>
+          <button type="button" class="network-banner__switch-btn" data-network="baseSepolia" aria-pressed="false">Testnet</button>
+          <button type="button" class="network-banner__switch-btn" data-network="baseMainnet" aria-pressed="false">Mainnet</button>
+        </div>`
+      : "";
+
+    // When the toggle is present, its active button already shows Testnet vs Mainnet — skip the duplicate badge.
+    const badgeHtml = canToggle
+      ? ""
+      : `<span class="network-banner__badge">${escapeHtml(p.badgeText)}</span>`;
 
     slot.innerHTML = `
-      <div class="network-banner ${variant}" role="status">
-        <span class="network-banner__badge">${escapeHtml(badge)}</span>
-        <span class="network-banner__text">${escapeHtml(line)}</span>
+      <div class="network-banner ${p.bannerVariantClass}" role="status">
+        ${switchHtml}
+        ${badgeHtml}
+        <span class="network-banner__text">${escapeHtml(p.bannerLine)}</span>
         <span class="network-banner__links">
-          <a href="${root}" target="_blank" rel="noopener noreferrer">Block explorer</a>
-          <span class="network-banner__sep">·</span>
-          <a href="${docsSwitch}" class="external">Network switch (docs)</a>
+          <a href="${escapeHtml(p.explorerRoot)}" target="_blank" rel="noopener noreferrer">Block explorer</a>
         </span>
       </div>
     `.trim();
 
     document.body.classList.add("site-has-banner");
+    if (canToggle) wireToggle(slot, cfg, p.activeKey);
 
     const ctx = el("deploymentContext");
     if (ctx) {
-      if (isTestnet) {
-        ctx.textContent =
-          "This site build targets Base Sepolia (testnet). Funds are for testing only; contracts and APIs may reset.";
-        ctx.hidden = false;
-      } else if (isMainnet && factory && apiBase) {
-        ctx.textContent =
-          "This site build targets Base mainnet. Verify factory and indexer URLs before moving real funds.";
-        ctx.hidden = false;
-      } else if (isMainnet) {
-        ctx.textContent =
-          "Mainnet is selected in deployments.json but configuration is incomplete — see banner and docs.";
+      if (p.heroCaption) {
+        ctx.textContent = p.heroCaption;
         ctx.hidden = false;
       } else {
         ctx.hidden = true;
@@ -92,17 +95,9 @@
 
     const exp = el("homeExplorerLink");
     if (exp) {
-      exp.href = root;
-      exp.textContent = root.replace(/^https:\/\//, "");
+      exp.href = p.explorerRoot;
+      exp.textContent = p.explorerHostLabel;
     }
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
   }
 
   function showError(slot, msg) {
@@ -115,15 +110,30 @@
     document.body.classList.add("site-has-banner");
   }
 
+  let cachedCfg = null;
+
   async function run() {
     const slot = el("networkBannerSlot");
     if (!slot) return;
     try {
-      const cfg = await loadJson(CONFIG_URL);
-      render(slot, cfg);
+      cachedCfg = await loadJson(CONFIG_URL);
+      render(slot, cachedCfg);
     } catch {
       showError(slot, "Could not load config/deployments.json — network banner unavailable.");
     }
+  }
+
+  function onNetworkChange(ev) {
+    const slot = el("networkBannerSlot");
+    if (!slot) return;
+    const cfg = ev.detail?.config || cachedCfg;
+    if (!cfg) return;
+    cachedCfg = cfg;
+    render(slot, cfg);
+  }
+
+  if (PSN) {
+    window.addEventListener(PSN.EVENT, onNetworkChange);
   }
 
   if (document.readyState === "loading") {

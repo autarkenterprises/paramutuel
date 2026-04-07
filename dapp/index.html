@@ -37,8 +37,8 @@
         </label>
 
         <label>
-          Collateral token (ERC20) address
-          <input id="collateralToken" placeholder="0x..." />
+          Collateral token (ERC-20 address)
+          <input id="collateralToken" placeholder="0x…" title="Human-readable token name appears below when detected" />
         </label>
         <div id="tokenMeta" class="muted span-2">
           Connect wallet to auto-detect network and token decimals.
@@ -194,6 +194,7 @@
         <input id="activeWagerAddress" placeholder="Active wager address (0x...)" />
         <button id="loadWagerBtn">Load Wager</button>
       </div>
+      <div id="activeWagerCollateralMeta" class="muted" hidden></div>
       <div class="grid">
         <label>
           Outcome index (uint256)

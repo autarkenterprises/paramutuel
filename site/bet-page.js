@@ -10,7 +10,23 @@
     84532: "Base Sepolia",
   };
 
+  /** Base / Base Sepolia presets (aligned with dApp TOKEN_PRESETS). */
+  const KNOWN_COLLATERAL_SYMBOLS = {
+    84532: {
+      "0x036cbd53842c5426634e7929541ec2318f3dcf7e": "USDC",
+      "0x4200000000000000000000000000000000000006": "WETH",
+    },
+    8453: {
+      "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": "USDC",
+      "0x4200000000000000000000000000000000000006": "WETH",
+      "0x50c5725949a6f0c72e6c4a641f24049a917db0cb": "DAI",
+      "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf": "cbBTC",
+    },
+  };
+
   const ERC20_DECIMALS_ABI = ["function decimals() view returns (uint8)"];
+  const ERC20_SYMBOL_STRING_ABI = ["function symbol() view returns (string)"];
+  const ERC20_SYMBOL_BYTES32_ABI = ["function symbol() view returns (bytes32)"];
 
   let deployments = null;
   let expectedChainId = null;
@@ -21,6 +37,8 @@
   let wagerContract = null;
   let collateralTokenAddr = "";
   let outcomeLabels = [];
+  /** Checksum address of the wager currently shown (for copy / reload). */
+  let loadedWagerAddress = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -69,8 +87,11 @@
   async function loadDeployments() {
     const data = await loadJson(CONFIG_URL);
     deployments = data;
-    const netKey = String(data?.defaultNetwork || "baseSepolia").trim();
-    const net = data?.[netKey] || {};
+    const PSN = globalThis.ParamutuelSiteNetwork;
+    const netKey = PSN
+      ? PSN.getActiveNetworkKey(data)
+      : String(data?.defaultNetwork || "baseSepolia").trim();
+    const net = PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey] || {};
     indexerBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const cid = net.chainId;
     expectedChainId = typeof cid === "number" ? cid : Number(cid);
@@ -83,6 +104,10 @@
   }
 
   function basescanUrl(addr) {
+    const PSN = globalThis.ParamutuelSiteNetwork;
+    if (PSN && typeof PSN.blockExplorerAddress === "function") {
+      return PSN.blockExplorerAddress(expectedChainId, addr);
+    }
     if (expectedChainId === 8453) return `https://basescan.org/address/${addr}`;
     return `https://sepolia.basescan.org/address/${addr}`;
   }
@@ -105,6 +130,7 @@
 
   function showError(msg) {
     clearLoading();
+    loadedWagerAddress = null;
     showEl("betError", true);
     showEl("betSummary", false);
     showEl("betFormSection", false);
@@ -120,11 +146,91 @@
     return r.json();
   }
 
+  /** Refresh summary/odds after a successful tx without toggling the loading panel. */
+  async function refreshWagerFromIndexerSilently() {
+    if (!loadedWagerAddress) return;
+    try {
+      await loadDeployments();
+      if (!wagerAbi) await loadWagerAbi();
+      const detail = await fetchWagerFromIndexer(loadedWagerAddress);
+      await applyWagerDetail(loadedWagerAddress, detail);
+    } catch (e) {
+      console.warn("Could not refresh wager from indexer:", e);
+    }
+  }
+
   function formatPot(raw) {
     try {
       return BigInt(String(raw || "0")).toLocaleString("en-US");
     } catch {
       return String(raw || "0");
+    }
+  }
+
+  function formatUtcSeconds(sec) {
+    const n = Number(sec);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    try {
+      return new Date(n * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+    } catch {
+      return String(sec);
+    }
+  }
+
+  function netPotAfterFees(totalPotBn, feeBpsBn) {
+    return totalPotBn - (totalPotBn * feeBpsBn) / 10000n;
+  }
+
+  function formatRatioBig(numerator, denominator, precision) {
+    if (denominator === 0n) return "N/A";
+    const p = BigInt(precision);
+    const scale = 10n ** p;
+    const scaled = (numerator * scale) / denominator;
+    const whole = scaled / scale;
+    const frac = (scaled % scale).toString().padStart(Number(precision), "0");
+    return `${whole}.${frac}`;
+  }
+
+  function outcomeTotalsByIndex(outcomesArr) {
+    const map = {};
+    for (const o of outcomesArr || []) {
+      map[Number(o.outcome_index)] = BigInt(String(o.outcome_total || "0"));
+    }
+    return map;
+  }
+
+  function renderOutcomesOddsTable(labels, outcomesArr, totalPotRaw, feeBpsRaw) {
+    const tbody = $("betOutcomesTableBody");
+    if (!tbody) return;
+
+    const totalPot = BigInt(String(totalPotRaw || "0"));
+    const feeBps = BigInt(String(feeBpsRaw || "0"));
+    const net = netPotAfterFees(totalPot, feeBps);
+    const byIdx = outcomeTotalsByIndex(outcomesArr);
+
+    let sumStakes = 0n;
+    for (let i = 0; i < labels.length; i++) {
+      sumStakes += byIdx[i] ?? 0n;
+    }
+
+    tbody.innerHTML = "";
+    for (let i = 0; i < labels.length; i++) {
+      const label = labels[i] || `#${i}`;
+      const stake = byIdx[i] ?? 0n;
+      const poolPct =
+        sumStakes > 0n ? Number((stake * 10000n) / sumStakes) / 100 : 0;
+      const mult =
+        stake > 0n ? `${formatRatioBig(net, stake, 4)}x` : "—";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i}</td>
+        <td class="bet-outcome-name-cell">${escapeHtml(label)}</td>
+        <td>${formatPot(stake)}</td>
+        <td>${poolPct.toFixed(1)}%</td>
+        <td>${escapeHtml(mult)}</td>
+      `;
+      tbody.appendChild(tr);
     }
   }
 
@@ -153,9 +259,72 @@
       .replace(/"/g, "&quot;");
   }
 
+  function knownCollateralSymbol(addr) {
+    if (!addr || expectedChainId == null) return null;
+    const m = KNOWN_COLLATERAL_SYMBOLS[expectedChainId];
+    return m ? m[String(addr).toLowerCase()] || null : null;
+  }
+
+  async function fetchCollateralSymbolFromChain(addr) {
+    if (!provider || !ethers.isAddress(addr)) return null;
+    const cStr = new ethers.Contract(addr, ERC20_SYMBOL_STRING_ABI, provider);
+    try {
+      const s = await cStr.symbol();
+      if (typeof s === "string") {
+        const t = s.trim();
+        if (t) return t.slice(0, 32);
+      }
+    } catch (_) {}
+    try {
+      const cB = new ethers.Contract(addr, ERC20_SYMBOL_BYTES32_ABI, provider);
+      const b = await cB.symbol();
+      if (b != null && typeof ethers.decodeBytes32String === "function") {
+        const t = ethers.decodeBytes32String(b).trim();
+        if (t) return t.slice(0, 32);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function updateBetCollateralDisplay() {
+    const human = $("betCollateralHuman");
+    const code = $("betCollateral");
+    if (!code) return;
+    const addr = collateralTokenAddr;
+    if (!addr || !ethers.isAddress(addr)) {
+      code.textContent = "—";
+      if (human) {
+        human.hidden = true;
+        human.textContent = "";
+      }
+      return;
+    }
+    const checksum = ethers.getAddress(addr);
+    code.textContent = checksum;
+    let sym = knownCollateralSymbol(addr);
+    if (!sym && provider) {
+      try {
+        sym = await fetchCollateralSymbolFromChain(addr);
+      } catch (_) {
+        sym = null;
+      }
+    }
+    if (human) {
+      if (sym) {
+        human.hidden = false;
+        human.textContent = `${sym} ·`;
+      } else {
+        human.hidden = true;
+        human.textContent = "";
+      }
+    }
+  }
+
   async function applyWagerDetail(address, detail) {
     const w = detail.wager;
     if (!w) throw new Error("Indexer response missing wager.");
+
+    loadedWagerAddress = address;
 
     const state = String(w.state || "").toUpperCase();
     const proposition = String(w.proposition || "").trim() || "(empty proposition)";
@@ -174,6 +343,8 @@
 
     outcomeLabels = labels;
     const totals = detail.totals || {};
+    const totalPotVal = totals.total_pot ?? "0";
+    const feeBpsVal = totals.total_fee_bps ?? w.total_fee_bps ?? "0";
 
     clearLoading();
     showEl("betError", false);
@@ -182,12 +353,51 @@
 
     $("betProposition").textContent = proposition;
     $("betState").textContent = state;
-    $("betCollateral").textContent = collateralTokenAddr || "—";
-    $("betPot").textContent = formatPot(totals.total_pot ?? w.total_pot ?? "0");
+    $("betWagerAddress").textContent = address;
+    $("betFactory").textContent = String(w.factory_address || "").trim() || "—";
+    $("betProposer").textContent = String(w.proposer || "").trim() || "—";
+    $("betResolver").textContent = String(w.resolver || "").trim() || "—";
+    await updateBetCollateralDisplay();
+    $("betPot").textContent = formatPot(totalPotVal);
+    $("betFeeBps").textContent = String(feeBpsVal);
+    $("betBettingClose").textContent = formatUtcSeconds(w.betting_close_time);
+    $("betResolutionDeadline").textContent = formatUtcSeconds(w.resolution_deadline);
+    $("betResolutionWindow").textContent =
+      w.resolution_window != null && w.resolution_window !== "" ? String(w.resolution_window) : "—";
+
+    const winRow = $("betWinningRow");
+    const winOut = $("betWinningOutcome");
+    if (
+      state === "RESOLVED" &&
+      totals &&
+      totals.winning_outcome != null &&
+      totals.winning_outcome !== ""
+    ) {
+      const wi = Number(totals.winning_outcome);
+      const winLabel =
+        !Number.isNaN(wi) && labels[wi] != null ? `${labels[wi]} (#${wi})` : `#${totals.winning_outcome}`;
+      const winStake = formatPot(totals.total_winning_stake ?? "0");
+      winOut.textContent = `${winLabel} · winning stake ${winStake} (raw)`;
+      if (winRow) winRow.hidden = false;
+    } else {
+      if (winRow) winRow.hidden = true;
+      if (winOut) winOut.textContent = "—";
+    }
+
+    const txShort = String(w.created_tx_hash || "").trim();
+    const txDisp = txShort.length > 18 ? `${txShort.slice(0, 10)}…${txShort.slice(-6)}` : txShort;
+    $("betCreatedMeta").textContent =
+      w.created_block != null && txDisp
+        ? `Block ${w.created_block} · ${txDisp}`
+        : w.created_block != null
+          ? `Block ${w.created_block}`
+          : txDisp || "—";
 
     const scan = $("betBasescan");
     scan.href = basescanUrl(address);
     scan.textContent = "View on Basescan";
+
+    renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal);
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
@@ -196,10 +406,10 @@
     const open = state === "OPEN";
     $("betSubmitBtn").disabled = !open || !signer;
     if (!open) {
-      $("betTxStatus").textContent =
-        state === "RESOLVED"
-          ? "This wager is resolved; staking is closed."
-          : "This wager is retracted; staking is closed.";
+      let msg = "This wager is not open for new stakes.";
+      if (state === "RESOLVED") msg = "Resolved — staking is closed. Winners can claim from the full dApp if applicable.";
+      else if (state === "RETRACTED") msg = "Retracted — staking is closed.";
+      $("betTxStatus").textContent = msg;
     } else {
       $("betTxStatus").textContent = "";
     }
@@ -272,6 +482,7 @@
       $("betSubmitBtn").disabled = st !== "OPEN";
       await refreshDecimals();
     }
+    await updateBetCollateralDisplay();
     syncDecimalsReadonly();
   }
 
@@ -351,6 +562,27 @@
     const tx = await c.placeBets(indices, amounts);
     await tx.wait();
     $("betTxStatus").textContent = "Bets placed successfully.";
+    await refreshWagerFromIndexerSilently();
+  }
+
+  async function copyLoadedWagerAddress() {
+    if (!loadedWagerAddress || !navigator.clipboard?.writeText) {
+      $("betTxStatus").textContent = "Copy not supported in this browser.";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(loadedWagerAddress);
+      const btn = $("betCopyAddressBtn");
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => {
+          btn.textContent = prev;
+        }, 2000);
+      }
+    } catch (e) {
+      $("betTxStatus").textContent = e.message || String(e);
+    }
   }
 
   async function init() {
@@ -360,6 +592,10 @@
     } catch (e) {
       console.warn(e);
     }
+
+    $("betCopyAddressBtn")?.addEventListener("click", () => {
+      copyLoadedWagerAddress().catch((e) => console.error(e));
+    });
 
     $("loadWagerBtn").addEventListener("click", () => loadWager($("wagerAddressInput").value));
     $("wagerAddressInput").addEventListener("keydown", (ev) => {
@@ -400,6 +636,21 @@
     if (fromQuery) {
       $("wagerAddressInput").value = fromQuery;
       loadWager(fromQuery);
+    }
+
+    const PSN = globalThis.ParamutuelSiteNetwork;
+    if (PSN) {
+      window.addEventListener(PSN.EVENT, () => {
+        loadDeployments()
+          .then(async () => {
+            const st = $("betNetworkStatus");
+            if (st && PSN.copy) st.textContent = PSN.copy.betSiteNetworkChanged;
+            if (loadedWagerAddress) {
+              await loadWager(loadedWagerAddress);
+            }
+          })
+          .catch((e) => console.warn(e));
+      });
     }
   }
 

@@ -36,6 +36,11 @@ let wagerContract; // last-created wager
 let currentChainId = null;
 let walletListenersAttached = false;
 let deploymentsConfig = null;
+/** When embedded from site/app.html with ?siteNetwork=baseMainnet|baseSepolia */
+let siteDeploymentNetworkKey = null;
+
+/** Optional `?wager=0x…` deep link: pre-fills the active wager field; loads after wallet connect. */
+let wagerAddressFromUrl = null;
 
 const CHAIN_INFO = {
   1: { name: "Ethereum Mainnet" },
@@ -84,6 +89,44 @@ const TOKEN_PRESETS = {
   ],
 };
 
+function knownSymbolForToken(chainId, tokenAddress) {
+  if (tokenAddress == null || chainId == null || Number.isNaN(chainId)) return null;
+  const list = TOKEN_PRESETS[chainId] || [];
+  const lower = String(tokenAddress).toLowerCase();
+  const hit = list.find((t) => String(t.address).toLowerCase() === lower);
+  return hit ? hit.symbol : null;
+}
+
+const ERC20_SYMBOL_STRING_ABI = ["function symbol() view returns (string)"];
+const ERC20_SYMBOL_BYTES32_ABI = ["function symbol() view returns (bytes32)"];
+
+async function fetchTokenSymbolFromChain(tokenAddress) {
+  if (!provider || !ethers.isAddress(tokenAddress)) return null;
+  const cStr = new ethers.Contract(tokenAddress, ERC20_SYMBOL_STRING_ABI, provider);
+  try {
+    const s = await cStr.symbol();
+    if (typeof s === "string") {
+      const t = s.trim();
+      if (t) return t.slice(0, 32);
+    }
+  } catch (_) {}
+  try {
+    const cB = new ethers.Contract(tokenAddress, ERC20_SYMBOL_BYTES32_ABI, provider);
+    const b = await cB.symbol();
+    if (b != null && typeof ethers.decodeBytes32String === "function") {
+      const t = ethers.decodeBytes32String(b).trim();
+      if (t) return t.slice(0, 32);
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function resolveTokenSymbolForDisplay(tokenAddress) {
+  const preset = knownSymbolForToken(currentChainId, tokenAddress);
+  if (preset) return preset;
+  return await fetchTokenSymbolFromChain(tokenAddress);
+}
+
 function $(id) {
   return document.getElementById(id);
 }
@@ -94,8 +137,12 @@ function chainName(chainId) {
 }
 
 function deploymentConfigKeyForChain(chainId) {
-  if (chainId !== null && DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId]) {
-    return DEPLOYMENTS_KEY_BY_CHAIN_ID[chainId];
+  const n = chainId == null ? NaN : Number(chainId);
+  if (Number.isFinite(n) && DEPLOYMENTS_KEY_BY_CHAIN_ID[n]) {
+    return DEPLOYMENTS_KEY_BY_CHAIN_ID[n];
+  }
+  if (siteDeploymentNetworkKey && deploymentsConfig && deploymentsConfig[siteDeploymentNetworkKey]) {
+    return siteDeploymentNetworkKey;
   }
   if (deploymentsConfig && typeof deploymentsConfig.defaultNetwork === "string") {
     const configured = deploymentsConfig.defaultNetwork.trim();
@@ -104,6 +151,19 @@ function deploymentConfigKeyForChain(chainId) {
     }
   }
   return "baseSepolia";
+}
+
+function applySiteDeploymentNetworkFromUrl() {
+  siteDeploymentNetworkKey = null;
+  if (!deploymentsConfig) return;
+  try {
+    const raw = new URLSearchParams(window.location.search).get("siteNetwork");
+    if (!raw) return;
+    const k = raw.trim();
+    if (deploymentsConfig[k] && typeof deploymentsConfig[k] === "object") {
+      siteDeploymentNetworkKey = k;
+    }
+  } catch (_) {}
 }
 
 function deploymentFactoryAddressForChain(chainId) {
@@ -460,7 +520,11 @@ async function resolveBettingDecimals(tokenAddress) {
   }
   const d = await fetchTokenDecimals(tokenAddress);
   $("decimals").value = String(d);
-  $("tokenMeta").textContent = `Token decimals: ${d} (read from token contract).`;
+  const sym = (await resolveTokenSymbolForDisplay(tokenAddress)) || null;
+  const a = ethers.getAddress(tokenAddress);
+  $("tokenMeta").textContent = sym
+    ? `${sym} (${a}) — Token decimals: ${d} (read from token contract).`
+    : `Token decimals: ${d} (read from token contract).`;
   return d;
 }
 
@@ -472,16 +536,33 @@ async function tryDetectDecimalsFromCollateralField() {
     return;
   }
   $("collateralToken").value = addr;
+  const checksum = ethers.getAddress(addr);
+  const symPreset = knownSymbolForToken(currentChainId, addr);
   if (!provider) {
-    $("tokenMeta").textContent = "Connect wallet to read decimals() from the token.";
+    $("tokenMeta").textContent = symPreset
+      ? `${symPreset} (${checksum}) — Connect wallet to read decimals() from the token.`
+      : "Connect wallet to read decimals() from the token.";
     return;
   }
   try {
     const d = await fetchTokenDecimals(addr);
     $("decimals").value = String(d);
-    $("tokenMeta").textContent = `Token decimals: ${d} (read from token contract).`;
+    const sym = symPreset || (await fetchTokenSymbolFromChain(addr));
+    $("tokenMeta").textContent = sym
+      ? `${sym} (${checksum}) — Token decimals: ${d} (read from token contract).`
+      : `Token decimals: ${d} (read from token contract).`;
   } catch (e) {
-    $("tokenMeta").textContent = `Could not read decimals(): ${e.message} — enable Manual decimals override.`;
+    let sym = symPreset;
+    if (!sym) {
+      try {
+        sym = await fetchTokenSymbolFromChain(addr);
+      } catch (_) {
+        sym = null;
+      }
+    }
+    $("tokenMeta").textContent = sym
+      ? `${sym} (${checksum}) — Could not read decimals(): ${e.message} — enable Manual decimals override.`
+      : `Could not read decimals(): ${e.message} — enable Manual decimals override.`;
   }
 }
 
@@ -502,6 +583,7 @@ async function loadDeploymentsConfig() {
     const response = await fetch(DEPLOYMENTS_CONFIG_URL);
     if (!response.ok) return;
     deploymentsConfig = await response.json();
+    applySiteDeploymentNetworkFromUrl();
   } catch (_) {
     // Optional for local/dev runs; manual factory entry still works.
   }
@@ -531,6 +613,15 @@ async function connectWallet() {
   $("walletAddr").textContent = userAddress;
   $("walletStatus").textContent = "Connected.";
   await tryDetectDecimalsFromCollateralField();
+
+  if (wagerAddressFromUrl) {
+    try {
+      await setActiveWager(wagerAddressFromUrl);
+      $("betStatus").textContent = "Loaded wager from URL.";
+    } catch (e) {
+      $("betStatus").textContent = `Could not load wager from link: ${e.message}`;
+    }
+  }
 
   if (!walletListenersAttached && typeof eip1193.on === "function") {
     eip1193.on("chainChanged", async () => {
@@ -577,6 +668,21 @@ async function setActiveWager(wagerAddress) {
   if (!$("claimsWagerAddress").value.trim()) {
     $("claimsWagerAddress").value = wagerAddress;
   }
+
+  const metaEl = $("activeWagerCollateralMeta");
+  if (metaEl) {
+    metaEl.hidden = false;
+    metaEl.textContent = "Reading collateral token…";
+    try {
+      const tokenAddr = await wagerContract.collateralToken();
+      const sym = await resolveTokenSymbolForDisplay(tokenAddr);
+      const disp = ethers.getAddress(tokenAddr);
+      metaEl.textContent = sym ? `Collateral: ${sym} (${disp})` : `Collateral: ${disp}`;
+    } catch (e) {
+      metaEl.textContent = "Could not read collateral token: " + e.message;
+    }
+  }
+
   await updateOddsPreview();
 }
 
@@ -1103,6 +1209,21 @@ async function main() {
 
   // Load ABIs for factory/wager
   await loadAbi();
+
+  const wagerParam = new URLSearchParams(window.location.search).get("wager");
+  if (wagerParam) {
+    const normalized = normalizeAddressInput(wagerParam);
+    if (normalized) {
+      wagerAddressFromUrl = normalized;
+      $("activeWagerAddress").value = normalized;
+      history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}?wager=${encodeURIComponent(normalized)}`
+      );
+    }
+  }
+
   clearOddsPreview("Create a wager first to preview odds.");
   $("walletStatus").textContent = "Ready.";
 }

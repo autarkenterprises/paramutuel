@@ -3,20 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel operator hub: indexer health, embedded explorer, and links to control, proposition, and resolution services." />
+  <meta name="description" content="Internal operator tools: indexer checks and optional hosted service links (not linked from the public site)." />
   <title>Paramutuel — Operator hub</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="operator-hub-body">
+  <script src="network-context.js"></script>
   <nav>
     <span class="logo">Paramutuel</span>
     <div class="links">
       <a href="index.html">Home</a>
-      <a href="app.html">App</a>
-      <a href="bet.html">Place a bet</a>
+      <a href="propose-a-wager.html">Propose a Wager</a>
+      <a href="place-a-bet.html">Place a Bet</a>
       <a href="explorer.html">Explorer</a>
-      <a href="operator.html" class="active">Operators</a>
-      <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
+      <a href="app.html">App</a>
+      <a href="about.html">About</a>
     </div>
   </nav>
   <div id="networkBannerSlot"></div>
@@ -26,21 +27,19 @@
     <header class="operator-hub-header card">
       <h1>Operator hub</h1>
       <p class="muted">
-        Consolidated entry for <strong>service operators</strong> (indexer-backed reads, lifecycle tooling, ingest, resolution).
-        The public dApp stays embedded separately from this shell; panels below are either same-origin (explorer) or open in a new tab when you configure hosted URLs.
+        Internal page for people running this deployment: quick indexer checks, embedded explorer, and optional links to privately hosted control or automation services.
+        This URL is not linked from the public navigation.
       </p>
       <p id="operatorHubStatus" class="operator-hub-status muted" role="status">Loading configuration…</p>
       <p class="muted" style="margin-top: 12px;">
         <strong>Network:</strong> <span id="operatorHubNetwork">—</span>
-        · See <a href="https://github.com/autarkenterprises/paramutuel/blob/master/service/README.md">service/README.md</a>
-        and <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WEBSITE.md">docs/WEBSITE.md</a>.
       </p>
     </header>
 
     <div class="operator-hub-grid">
       <section class="card operator-card">
         <h2>Indexer API</h2>
-        <p class="muted">JSON HTTP API (wagers list, detail, health). Base URL comes from <code>config/deployments.json</code> for the active <code>defaultNetwork</code>.</p>
+        <p class="muted">JSON HTTP API (wagers list, detail, health). Uses the same base URL as the public site’s wager indexer.</p>
         <p class="operator-card-actions">
           <a id="operatorIndexerHealthLink" class="btn btn-secondary" href="#">Health</a>
           <a id="operatorIndexerWagersLink" class="btn btn-secondary" href="#">Sample wagers</a>
@@ -49,7 +48,7 @@
 
       <section class="card operator-card">
         <h2>Control panel</h2>
-        <p class="muted">CLI or token-gated web API for wager lifecycle actions. Host privately; set the public base URL in <code>config/operator-hub.json</code>.</p>
+        <p class="muted">Optional privately hosted control API for create / resolve / claim. Configure its base URL in your deployment’s operator-hub settings.</p>
         <p class="operator-card-actions">
           <a id="operatorControlPanelLink" class="btn btn-primary" href="#">Not configured</a>
         </p>
@@ -57,7 +56,7 @@
 
       <section class="card operator-card">
         <h2>Proposition service</h2>
-        <p class="muted">Draft wagers from feeds; operator review and optional <code>cast</code> dispatch. See <code>docs/PROPOSITION-SERVICE.md</code>.</p>
+        <p class="muted">Optional proposition / ingest pipeline when you run it alongside this deployment.</p>
         <p class="operator-card-actions">
           <a id="operatorPropositionLink" class="btn btn-primary" href="#">Not configured</a>
         </p>
@@ -65,7 +64,7 @@
 
       <section class="card operator-card">
         <h2>Resolution service</h2>
-        <p class="muted">Decision-file driven resolve/retract. See <code>docs/RESOLUTION-SERVICE.md</code>.</p>
+        <p class="muted">Optional resolution automation when you run it alongside this deployment.</p>
         <p class="operator-card-actions">
           <a id="operatorResolutionLink" class="btn btn-primary" href="#">Not configured</a>
         </p>
@@ -86,7 +85,9 @@
   </div>
 
   <footer>
-    Paramutuel Protocol &mdash; <a href="https://github.com/autarkenterprises/paramutuel">Open Source</a>
+    <a href="index.html">Home</a>
+    · <a href="about.html">About</a>
+    · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
   </footer>
 
   <script src="operator-hub.js" defer></script>
