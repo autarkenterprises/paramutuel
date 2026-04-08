@@ -46,6 +46,7 @@ contract ParamutuelV2ExtensiveTest is Test {
     address alice = address(0x3000);
     address bob = address(0x4000);
     address carol = address(0x5000);
+    address dave = address(0x6000);
 
     uint64 minBettingWindow = 1 hours;
     uint64 minResolutionWindow = 1 hours;
@@ -62,6 +63,7 @@ contract ParamutuelV2ExtensiveTest is Test {
         token.mint(alice, 1e24);
         token.mint(bob, 1e24);
         token.mint(carol, 1e24);
+        token.mint(dave, 1e24);
     }
 
     function _outcomes3() internal pure returns (string[] memory o) {
@@ -91,6 +93,29 @@ contract ParamutuelV2ExtensiveTest is Test {
             "doc example A-E",
             _outcomes5(),
             ParamutuelWagerV2.PayoffPolicy.ANY_OF,
+            0,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraR,
+            extraB
+        );
+        w = ParamutuelWagerV2(wa);
+    }
+
+    /// @dev Worked **EXACT_SET** example: three options A–C, `W = {A,C}` (mask 5); see `docs/PAYOUT-CALCULATION.md`.
+    function _createExactSetThreeOutcomesNoFees() internal returns (ParamutuelWagerV2 w) {
+        factory = new ParamutuelFactoryV2(treasury, 0, minBettingWindow, minResolutionWindow);
+        address[] memory extraR = new address[](0);
+        uint16[] memory extraB = new uint16[](0);
+        vm.prank(proposer);
+        address wa = factory.createWager(
+            address(token),
+            "doc example EXACT_SET A-C",
+            _outcomes3(),
+            ParamutuelWagerV2.PayoffPolicy.EXACT_SET,
             0,
             uint64(block.timestamp + 2 hours),
             2 hours,
@@ -361,6 +386,59 @@ contract ParamutuelV2ExtensiveTest is Test {
         w.claim();
 
         assertEq(token.balanceOf(address(w)), 2, "integer division dust stays in wager");
+    }
+
+    /// @notice Same stakes and masks as **Worked example (EXACT_SET)** in `docs/PAYOUT-CALCULATION.md`.
+    function testExactSet_documentationWorkedExample_threeOutcomes() public {
+        uint256 ticketAC = M0 | M2; // {A,C} = 5
+        uint256 winningAC = ticketAC;
+
+        ParamutuelWagerV2 w = _createExactSetThreeOutcomesNoFees();
+
+        vm.prank(alice);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bob);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(carol);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(dave);
+        token.approve(address(w), type(uint256).max);
+
+        vm.prank(alice);
+        w.placeBet(ticketAC, 60);
+        vm.prank(bob);
+        w.placeBet(M0, 100);
+        vm.prank(carol);
+        w.placeBet(M0 | M1 | M2, 140);
+        vm.prank(dave);
+        w.placeBet(ticketAC, 40);
+
+        assertEq(w.totalPot(), 340);
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        w.resolve(winningAC);
+
+        assertEq(w.totalWinningUnits(), 100);
+
+        uint256 balAlice = token.balanceOf(alice);
+        uint256 balDave = token.balanceOf(dave);
+        vm.prank(alice);
+        w.claim();
+        vm.prank(dave);
+        w.claim();
+
+        assertEq(token.balanceOf(alice) - balAlice, 204);
+        assertEq(token.balanceOf(dave) - balDave, 136);
+
+        vm.prank(bob);
+        vm.expectRevert(ParamutuelWagerV2.NothingToClaim.selector);
+        w.claim();
+        vm.prank(carol);
+        vm.expectRevert(ParamutuelWagerV2.NothingToClaim.selector);
+        w.claim();
+
+        assertEq(token.balanceOf(address(w)), 0, "payouts exhaust netPot in this example");
     }
 
     function testAnyOf_loserAfterSuccessfulResolve_revertsClaim() public {

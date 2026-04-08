@@ -182,6 +182,38 @@ Per-ticket claims (integer division, then summed per bettor):
 
 **On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw amounts passed to `placeBet` (as in the Foundry regression). If you use **human-scale** stakes (e.g. **`500e6`** raw for **500 USDC**), **`netPot`** is also in **raw** form; Alice’s lines are still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) — the **remainder** left on the contract stays **dust on the smallest-unit scale**, not “a few dollars” or “a few ETH.” You **cannot** derive payouts by multiplying the toy integers **213** × **`10^6`** unless you repeat the same floor math on full-precision integers. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
 
+#### Worked example (`EXACT_SET`)
+
+Same **raw integer** convention as the **ANY_OF** example above (toy amounts in **smallest token units**; see the **ERC-20 raw units** and **rounding dust** paragraphs at the top of this document).
+
+- Three base options **A, B, C** (indices `0 … 2`). Ticket masks: **`{A}=1`**, **`{B}=2`**, **`{C}=4`**, **`{A,C}=5`**, **`{A,B,C}=7`**.
+- **`payoffPolicy = EXACT_SET`**, **`policyParam = 0`**.
+- Resolver sets **`W = {A, C}`**, i.e. **`winningMask = 5`**.
+
+Under **EXACT_SET**, a ticket **`T`** wins **only if** **`T == W`**. Overlap is **not** enough: a ticket on **`{A}`** or on the full **`{A,B,C}`** **loses** because those masks are **not** exactly **`5`**.
+
+| Bettor | Ticket (set) | Mask | Stake (raw) | vs `W = {A,C}` |
+|--------|----------------|------|-------------|----------------|
+| Alice | `{A, C}` | **5** | **60** | **Win** (`5 == 5`) |
+| Bob | `{A}` | **1** | **100** | **Lose** (`1 ≠ 5`) |
+| Carol | `{A, B, C}` | **7** | **140** | **Lose** (`7 ≠ 5`) |
+| Dave | `{A, C}` | **5** | **40** | **Win** (`5 == 5`) |
+
+**`totalPot`** = 60 + 100 + 140 + 40 = **340**; with **no fees**, **`netPot` = 340**.
+
+Only one **distinct winning mask** appears: **`5`**. Its pool is **`ticketPoolTotal[5]`** = 60 + 40 = **100**, so **`totalWinningUnits` = 100**. Losers’ stakes remain in **`netPot`** but do **not** enter the denominator — they are effectively forfeit to the winning side of the pool (same parimutuel idea as v1 losers funding winners).
+
+**Claims** (each winning line: \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\)):
+
+- **Alice:** ⌊60 × 340 / 100⌋ = **204**.
+- **Dave:** ⌊40 × 340 / 100⌋ = **136**.
+
+**204 + 136 = 340 = `netPot`**: in this table the floors **close exactly** (no dust). **Bob** and **Carol** have **no** winning ticket, so **`claim()`** reverts (`NothingToClaim`).
+
+**Contrast with `ANY_OF`:** If this were **`ANY_OF`** and the same **`W`**, tickets **`{A}`** and **`{A,B,C}`** would **win** (non-zero overlap); under **`EXACT_SET`** they **lose** because they did not name **exactly** **`{A,C}`**.
+
+Regression: **`testExactSet_documentationWorkedExample_threeOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+
 ### Retracted or expired (refund)
 
 Identical formula to **v1**:
