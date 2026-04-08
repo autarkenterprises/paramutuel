@@ -7,7 +7,9 @@ This document describes how **collateral token amounts** are computed when a wag
 
 **Source layout:** v1 ships from `master`. v2 (`ParamutuelWagerV2`, `ParamutuelFactoryV2`) is developed on **`experiment/adr-0008-multi-winner-v2`** until merged after certification ([`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)). Part B matches `src/ParamutuelWagerV2.sol` on that branch.
 
-All amounts are in the wager’s **ERC-20 raw units** (wei of that token). Arithmetic uses **integer division**; rounding favors staying **at or below** the true rational value, so a few wei of collateral can remain in the contract after all claims.
+All amounts are in the wager’s **ERC-20 raw units**: the token’s **smallest indivisible unit** (for **ETH** / **WETH**, “wei”; for **USDC**, \(10^{-6}\) of a dollar — i.e. **`1e6` raw units = 1 USDC**). Arithmetic uses **integer division**; each payout line is floored, so **unclaimed collateral** after every winner has claimed is **rounding dust** only.
+
+**Production expectation:** That dust is **tiny in human terms** — on the order of **a few smallest units per floored division** (many lines across many bettors can add up, but still **far below one cent** for USDC or **far below one finney** for 18‑decimal ETH), **not** a percentage of **`netPot`**. Losing **multiple whole tokens** (e.g. 3 **USDC** or **ETH**) out of a **500**‑unit pot would **not** come from this rounding; it would imply misconfiguration, fees, or a bug, and should be investigated separately.
 
 ---
 
@@ -159,7 +161,7 @@ Summed over all of the bettor’s tickets. If the sum is **0** (e.g. only losing
 
 #### Worked example (`ANY_OF`)
 
-Assume **fees are 0**. All stakes below are **integer raw token units** as on-chain (see [Pot and fees](#pot-and-fees) above).
+Assume **fees are 0**. The numbers **100**, **50**, … are **only** illustrative **raw integers** (they could mean **100 wei** in a test, or **100** of any token’s smallest unit). They are **not** “100 ETH” or “100 USDC” unless you scale the whole worked example consistently.
 
 - Five base options **A–E** (indices `0 … 4`).
 - Resolver sets **`W = {A, C, E}`**.
@@ -176,9 +178,9 @@ Per-ticket claims (integer division, then summed per bettor):
 - **Alice:** ⌊100 × 500 / 350⌋ + ⌊50 × 500 / 350⌋ = **142** + **71** = **213**.
 - **Bob:** ⌊200 × 500 / 350⌋ = **285**.
 
-**Alice + Bob** receive **498** of **`netPot`**; **2** raw units remain in the contract as **rounding dust** from flooring each term. **Carol** has no winning ticket, so **`claim()`** reverts (`NothingToClaim`) in the resolved-winner path.
+**Alice + Bob** receive **498** of **`netPot`**; **2** of the **same smallest units** remain in the contract as **rounding dust** (in the toy table, that is literally **2 wei** if stakes were **100 wei**, **50 wei**, … — **not** 2 whole USDC or 2 ETH). **Carol** has no winning ticket, so **`claim()`** reverts (`NothingToClaim`) in the resolved-winner path.
 
-**On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw token amounts passed to `placeBet` (e.g. **100 wei** of a token). If you multiply every stake and thus **`totalPot`** by **`10^18`**, each term is still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) in **wei**; you **cannot** obtain Alice’s payout by simply multiplying **213** by **`10^18`** — the floored division is applied at full precision. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+**On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw amounts passed to `placeBet` (as in the Foundry regression). If you use **human-scale** stakes (e.g. **`500e6`** raw for **500 USDC**), **`netPot`** is also in **raw** form; Alice’s lines are still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) — the **remainder** left on the contract stays **dust on the smallest-unit scale**, not “a few dollars” or “a few ETH.” You **cannot** derive payouts by multiplying the toy integers **213** × **`10^6`** unless you repeat the same floor math on full-precision integers. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
 
 ### Retracted or expired (refund)
 

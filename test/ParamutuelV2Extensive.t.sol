@@ -299,8 +299,9 @@ contract ParamutuelV2ExtensiveTest is Test {
     }
 
     /// @notice Same stakes and masks as **Worked example (ANY_OF)** in `docs/PAYOUT-CALCULATION.md`.
-    /// @dev Uses **small raw wei** (100, 50, …) so ⌊amt×netPot/denom⌋ matches the doc’s integer table. Scaling all
-    ///      stakes by `10^18` changes each floored term (e.g. 142+71 is not preserved in ether-sized units).
+    /// @dev Stakes **100**, **50**, … are **raw smallest units** (here: literal wei of the mock token), so the doc’s
+    ///      integer table matches `claim` exactly. The **2** left on the wager is **2 wei** of dust, not 2 ETH/USDC.
+    ///      Real pots use large raw amounts (e.g. `500e6` for 500 USDC); rounding loss stays microscopic vs the pot.
     function testAnyOf_documentationWorkedExample_fiveOutcomes() public {
         uint256 mA = 1; // bit 0
         uint256 mB = 2; // bit 1
