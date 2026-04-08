@@ -71,6 +71,38 @@ contract ParamutuelV2ExtensiveTest is Test {
         o[2] = "C";
     }
 
+    function _outcomes5() internal pure returns (string[] memory o) {
+        o = new string[](5);
+        o[0] = "A";
+        o[1] = "B";
+        o[2] = "C";
+        o[3] = "D";
+        o[4] = "E";
+    }
+
+    /// @dev Mirrors the worked **ANY_OF** example in `docs/PAYOUT-CALCULATION.md` (five options A–E, `W = {A,C,E}`).
+    function _createAnyOfFiveOutcomesNoFees() internal returns (ParamutuelWagerV2 w) {
+        factory = new ParamutuelFactoryV2(treasury, 0, minBettingWindow, minResolutionWindow);
+        address[] memory extraR = new address[](0);
+        uint16[] memory extraB = new uint16[](0);
+        vm.prank(proposer);
+        address wa = factory.createWager(
+            address(token),
+            "doc example A-E",
+            _outcomes5(),
+            ParamutuelWagerV2.PayoffPolicy.ANY_OF,
+            0,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            extraR,
+            extraB
+        );
+        w = ParamutuelWagerV2(wa);
+    }
+
     function _create(ParamutuelWagerV2.PayoffPolicy policy, uint256 policyParam, uint16 protocolBps)
         internal
         returns (ParamutuelWagerV2 w)
@@ -264,6 +296,70 @@ contract ParamutuelV2ExtensiveTest is Test {
         w.resolve(M2); // only C wins — neither ticket overlaps
 
         assertEq(uint256(w.state()), uint256(ParamutuelWagerV2.State.Open));
+    }
+
+    /// @notice Same stakes and masks as **Worked example (ANY_OF)** in `docs/PAYOUT-CALCULATION.md`.
+    /// @dev Uses **small raw wei** (100, 50, …) so ⌊amt×netPot/denom⌋ matches the doc’s integer table. Scaling all
+    ///      stakes by `10^18` changes each floored term (e.g. 142+71 is not preserved in ether-sized units).
+    function testAnyOf_documentationWorkedExample_fiveOutcomes() public {
+        uint256 mA = 1; // bit 0
+        uint256 mB = 2; // bit 1
+        uint256 mC = 4; // bit 2
+        uint256 mD = 8; // bit 3
+        uint256 mE = 16; // bit 4
+        uint256 ticketAC = mA | mC;
+        uint256 ticketED = mE | mD;
+        uint256 winningACE = mA | mC | mE;
+
+        uint256 stakeAC = 100;
+        uint256 stakeED = 50;
+        uint256 stakeBob = 200;
+        uint256 stakeCarol = 150;
+
+        ParamutuelWagerV2 w = _createAnyOfFiveOutcomesNoFees();
+
+        vm.prank(alice);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bob);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(carol);
+        token.approve(address(w), type(uint256).max);
+
+        vm.prank(alice);
+        w.placeBet(ticketAC, stakeAC);
+        vm.prank(alice);
+        w.placeBet(ticketED, stakeED);
+        vm.prank(bob);
+        w.placeBet(mA, stakeBob);
+        vm.prank(carol);
+        w.placeBet(mB, stakeCarol);
+
+        assertEq(w.totalPot(), 500);
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        w.resolve(winningACE);
+
+        assertEq(w.totalWinningUnits(), 350);
+
+        uint256 netPot = w.totalPot() - w.totalPot() * w.totalFeeBps() / w.BPS_DENOMINATOR();
+        assertEq(netPot, 500);
+
+        uint256 balAlice = token.balanceOf(alice);
+        uint256 balBob = token.balanceOf(bob);
+        vm.prank(alice);
+        w.claim();
+        vm.prank(bob);
+        w.claim();
+
+        assertEq(token.balanceOf(alice) - balAlice, 213, "Alice: 142 + 71 from doc");
+        assertEq(token.balanceOf(bob) - balBob, 285, "Bob share from doc");
+
+        vm.prank(carol);
+        vm.expectRevert(ParamutuelWagerV2.NothingToClaim.selector);
+        w.claim();
+
+        assertEq(token.balanceOf(address(w)), 2, "integer division dust stays in wager");
     }
 
     function testAnyOf_loserAfterSuccessfulResolve_revertsClaim() public {

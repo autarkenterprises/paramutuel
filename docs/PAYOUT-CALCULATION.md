@@ -178,6 +178,8 @@ Per-ticket claims (integer division, then summed per bettor):
 
 **Alice + Bob** receive **498** of **`netPot`**; **2** raw units remain in the contract as **rounding dust** from flooring each term. **Carol** has no winning ticket, so **`claim()`** reverts (`NothingToClaim`) in the resolved-winner path.
 
+**On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw token amounts passed to `placeBet` (e.g. **100 wei** of a token). If you multiply every stake and thus **`totalPot`** by **`10^18`**, each term is still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) in **wei**; you **cannot** obtain Alice’s payout by simply multiplying **213** by **`10^18`** — the floored division is applied at full precision. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+
 ### Retracted or expired (refund)
 
 Identical formula to **v1**:
