@@ -10,7 +10,7 @@ Current protocol semantics model a wager as a single winning outcome index selec
 This is insufficient for propositions where multiple options can be simultaneously true (example: "Which tickers are positive tomorrow?" across 10 symbols), and where users may want payout rules such as:
 
 - **Any-of semantics:** bet is winning if any selected option is in the winning set.
-- **Exact-set semantics:** bet is winning only if the selected set exactly matches the final winning set.
+- **Exact-set semantics:** bet is winning only if the selected set exactly matches the final winning set (`T == W`). (Distinct from **subset-of-truth** semantics `T ⊆ W` — “every picked option is a winner” — which v2 does **not** implement; future ADR if product requires it.)
 - **Threshold semantics:** bet is winning if at least `k` selected options are in the winning set.
 - **Weighted/scored semantics:** payout scales by overlap or score rather than binary win/loss.
 

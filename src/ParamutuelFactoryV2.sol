@@ -26,6 +26,8 @@ contract ParamutuelFactoryV2 {
     error TooManyOutcomes();
     error InvalidLifecycleConfig();
     error BadSeedConfig();
+    /// @dev Mirrors `ParamutuelWagerV2.InvalidPolicyParam` (same selector) for early validation before deploy.
+    error InvalidPolicyParam();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 10_000;
@@ -146,6 +148,12 @@ contract ParamutuelFactoryV2 {
             seedTotal += seedAmounts[i];
         }
 
+        uint256 nOpt = outcomes.length;
+        _validatePolicyParam(payoffPolicy, policyParam, nOpt);
+        for (uint256 s; s < seedTicketMasks.length; s++) {
+            _validateSeedTicketMask(seedTicketMasks[s], payoffPolicy, nOpt);
+        }
+
         uint64 nowTs = uint64(block.timestamp);
         if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
         if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
@@ -230,6 +238,37 @@ contract ParamutuelFactoryV2 {
             feeBps[idx] = extraBps[i];
             totalFeeBps += extraBps[i];
             idx++;
+        }
+    }
+
+    function _validatePolicyParam(ParamutuelWagerV2.PayoffPolicy policy, uint256 policyParam_, uint256 numOutcomes)
+        internal
+        pure
+    {
+        if (policy == ParamutuelWagerV2.PayoffPolicy.AT_LEAST_K) {
+            if (policyParam_ < 1 || policyParam_ > numOutcomes) revert InvalidPolicyParam();
+        } else if (policyParam_ != 0) {
+            revert InvalidPolicyParam();
+        }
+    }
+
+    function _popcount(uint256 x) internal pure returns (uint256 c) {
+        unchecked {
+            while (x != 0) {
+                x &= x - 1;
+                c++;
+            }
+        }
+    }
+
+    function _validateSeedTicketMask(uint256 mask, ParamutuelWagerV2.PayoffPolicy policy, uint256 numOptions_)
+        internal
+        pure
+    {
+        if (mask == 0) revert BadSeedConfig();
+        if (mask >> numOptions_ != 0) revert BadSeedConfig();
+        if (policy == ParamutuelWagerV2.PayoffPolicy.SINGLE_WINNER && _popcount(mask) != 1) {
+            revert BadSeedConfig();
         }
     }
 }

@@ -107,6 +107,9 @@ Let **`overlap = T & W`** (bits in both ticket and truth). Define **`popcount(x)
 | **ANY_OF** | **`overlap ≠ 0`** (any shared true option). |
 | **EXACT_SET** | **`T == W`** (ticket equals the full resolved set). |
 | **AT_LEAST_K** | **`popcount(overlap) ≥ policyParam`** (integer **`k`** set at creation). |
+
+**Product wording:** When copy says **“all of these outcomes,”** it maps to **EXACT_SET** above — the ticket must match the resolver’s set **exactly** (`T == W`). A different rule — **win if every selected option is among the true outcomes** (`T ⊆ W`, i.e. “my picks are all winners” without requiring `T == W`) — is **not** in v2; treat it as future scope and document explicitly if product needs it.
+
 | **WEIGHTED_OVERLAP** | **`overlap ≠ 0`** (same overlap test as “in the money”; payout uses weights below). |
 
 If **`resolve`** would yield **no** winning ticket with positive pool, the call **reverts** (`NoWinningStake`).

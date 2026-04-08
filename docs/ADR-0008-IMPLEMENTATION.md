@@ -8,7 +8,7 @@
 ADR-0008 calls for **versioned** contracts instead of mutating deployed v1. This branch adds:
 
 - `src/ParamutuelWagerV2.sol` — bitmask **tickets** over base options; resolver submits a **winning set** as `uint256 winningMask` (bit *i* ⇔ option *i* is true).
-- `src/ParamutuelFactoryV2.sol` — creates v2 wagers with an immutable **`PayoffPolicy`** and optional **`policyParam`** (used for `AT_LEAST_K`).
+- `src/ParamutuelFactoryV2.sol` — creates v2 wagers with an immutable **`PayoffPolicy`** and optional **`policyParam`** (used for `AT_LEAST_K`). Validates **`policyParam`** and **seed ticket masks** before `new ParamutuelWagerV2` (`InvalidPolicyParam`, `BadSeedConfig`) so invalid creates fail cheaply and never deploy a wager that would revert on seeding.
 
 Settlement iterates **`_usedMasks`** — the distinct ticket masks that received stake — so gas is **O(number of distinct tickets)**, bounded by `MAX_DISTINCT_TICKETS` (1024). This avoids enumerating `2^n` subsets.
 
@@ -30,7 +30,7 @@ Settlement iterates **`_usedMasks`** — the distinct ticket masks that received
 
 **Overlap semantics:** Under `ANY_OF` / `AT_LEAST_K` / `WEIGHTED_OVERLAP`, a ticket that hits multiple true outcomes is still **one** ticket — it does not “double count” outcomes except under `WEIGHTED_OVERLAP`, where **more overlap ⇒ higher weight** (intentional partial payout curve).
 
-**Exact-set vs overlap:** Under `EXACT_SET`, only bettors who staked **exactly** the resolved set participate in the winner pool; overlapping subsets (e.g. `{A}` when `W={A,B}`) **lose** — expected for “you must call the full combination” markets.
+**Exact-set vs overlap:** Under `EXACT_SET`, only bettors who staked **exactly** the resolved set participate in the winner pool; overlapping subsets (e.g. `{A}` when `W={A,B}`) **lose** — expected for “you must call the full combination” markets. Product phrase **“all of these outcomes”** means **exactly this set** (`T == W`), not “all my picks are true” (`T ⊆ W`); the latter is **out of scope** for v2 unless added as a new policy in a follow-up ADR.
 
 ## Resolver constraints
 
