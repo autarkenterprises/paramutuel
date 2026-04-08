@@ -14,7 +14,7 @@ Settlement iterates **`_usedMasks`** — the distinct ticket masks that received
 
 ## Encoding
 
-- **Options:** `n` labels, indices `0 … n-1`, `n ≤ 256` in the wager (factory caps at **64** to match practical gas).
+- **Options:** `n` labels, indices `0 … n-1`, `n ≤ 255` on-chain (factory `MAX_OUTCOMES`; `WagerV2Masks.fullSet` requires `n < 256`).
 - **Ticket mask:** non-zero `uint256` with bits only below `n` (`mask >> n == 0`).
 - **Winning mask:** same constraints; for `SINGLE_WINNER` exactly one bit set.
 
@@ -48,7 +48,7 @@ Settlement iterates **`_usedMasks`** — the distinct ticket masks that received
 ## Security / limits
 
 - **Distinct tickets:** cap 1024 per wager to limit resolve/claim loops.
-- **Options:** factory max 64 outcomes.
+- **Options:** factory max **255** outcomes.
 - **Audits:** not performed; **do not use in production** without review.
 
 ## Tests

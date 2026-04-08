@@ -85,6 +85,19 @@ quote_place_bets(
 
 ---
 
+## Loop C: freeform text answer (ADR-0009)
+
+Indexer marks these with `protocol_version === "freeform"`. There is **no** enumerated outcome index on-chain (`outcomesCount() === 0`).
+
+1. Discover wagers as usual (`list_wagers`). Inspect `protocol_version` on detail payloads.
+2. **Do not** use `quote_place_bet` (it targets `placeBet(uint256,uint256)`). Use:
+   - `encode_place_bet_freeform(wager_address, collateral_token, answer, amount)` for the bet, and
+   - `encode_resolve_freeform(wager_address, winning_answer)` for resolution (resolver only).
+3. The **`answer` and `winning_answer` strings must match exactly** in UTF-8 bytes; otherwise the ticket id (`keccak256(bytes(answer))`) will not match.
+4. Optional: `encode_create_freeform_wager(...)` against `FACTORY_FREEFORM_ADDRESS` / deployments `factoryFreeformAddress`.
+
+---
+
 ## Reliability pattern (important)
 
 Even with indexer-based quoting, betting can change between quote-time and tx submission.

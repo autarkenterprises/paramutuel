@@ -4,6 +4,7 @@
     "chainId": 84532,
     "factoryAddress": "0x655f6c5a3dc4cb3bf68173952bca9dac1bb5bf39",
     "factoryV2Address": "",
+    "factoryFreeformAddress": "",
     "indexerFromBlock": 39608044,
     "explorerApiBase": "https://paramutuel-git-406244230167.europe-west1.run.app"
   },
@@ -11,6 +12,7 @@
     "chainId": 8453,
     "factoryAddress": "",
     "factoryV2Address": "",
+    "factoryFreeformAddress": "",
     "explorerApiBase": ""
   }
 }

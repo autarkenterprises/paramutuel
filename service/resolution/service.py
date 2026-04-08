@@ -77,17 +77,17 @@ def _action_command(
     action: str,
     rpc_url: str,
     private_key: str,
-    outcome_index: int | None = None,
+    resolve_uint256: int | None = None,
 ) -> list[str]:
     if action == "resolve":
-        if outcome_index is None:
-            raise ValueError("resolve decision requires outcomeIndex")
+        if resolve_uint256 is None:
+            raise ValueError("resolve decision requires outcomeIndex or winningMask")
         return [
             "cast",
             "send",
             wager_address,
             "resolve(uint256)",
-            str(outcome_index),
+            str(resolve_uint256),
             "--rpc-url",
             rpc_url,
             "--private-key",
@@ -133,6 +133,8 @@ def evaluate_candidates(
         if decision and "action" in decision:
             candidate["decision_action"] = decision.get("action")
             candidate["decision_outcome_index"] = decision.get("outcomeIndex")
+            if decision.get("winningMask") is not None:
+                candidate["decision_winning_mask"] = decision.get("winningMask")
         out.append(candidate)
     return out
 
@@ -224,10 +226,13 @@ class Handler(BaseHTTPRequestHandler):
             decision = c.get("decision") or {}
             action = str(decision.get("action") or "").strip().lower()
             try:
+                win = decision.get("winningMask")
+                if win is None:
+                    win = decision.get("outcomeIndex")
                 cmd = _action_command(
                     wager_address=c["wager_address"],
                     action=action,
-                    outcome_index=decision.get("outcomeIndex"),
+                    resolve_uint256=win,
                     rpc_url=self.rpc_url,
                     private_key=self.private_key,
                 )

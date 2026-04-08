@@ -88,7 +88,7 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 **Canonical integration branch:** `experiment/adr-0008-multi-winner-v2` — all v2 contract work, Foundry tests, gas docs, and follow-on indexer/dApp/MCP land here first; merge to `master` only after coordinated certification. Contents: `ParamutuelFactoryV2` + `ParamutuelWagerV2`, tests, [`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md).
 
 - [x] Specify canonical payoff policies and formulas (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`) — see implementation doc.
-- [x] Define compact winner-set and ticket-selection encoding (`uint256` bitset, `MAX_DISTINCT_TICKETS`, factory `MAX_OUTCOMES = 64`).
+- [x] Define compact winner-set and ticket-selection encoding (`uint256` bitset, `MAX_DISTINCT_TICKETS`, factory `MAX_OUTCOMES = 255`).
 - [x] Draft v2 factory/wager contracts for policy-bound creation and `resolve(winningMask)`.
 - [x] Claim accounting + Foundry tests (including fuzz conservation on `ANY_OF`, extensive lifecycle/policy matrix, gas profiling harness — see `docs/ADR-0008-GAS.md`, `test/ParamutuelV2Extensive.t.sol`).
 - [ ] Add indexer schema/API changes for `winning_mask`, policy metadata, and ticket masks on bets.

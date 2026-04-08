@@ -13,6 +13,15 @@ class TestSubagentManifest(unittest.TestCase):
         self.assertTrue(any(s.get("id", "").endswith(".bettor") for s in subs))
         inv = subs[0].get("invocation") or {}
         self.assertEqual(inv.get("type"), "stdio_json")
+        complements = subs[0].get("complements") or []
+        self.assertTrue(
+            any("quote_place_bet" in str(c.get("note", "")) for c in complements),
+            "manifest should point integrators at MCP quote_place_bet",
+        )
+        self.assertTrue(
+            any("protocol_version" in str(c.get("note", "")) for c in complements),
+            "manifest MCP note should mention indexer protocol_version / v2 awareness",
+        )
 
 
 if __name__ == "__main__":

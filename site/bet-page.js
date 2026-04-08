@@ -3,7 +3,8 @@
 
   const ethers = globalThis.ethers;
   const CONFIG_URL = "config/deployments.json";
-  const WAGER_ABI_URL = "dapp/abi/ParamutuelWager.json";
+  const WAGER_ABI_V1_URL = "dapp/abi/ParamutuelWager.json";
+  const WAGER_ABI_V2_URL = "dapp/abi/ParamutuelWagerV2.json";
 
   const CHAIN_NAMES = {
     8453: "Base Mainnet",
@@ -31,6 +32,8 @@
   let deployments = null;
   let expectedChainId = null;
   let wagerAbi = null;
+  /** @type {"v1"|"v2"} */
+  let currentProtocolVersion = "v1";
   let indexerBase = "";
   let provider = null;
   let signer = null;
@@ -98,9 +101,12 @@
     return { netKey, indexerBase, expectedChainId };
   }
 
-  async function loadWagerAbi() {
-    const j = await loadJson(WAGER_ABI_URL);
+  async function loadWagerAbiForProtocol(pv) {
+    const v = String(pv || "v1").trim().toLowerCase() === "v2" ? "v2" : "v1";
+    const url = v === "v2" ? WAGER_ABI_V2_URL : WAGER_ABI_V1_URL;
+    const j = await loadJson(url);
     wagerAbi = j.abi;
+    currentProtocolVersion = v;
   }
 
   function basescanUrl(addr) {
@@ -151,7 +157,6 @@
     if (!loadedWagerAddress) return;
     try {
       await loadDeployments();
-      if (!wagerAbi) await loadWagerAbi();
       const detail = await fetchWagerFromIndexer(loadedWagerAddress);
       await applyWagerDetail(loadedWagerAddress, detail);
     } catch (e) {
@@ -199,7 +204,15 @@
     return map;
   }
 
-  function renderOutcomesOddsTable(labels, outcomesArr, totalPotRaw, feeBpsRaw) {
+  function ticketPoolStakeRaw(ticketPoolsArr, outcomeIdx) {
+    const mask = (1n << BigInt(outcomeIdx)).toString();
+    for (const row of ticketPoolsArr || []) {
+      if (String(row.ticket_mask) === mask) return BigInt(String(row.pool_total || "0"));
+    }
+    return 0n;
+  }
+
+  function renderOutcomesOddsTable(labels, outcomesArr, totalPotRaw, feeBpsRaw, ticketPoolsArr, useV2Pools) {
     const tbody = $("betOutcomesTableBody");
     if (!tbody) return;
 
@@ -210,13 +223,14 @@
 
     let sumStakes = 0n;
     for (let i = 0; i < labels.length; i++) {
-      sumStakes += byIdx[i] ?? 0n;
+      const stake = useV2Pools ? ticketPoolStakeRaw(ticketPoolsArr, i) : byIdx[i] ?? 0n;
+      sumStakes += stake;
     }
 
     tbody.innerHTML = "";
     for (let i = 0; i < labels.length; i++) {
       const label = labels[i] || `#${i}`;
-      const stake = byIdx[i] ?? 0n;
+      const stake = useV2Pools ? ticketPoolStakeRaw(ticketPoolsArr, i) : byIdx[i] ?? 0n;
       const poolPct =
         sumStakes > 0n ? Number((stake * 10000n) / sumStakes) / 100 : 0;
       const mult =
@@ -326,6 +340,9 @@
 
     loadedWagerAddress = address;
 
+    const pv = String(w.protocol_version || "v1").trim().toLowerCase() === "v2" ? "v2" : "v1";
+    await loadWagerAbiForProtocol(pv);
+
     const state = String(w.state || "").toUpperCase();
     const proposition = String(w.proposition || "").trim() || "(empty proposition)";
     collateralTokenAddr = String(w.collateral_token || "").trim();
@@ -353,6 +370,15 @@
 
     $("betProposition").textContent = proposition;
     $("betState").textContent = state;
+    const protEl = $("betProtocol");
+    if (protEl) {
+      protEl.textContent =
+        pv === "v2"
+          ? `v2 · payoffPolicy ${w.payoff_policy != null ? w.payoff_policy : "—"} · policyParam ${
+              w.policy_param != null && w.policy_param !== "" ? w.policy_param : "—"
+            }`
+          : "v1";
+    }
     $("betWagerAddress").textContent = address;
     $("betFactory").textContent = String(w.factory_address || "").trim() || "—";
     $("betProposer").textContent = String(w.proposer || "").trim() || "—";
@@ -373,9 +399,21 @@
       totals.winning_outcome != null &&
       totals.winning_outcome !== ""
     ) {
-      const wi = Number(totals.winning_outcome);
-      const winLabel =
-        !Number.isNaN(wi) && labels[wi] != null ? `${labels[wi]} (#${wi})` : `#${totals.winning_outcome}`;
+      let winLabel;
+      if (pv === "v2") {
+        const wm = BigInt(String(totals.winning_outcome || "0"));
+        winLabel = `mask ${wm.toString()}`;
+        for (let i = 0; i < labels.length; i++) {
+          if (wm === 1n << BigInt(i)) {
+            winLabel = `${labels[i]} (#${i}) · mask ${wm.toString()}`;
+            break;
+          }
+        }
+      } else {
+        const wi = Number(totals.winning_outcome);
+        winLabel =
+          !Number.isNaN(wi) && labels[wi] != null ? `${labels[wi]} (#${wi})` : `#${totals.winning_outcome}`;
+      }
       const winStake = formatPot(totals.total_winning_stake ?? "0");
       winOut.textContent = `${winLabel} · winning stake ${winStake} (raw)`;
       if (winRow) winRow.hidden = false;
@@ -397,7 +435,8 @@
     scan.href = basescanUrl(address);
     scan.textContent = "View on Basescan";
 
-    renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal);
+    const tPools = detail.ticket_pools || [];
+    renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal, tPools, pv === "v2");
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
@@ -510,7 +549,6 @@
 
     try {
       await loadDeployments();
-      if (!wagerAbi) await loadWagerAbi();
       const detail = await fetchWagerFromIndexer(addr);
       await applyWagerDetail(addr, detail);
     } catch (e) {
@@ -559,7 +597,9 @@
 
     $("betTxStatus").textContent = "Submitting placeBets…";
     const c = wagerContract.connect(signer);
-    const tx = await c.placeBets(indices, amounts);
+    const firstArr =
+      currentProtocolVersion === "v2" ? indices.map((i) => 1n << BigInt(i)) : indices;
+    const tx = await c.placeBets(firstArr, amounts);
     await tx.wait();
     $("betTxStatus").textContent = "Bets placed successfully.";
     await refreshWagerFromIndexerSilently();
@@ -588,7 +628,6 @@
   async function init() {
     try {
       await loadDeployments();
-      await loadWagerAbi();
     } catch (e) {
       console.warn(e);
     }

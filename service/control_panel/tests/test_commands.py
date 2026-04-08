@@ -71,6 +71,45 @@ class ControlPanelCommandTests(unittest.TestCase):
         self.assertIn("[0,1]", joined)
         self.assertIn("[100,200]", joined)
 
+    def test_create_wager_rejects_more_than_255_outcomes(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_create_wager_command(
+                factory="0x1111111111111111111111111111111111111111",
+                collateral="0x2222222222222222222222222222222222222222",
+                proposition="Q?",
+                outcomes=["O"] * 256,
+                betting_close_time=1234567890,
+                resolution_window=7200,
+                resolver="0x0000000000000000000000000000000000000000",
+                betting_closer="0x0000000000000000000000000000000000000000",
+                resolution_closer="0x0000000000000000000000000000000000000000",
+                extra_recipients=[],
+                extra_bps=[],
+                rpc_url="http://localhost:8545",
+                private_key="0xabc",
+            )
+        self.assertIn("255", str(ctx.exception))
+
+    @unittest.expectedFailure
+    def test_XFAIL_DEPRECATED_cli_rejected_66_outcomes_when_max_was_64(self):
+        """Hypothetical strict CLI (never shipped): reject >64 outcomes. Cap is now 255 so 66 is valid."""
+        with self.assertRaises(ValueError):
+            build_create_wager_command(
+                factory="0x1111111111111111111111111111111111111111",
+                collateral="0x2222222222222222222222222222222222222222",
+                proposition="Q?",
+                outcomes=["O"] * 66,
+                betting_close_time=1234567890,
+                resolution_window=7200,
+                resolver="0x0000000000000000000000000000000000000000",
+                betting_closer="0x0000000000000000000000000000000000000000",
+                resolution_closer="0x0000000000000000000000000000000000000000",
+                extra_recipients=[],
+                extra_bps=[],
+                rpc_url="http://localhost:8545",
+                private_key="0xabc",
+            )
+
     def test_action_command_requires_outcome_for_resolve(self):
         with self.assertRaises(ValueError):
             build_wager_action_command(

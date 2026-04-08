@@ -16,4 +16,6 @@
   - Upper-layer gas abstraction via an assisted transaction gateway and pluggable permit/approval paths.
 - `ADR-0008-multi-winner-and-settlement-generalization.md`
   - Versioned path for multi-winner resolution and policy-driven payout semantics (any-of, exact-set, and beyond) without mutating v1 deployments. **Canonical integration branch:** `experiment/adr-0008-multi-winner-v2` (merge to `master` after certification). Doc: `docs/ADR-0008-IMPLEMENTATION.md`.
+- `ADR-0009-freeform-text-wagers.md`
+  - Freeform text-answer wagers: no enumerated outcomes at creation; bettors stake on arbitrary strings; resolver submits the winning string; exact byte match; single-winner parimutuel semantics; separate contract surface from bitmask v2. Implementation + outcome-cap discussion: `docs/ADR-0009-IMPLEMENTATION.md`.
 

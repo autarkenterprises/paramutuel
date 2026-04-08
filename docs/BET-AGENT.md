@@ -21,6 +21,8 @@ paramutuel-bettor health
 paramutuel-bettor scan --state OPEN --limit 20
 paramutuel-bettor recommend --bet-amount-raw 1000000 --scan-limit 30 --top 5
 paramutuel-bettor quote --wager 0x... --outcome-index 0 --bet-amount-raw 1000000
+# ADR-0009 freeform: optional exact answer string for placeBet calldata
+paramutuel-bettor quote --wager 0x... --outcome-index 0 --bet-amount-raw 1000000 --freeform-answer "Paris"
 ```
 
 From repo root:
@@ -30,6 +32,7 @@ PYTHONPATH=. python3 -m agents.paramutuel_bettor health
 PYTHONPATH=. python3 -m agents.paramutuel_bettor scan --state OPEN --limit 20
 PYTHONPATH=. python3 -m agents.paramutuel_bettor recommend --bet-amount-raw 1000000 --scan-limit 30 --top 5
 PYTHONPATH=. python3 -m agents.paramutuel_bettor quote --wager 0x... --outcome-index 0 --bet-amount-raw 1000000
+# Freeform: add --freeform-answer "..." when you know the exact UTF-8 string
 ```
 
 Environment:
@@ -47,7 +50,7 @@ Operations:
 | `health` | — | Indexer `/health` |
 | `scan` | `state?`, `limit?`, `order?`, `q?` | Wager list summaries |
 | `recommend` | `bet_amount_raw`, `strategy?`, `scan_limit?`, `min_total_pot_raw?`, `proposition_contains?`, `top?` | Ranked suggestions |
-| `quote` | `wager_address`, `outcome_index`, `bet_amount_raw` | Fixed-outcome quote |
+| `quote` | `wager_address`, `outcome_index`, `bet_amount_raw`, `freeform_answer?` | Quote; **freeform** uses `outcome_index` as index into sorted `ticket_pools`; pass `freeform_answer` for `placeBet` calldata |
 
 Example:
 
@@ -60,7 +63,7 @@ echo '{"op":"recommend","bet_amount_raw":1000000,"scan_limit":15,"top":3}' \
 
 1. Run `recommend` or `scan` to shortlist `OPEN` wagers.
 2. For each candidate, inspect `proposition`, fees, and `betting_open`.
-3. Use MCP `quote_place_bet` (or agent `quote` + `cast`) to obtain final calldata immediately before signing.
+3. Use MCP `quote_place_bet` for v1/v2 (or agent `quote` + `cast`), or MCP `encode_place_bet_freeform` for **freeform** wagers, to obtain final calldata immediately before signing.
 4. Executor wallet signs `approve` then `placeBet` (see [`AGENT-LOOP.md`](AGENT-LOOP.md)).
 
 ## Claude Code / Cursor

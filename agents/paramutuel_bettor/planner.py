@@ -55,6 +55,8 @@ def recommend(
                 odds=od,
                 betting_open=bool(pick["betting_open"]),
                 revert_hint=str(pick["revert_hint"] or ""),
+                protocol_version=str(wager.get("protocol_version") or "v1"),
+                freeform_answer=None,
             )
             recs.append(
                 {
@@ -86,11 +88,13 @@ def quote_wager(
     wager_address: str,
     outcome_index: int,
     bet_amount_raw: int,
+    freeform_answer: str | None = None,
 ) -> dict[str, Any]:
     detail = client.get_wager(wager_address)
     wager = detail.get("wager") or {}
     totals_meta = detail.get("totals") or {}
     outcome_rows = detail.get("outcomes") or []
+    protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
 
     total_pot = int(totals_meta.get("total_pot", 0) or 0) if totals_meta else int(wager.get("total_pot", 0) or 0)
     total_fee_bps = int(totals_meta.get("total_fee_bps", 0) or 0) if totals_meta else int(wager.get("total_fee_bps", 0) or 0)
@@ -98,13 +102,36 @@ def quote_wager(
     now_ts = int(time.time())
     betting_open, revert_hint = odds_mod.betting_open_status(wager, now_ts=now_ts)
 
-    otot = None
-    for row in outcome_rows:
-        if int(row.get("outcome_index", -1)) == int(outcome_index):
-            otot = int(row.get("outcome_total", 0) or 0)
-            break
-    if otot is None:
-        raise ValueError(f"outcome_index {outcome_index} not found on wager")
+    otot: int | None = None
+    answer_id_hex: str | None = None
+    if protocol_version == "v2":
+        mask = int(1) << int(outcome_index)
+        key = str(mask)
+        for tp in detail.get("ticket_pools") or []:
+            if str(tp.get("ticket_mask")) == key:
+                otot = int(tp.get("pool_total", 0) or 0)
+                break
+        if otot is None:
+            otot = 0
+    elif protocol_version == "freeform":
+        pools = [p for p in (detail.get("ticket_pools") or []) if isinstance(p, dict)]
+        pools.sort(key=lambda p: str(p.get("ticket_mask") or "").lower())
+        oi = int(outcome_index)
+        if oi < 0 or oi >= len(pools):
+            raise ValueError(
+                "freeform: outcome_index must be the row index into ticket_pools "
+                "(sorted by answer id), as returned by recommend/pick_outcome"
+            )
+        row = pools[oi]
+        otot = int(row.get("pool_total", 0) or 0)
+        answer_id_hex = str(row.get("ticket_mask") or "").strip().lower()
+    else:
+        for row in outcome_rows:
+            if int(row.get("outcome_index", -1)) == int(outcome_index):
+                otot = int(row.get("outcome_total", 0) or 0)
+                break
+        if otot is None:
+            raise ValueError(f"outcome_index {outcome_index} not found on wager")
 
     od = odds_mod.compute_odds(
         total_pot=total_pot,
@@ -121,8 +148,10 @@ def quote_wager(
         odds=od,
         betting_open=betting_open,
         revert_hint=revert_hint,
+        protocol_version=protocol_version,
+        freeform_answer=freeform_answer,
     )
-    return {
+    out: dict[str, Any] = {
         "wager_address": wager_address,
         "outcome_index": outcome_index,
         "bet_amount_raw": bet_amount_raw,
@@ -130,3 +159,6 @@ def quote_wager(
         "total_pot_raw": total_pot,
         "quote": quote,
     }
+    if answer_id_hex:
+        out["answer_id_hex"] = answer_id_hex
+    return out

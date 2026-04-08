@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 
 import {ParamutuelFactoryV2} from "../src/ParamutuelFactoryV2.sol";
+import {ParamutuelFactoryV2Max64} from "./mocks/ParamutuelFactoryV2Max64.sol";
 import {ParamutuelWagerV2} from "../src/ParamutuelWagerV2.sol";
 
 /// @dev Minimal ERC20 for factory create + seed flows.
@@ -62,6 +63,13 @@ contract ParamutuelFactoryV2Test is Test {
 
     function _futureCloseAndWindow() internal view returns (uint64, uint64) {
         return (uint64(block.timestamp + 2 hours), 2 hours);
+    }
+
+    function _nSameOutcomes(uint256 n) internal pure returns (string[] memory o) {
+        o = new string[](n);
+        for (uint256 i; i < n; i++) {
+            o[i] = "x";
+        }
     }
 
     function test_reverts_seedMaskZero_beforeSuccessfulCreate() public {
@@ -262,16 +270,68 @@ contract ParamutuelFactoryV2Test is Test {
         assertEq(w.ticketPoolTotal(M1), 20 ether);
     }
 
-    function test_reverts_tooManyOutcomes() public {
+    function test_v2_factory_MAX_OUTCOMES_is_255() public view {
+        assertEq(factory.MAX_OUTCOMES(), 255);
+    }
+
+    /// @notice `MAX_OUTCOMES` was raised from 64 to 255; 65 outcomes used to revert with `TooManyOutcomes`.
+    function test_v2_create_succeeds_with_65_outcomes_past_old_cap() public {
         (uint64 close, uint64 resWin) = _futureCloseAndWindow();
-        string[] memory outcomes = new string[](65);
-        for (uint256 i; i < 65; i++) {
-            outcomes[i] = "x";
-        }
+        string[] memory outcomes = _nSameOutcomes(65);
+
+        vm.startPrank(proposer);
+        token.approve(address(factory), type(uint256).max);
+        uint256 before = factory.wagersCount();
+        factory.createWager(
+            address(token),
+            "p",
+            outcomes,
+            ParamutuelWagerV2.PayoffPolicy.ANY_OF,
+            0,
+            close,
+            resWin,
+            address(0),
+            proposer,
+            proposer,
+            new address[](0),
+            new uint16[](0)
+        );
+        vm.stopPrank();
+        assertEq(factory.wagersCount(), before + 1);
+    }
+
+    function test_v2_reverts_when_outcomes_length_exceeds_MAX_OUTCOMES() public {
+        (uint64 close, uint64 resWin) = _futureCloseAndWindow();
+        string[] memory outcomes = _nSameOutcomes(256);
 
         vm.prank(proposer);
         vm.expectRevert(ParamutuelFactoryV2.TooManyOutcomes.selector);
         factory.createWager(
+            address(token),
+            "p",
+            outcomes,
+            ParamutuelWagerV2.PayoffPolicy.ANY_OF,
+            0,
+            close,
+            resWin,
+            address(0),
+            proposer,
+            proposer,
+            new address[](0),
+            new uint16[](0)
+        );
+    }
+
+    /// @dev Uses `test/mocks/ParamutuelFactoryV2Max64.sol` (local-only, not deployed) to assert the old 64-outcome cap behavior.
+    function test_legacy_v2_65_outcomes_revert_under_Max64_mock_factory() public {
+        ParamutuelFactoryV2Max64 f =
+            new ParamutuelFactoryV2Max64(treasury, 0, minBettingWindow, minResolutionWindow);
+        (uint64 close, uint64 resWin) = _futureCloseAndWindow();
+        string[] memory outcomes = _nSameOutcomes(65);
+
+        vm.prank(proposer);
+        vm.expectRevert(ParamutuelFactoryV2Max64.TooManyOutcomes.selector);
+        f.createWager(
             address(token),
             "p",
             outcomes,

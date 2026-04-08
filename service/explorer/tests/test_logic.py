@@ -9,6 +9,13 @@ class ExplorerLogicTests(unittest.TestCase):
         self.assertEqual(classify_wager_state({"state": "RESOLVED"}), "resolved")
         self.assertEqual(classify_wager_state({"state": "RETRACTED"}), "retracted")
 
+    def test_state_classification_ignores_protocol_version(self):
+        """Indexer rows may include protocol_version=v2; UI state chip stays lifecycle-only."""
+        self.assertEqual(
+            classify_wager_state({"state": "OPEN", "protocol_version": "v2"}),
+            "open",
+        )
+
     def test_can_expire_for_closed_resolution_window(self):
         row = {"resolution_window_closed": 1, "resolution_window": 0}
         self.assertTrue(can_expire_candidate_row(row, 1))

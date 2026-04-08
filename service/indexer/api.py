@@ -62,10 +62,13 @@ def list_wagers(
             "LOWER(COALESCE(t.total_pot, '0')) LIKE ? OR "
             "LOWER(COALESCE(t.total_fee_bps, '0')) LIKE ? OR "
             "LOWER(COALESCE(t.winning_outcome, '')) LIKE ? OR "
-            "LOWER(COALESCE(t.total_winning_stake, '')) LIKE ?"
+            "LOWER(COALESCE(t.total_winning_stake, '')) LIKE ? OR "
+            "LOWER(COALESCE(m.protocol_version, '')) LIKE ? OR "
+            "LOWER(COALESCE(CAST(m.payoff_policy AS TEXT), '')) LIKE ? OR "
+            "LOWER(COALESCE(m.policy_param, '')) LIKE ?"
             ")"
         )
-        params.extend([needle] * 23)
+        params.extend([needle] * 26)
 
     order_sql = "DESC" if order == "desc" else "ASC"
 
@@ -87,6 +90,10 @@ def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
         "SELECT outcome_index, outcome_total FROM wager_outcomes WHERE wager_address = ? ORDER BY outcome_index ASC",
         (wager_address.lower(),),
     ).fetchall()
+    ticket_pools = conn.execute(
+        "SELECT ticket_mask, pool_total FROM wager_ticket_pools WHERE wager_address = ? ORDER BY ticket_mask ASC",
+        (wager_address.lower(),),
+    ).fetchall()
     events = conn.execute(
         "SELECT event_name, block_number, tx_hash, log_index, payload_json FROM events_log WHERE wager_address = ? ORDER BY block_number ASC, log_index ASC",
         (wager_address.lower(),),
@@ -95,6 +102,7 @@ def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
         "wager": row_to_dict(m),
         "totals": row_to_dict(totals) if totals else None,
         "outcomes": [row_to_dict(o) for o in outcomes],
+        "ticket_pools": [row_to_dict(tp) for tp in ticket_pools],
         "events": [
             {
                 **row_to_dict(e),
@@ -107,6 +115,10 @@ def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
 
 class Handler(BaseHTTPRequestHandler):
     conn: sqlite3.Connection = None  # type: ignore
+    # Optional: live_api sets these so /health can echo configured factories without env injection.
+    indexer_factory_address: str | None = None
+    indexer_factory_v2_address: str | None = None
+    indexer_factory_freeform_address: str | None = None
 
     def _send_json(self, code: int, body: dict) -> None:
         payload = json.dumps(body).encode()
@@ -156,6 +168,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.conn.execute("SELECT COUNT(*) AS c FROM wagers").fetchone()["c"]
             )
             err = get_meta_str(self.conn, "last_sync_error")
+            fac1 = getattr(self.__class__, "indexer_factory_address", None)
+            fac2 = getattr(self.__class__, "indexer_factory_v2_address", None)
+            fac3 = getattr(self.__class__, "indexer_factory_freeform_address", None)
             self._send_json(
                 200,
                 {
@@ -165,6 +180,9 @@ class Handler(BaseHTTPRequestHandler):
                     "last_indexed_block": get_meta_int(self.conn, "last_indexed_block"),
                     "chain_head": get_meta_int(self.conn, "chain_head"),
                     "last_sync_error": err if err else None,
+                    "factory_address": fac1,
+                    "factory_v2_address": fac2,
+                    "factory_freeform_address": fac3,
                 },
             )
             return

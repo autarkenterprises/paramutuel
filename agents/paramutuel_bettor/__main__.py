@@ -44,11 +44,14 @@ def _cmd_recommend(client: IndexerClient, args: argparse.Namespace) -> dict[str,
 
 
 def _cmd_quote(client: IndexerClient, args: argparse.Namespace) -> dict[str, Any]:
+    ff = getattr(args, "freeform_answer", None)
+    ff_s = str(ff).strip() if ff is not None else ""
     q = quote_wager(
         client,
         wager_address=args.wager,
         outcome_index=args.outcome_index,
         bet_amount_raw=args.bet_amount_raw,
+        freeform_answer=ff_s if ff_s else None,
     )
     return {"ok": True, **q}
 
@@ -89,11 +92,13 @@ def _dispatch_json(client: IndexerClient, payload: dict[str, Any]) -> dict[str, 
         bet_amount_raw = int(payload.get("bet_amount_raw") or payload.get("bet_amount") or 0)
         if not wager or bet_amount_raw <= 0:
             raise ValueError("wager_address and bet_amount_raw required")
+        ffa = payload.get("freeform_answer")
         q = quote_wager(
             client,
             wager_address=wager,
             outcome_index=outcome_index,
             bet_amount_raw=bet_amount_raw,
+            freeform_answer=str(ffa).strip() if ffa is not None and str(ffa).strip() != "" else None,
         )
         return {"ok": True, **q}
     raise ValueError(f"unknown op: {op}")
@@ -125,6 +130,11 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--wager", required=True)
     sp.add_argument("--outcome-index", type=int, required=True)
     sp.add_argument("--bet-amount-raw", type=int, required=True)
+    sp.add_argument(
+        "--freeform-answer",
+        default="",
+        help="ADR-0009: exact UTF-8 answer string for placeBet(string,...) calldata when protocol_version is freeform.",
+    )
 
     sub.add_parser("json", help="Read one JSON object from stdin (subagent / tool bridge)")
 

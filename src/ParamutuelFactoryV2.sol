@@ -31,7 +31,8 @@ contract ParamutuelFactoryV2 {
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 10_000;
-    uint256 public constant MAX_OUTCOMES = 64;
+    /// @dev Upper bound 255 so every valid option index fits in one `uint256` bit (`WagerV2Masks.fullSet` requires `n < 256`).
+    uint256 public constant MAX_OUTCOMES = 255;
 
     uint64 public immutable minBettingWindow;
     uint64 public immutable minResolutionWindow;

@@ -7,9 +7,17 @@ from urllib import parse, request
 from urllib.error import URLError
 from pathlib import Path
 
-
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-WAGER_CREATED_TOPIC = "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37bc7e35f28def"
+from testnet_helpers import (
+    DUMMY_COLLATERAL,
+    V2_CREATE_WAGER_SIG,
+    V2_FUNDED_RESOLVE_CASES,
+    V2_MINIMAL_EXPIRE_POLICIES,
+    WAGER_CREATED_TOPIC_V1,
+    WAGER_CREATED_TOPIC_V2,
+    ZERO_ADDRESS,
+    default_factory_v2_address,
+    extract_wager_address_from_receipt,
+)
 
 
 def _env(name: str, default: str = "") -> str:
@@ -154,23 +162,16 @@ def _receipt(tx_hash: str) -> dict:
     return json.loads(out)
 
 
-def _topic_to_address(topic_word: str) -> str:
-    cleaned = topic_word.lower().replace("0x", "")
-    return "0x" + cleaned[-40:]
-
-
 def _extract_created_wager_from_receipt(tx_hash: str, factory_address: str) -> str:
-    payload = _receipt(tx_hash)
-    for log in payload.get("logs", []):
-        if str(log.get("address", "")).lower() != factory_address.lower():
-            continue
-        topics = log.get("topics") or []
-        if len(topics) < 2:
-            continue
-        if str(topics[0]).lower() != WAGER_CREATED_TOPIC:
-            continue
-        return _topic_to_address(str(topics[1]))
-    raise AssertionError(f"WagerCreated event not found in receipt for tx {tx_hash}")
+    return extract_wager_address_from_receipt(
+        _receipt(tx_hash), factory_address, WAGER_CREATED_TOPIC_V1
+    )
+
+
+def _extract_created_wager_v2_from_receipt(tx_hash: str, factory_v2_address: str) -> str:
+    return extract_wager_address_from_receipt(
+        _receipt(tx_hash), factory_v2_address, WAGER_CREATED_TOPIC_V2
+    )
 
 
 def _as_int(value: str) -> int:
@@ -331,6 +332,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
     def test_existing_wager_views(self) -> None:
         if not self.wager_address:
             self.skipTest("Set TESTNET_WAGER_ADDRESS to run wager read checks")
+        # Intentionally v1: factory() must match the v1 ParamutuelFactory, not ParamutuelFactoryV2.
 
         factory_on_wager = _call(self.wager_address, "factory()(address)")
         betting_close_time = _as_int(_call(self.wager_address, "bettingCloseTime()(uint64)"))
@@ -606,6 +608,217 @@ class TestBaseSepoliaLive(unittest.TestCase):
         except AssertionError as exc:
             self.skipTest(f"Hosted indexer has not yet indexed wager {wager}: {exc}")
         self.assertEqual(str(indexed.get("wager_address", "")).lower(), wager.lower())
+
+
+def _filtered_live_v2_cases():
+    raw = _env("TESTNET_V2_CASES", "").strip()
+    if not raw:
+        return V2_FUNDED_RESOLVE_CASES
+    want = {x.strip() for x in raw.split(",") if x.strip()}
+    return tuple(c for c in V2_FUNDED_RESOLVE_CASES if c.case_id in want)
+
+
+class TestBaseSepoliaLiveV2(unittest.TestCase):
+    """ParamutuelFactoryV2 / ParamutuelWagerV2 coverage (skipped when factory v2 not configured)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.rpc = _rpc_url()
+        cls.factory_v2 = _env("FACTORY_V2_ADDRESS") or default_factory_v2_address()
+        cls.mode = _env("TESTNET_MODE", "readonly").lower()
+        cls.private_key = _env("PRIVATE_KEY")
+        cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
+        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
+        cls.indexer_base_url = _indexer_base_url()
+        cls.wager_address_v2 = _env("TESTNET_WAGER_ADDRESS_V2")
+        cls.skip_v2 = _env("TESTNET_SKIP_V2", "").lower() in ("1", "true", "yes")
+
+        if cls.skip_v2:
+            raise unittest.SkipTest("TESTNET_SKIP_V2 set — skipping all v2 live tests")
+        if not cls.rpc:
+            raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
+        if not cls.factory_v2:
+            raise unittest.SkipTest(
+                "Set FACTORY_V2_ADDRESS or config/deployments.json baseSepolia.factoryV2Address for v2 tests"
+            )
+
+        cls.sender = ""
+        if cls.private_key:
+            cls.sender = _run_cast(["wallet", "address", "--private-key", cls.private_key])
+        cls.secondary_sender = ""
+        if cls.secondary_private_key:
+            cls.secondary_sender = _run_cast(["wallet", "address", "--private-key", cls.secondary_private_key])
+
+    def test_factory_v2_view_invariants(self) -> None:
+        treasury = _call(self.factory_v2, "treasury()(address)")
+        protocol_fee_bps = _as_int(_call(self.factory_v2, "protocolFeeBps()(uint16)"))
+        min_betting_window = _as_int(_call(self.factory_v2, "minBettingWindow()(uint64)"))
+        min_resolution_window = _as_int(_call(self.factory_v2, "minResolutionWindow()(uint64)"))
+        wagers_count = _as_int(_call(self.factory_v2, "wagersCount()(uint256)"))
+
+        self.assertNotEqual(treasury.lower(), ZERO_ADDRESS)
+        self.assertGreaterEqual(protocol_fee_bps, 0)
+        self.assertLessEqual(protocol_fee_bps, 10000)
+        self.assertGreaterEqual(min_betting_window, 0)
+        self.assertGreaterEqual(min_resolution_window, 0)
+        self.assertGreaterEqual(wagers_count, 0)
+
+    def test_optional_known_v2_wager_reads(self) -> None:
+        if not self.wager_address_v2:
+            self.skipTest("Set TESTNET_WAGER_ADDRESS_V2 to run v2 wager read checks")
+
+        factory_on_wager = _call(self.wager_address_v2, "factory()(address)")
+        policy = _as_int(_call(self.wager_address_v2, "payoffPolicy()(uint8)"))
+        pparam = _as_int(_call(self.wager_address_v2, "policyParam()(uint256)"))
+        nopt = _as_int(_call(self.wager_address_v2, "numOptions()(uint256)"))
+        state = _as_int(_call(self.wager_address_v2, "state()(uint8)"))
+
+        self.assertEqual(factory_on_wager.lower(), self.factory_v2.lower())
+        self.assertIn(policy, (0, 1, 2, 3, 4))
+        self.assertGreaterEqual(nopt, 2)
+        self.assertIn(state, (0, 1, 2))
+
+    def test_minimal_tx_v2_payoff_policy_expire_matrix(self) -> None:
+        if self.mode != "minimal-tx":
+            self.skipTest("Set TESTNET_MODE=minimal-tx to run v2 minimal transaction matrix")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for v2 minimal transaction matrix")
+
+        for policy, param, outcomes_json in V2_MINIMAL_EXPIRE_POLICIES:
+            with self.subTest(policy=policy, outcomes=outcomes_json):
+                proposition = f"live-v2-min-{policy}-{int(time.time())}"
+                create_tx = _send(
+                    self.factory_v2,
+                    V2_CREATE_WAGER_SIG,
+                    DUMMY_COLLATERAL,
+                    proposition,
+                    outcomes_json,
+                    str(policy),
+                    str(param),
+                    "0",
+                    "0",
+                    ZERO_ADDRESS,
+                    self.sender,
+                    self.sender,
+                    "[]",
+                    "[]",
+                )
+                wager = _extract_created_wager_v2_from_receipt(create_tx, self.factory_v2)
+                po = _as_int(_call(wager, "payoffPolicy()(uint8)"))
+                self.assertEqual(po, policy)
+
+                _send(wager, "closeBetting()")
+                _wait_for_bool_value(wager, "bettingClosedByAuthority()(bool)", True)
+                _send(wager, "closeResolutionWindow()")
+                _wait_for_bool_value(
+                    wager,
+                    "resolutionWindowClosedByAuthority()(bool)",
+                    True,
+                )
+                _send(wager, "expire()")
+                self.assertEqual(_wait_for_state(wager, 2), 2)
+
+    def test_funded_tx_v2_payoff_policy_resolve_matrix(self) -> None:
+        if self.mode != "funded-tx":
+            self.skipTest("Set TESTNET_MODE=funded-tx for v2 funded policy matrix")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for v2 funded policy matrix")
+        if not self.collateral_token:
+            self.skipTest("Set TESTNET_COLLATERAL_TOKEN for v2 funded policy matrix")
+
+        decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
+        amount_raw = _parse_units(self.bet_amount, decimals)
+        if amount_raw <= 0:
+            self.skipTest("TESTNET_BET_AMOUNT must parse to a positive amount")
+
+        sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
+        cases = _filtered_live_v2_cases()
+        max_per_wager = max(amount_raw * len(c.ticket_masks) for c in cases) if cases else amount_raw
+        if sender_balance < max_per_wager:
+            self.skipTest(
+                "Insufficient collateral for largest v2 scenario "
+                f"(have {sender_balance}, need at least {max_per_wager} raw)"
+            )
+
+        last_wager = ""
+        for case in _filtered_live_v2_cases():
+            with self.subTest(case_id=case.case_id):
+                legs = len(case.ticket_masks)
+                total_stake = amount_raw * legs
+                if sender_balance < total_stake:
+                    self.skipTest(f"Insufficient balance for case {case.case_id} (need {total_stake} raw)")
+
+                proposition = f"live-v2-{case.case_id}-{int(time.time())}"
+                create_tx = _send(
+                    self.factory_v2,
+                    V2_CREATE_WAGER_SIG,
+                    self.collateral_token,
+                    proposition,
+                    case.outcomes_json,
+                    str(case.payoff_policy),
+                    str(case.policy_param),
+                    "0",
+                    "0",
+                    ZERO_ADDRESS,
+                    self.sender,
+                    self.sender,
+                    "[]",
+                    "[]",
+                )
+                wager = _extract_created_wager_v2_from_receipt(create_tx, self.factory_v2)
+                last_wager = wager
+
+                self.assertEqual(_as_int(_call(wager, "payoffPolicy()(uint8)")), case.payoff_policy)
+
+                _send(self.collateral_token, "approve(address,uint256)", wager, str(total_stake))
+
+                if case.use_place_bets and legs > 1:
+                    masks_lit = "[" + ",".join(str(m) for m in case.ticket_masks) + "]"
+                    amts_lit = "[" + ",".join(str(amount_raw) for _ in case.ticket_masks) + "]"
+                    _send(
+                        wager,
+                        "placeBets(uint256[],uint256[])",
+                        masks_lit,
+                        amts_lit,
+                    )
+                else:
+                    for idx, mask in enumerate(case.ticket_masks):
+                        if idx > 0 and self.secondary_private_key:
+                            _send_with_key(
+                                self.secondary_private_key,
+                                self.collateral_token,
+                                "approve(address,uint256)",
+                                wager,
+                                str(amount_raw),
+                            )
+                            _send_with_key(
+                                self.secondary_private_key,
+                                wager,
+                                "placeBet(uint256,uint256)",
+                                str(mask),
+                                str(amount_raw),
+                            )
+                        else:
+                            _send(
+                                wager,
+                                "placeBet(uint256,uint256)",
+                                str(mask),
+                                str(amount_raw),
+                            )
+
+                _send(wager, "closeBetting()")
+                _send(wager, "resolve(uint256)", str(case.winning_mask))
+                self.assertEqual(_wait_for_state(wager, 1), 1)
+                _send(wager, "claim()")
+
+        if self.indexer_base_url and last_wager:
+            try:
+                detail = _wait_for_indexer_wager(self.indexer_base_url, last_wager, timeout_seconds=180)
+            except AssertionError as exc:
+                self.skipTest(f"Indexer did not surface last v2 wager: {exc}")
+            w = detail.get("wager") or {}
+            self.assertEqual(str(w.get("protocol_version", "")).lower(), "v2")
 
 
 if __name__ == "__main__":

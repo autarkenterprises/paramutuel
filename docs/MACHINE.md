@@ -6,9 +6,15 @@ Contract upgrade/redeploy procedure: [`CONTRACT-UPGRADE-RUNBOOK.md`](CONTRACT-UP
 
 ## ABIs
 
-Pre-extracted ABI-only JSON is committed at `dapp/abi/ParamutuelFactory.json` and `dapp/abi/ParamutuelWager.json`. These contain `{"abi": [...]}` and can be loaded directly. Full Foundry artifacts are available under `out/` after `forge build`.
+Pre-extracted ABI-only JSON is committed under `dapp/abi/` for **v1** (`ParamutuelFactory.json`, `ParamutuelWager.json`), **v2 / ADR-0008** (`ParamutuelFactoryV2.json`, `ParamutuelWagerV2.json`), and **freeform / ADR-0009** (`ParamutuelFactoryFreeform.json`, `ParamutuelWagerFreeform.json`). Each file is `{"abi": [...]}`. Full Foundry artifacts are available under `out/` after `forge build`.
+
+The MCP server bundles the same contract names under `mcp_server/abi/` (see `paramutuel-mcp` wheel `force-include`), including the freeform pair when present.
 
 To re-sync after contract changes: `./script/sync-abi.sh`.
+
+### Indexer payload notes (v2)
+
+Hosted indexer `GET /wagers/{address}` includes `ticket_pools` (v2: per ticket bitmask stake totals; **freeform:** per `answerId` hex keyed as `ticket_mask`) and wager fields `protocol_version`, `payoff_policy`, `policy_param` (v2). MCP `quote_place_bet` / `quote_place_bets` interpret `protocol_version === "v2"` and map a chosen **outcome index** to ticket mask `1 << index` for single-outcome legs. For **`protocol_version === "freeform"`**, use MCP **`encode_place_bet_freeform`** / **`encode_resolve_freeform`** (exact UTF-8 strings); `quote_place_bet` does not apply. Tooling: `encode_create_wager_v2` → `FACTORY_V2_ADDRESS` / `factoryV2Address`; **`encode_create_freeform_wager`** → `FACTORY_FREEFORM_ADDRESS` / `factoryFreeformAddress`.
 
 ## Factory (`ParamutuelFactory`)
 
@@ -18,7 +24,7 @@ To re-sync after contract changes: `./script/sync-abi.sh`.
 |------|-------|-------------|
 | `BPS_DENOMINATOR` | `10_000` | Basis-point denominator |
 | `MAX_TOTAL_FEE_BPS` | `10_000` | 100% fee cap (protocol + extra combined) |
-| `MAX_OUTCOMES` | `64` | Maximum outcome count per wager |
+| `MAX_OUTCOMES` | `255` | Maximum outcome count per wager |
 
 ### Read-only state
 
@@ -301,11 +307,11 @@ Operator transaction workflows are documented in `docs/WORKFLOWS.md`.
 
 ## MCP server
 
-A ready-to-use MCP (Model Context Protocol) server is available at `mcp_server/`. It exposes 16 tools across three categories:
+A ready-to-use MCP (Model Context Protocol) server is available at `mcp_server/`. It exposes 17 tools across three categories:
 
 - **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`, `get_indexer_health`
 - **Analysis:** `calculate_odds`, `quote_place_bet`, `quote_place_bets`
-- **Transaction encoding:** `encode_create_wager`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
+- **Transaction encoding:** `encode_create_wager`, `encode_create_wager_v2`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
 Run with:
 
@@ -320,7 +326,7 @@ Or via the entry point after `pip install -e mcp_server/`:
 paramutuel-mcp
 ```
 
-The server reads factory address and chain ID from `config/deployments.json` (overridable via `FACTORY_ADDRESS` and `CHAIN_ID` env vars). Discovery tools query the indexer API; transaction-encoding tools return raw calldata and approval instructions for the caller's signer.
+The server reads factory address(es) and chain ID from `config/deployments.json` (overridable via `FACTORY_ADDRESS`, optional `FACTORY_V2_ADDRESS`, and `CHAIN_ID` env vars). Discovery tools query the indexer API; transaction-encoding tools return raw calldata and approval instructions for the caller's signer.
 
 Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittest mcp_server/tests/test_server.py`).
 

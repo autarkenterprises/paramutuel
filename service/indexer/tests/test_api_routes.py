@@ -18,6 +18,9 @@ class ApiRouteTests(unittest.TestCase):
         self.conn = db_connect(self.db_path)
         init_db(self.conn)
         Handler.conn = self.conn
+        Handler.indexer_factory_address = None
+        Handler.indexer_factory_v2_address = None
+        Handler.indexer_factory_freeform_address = None
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         host, port = self.server.server_address
@@ -31,6 +34,9 @@ class ApiRouteTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=2)
         self.conn.close()
+        Handler.indexer_factory_address = None
+        Handler.indexer_factory_v2_address = None
+        Handler.indexer_factory_freeform_address = None
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
@@ -49,15 +55,20 @@ class ApiRouteTests(unittest.TestCase):
         proposer: str,
         collateral_token: str,
         total_pot: str = "0",
+        *,
+        protocol_version: str = "v1",
+        payoff_policy: int | None = None,
+        policy_param: str | None = None,
     ) -> None:
         self.conn.execute(
             """
             INSERT INTO wagers(
               wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
               collateral_token, proposition, outcomes_json,
+              protocol_version, payoff_policy, policy_param,
               betting_close_time, resolution_window, resolution_deadline,
               betting_closed_by_authority, resolution_window_closed, state, created_block, created_tx_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
             """,
             (
                 wager,
@@ -69,6 +80,9 @@ class ApiRouteTests(unittest.TestCase):
                 collateral_token,
                 proposition,
                 json.dumps(outcomes),
+                protocol_version,
+                payoff_policy,
+                policy_param,
                 1000,
                 3600,
                 4600,
@@ -116,6 +130,69 @@ class ApiRouteTests(unittest.TestCase):
         )
         self.conn.commit()
 
+    def test_get_wager_includes_ticket_pools(self) -> None:
+        status, body = self._get_json("/wagers/0xabc1000000000000000000000000000000000001")
+        self.assertEqual(status, 200)
+        self.assertIn("ticket_pools", body)
+        self.assertEqual(body["ticket_pools"], [])
+
+    def test_get_wager_v2_exposes_ticket_pools_rows(self) -> None:
+        waddr = "0xabc10000000000000000000000000000000000aa"
+        self._insert_wager(
+            wager=waddr,
+            proposition="V2 bitmask pool test",
+            outcomes=["A", "B"],
+            created_block=9,
+            created_tx_hash="0xaaf",
+            proposer="0xabc2000000000000000000000000000000000002",
+            collateral_token="0xabc6000000000000000000000000000000000006",
+            protocol_version="v2",
+            payoff_policy=0,
+            policy_param="0",
+        )
+        self.conn.execute(
+            "INSERT INTO wager_ticket_pools(wager_address, ticket_mask, pool_total) VALUES (?, ?, ?)",
+            (waddr.lower(), "2", "777"),
+        )
+        self.conn.commit()
+        status, body = self._get_json(f"/wagers/{waddr}")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["wager"]["protocol_version"], "v2")
+        pools = {p["ticket_mask"]: p["pool_total"] for p in body["ticket_pools"]}
+        self.assertEqual(pools.get("2"), "777")
+
+    def test_wagers_search_includes_protocol_version_field(self) -> None:
+        self._insert_wager(
+            wager="0xabc10000000000000000000000000000000000bb",
+            proposition="Alpha only",
+            outcomes=["X", "Y"],
+            created_block=8,
+            created_tx_hash="0xaae",
+            proposer="0xabc20000000000000000000000000000000000bb",
+            collateral_token="0xabc6000000000000000000000000000000000006",
+            protocol_version="v2",
+        )
+        self.conn.commit()
+        status, body = self._get_json("/wagers?q=v2")
+        self.assertEqual(status, 200)
+        addrs = {m["wager_address"] for m in body["wagers"]}
+        self.assertIn("0xabc10000000000000000000000000000000000bb", addrs)
+
+    def test_health_echoes_configured_factories(self) -> None:
+        Handler.indexer_factory_address = "0xfac7000000000000000000000000000000000001"
+        Handler.indexer_factory_v2_address = "0xfac7000000000000000000000000000000000002"
+        status, body = self._get_json("/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(body.get("factory_address"), Handler.indexer_factory_address)
+        self.assertEqual(body.get("factory_v2_address"), Handler.indexer_factory_v2_address)
+        self.assertIsNone(body.get("factory_freeform_address"))
+
+    def test_health_echoes_freeform_factory_when_set(self) -> None:
+        Handler.indexer_factory_freeform_address = "0xfac7000000000000000000000000000000000003"
+        status, body = self._get_json("/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(body.get("factory_freeform_address"), Handler.indexer_factory_freeform_address)
+
     def test_root_returns_service_metadata(self) -> None:
         status, body = self._get_json("/")
         self.assertEqual(status, 200)
@@ -132,6 +209,11 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("wagers", body1)
 
     def test_legacy_market_routes_are_rejected(self) -> None:
+        """Regression: pre-wager "/markets" paths must stay gone (404).
+
+        If these ever return 200 again, a deprecated API surface has been reintroduced
+        and this test should fail until the routes are removed or intentionally versioned.
+        """
         with self.assertRaises(HTTPError):
             self._get_json("/markets?limit=1")
         with self.assertRaises(HTTPError):
@@ -206,6 +288,9 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("last_indexed_block", body)
         self.assertIn("chain_head", body)
         self.assertIn("last_sync_error", body)
+        self.assertIn("factory_address", body)
+        self.assertIn("factory_v2_address", body)
+        self.assertIn("factory_freeform_address", body)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,10 @@ set -euo pipefail
 #
 # Funded transaction mode (real collateral flow):
 #   TESTNET_MODE=funded-tx PRIVATE_KEY=0x... TESTNET_COLLATERAL_TOKEN=0x... FACTORY_ADDRESS=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
+#
+# v2 factory matrices: FACTORY_V2_ADDRESS or deployments factoryV2Address; see docs/TESTNET-LIVE-SUITE.md
+# (TESTNET_V2_CASES, TESTNET_SKIP_V2, TESTNET_WAGER_ADDRESS_V2).
+# Freeform: FACTORY_FREEFORM_ADDRESS or deployments factoryFreeformAddress when exercising freeform paths.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"

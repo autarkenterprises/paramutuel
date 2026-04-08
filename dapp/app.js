@@ -26,6 +26,10 @@ const WAGER_ABI_URL = "abi/ParamutuelWager.json";
 const WAGER_ABI_FALLBACK = "../out/ParamutuelWager.sol/ParamutuelWager.json";
 const WAGER_ABI_V2_URL = "abi/ParamutuelWagerV2.json";
 const WAGER_ABI_V2_FALLBACK = "../out/ParamutuelWagerV2.sol/ParamutuelWagerV2.json";
+const FACTORY_ABI_FF_URL = "abi/ParamutuelFactoryFreeform.json";
+const FACTORY_ABI_FF_FALLBACK = "../out/ParamutuelFactoryFreeform.sol/ParamutuelFactoryFreeform.json";
+const WAGER_ABI_FF_URL = "abi/ParamutuelWagerFreeform.json";
+const WAGER_ABI_FF_FALLBACK = "../out/ParamutuelWagerFreeform.sol/ParamutuelWagerFreeform.json";
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
 const Logic = globalThis.ParamutuelLogic;
 
@@ -37,7 +41,9 @@ let factoryAbiV1;
 let wagerAbiV1;
 let factoryAbiV2;
 let wagerAbiV2;
-/** @type {"v1"|"v2"} */
+let factoryAbiFF;
+let wagerAbiFF;
+/** @type {"v1"|"v2"|"freeform"} */
 let activeWagerProtocol = "v1";
 
 let wagerContract; // last-created wager
@@ -186,29 +192,53 @@ function deploymentFactoryV2AddressForChain(chainId) {
   return String((deploymentsConfig[key] || {}).factoryV2Address || "").trim();
 }
 
+function deploymentFactoryFreeformAddressForChain(chainId) {
+  if (!deploymentsConfig) return "";
+  const key = deploymentConfigKeyForChain(chainId);
+  return String((deploymentsConfig[key] || {}).factoryFreeformAddress || "").trim();
+}
+
 function applyDefaultFactoryAddress() {
   const current = $("factoryAddress").value.trim();
   if (current) return;
   const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
-  const configured =
-    protocol === "v2"
-      ? deploymentFactoryV2AddressForChain(currentChainId)
-      : deploymentFactoryAddressForChain(currentChainId);
+  let configured = "";
+  if (protocol === "v2") configured = deploymentFactoryV2AddressForChain(currentChainId);
+  else if (protocol === "freeform") configured = deploymentFactoryFreeformAddressForChain(currentChainId);
+  else configured = deploymentFactoryAddressForChain(currentChainId);
   if (!configured || !ethers.isAddress(configured)) return;
   $("factoryAddress").value = configured;
 }
 
 function syncProtocolCreateUi() {
   const el = $("createV2Fields");
-  if (!el) return;
-  const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
-  el.hidden = protocol !== "v2";
+  if (el) {
+    const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
+    el.hidden = protocol !== "v2";
+  }
+  const outWrap = $("outcomesLabelWrap");
+  if (outWrap) {
+    const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
+    outWrap.hidden = protocol === "freeform";
+  }
+  const seedSec = $("seedLiquiditySection");
+  if (seedSec) {
+    const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
+    seedSec.hidden = protocol === "freeform";
+  }
   const hint = $("factoryProtocolHint");
   if (hint) {
-    hint.textContent =
-      protocol === "v2"
-        ? "Use a ParamutuelFactoryV2 deployment (ADR-0008). v1 factory addresses will revert."
-        : "Use ParamutuelFactory (v1). For bitmask tickets and policies, switch Protocol to v2.";
+    const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
+    if (protocol === "v2") {
+      hint.textContent =
+        "Use a ParamutuelFactoryV2 deployment (ADR-0008). v1 / freeform factory addresses will revert.";
+    } else if (protocol === "freeform") {
+      hint.textContent =
+        "Use ParamutuelFactoryFreeform (ADR-0009). No outcome list at create; bettors submit UTF-8 answers (max 1024 bytes each).";
+    } else {
+      hint.textContent =
+        "Use ParamutuelFactory (v1). For bitmask tickets use v2; for open text answers use freeform.";
+    }
   }
 }
 
@@ -342,6 +372,60 @@ function netPot(totalPot, totalFeeBps) {
   return totalPot - ((totalPot * totalFeeBps) / 10000n);
 }
 
+async function updateOddsPreviewFreeform() {
+  const answer = $("betOutcomeIndex").value.trim();
+  if (!answer) {
+    clearOddsPreview("Enter answer text to preview payout (exact bytes matter).");
+    return;
+  }
+  const b = ethers.toUtf8Bytes(answer);
+  if (b.length > 1024) {
+    clearOddsPreview("Answer exceeds 1024 UTF-8 bytes (on-chain limit).");
+    return;
+  }
+  const amountNumber = Number($("betAmount").value);
+  if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+    clearOddsPreview("Enter a positive bet amount to preview payout.");
+    return;
+  }
+
+  const state = Number(await wagerContract.state());
+  if (state !== 0) {
+    clearOddsPreview("Wager is not open. Odds preview is only shown for open wagers.");
+    return;
+  }
+
+  const answerId = ethers.keccak256(b);
+  const collateralTokenAddress = await wagerContract.collateralToken();
+  const decimals = await resolveBettingDecimals(collateralTokenAddress);
+  const betAmount = parseAmount(amountNumber, decimals);
+
+  const [totalPot, totalFeeBps, pool] = await Promise.all([
+    wagerContract.totalPot(),
+    wagerContract.totalFeeBps(),
+    wagerContract.ticketPoolTotal(answerId),
+  ]);
+
+  const netBefore = netPot(totalPot, totalFeeBps);
+  const currentMultiple =
+    pool > 0n ? `${formatRatio(netBefore, pool, 4)}x` : "N/A (no stake yet on this answer)";
+
+  const totalPotAfter = totalPot + betAmount;
+  const netAfter = netPot(totalPotAfter, totalFeeBps);
+  const poolAfter = pool + betAmount;
+
+  const payoutPreview = (betAmount * netAfter) / poolAfter;
+  const profitPreview = payoutPreview - betAmount;
+  const afterMultiple = `${formatRatio(netAfter, poolAfter, 4)}x`;
+
+  $("oddsCurrentMultiple").value = currentMultiple;
+  $("oddsAfterMultiple").value = afterMultiple;
+  $("oddsExpectedPayout").value = formatTokenAmount(payoutPreview, decimals);
+  $("oddsExpectedProfit").value = formatTokenAmount(profitPreview, decimals);
+  $("oddsStatus").textContent =
+    "Freeform single-pool preview (same math as v1 single-outcome). Resolver must call resolve() with identical string bytes.";
+}
+
 async function updateOddsPreviewV2() {
   const amountNumber = Number($("betAmount").value);
   if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
@@ -419,6 +503,15 @@ async function updateOddsPreviewV2() {
 async function updateOddsPreview() {
   if (!wagerContract) {
     clearOddsPreview("Create a wager first to preview odds.");
+    return;
+  }
+
+  if (activeWagerProtocol === "freeform") {
+    try {
+      await updateOddsPreviewFreeform();
+    } catch (e) {
+      clearOddsPreview(`Could not compute odds preview: ${e.message}`);
+    }
     return;
   }
 
@@ -710,11 +803,13 @@ async function loadDeploymentsConfig() {
 }
 
 async function loadAbi() {
-  [factoryAbiV1, wagerAbiV1, factoryAbiV2, wagerAbiV2] = await Promise.all([
+  [factoryAbiV1, wagerAbiV1, factoryAbiV2, wagerAbiV2, factoryAbiFF, wagerAbiFF] = await Promise.all([
     fetchAbiWithFallback(FACTORY_ABI_URL, FACTORY_ABI_FALLBACK),
     fetchAbiWithFallback(WAGER_ABI_URL, WAGER_ABI_FALLBACK),
     fetchAbiWithFallback(FACTORY_ABI_V2_URL, FACTORY_ABI_V2_FALLBACK),
     fetchAbiWithFallback(WAGER_ABI_V2_URL, WAGER_ABI_V2_FALLBACK),
+    fetchAbiWithFallback(FACTORY_ABI_FF_URL, FACTORY_ABI_FF_FALLBACK),
+    fetchAbiWithFallback(WAGER_ABI_FF_URL, WAGER_ABI_FF_FALLBACK),
   ]);
 }
 
@@ -766,7 +861,8 @@ async function connectWallet() {
 
 async function getFactoryConstraints(factoryAddress, protocol = "v1") {
   await ensureContractExistsOnCurrentNetwork(factoryAddress, "Factory address");
-  const abi = protocol === "v2" ? factoryAbiV2 : factoryAbiV1;
+  const abi =
+    protocol === "v2" ? factoryAbiV2 : protocol === "freeform" ? factoryAbiFF : factoryAbiV1;
   const factory = new ethers.Contract(factoryAddress, abi, provider);
   const minBettingWindow = await factory.minBettingWindow();
   const minResolutionWindow = await factory.minResolutionWindow();
@@ -783,16 +879,31 @@ async function setActiveWager(wagerAddress) {
   if (!ethers.isAddress(wagerAddress)) throw new Error("Invalid wager address.");
   await ensureContractExistsOnCurrentNetwork(wagerAddress, "Wager address");
 
+  const commonProbe = new ethers.Contract(
+    wagerAddress,
+    ["function outcomesCount() view returns (uint256)"],
+    provider
+  );
+  const oc = await commonProbe.outcomesCount();
   let protocol = "v1";
-  const probe = new ethers.Contract(wagerAddress, wagerAbiV2, provider);
-  try {
-    await probe.payoffPolicy();
-    protocol = "v2";
-  } catch {
-    protocol = "v1";
+  if (oc === 0n) {
+    protocol = "freeform";
+  } else {
+    const probe = new ethers.Contract(
+      wagerAddress,
+      ["function payoffPolicy() view returns (uint8)"],
+      provider
+    );
+    try {
+      await probe.payoffPolicy();
+      protocol = "v2";
+    } catch {
+      protocol = "v1";
+    }
   }
   activeWagerProtocol = protocol;
-  const wagerAbi = protocol === "v2" ? wagerAbiV2 : wagerAbiV1;
+  const wagerAbi =
+    protocol === "v2" ? wagerAbiV2 : protocol === "freeform" ? wagerAbiFF : wagerAbiV1;
   wagerContract = new ethers.Contract(wagerAddress, wagerAbi, getRunner());
 
   $("wagerAddress").textContent = wagerAddress;
@@ -813,7 +924,9 @@ async function setActiveWager(wagerAddress) {
       const sym = await resolveTokenSymbolForDisplay(tokenAddr);
       const disp = ethers.getAddress(tokenAddr);
       let line = sym ? `Collateral: ${sym} (${disp})` : `Collateral: ${disp}`;
-      if (protocol === "v2") {
+      if (protocol === "freeform") {
+        line += " · Protocol freeform (ADR-0009 text answers; resolve(string) must match bet bytes)";
+      } else if (protocol === "v2") {
         const pol = await wagerContract.payoffPolicy();
         line += ` · Protocol v2 · ${Logic.payoffPolicyLabel(pol)}`;
       } else {
@@ -831,25 +944,30 @@ async function setActiveWager(wagerAddress) {
 
 function syncBettingAndResolutionLabels() {
   const v2 = activeWagerProtocol === "v2";
+  const ff = activeWagerProtocol === "freeform";
   const betLab = $("betOutcomeFieldLabel");
   if (betLab) {
-    betLab.textContent = v2
-      ? "Ticket — outcome indices (comma-separated bitmask)"
-      : "Outcome index (single integer)";
+    betLab.textContent = ff
+      ? "Answer text (exact UTF-8 bytes; ticket id = keccak256(bytes))"
+      : v2
+        ? "Ticket — outcome indices (comma-separated bitmask)"
+        : "Outcome index (single integer)";
   }
   const winLab = $("winningOutcomeFieldLabel");
   if (winLab) {
-    winLab.textContent = v2
-      ? "Winning set — outcome indices (comma-separated)"
-      : "Winning outcome index";
+    winLab.textContent = ff
+      ? "Winning answer (exact UTF-8 string)"
+      : v2
+        ? "Winning set — outcome indices (comma-separated)"
+        : "Winning outcome index";
   }
   const betPh = $("betOutcomeIndex");
   if (betPh) {
-    betPh.placeholder = v2 ? "e.g. 0 or 0,2 for A and C" : "0";
+    betPh.placeholder = ff ? "e.g. Paris" : v2 ? "e.g. 0 or 0,2 for A and C" : "0";
   }
   const winPh = $("winningOutcomeIndex");
   if (winPh) {
-    winPh.placeholder = v2 ? "e.g. 0,2 — exact true set" : "0";
+    winPh.placeholder = ff ? "exact winning text" : v2 ? "e.g. 0,2 — exact true set" : "0";
   }
 }
 
@@ -907,8 +1025,9 @@ async function createWager() {
 
   if (!factoryAddressInput) throw new Error("Factory address is required.");
   if (!collateralTokenInput) throw new Error("Collateral token is required.");
-  if (!outcomesCsv) throw new Error("Outcomes are required.");
   if (!proposition) throw new Error("Proposition is required.");
+  const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
+  if (protocol !== "freeform" && !outcomesCsv) throw new Error("Outcomes are required.");
   if (factoryAddressInput === null) throw new Error("Factory address is invalid.");
   if (collateralTokenInput === null) {
     throw new Error("Collateral token address is invalid. Use a 0x... ERC-20 address.");
@@ -937,12 +1056,11 @@ async function createWager() {
     }
   }
 
-  const outcomes = parseCsvToArray(outcomesCsv);
-  if (outcomes.length < 2) throw new Error("Need at least 2 outcomes.");
+  const outcomes = protocol === "freeform" ? [] : parseCsvToArray(outcomesCsv);
+  if (protocol !== "freeform" && outcomes.length < 2) throw new Error("Need at least 2 outcomes.");
 
-  const protocol = $("protocolVersion") ? $("protocolVersion").value : "v1";
-  if (protocol === "v2" && outcomes.length > 64) {
-    throw new Error("ParamutuelFactoryV2 allows at most 64 outcomes.");
+  if (protocol !== "freeform" && outcomes.length > 255) {
+    throw new Error("Factory allows at most 255 outcomes.");
   }
 
   const extraFeeRecipients = extraFeeRecipientsCsv
@@ -954,10 +1072,15 @@ async function createWager() {
   if (extraFeeRecipients.length !== extraFeeBps.length) {
     throw new Error("extraFeeRecipients and extraFeeBps length mismatch.");
   }
-  const seedParsed = Logic.parseMultiBetInputs(seedOutcomeIndicesCsv, seedAmountsCsv, true);
-  for (const idx of seedParsed.outcomeIndices) {
-    if (idx >= outcomes.length) {
-      throw new Error(`Seed outcome index ${idx} out of range (0-${outcomes.length - 1}).`);
+  const seedParsed =
+    protocol === "freeform"
+      ? { outcomeIndices: [], amountNumbers: [] }
+      : Logic.parseMultiBetInputs(seedOutcomeIndicesCsv, seedAmountsCsv, true);
+  if (protocol !== "freeform") {
+    for (const idx of seedParsed.outcomeIndices) {
+      if (idx >= outcomes.length) {
+        throw new Error(`Seed outcome index ${idx} out of range (0-${outcomes.length - 1}).`);
+      }
     }
   }
 
@@ -1013,7 +1136,8 @@ async function createWager() {
     " (window values of 0 enable no-max mode)" +
     (warnings.length ? `; Warning: ${warnings.join("; ")}` : "");
 
-  const factoryAbi = protocol === "v2" ? factoryAbiV2 : factoryAbiV1;
+  const factoryAbi =
+    protocol === "v2" ? factoryAbiV2 : protocol === "freeform" ? factoryAbiFF : factoryAbiV1;
   const factory = new ethers.Contract(factoryAddress, factoryAbi, signer);
 
   let resolverArg = ethers.ZeroAddress;
@@ -1055,7 +1179,20 @@ async function createWager() {
 
   $("createStatus").textContent = "Submitting create wager transaction...";
   let receipt;
-  if (protocol === "v2") {
+  if (protocol === "freeform") {
+    const tx = await factory.createFreeformWager(
+      collateralToken,
+      proposition,
+      BigInt(closeTime),
+      BigInt(resolutionWindowArg),
+      resolverArg,
+      bettingCloserArg,
+      resolutionCloserArg,
+      extraFeeRecipients,
+      extraFeeBps
+    );
+    receipt = await tx.wait();
+  } else if (protocol === "v2") {
     const payoffPolicy = Number($("payoffPolicy").value);
     const policyParamRaw = Number($("policyParam").value);
     if (!Number.isInteger(payoffPolicy) || payoffPolicy < 0 || payoffPolicy > 4) {
@@ -1118,13 +1255,20 @@ async function createWager() {
   for (const log of receipt.logs) {
     try {
       const parsed = factory.interface.parseLog(log);
-      if (parsed && (parsed.name === "WagerCreated" || parsed.name === "WagerCreatedV2")) {
+      if (
+        parsed &&
+        (parsed.name === "WagerCreated" ||
+          parsed.name === "WagerCreatedV2" ||
+          parsed.name === "WagerCreatedFreeform")
+      ) {
         wagerAddress = parsed.args.wager;
         break;
       }
     } catch (_) {}
   }
-  if (!wagerAddress) throw new Error("WagerCreated / WagerCreatedV2 event not found in tx receipt.");
+  if (!wagerAddress) {
+    throw new Error("WagerCreated / WagerCreatedV2 / WagerCreatedFreeform event not found in tx receipt.");
+  }
 
   await setActiveWager(wagerAddress);
   $("createStatus").textContent = "Wager created.";
@@ -1137,7 +1281,15 @@ async function placeBet() {
   const numOptions = Number(await wagerContract.outcomesCount());
 
   let placeArg;
-  if (activeWagerProtocol === "v2") {
+  if (activeWagerProtocol === "freeform") {
+    const answer = $("betOutcomeIndex").value.trim();
+    if (!answer) {
+      throw new Error("Enter the exact UTF-8 answer string to bet on (max 1024 bytes on-chain).");
+    }
+    const b = ethers.toUtf8Bytes(answer);
+    if (b.length > 1024) throw new Error("Answer exceeds 1024 UTF-8 bytes.");
+    placeArg = answer;
+  } else if (activeWagerProtocol === "v2") {
     const mask = Logic.parseOutcomeIndicesCsvToTicketMask($("betOutcomeIndex").value.trim(), numOptions);
     const pol = Number(await wagerContract.payoffPolicy());
     if (pol === Logic.PAYOFF_POLICY.SINGLE_WINNER && Logic.popcountMask(mask) !== 1) {
@@ -1179,6 +1331,9 @@ async function placeBet() {
 
 async function placeBets() {
   if (!wagerContract) throw new Error("Create a wager first.");
+  if (activeWagerProtocol === "freeform") {
+    throw new Error("Freeform wagers only support placeBet(string,uint256). Use the single bet field above.");
+  }
 
   const parsed = Logic.parseMultiBetInputs($("betOutcomeIndices").value, $("betAmounts").value, false);
   const numOpts = Number(await wagerContract.outcomesCount());
@@ -1214,7 +1369,12 @@ async function placeBets() {
 async function resolveWager() {
   let winningArg;
   const { targetWager } = await ensureWagerForPlannedAction("resolve");
-  if (activeWagerProtocol === "v2") {
+  if (activeWagerProtocol === "freeform") {
+    const ans = $("winningOutcomeIndex").value.trim();
+    if (!ans) throw new Error("Enter the exact winning answer string (UTF-8 bytes must match a staked answer).");
+    if (ethers.toUtf8Bytes(ans).length > 1024) throw new Error("Answer exceeds 1024 UTF-8 bytes.");
+    winningArg = ans;
+  } else if (activeWagerProtocol === "v2") {
     const numOptions = Number(await targetWager.outcomesCount());
     winningArg = Logic.parseOutcomeIndicesCsvToTicketMask($("winningOutcomeIndex").value.trim(), numOptions);
   } else {

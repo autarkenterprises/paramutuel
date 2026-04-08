@@ -43,6 +43,8 @@ def build_create_wager_command(
         seed_amounts = []
     if len(outcomes) < 2:
         raise ValueError("outcomes must have at least 2 items")
+    if len(outcomes) > 255:
+        raise ValueError("outcomes must have at most 255 items (factory MAX_OUTCOMES)")
     if len(extra_recipients) != len(extra_bps):
         raise ValueError("extra_recipients and extra_bps length mismatch")
     if len(seed_outcome_indices) != len(seed_amounts):

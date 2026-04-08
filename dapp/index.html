@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel self-custody dApp: v1 single-outcome and v2 (ADR-0008) bitmask policies — create wagers, place bets, resolve, claim on Base." />
+  <meta name="description" content="Paramutuel self-custody dApp: v1, v2 (ADR-0008 bitmask), and freeform text answers (ADR-0009) — create, bet, resolve, claim on Base." />
   <title>Paramutuel MVP dApp</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -29,6 +29,7 @@
           <select id="protocolVersion">
             <option value="v1" selected>v1 — ParamutuelFactory / single winning outcome</option>
             <option value="v2">v2 — ParamutuelFactoryV2 / bitmask tickets &amp; payoff policies (ADR-0008)</option>
+            <option value="freeform">freeform — ParamutuelFactoryFreeform / text answers (ADR-0009)</option>
           </select>
         </label>
         <div id="factoryProtocolHint" class="muted span-2"></div>
@@ -58,7 +59,7 @@
           Proposition
           <input id="proposition" placeholder="Will team A win?" />
         </label>
-        <label>
+        <label id="outcomesLabelWrap">
           Outcomes (comma-separated)
           <input id="outcomes" placeholder="YES,NO" />
         </label>
@@ -79,7 +80,7 @@
             <input id="policyParam" type="number" value="0" min="0" step="1" />
           </label>
           <p class="muted span-2" style="margin:0;">
-            See <a href="../docs/PAYOUT-CALCULATION.md" target="_blank" rel="noopener">docs/PAYOUT-CALCULATION.md</a> Part B. Factory v2 caps at 64 outcomes.
+            See <a href="../docs/PAYOUT-CALCULATION.md" target="_blank" rel="noopener">docs/PAYOUT-CALCULATION.md</a> Part B. Factory v2 caps at 255 outcomes.
           </p>
         </div>
 
@@ -179,6 +180,7 @@
           Optional fee bps (comma-separated)
           <input id="extraFeeBps" placeholder="300,100" />
         </label>
+        <div id="seedLiquiditySection" class="span-2 grid">
         <label>
           Seed outcome indices (optional, comma-separated)
           <input id="seedOutcomeIndices" placeholder="0,2" />
@@ -192,8 +194,10 @@
           <div class="muted">
             Optional initial liquidity at create-time. Provide aligned index and amount lists (for example: indices <code>0,2</code> and amounts <code>10,3.5</code>). The dApp approves the total once and submits one create transaction.
             For <strong>v2</strong>, each index is seeded as a <strong>single-outcome ticket</strong> (bit mask <code>1 &lt;&lt; index</code>). <strong>SINGLE_WINNER</strong> v2 seeds must stay single-index per row.
+            <strong>Freeform</strong> factory has no create-time seeds.
           </div>
         </details>
+        </div>
 
         <label class="checkbox-label">
           <input type="checkbox" id="decimalsManual" />
