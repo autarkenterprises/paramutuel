@@ -3,7 +3,8 @@
 This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from committed files in `dapp/abi/`, with a fallback to Foundry build artifacts in `out/`.
 
 It supports:
-- Creating wagers via `ParamutuelFactory`
+- **Protocol choice:** **v1** (`ParamutuelFactory` / `ParamutuelWager`, single winning outcome) or **v2** (`ParamutuelFactoryV2` / `ParamutuelWagerV2`, ADR-0008 bitmask tickets and payoff policies).
+- Creating wagers via the selected factory (v2 adds payoff policy, `policyParam` for `AT_LEAST_K`, and parses `WagerCreatedV2`).
 - Optional seeded liquidity at create-time (multi-outcome in one tx)
 - Configuring delegated lifecycle roles (`resolver`, `bettingCloser`, `resolutionCloser`)
 - Finite windows or closer-managed no-max windows (`bettingCloseTime = 0`, `resolutionWindow = 0`)
@@ -18,8 +19,9 @@ It supports:
 
 - A node wallet with gas funds on your target network
 - Deployed contract addresses:
-  - `ParamutuelFactory` address
-  - (wagers are created dynamically; the dApp reads the wager address from the `WagerCreated` event)
+  - `ParamutuelFactory` (v1) and/or `ParamutuelFactoryV2` (v2)
+  - Optional: set `factoryV2Address` in `config/deployments.json` for auto-fill when **Protocol → v2** is selected (v1 continues to use `factoryAddress`).
+  - Wagers are created dynamically; the dApp reads the wager address from `WagerCreated` or `WagerCreatedV2`.
 - Serve the directory with an HTTP server (do not open via `file://...`).
 
 ### Run locally
@@ -43,7 +45,8 @@ python3 -m http.server 8080
 ### How to configure
 
 In the dApp UI, paste:
-- `Factory address` (auto-filled from `config/deployments.json` when available)
+- **Protocol** (v1 vs v2) — loading an existing wager **auto-detects** v2 via `payoffPolicy()`.
+- `Factory address` (auto-filled from `config/deployments.json`: `factoryAddress` / `factoryV2Address` by protocol)
 - `Collateral token preset` (network-aware dropdown; includes Base mainnet and Base Sepolia presets)
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)
@@ -56,7 +59,9 @@ In the dApp UI, paste:
 - Optional no-max checkboxes for both windows (closer-managed mode)
 - Wager template selection (sports, election, long-horizon, closer-managed)
 - Optional extra fee recipients + bps (comma-separated)
-- Optional seed outcome indices + seed amounts (comma-separated aligned lists)
+- Optional seed outcome indices + seed amounts (comma-separated aligned lists). **v2:** each seed index is a **single-outcome** ticket mask (`1 << index`).
+- **v2 only:** payoff policy dropdown + policy param (`k` for `AT_LEAST_K`, otherwise `0`). Up to **64** outcomes on the v2 factory.
+- **Betting / resolution (v2):** enter **comma-separated outcome indices** to build the ticket or winning set bitmask (e.g. `0,2`). **v1** remains a **single integer** per field (no commas).
 
 ### Notes
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel self-custody dApp: create parimutuel wagers, place bets, resolve, and claim on Base." />
+  <meta name="description" content="Paramutuel self-custody dApp: v1 single-outcome and v2 (ADR-0008) bitmask policies — create wagers, place bets, resolve, claim on Base." />
   <title>Paramutuel MVP dApp</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -24,6 +24,15 @@
       <h2>Create Wager</h2>
 
       <div class="grid">
+        <label>
+          Protocol
+          <select id="protocolVersion">
+            <option value="v1" selected>v1 — ParamutuelFactory / single winning outcome</option>
+            <option value="v2">v2 — ParamutuelFactoryV2 / bitmask tickets &amp; payoff policies (ADR-0008)</option>
+          </select>
+        </label>
+        <div id="factoryProtocolHint" class="muted span-2"></div>
+
         <label>
           Factory address
           <input id="factoryAddress" placeholder="0x... (auto-filled from config/deployments.json when available)" />
@@ -53,6 +62,27 @@
           Outcomes (comma-separated)
           <input id="outcomes" placeholder="YES,NO" />
         </label>
+
+        <div id="createV2Fields" class="span-2 grid" hidden>
+          <label>
+            Payoff policy
+            <select id="payoffPolicy">
+              <option value="0">SINGLE_WINNER — one true option; single-bit tickets</option>
+              <option value="1" selected>ANY_OF — ticket wins if it overlaps the resolved set</option>
+              <option value="2">EXACT_SET — ticket wins only if it equals the resolved set</option>
+              <option value="3">AT_LEAST_K — win if overlap count ≥ k (set k below)</option>
+              <option value="4">WEIGHTED_OVERLAP — partial credit by overlap size</option>
+            </select>
+          </label>
+          <label>
+            Policy param (k for AT_LEAST_K; otherwise 0)
+            <input id="policyParam" type="number" value="0" min="0" step="1" />
+          </label>
+          <p class="muted span-2" style="margin:0;">
+            See <a href="../docs/PAYOUT-CALCULATION.md" target="_blank" rel="noopener">docs/PAYOUT-CALCULATION.md</a> Part B. Factory v2 caps at 64 outcomes.
+          </p>
+        </div>
+
         <label>
           Wager template
           <select id="wagerTemplate">
@@ -161,6 +191,7 @@
           <summary>Seed liquidity help</summary>
           <div class="muted">
             Optional initial liquidity at create-time. Provide aligned index and amount lists (for example: indices <code>0,2</code> and amounts <code>10,3.5</code>). The dApp approves the total once and submits one create transaction.
+            For <strong>v2</strong>, each index is seeded as a <strong>single-outcome ticket</strong> (bit mask <code>1 &lt;&lt; index</code>). <strong>SINGLE_WINNER</strong> v2 seeds must stay single-index per row.
           </div>
         </details>
 
@@ -197,8 +228,8 @@
       <div id="activeWagerCollateralMeta" class="muted" hidden></div>
       <div class="grid">
         <label>
-          Outcome index (uint256)
-          <input id="betOutcomeIndex" type="number" value="0" />
+          <span id="betOutcomeFieldLabel">Outcome index (single integer)</span>
+          <input id="betOutcomeIndex" type="text" value="0" inputmode="numeric" autocomplete="off" />
         </label>
         <label>
           Bet amount
@@ -216,7 +247,8 @@
         </label>
       </div>
       <div class="muted">
-        Batch mode places multiple outcome legs in one transaction using <code>placeBets()</code>.
+        Batch mode places multiple legs in one <code>placeBets()</code> call. <strong>v1:</strong> one outcome index per leg.
+        <strong>v2:</strong> each index becomes a <strong>single-outcome ticket</strong> (use the field above for multi-outcome combo tickets).
       </div>
       <div class="grid">
         <label>
@@ -257,8 +289,8 @@
       </details>
       <div class="grid">
         <label>
-          Winning outcome index
-          <input id="winningOutcomeIndex" type="number" value="0" />
+          <span id="winningOutcomeFieldLabel">Winning outcome index</span>
+          <input id="winningOutcomeIndex" type="text" value="0" inputmode="numeric" autocomplete="off" />
         </label>
       </div>
       <div class="row">

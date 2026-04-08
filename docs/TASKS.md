@@ -92,6 +92,7 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 - [x] Draft v2 factory/wager contracts for policy-bound creation and `resolve(winningMask)`.
 - [x] Claim accounting + Foundry tests (including fuzz conservation on `ANY_OF`, extensive lifecycle/policy matrix, gas profiling harness — see `docs/ADR-0008-GAS.md`, `test/ParamutuelV2Extensive.t.sol`).
 - [ ] Add indexer schema/API changes for `winning_mask`, policy metadata, and ticket masks on bets.
-- [ ] Update dApp/explorer UX for policy + bitmask tickets + resolver set UI.
+- [x] Update dApp UX for v2 (`dapp/`): protocol toggle, `ParamutuelFactoryV2` create + `WagerCreatedV2`, bitmask tickets / winning set via comma-separated outcome indices, payoff policy + `policyParam`, odds preview (full for `SINGLE_WINNER`; pool note for other policies). Set `factoryV2Address` in `config/deployments.json` when a network has a v2 factory deployed.
+- [ ] Update explorer / site surfaces for v2 metadata (indexer-backed).
 - [ ] Extend service/control/MCP for v2 create/resolve encodings.
 - [ ] Gas/safety audit pass and formal limits sign-off before mainnet v2 factory.

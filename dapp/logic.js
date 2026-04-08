@@ -175,6 +175,111 @@
     return warnings;
   }
 
+  /** Matches `ParamutuelWagerV2.PayoffPolicy` enum ordinals. */
+  const PAYOFF_POLICY = Object.freeze({
+    SINGLE_WINNER: 0,
+    ANY_OF: 1,
+    EXACT_SET: 2,
+    AT_LEAST_K: 3,
+    WEIGHTED_OVERLAP: 4,
+  });
+
+  function payoffPolicyLabel(policy) {
+    const labels = ["SINGLE_WINNER", "ANY_OF", "EXACT_SET", "AT_LEAST_K", "WEIGHTED_OVERLAP"];
+    const n = Number(policy);
+    return Number.isInteger(n) && n >= 0 && n < labels.length ? labels[n] : `UNKNOWN(${policy})`;
+  }
+
+  function popcountMask(mask) {
+    let m = BigInt(mask);
+    let c = 0;
+    while (m > 0n) {
+      m &= m - 1n;
+      c += 1;
+    }
+    return c;
+  }
+
+  /**
+   * Build a v2 ticket bitmask from distinct outcome indices (0-based).
+   * @param {number[]} indices
+   * @param {number} numOptions
+   * @returns {bigint}
+   */
+  function outcomeIndicesToTicketMask(indices, numOptions) {
+    const n = Number(numOptions);
+    if (!Number.isInteger(n) || n < 2 || n > 256) {
+      throw new Error("numOptions must be an integer from 2 to 256.");
+    }
+    if (!indices || indices.length === 0) {
+      throw new Error("Select at least one outcome index for the ticket.");
+    }
+    let mask = 0n;
+    for (const idx of indices) {
+      const i = Number(idx);
+      if (!Number.isInteger(i) || i < 0 || i >= n) {
+        throw new Error(`Outcome index ${idx} is out of range (0-${n - 1}).`);
+      }
+      const bit = 1n << BigInt(i);
+      if ((mask & bit) !== 0n) {
+        throw new Error(`Duplicate outcome index: ${i}`);
+      }
+      mask |= bit;
+    }
+    return mask;
+  }
+
+  /**
+   * Comma-separated indices, e.g. "0" or "0,2" for a ticket on outcomes 0 and 2.
+   * @param {string} csv
+   * @param {number} numOptions
+   * @returns {bigint}
+   */
+  function parseOutcomeIndicesCsvToTicketMask(csv, numOptions) {
+    const parts = String(csv || "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0);
+    if (parts.length === 0) {
+      throw new Error("Ticket needs at least one outcome index.");
+    }
+    const indices = parts.map((v) => {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0) {
+        throw new Error(`Invalid outcome index: ${v}`);
+      }
+      return n;
+    });
+    return outcomeIndicesToTicketMask(indices, numOptions);
+  }
+
+  /**
+   * v1-style seed lines: each outcome index becomes a single-bit v2 seed ticket.
+   * @param {number[]} outcomeIndices
+   * @returns {bigint[]}
+   */
+  function seedOutcomeIndicesToTicketMasks(outcomeIndices) {
+    return outcomeIndices.map((i) => {
+      const n = Number(i);
+      if (!Number.isInteger(n) || n < 0) {
+        throw new Error(`Invalid seed outcome index: ${i}`);
+      }
+      return 1n << BigInt(n);
+    });
+  }
+
+  function validatePolicyParamForCreate(policy, policyParam, numOutcomes) {
+    const p = Number(policy);
+    const k = Number(policyParam);
+    if (p === PAYOFF_POLICY.AT_LEAST_K) {
+      if (!Number.isInteger(k) || k < 1 || k > numOutcomes) {
+        throw new Error(`AT_LEAST_K requires k between 1 and ${numOutcomes} (inclusive).`);
+      }
+    } else if (!Number.isFinite(k) || k !== 0) {
+      throw new Error("policyParam must be 0 except for AT_LEAST_K (k).");
+    }
+  }
+
   function parseMultiBetInputs(indicesCsv, amountsCsv, allowEmpty = true) {
     const parseCsv = (s) =>
       String(s || "")
@@ -247,6 +352,13 @@
     resolveTemplate,
     WAGER_ACTION_CONFIG,
     planWagerAction,
+    PAYOFF_POLICY,
+    payoffPolicyLabel,
+    popcountMask,
+    outcomeIndicesToTicketMask,
+    parseOutcomeIndicesCsvToTicketMask,
+    seedOutcomeIndicesToTicketMasks,
+    validatePolicyParamForCreate,
   };
 
   if (typeof module !== "undefined" && module.exports) {

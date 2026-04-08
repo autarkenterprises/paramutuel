@@ -36,9 +36,11 @@ Settlement iterates **`_usedMasks`** — the distinct ticket masks that received
 
 - `resolve(winningMask)` **reverts** with `NoWinningStake` if no ticket qualifies under the policy. This avoids a resolved state with zero claimable winners (resolver must pick a `W` that matches at least one ticket).
 
-## Indexer / API / dApp (not done on this branch)
+## Indexer / API / dApp
 
-Planned fields (for a follow-up PR):
+**Self-custody dApp (`dapp/`):** protocol toggle v1/v2, `ParamutuelFactoryV2` create + bitmask tickets / `resolve(winningMask)` via comma-separated outcome indices, payoff policy + `policyParam`. See [`dapp/README.md`](../dapp/README.md). Set `factoryV2Address` in `config/deployments.json` when v2 is deployed on a network.
+
+**Indexer / explorer (follow-up):**
 
 - `payoff_policy`, `policy_param`, `winning_mask` (or `winning_set_bits`), `ticket_mask` on bet rows instead of scalar `outcome_index`.
 - Replay of `BetPlaced(bettor, ticketMask, amount)` and `Resolved(winningMask)`.
