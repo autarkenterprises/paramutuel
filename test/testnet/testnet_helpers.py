@@ -18,6 +18,15 @@ WAGER_CREATED_TOPIC_V1 = "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37
 # keccak256("WagerCreatedV2(address,address,address,address,uint8,uint256,uint64,uint64,uint64,address,address)")
 WAGER_CREATED_TOPIC_V2 = "0x7245d6cca974fb4447fd236c460f3aa281da5ffa682c9b5392e99c37bb3ca89a"
 
+# keccak256("WagerCreatedFreeform(address,address,address,address,uint64,uint64,uint64,address,address)")
+WAGER_CREATED_TOPIC_FREEFORM = (
+    "0x60df4ecdea5ae023d85c252f83dc6af864416587f18faf8390628be794f4591f"
+)
+
+FREEFORM_CREATE_WAGER_SIG = (
+    "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
+)
+
 # ParamutuelWagerV2.PayoffPolicy enum order (must match Solidity)
 PAYOFF_SINGLE_WINNER = 0
 PAYOFF_ANY_OF = 1
@@ -42,6 +51,20 @@ def default_factory_v2_address() -> str:
     except json.JSONDecodeError:
         return ""
     return str((data.get("baseSepolia") or {}).get("factoryV2Address") or "").strip()
+
+
+def default_factory_freeform_address() -> str:
+    env = os.environ.get("FACTORY_FREEFORM_ADDRESS", "").strip()
+    if env:
+        return env
+    config_path = Path(__file__).resolve().parents[2] / "config" / "deployments.json"
+    if not config_path.exists():
+        return ""
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    return str((data.get("baseSepolia") or {}).get("factoryFreeformAddress") or "").strip()
 
 
 def topic_to_address(topic_word: str) -> str:

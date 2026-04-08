@@ -9,12 +9,15 @@ from pathlib import Path
 
 from testnet_helpers import (
     DUMMY_COLLATERAL,
+    FREEFORM_CREATE_WAGER_SIG,
     V2_CREATE_WAGER_SIG,
     V2_FUNDED_RESOLVE_CASES,
     V2_MINIMAL_EXPIRE_POLICIES,
     WAGER_CREATED_TOPIC_V1,
+    WAGER_CREATED_TOPIC_FREEFORM,
     WAGER_CREATED_TOPIC_V2,
     ZERO_ADDRESS,
+    default_factory_freeform_address,
     default_factory_v2_address,
     extract_wager_address_from_receipt,
 )
@@ -171,6 +174,12 @@ def _extract_created_wager_from_receipt(tx_hash: str, factory_address: str) -> s
 def _extract_created_wager_v2_from_receipt(tx_hash: str, factory_v2_address: str) -> str:
     return extract_wager_address_from_receipt(
         _receipt(tx_hash), factory_v2_address, WAGER_CREATED_TOPIC_V2
+    )
+
+
+def _extract_created_wager_freeform_from_receipt(tx_hash: str, factory_freeform_address: str) -> str:
+    return extract_wager_address_from_receipt(
+        _receipt(tx_hash), factory_freeform_address, WAGER_CREATED_TOPIC_FREEFORM
     )
 
 
@@ -819,6 +828,204 @@ class TestBaseSepoliaLiveV2(unittest.TestCase):
                 self.skipTest(f"Indexer did not surface last v2 wager: {exc}")
             w = detail.get("wager") or {}
             self.assertEqual(str(w.get("protocol_version", "")).lower(), "v2")
+
+
+class TestBaseSepoliaLiveFreeform(unittest.TestCase):
+    """ParamutuelFactoryFreeform / ParamutuelWagerFreeform (skipped when freeform factory unset)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.rpc = _rpc_url()
+        cls.factory_ff = _env("FACTORY_FREEFORM_ADDRESS") or default_factory_freeform_address()
+        cls.mode = _env("TESTNET_MODE", "readonly").lower()
+        cls.private_key = _env("PRIVATE_KEY")
+        cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
+        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
+        cls.skip_freeform = _env("TESTNET_SKIP_FREEFORM", "").lower() in ("1", "true", "yes")
+
+        if cls.skip_freeform:
+            raise unittest.SkipTest("TESTNET_SKIP_FREEFORM set — skipping freeform live tests")
+        if not cls.rpc:
+            raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
+        if not cls.factory_ff:
+            raise unittest.SkipTest(
+                "Set FACTORY_FREEFORM_ADDRESS or config/deployments.json baseSepolia.factoryFreeformAddress"
+            )
+
+        cls.sender = ""
+        if cls.private_key:
+            cls.sender = _run_cast(["wallet", "address", "--private-key", cls.private_key])
+        cls.secondary_sender = ""
+        if cls.secondary_private_key:
+            cls.secondary_sender = _run_cast(["wallet", "address", "--private-key", cls.secondary_private_key])
+
+    def test_factory_freeform_view_invariants(self) -> None:
+        treasury = _call(self.factory_ff, "treasury()(address)")
+        protocol_fee_bps = _as_int(_call(self.factory_ff, "protocolFeeBps()(uint16)"))
+        min_betting_window = _as_int(_call(self.factory_ff, "minBettingWindow()(uint64)"))
+        min_resolution_window = _as_int(_call(self.factory_ff, "minResolutionWindow()(uint64)"))
+        wagers_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
+
+        self.assertNotEqual(treasury.lower(), ZERO_ADDRESS)
+        self.assertGreaterEqual(protocol_fee_bps, 0)
+        self.assertLessEqual(protocol_fee_bps, 10000)
+        self.assertGreaterEqual(min_betting_window, 0)
+        self.assertGreaterEqual(min_resolution_window, 0)
+        self.assertGreaterEqual(wagers_count, 0)
+
+    def test_minimal_tx_freeform_expire(self) -> None:
+        if self.mode != "minimal-tx":
+            self.skipTest("Set TESTNET_MODE=minimal-tx for freeform minimal transaction checks")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for freeform minimal transaction checks")
+
+        before_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
+        proposition = f"ff-min-{int(time.time())}"
+        create_tx = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            DUMMY_COLLATERAL,
+            proposition,
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        after_count = _wait_for_wagers_count(self.factory_ff, before_count + 1)
+        self.assertGreaterEqual(after_count, before_count + 1)
+
+        wager = _extract_created_wager_freeform_from_receipt(create_tx, self.factory_ff)
+        self.assertEqual(_as_int(_call(wager, "outcomesCount()(uint256)")), 0)
+
+        _send(wager, "closeBetting()")
+        _wait_for_bool_value(wager, "bettingClosedByAuthority()(bool)", True)
+        _send(wager, "closeResolutionWindow()")
+        _wait_for_bool_value(wager, "resolutionWindowClosedByAuthority()(bool)", True)
+        _send(wager, "expire()")
+        self.assertEqual(_wait_for_state(wager, 2), 2)
+
+    def test_funded_tx_freeform_resolve_retract_expire(self) -> None:
+        if self.mode != "funded-tx":
+            self.skipTest("Set TESTNET_MODE=funded-tx for freeform funded checks")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for freeform funded checks")
+        if not self.collateral_token:
+            self.skipTest("Set TESTNET_COLLATERAL_TOKEN for freeform funded checks")
+
+        decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
+        amount_raw = _parse_units(self.bet_amount, decimals)
+        if amount_raw <= 0:
+            self.skipTest("TESTNET_BET_AMOUNT must parse to a positive amount")
+
+        sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
+        if sender_balance < amount_raw * 4:
+            self.skipTest(
+                f"Insufficient token balance for freeform funded matrix: have {sender_balance}, "
+                f"want at least {amount_raw * 4} raw"
+            )
+
+        before_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
+        protocol_fee_bps = _as_int(_call(self.factory_ff, "protocolFeeBps()(uint16)"))
+        extra_bps = 1 if protocol_fee_bps < 10000 else 0
+        extra_recipients = f"[{self.sender}]" if extra_bps > 0 else "[]"
+        extra_bps_json = f"[{extra_bps}]" if extra_bps > 0 else "[]"
+
+        # Resolve + claim (+ optional fee withdraw).
+        create_tx_r = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            self.collateral_token,
+            f"ff-funded-resolve-{int(time.time())}",
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            extra_recipients,
+            extra_bps_json,
+        )
+        _wait_for_wagers_count(self.factory_ff, before_count + 1)
+        wager_r = _extract_created_wager_freeform_from_receipt(create_tx_r, self.factory_ff)
+
+        _send(self.collateral_token, "approve(address,uint256)", wager_r, str(amount_raw * 2))
+        _send(wager_r, "placeBet(string,uint256)", "YES", str(amount_raw))
+        if self.secondary_private_key:
+            sb = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.secondary_sender))
+            if sb >= amount_raw:
+                _send_with_key(
+                    self.secondary_private_key,
+                    self.collateral_token,
+                    "approve(address,uint256)",
+                    wager_r,
+                    str(amount_raw),
+                )
+                _send_with_key(
+                    self.secondary_private_key,
+                    wager_r,
+                    "placeBet(string,uint256)",
+                    "NO",
+                    str(amount_raw),
+                )
+
+        _send(wager_r, "closeBetting()")
+        _send(wager_r, "resolve(string)", "YES")
+        self.assertEqual(_wait_for_state(wager_r, 1), 1)
+        _send(wager_r, "claim()")
+        if extra_bps > 0:
+            fb = _as_int(_call(wager_r, "feeBalances(address)(uint256)", self.sender))
+            if fb > 0:
+                _send(wager_r, "withdrawFees()")
+
+        # Retract + claim.
+        create_tx_t = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            self.collateral_token,
+            f"ff-funded-retract-{int(time.time())}",
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        _wait_for_wagers_count(self.factory_ff, before_count + 2)
+        wager_t = _extract_created_wager_freeform_from_receipt(create_tx_t, self.factory_ff)
+        _send(self.collateral_token, "approve(address,uint256)", wager_t, str(amount_raw))
+        _send(wager_t, "placeBet(string,uint256)", "BRANCH2", str(amount_raw))
+        _send(wager_t, "closeBetting()")
+        _send(wager_t, "retract()")
+        self.assertEqual(_wait_for_state(wager_t, 2), 2)
+        _send(wager_t, "claim()")
+
+        # Expire + claim.
+        create_tx_e = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            self.collateral_token,
+            f"ff-funded-expire-{int(time.time())}",
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        _wait_for_wagers_count(self.factory_ff, before_count + 3)
+        wager_e = _extract_created_wager_freeform_from_receipt(create_tx_e, self.factory_ff)
+        _send(self.collateral_token, "approve(address,uint256)", wager_e, str(amount_raw))
+        _send(wager_e, "placeBet(string,uint256)", "BRANCH3", str(amount_raw))
+        _send(wager_e, "closeBetting()")
+        _send(wager_e, "closeResolutionWindow()")
+        _send(wager_e, "expire()")
+        self.assertEqual(_wait_for_state(wager_e, 2), 2)
+        _send(wager_e, "claim()")
 
 
 if __name__ == "__main__":

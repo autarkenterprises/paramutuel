@@ -42,6 +42,13 @@ Optional:
 - `TESTNET_MODE=funded-tx` — runs a **funded resolve matrix**: for each policy, creates a v2 wager with real collateral, places **`placeBet` or `placeBets`** (per scenario), `resolve(winningMask)`, `claim()`. Cases cover `SINGLE_WINNER`, `ANY_OF` (+ batch `placeBets`), `EXACT_SET`, `AT_LEAST_K` (3 outcomes, `policyParam=2`), and `WEIGHTED_OVERLAP`.
 - `TESTNET_V2_CASES` — comma-separated subset of case ids: `single_winner`, `any_of`, `exact_set`, `at_least_k`, `weighted_overlap` (default: all).
 
+**ParamutuelFactoryFreeform** (`TestBaseSepoliaLiveFreeform` in `test/testnet/test_live_base_sepolia.py`):
+
+- Factory: `FACTORY_FREEFORM_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryFreeformAddress`.
+- `TESTNET_SKIP_FREEFORM=1` — skip all freeform live tests.
+- `TESTNET_MODE=minimal-tx` — create (dummy collateral) → authority close → `expire()`.
+- `TESTNET_MODE=funded-tx` — resolve / retract / expire matrix with `TESTNET_COLLATERAL_TOKEN` and `placeBet(string,uint256)` / `resolve(string)`.
+
 ## Run
 
 Recommended order:
