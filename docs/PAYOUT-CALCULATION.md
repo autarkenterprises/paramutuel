@@ -107,10 +107,9 @@ Let **`overlap = T & W`** (bits in both ticket and truth). Define **`popcount(x)
 | **ANY_OF** | **`overlap ≠ 0`** (any shared true option). |
 | **EXACT_SET** | **`T == W`** (ticket equals the full resolved set). |
 | **AT_LEAST_K** | **`popcount(overlap) ≥ policyParam`** (integer **`k`** set at creation). |
+| **WEIGHTED_OVERLAP** | **`overlap ≠ 0`** (same overlap test as “in the money”; payout uses weights below). |
 
 **Product wording:** When copy says **“all of these outcomes,”** it maps to **EXACT_SET** above — the ticket must match the resolver’s set **exactly** (`T == W`). A different rule — **win if every selected option is among the true outcomes** (`T ⊆ W`, i.e. “my picks are all winners” without requiring `T == W`) — is **not** in v2; treat it as future scope and document explicitly if product needs it.
-
-| **WEIGHTED_OVERLAP** | **`overlap ≠ 0`** (same overlap test as “in the money”; payout uses weights below). |
 
 If **`resolve`** would yield **no** winning ticket with positive pool, the call **reverts** (`NoWinningStake`).
 
@@ -157,6 +156,27 @@ Summed over all of the bettor’s tickets. If the sum is **0** (e.g. only losing
 
 - **ANY_OF** / **EXACT_SET** / **AT_LEAST_K** / **SINGLE_WINNER**: same idea as v1 — **`netPot`** is split among **winning stakes** in proportion to each **winning ticket’s pool share**; each bettor’s share is proportional to their stake on each winning mask.
 - **WEIGHTED_OVERLAP**: larger **overlap** between **`T`** and **`W`** multiplies that ticket’s contribution to the denominator and to the bettor’s claim (partial credit).
+
+#### Worked example (`ANY_OF`)
+
+Assume **fees are 0**. All stakes below are **integer raw token units** as on-chain (see [Pot and fees](#pot-and-fees) above).
+
+- Five base options **A–E** (indices `0 … 4`).
+- Resolver sets **`W = {A, C, E}`**.
+- **Alice** stakes **100** on ticket **`{A, C}`** and **50** on **`{E, D}`**. Under **ANY_OF**, both tickets **win**: the first overlaps **A** and **C**; the second overlaps **E** (even though **D** is not in **`W`**).
+- **Bob** stakes **200** on ticket **`{A}`** only (wins).
+- **Carol** stakes **150** on **`{B}`** (loses; no overlap with **`W`**).
+
+Then **`totalPot`** = 100 + 50 + 200 + 150 = **500**, and with no fees **`netPot`** = **500**.
+
+**`totalWinningUnits`** counts only **winning** ticket pools: 100 + 50 + 200 = **350** (Carol’s losing pool is excluded).
+
+Per-ticket claims (integer division, then summed per bettor):
+
+- **Alice:** ⌊100 × 500 / 350⌋ + ⌊50 × 500 / 350⌋ = **142** + **71** = **213**.
+- **Bob:** ⌊200 × 500 / 350⌋ = **285**.
+
+**Alice + Bob** receive **498** of **`netPot`**; **2** raw units remain in the contract as **rounding dust** from flooring each term. **Carol** has no winning ticket, so **`claim()`** reverts (`NothingToClaim`) in the resolved-winner path.
 
 ### Retracted or expired (refund)
 
