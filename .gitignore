@@ -30,6 +30,8 @@ service/proposition/data/*.db-wal
 .DS_Store
 .vscode/
 .idea/
+.claude/
+.env~
 
 # Secrets / keys
 *.pem
