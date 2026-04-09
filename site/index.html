@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel — parimutuel wagers on Base. Propose wagers, place bets, live feed, and open protocol docs." />
+  <meta name="description" content="Paramutuel — parimutuel pools on Base: classic outcomes, v2 ticket rules (multi-winner styles), and freeform text-answer wagers. Propose, bet, explore, open protocol." />
   <meta property="og:title" content="Paramutuel" />
-  <meta property="og:description" content="Parimutuel pools on Base: propose wagers, stake on outcomes, resolve and claim on-chain." />
+  <meta property="og:description" content="Parimutuel on Base: enumerated outcomes, advanced v2 payoff rules, or freeform UTF-8 answers — one pool per wager, resolve and claim on-chain." />
   <meta property="og:type" content="website" />
   <title>Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
@@ -28,7 +28,7 @@
 
   <div class="hero">
     <h1>Paramutuel</h1>
-    <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel wagers on Base</p>
+    <p class="tagline">Augur for prop bets &mdash; on-chain parimutuel on Base (classic, v2 rules, or freeform answers)</p>
 
     <div class="actions actions--dual">
       <a href="propose-a-wager.html" class="btn btn-primary">Propose a Wager</a>
@@ -52,21 +52,21 @@
     <section class="card home-lifecycle" id="how-wagers-work" aria-labelledby="home-lifecycle-heading">
       <h2 id="home-lifecycle-heading" class="home-lifecycle-title">How wagers move from idea to payout</h2>
       <p class="home-lifecycle-lead muted">
-        Each wager is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle.
+        Each wager is its own on-chain contract: one shared pool, moving odds, and fixed rules for when betting stops and who may settle. Deploy through a <strong>factory</strong> for your shape of market: <strong>v1</strong> (listed outcomes), <strong>v2</strong> (same list, richer payoff rules and batch tickets), or <strong>freeform</strong> (bettors type answers; resolver picks the exact winning string).
       </p>
       <ol class="home-lifecycle-steps">
         <li class="home-lifecycle-step">
           <span class="home-lifecycle-step-num" aria-hidden="true">1</span>
           <div class="home-lifecycle-step-body">
             <h3 class="home-lifecycle-step-title">Create</h3>
-            <p>A <strong>proposer</strong> deploys a wager through the factory: the question, outcome labels, collateral token, fee split, and time rules. The <strong>resolver</strong> (who picks the winner or cancels) defaults to the proposer unless another address is set.</p>
+            <p>A <strong>proposer</strong> deploys a wager through the factory: the question, collateral token, fee split, and time rules. <strong>v1/v2</strong> markets include an explicit outcome list (up to 255 labels). <strong>Freeform</strong> markets ship without enumerated outcomes; stakes are keyed by the UTF-8 text each bettor chooses. The <strong>resolver</strong> defaults to the proposer unless another address is set.</p>
           </div>
         </li>
         <li class="home-lifecycle-step">
           <span class="home-lifecycle-step-num" aria-hidden="true">2</span>
           <div class="home-lifecycle-step-body">
             <h3 class="home-lifecycle-step-title">Open betting</h3>
-            <p>Anyone with the right token stakes on one or more outcomes. All stakes sit in one pot; implied odds shift as the pool grows.</p>
+            <p>Anyone with the right token stakes: on outcome indices (v1), on ticket bitmasks (v2, including multi-leg batch bets), or with a text answer (freeform). All stakes sit in one pot; implied odds shift as the pool grows.</p>
           </div>
         </li>
         <li class="home-lifecycle-step">
@@ -80,7 +80,7 @@
           <span class="home-lifecycle-step-num" aria-hidden="true">4</span>
           <div class="home-lifecycle-step-body">
             <h3 class="home-lifecycle-step-title">Settle</h3>
-            <p>During the <strong>resolution window</strong>, the resolver either names the winning outcome, <strong>retracts</strong> (invalidates the wager), or does nothing until the window ends. If the window ends without a winner, <strong>anyone</strong> can call <strong>expire</strong> so participants can recover stakes (fees may still apply).</p>
+            <p>During the <strong>resolution window</strong>, the resolver settles: winning <strong>outcome index</strong> (v1), <strong>winning ticket mask</strong> (v2, per the wager&rsquo;s payoff rule), or the exact <strong>winning answer string</strong> (freeform). They may <strong>retract</strong> or let the window lapse; then <strong>anyone</strong> can call <strong>expire</strong> so participants recover stakes (fees may still apply).</p>
           </div>
         </li>
         <li class="home-lifecycle-step">
@@ -101,7 +101,7 @@
     <section class="onboarding card">
       <h2 class="onboarding-title">Protocol &amp; getting started</h2>
       <p class="onboarding-lead">
-        Paramutuel is on-chain parimutuel betting: one pool per wager, odds move as people stake on outcomes, then the resolver settles and winners claim pro-rata. Use <a href="propose-a-wager.html">Propose a Wager</a> or <a href="place-a-bet.html">Place a Bet</a> above for the main flows; the sections below are for orientation and deeper links.
+        Paramutuel is on-chain parimutuel betting: one pool per wager, odds move as people stake, then the resolver settles and winners claim pro-rata. Protocol versions share the same lifecycle (open &rarr; close &rarr; resolve / retract / expire &rarr; claim) but differ in how tickets are expressed: <strong>v1</strong> single-outcome legs, <strong>v2</strong> bitmask tickets with payoff policies such as single-winner, any-of, exact-set, at-least-<em>k</em>, and weighted overlap, and <strong>freeform</strong> user-typed answers hashed on-chain. Use <a href="propose-a-wager.html">Propose a Wager</a> or <a href="place-a-bet.html">Place a Bet</a> for the main flows; the <a href="app.html">full dApp</a> exposes every factory parameter.
       </p>
       <ol class="onboarding-steps">
         <li>
@@ -118,7 +118,7 @@
         </li>
         <li>
           <strong>Stake on a wager</strong>
-          <span>Use <a href="place-a-bet.html">Place a Bet</a> to search open wagers and open the wallet staking flow, skim the <strong>live feed</strong> on the home page, or use <a href="explorer.html">Explorer</a>. Connect your wallet, enter stakes per outcome, approve once, and submit <code>placeBets</code>. The full <a href="app.html">dApp</a> adds create, richer odds preview, resolve, and claim.</span>
+          <span>Use <a href="place-a-bet.html">Place a Bet</a> to search open wagers and open the wallet flow, skim the <strong>live feed</strong>, or use <a href="explorer.html">Explorer</a>. Connect your wallet: enumerated markets use <code>placeBet</code> / <code>placeBets</code>; freeform markets use a text answer plus <code>placeBet(string,uint256)</code>. The <a href="app.html">dApp</a> adds create, odds preview, resolve, and claim for all protocol versions.</span>
         </li>
         <li>
           <strong>Inspect &amp; verify</strong>
@@ -138,15 +138,15 @@
     <div class="features">
       <div class="card">
         <h3>Create Wagers</h3>
-        <p>Deploy parimutuel wagers for any proposition with custom outcomes, time windows, and fee structures. Supports templates for sports events, elections, and long-horizon forecasts.</p>
+        <p>Deploy through the factory that fits your market: classic enumerated outcomes (v1), the same with advanced payoff rules and up to 255 outcomes (v2), or freeform text-answer pools with no fixed list at create time.</p>
       </div>
       <div class="card">
         <h3>Place Bets</h3>
-        <p>Bet on outcomes using ERC-20 collateral. Single bets or batch multi-outcome legs in one transaction. Live odds preview shows expected payouts before you commit.</p>
+        <p>Stake ERC-20 collateral per outcome index, per v2 ticket mask (including batched legs), or with a freeform UTF-8 answer. Odds and pool share update as the pot moves.</p>
       </div>
       <div class="card">
         <h3>Resolve &amp; Claim</h3>
-        <p>Wagers resolve to a winning outcome, retract (refund minus fees), or expire if unresolved. Winners claim pro-rata payouts from the net pot.</p>
+        <p>Resolvers commit the winning index, bitmask (v2), or exact string (freeform); retract and expire paths refund per contract rules. Winners claim pro-rata from the net pot.</p>
       </div>
     </div>
 
@@ -161,6 +161,7 @@
           <ul>
             <li><strong>Parimutuel math</strong> &mdash; all stakes go into one pot per wager; implied odds reflect aggregate sentiment, not a house line.</li>
             <li><strong>ERC-20 collateral</strong> &mdash; use standard tokens (e.g. USDC) per wager; amounts are enforced by contract logic.</li>
+            <li><strong>Three protocol shapes</strong> &mdash; v1 simplicity, v2 expressive ticket rules, freeform for open-ended answers with on-chain hashing.</li>
             <li><strong>Composable lifecycle</strong> &mdash; factory-deployed wagers with configurable closers, resolution windows, and fee recipients (treasury + extras).</li>
             <li><strong>Live wager list</strong> &mdash; search and explore wagers without scraping the chain yourself.</li>
             <li><strong>Base-first</strong> &mdash; low-friction L2 for everyday wallet use.</li>
@@ -187,8 +188,16 @@
           <dd id="networkDisplay">Same as the banner above</dd>
         </div>
         <div>
-          <dt>Factory</dt>
+          <dt>Factory (v1)</dt>
           <dd id="factoryAddressDisplay">Shown when this deployment publishes it</dd>
+        </div>
+        <div id="factoryV2Row" hidden>
+          <dt>Factory (v2)</dt>
+          <dd id="factoryV2AddressDisplay">—</dd>
+        </div>
+        <div id="factoryFreeformRow" hidden>
+          <dt>Factory (freeform)</dt>
+          <dd id="factoryFreeformAddressDisplay">—</dd>
         </div>
         <div>
           <dt>Collateral</dt>
@@ -218,6 +227,20 @@
         if (networkNode) networkNode.textContent = p.homeNetworkSummaryLine;
         const factoryNode = document.getElementById("factoryAddressDisplay");
         if (factoryNode) factoryNode.textContent = p.homeFactorySummaryText;
+        const v2Row = document.getElementById("factoryV2Row");
+        const v2Node = document.getElementById("factoryV2AddressDisplay");
+        if (v2Row && v2Node) {
+          const a = String(p.factoryV2Address || "").trim();
+          v2Row.hidden = !a;
+          v2Node.textContent = a || "—";
+        }
+        const ffRow = document.getElementById("factoryFreeformRow");
+        const ffNode = document.getElementById("factoryFreeformAddressDisplay");
+        if (ffRow && ffNode) {
+          const a = String(p.factoryFreeformAddress || "").trim();
+          ffRow.hidden = !a;
+          ffNode.textContent = a || "—";
+        }
       }
 
       (async () => {

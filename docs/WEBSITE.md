@@ -10,7 +10,7 @@ The static site under `site/` is a **thin shell**: marketing copy, a testnet/mai
 | `/propose-a-wager.html` | Facilitated create — templates + streamlined flow (assisted TX per ADR-0006/7; full dApp linked for power users) |
 | `/place-a-bet.html` | Betting entry — indexer search + CTA into wallet staking (`bet.html`) |
 | `/app.html` | Full dApp embedded via iframe |
-| `/bet.html` | Wallet staking (`placeBets`; loads **v1 or v2** wager ABI from the indexer’s `protocol_version`; v2 uses ticket masks `1<<i` per leg — not in nav — reached from Place a Bet, feed, Explorer, or `?wager=`) |
+| `/bet.html` | Wallet staking: **v1/v2** use `placeBet` / `placeBets`; **freeform** uses `placeBet(string,uint256)` with a typed answer. ABI from indexer `protocol_version`. Reached from Place a Bet, feed, Explorer, or `?wager=` |
 | `/explorer.html` | Explorer UI with optional indexer URL override |
 | `/operator.html` | **Operator hub** — indexer links, embedded explorer, outbound URLs for other services |
 | `/dapp/` | Same dApp as embedded, for direct links and debugging |
@@ -31,7 +31,7 @@ Runtime configuration is read from `config/deployments.json` (copied to `_site/c
 ### Turnkey checklist when Base mainnet is live
 
 1. Edit **`config/deployments.json`**.
-2. Under **`baseMainnet`**, set **`factoryAddress`**, optional **`factoryV2Address`** when v2 is live, **`explorerApiBase`**, and **`indexerFromBlock`** (for your indexer deployment). Keep **`chainId`** `8453`.
+2. Under **`baseMainnet`**, set **`factoryAddress`**, optional **`factoryV2Address`** / **`factoryFreeformAddress`** when those factories are live, **`explorerApiBase`**, and **`indexerFromBlock`** (for your indexer deployment). Keep **`chainId`** `8453`.
 3. Optionally set **`defaultNetwork`** to `"baseMainnet"` if you want new visitors to land on mainnet by default.
 4. Commit and push; **Deploy to GitHub Pages** rebuilds the site.
 
@@ -57,7 +57,7 @@ From repo root (after `forge build` if you need fresh ABIs):
 mkdir -p _site/dapp/abi _site/explorer _site/config
 python3 -c "
 import json
-for name in ['ParamutuelFactory', 'ParamutuelWager', 'ParamutuelFactoryV2', 'ParamutuelWagerV2']:
+for name in ['ParamutuelFactory', 'ParamutuelWager', 'ParamutuelFactoryV2', 'ParamutuelWagerV2', 'ParamutuelFactoryFreeform', 'ParamutuelWagerFreeform']:
     data = json.load(open(f'out/{name}.sol/{name}.json'))
     with open(f'_site/dapp/abi/{name}.json', 'w') as f:
         json.dump({'abi': data['abi']}, f, indent=2)

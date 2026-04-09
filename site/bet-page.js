@@ -5,6 +5,7 @@
   const CONFIG_URL = "config/deployments.json";
   const WAGER_ABI_V1_URL = "dapp/abi/ParamutuelWager.json";
   const WAGER_ABI_V2_URL = "dapp/abi/ParamutuelWagerV2.json";
+  const WAGER_ABI_FREEFORM_URL = "dapp/abi/ParamutuelWagerFreeform.json";
 
   const CHAIN_NAMES = {
     8453: "Base Mainnet",
@@ -32,7 +33,7 @@
   let deployments = null;
   let expectedChainId = null;
   let wagerAbi = null;
-  /** @type {"v1"|"v2"} */
+  /** @type {"v1"|"v2"|"freeform"} */
   let currentProtocolVersion = "v1";
   let indexerBase = "";
   let provider = null;
@@ -102,8 +103,16 @@
   }
 
   async function loadWagerAbiForProtocol(pv) {
-    const v = String(pv || "v1").trim().toLowerCase() === "v2" ? "v2" : "v1";
-    const url = v === "v2" ? WAGER_ABI_V2_URL : WAGER_ABI_V1_URL;
+    const p = String(pv || "v1").trim().toLowerCase();
+    let v = "v1";
+    let url = WAGER_ABI_V1_URL;
+    if (p === "v2") {
+      v = "v2";
+      url = WAGER_ABI_V2_URL;
+    } else if (p === "freeform") {
+      v = "freeform";
+      url = WAGER_ABI_FREEFORM_URL;
+    }
     const j = await loadJson(url);
     wagerAbi = j.abi;
     currentProtocolVersion = v;
@@ -212,6 +221,45 @@
     return 0n;
   }
 
+  function renderFreeformPoolsTable(ticketPoolsArr, totalPotRaw, feeBpsRaw) {
+    const tbody = $("betOutcomesTableBody");
+    if (!tbody) return;
+    const totalPot = BigInt(String(totalPotRaw || "0"));
+    const feeBps = BigInt(String(feeBpsRaw || "0"));
+    const net = netPotAfterFees(totalPot, feeBps);
+    const rows = (ticketPoolsArr || []).filter((r) => BigInt(String(r.pool_total || "0")) > 0n);
+    const sumStakes = rows.reduce((a, r) => a + BigInt(String(r.pool_total || "0")), 0n);
+
+    tbody.innerHTML = "";
+    rows
+      .map((r) => ({
+        mask: String(r.ticket_mask || "").trim(),
+        stake: BigInt(String(r.pool_total || "0")),
+      }))
+      .sort((a, b) => (a.stake > b.stake ? -1 : a.stake < b.stake ? 1 : 0))
+      .forEach((row, i) => {
+        const poolPct =
+          sumStakes > 0n ? Number((row.stake * 10000n) / sumStakes) / 100 : 0;
+        const mult =
+          row.stake > 0n ? `${formatRatioBig(net, row.stake, 4)}x` : "—";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+        <td>${i}</td>
+        <td class="bet-outcome-name-cell"><code>${escapeHtml(row.mask)}</code></td>
+        <td>${formatPot(row.stake)}</td>
+        <td>${poolPct.toFixed(1)}%</td>
+        <td>${escapeHtml(mult)}</td>
+      `;
+        tbody.appendChild(tr);
+      });
+    if (rows.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td colspan="5" class="muted">No stakes yet — be the first to back an answer (exact text matters at resolution).</td>';
+      tbody.appendChild(tr);
+    }
+  }
+
   function renderOutcomesOddsTable(labels, outcomesArr, totalPotRaw, feeBpsRaw, ticketPoolsArr, useV2Pools) {
     const tbody = $("betOutcomesTableBody");
     if (!tbody) return;
@@ -263,6 +311,25 @@
       `;
       host.appendChild(row);
     });
+  }
+
+  function renderFreeformStakeInputs() {
+    const host = $("betOutcomeRows");
+    host.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "bet-outcome-row bet-freeform-row";
+    row.innerHTML = `
+      <label class="bet-outcome-label bet-freeform-answer-label">
+        <span class="bet-outcome-name">Your answer (UTF-8)</span>
+        <span class="muted" style="display:block;font-size:0.85rem;margin:4px 0 6px;">Must match resolver text <strong>exactly</strong> (bytes) if this side wins.</span>
+        <input type="text" id="betFreeformAnswerInput" class="bet-freeform-text-input" autocomplete="off" spellcheck="true" placeholder="e.g. Team A · 42 · yes" />
+      </label>
+      <label class="bet-outcome-label">
+        <span class="bet-outcome-name">Amount (human token units)</span>
+        <input type="number" class="bet-amount-input" data-freeform-amount="1" min="0" step="any" placeholder="0" />
+      </label>
+    `;
+    host.appendChild(row);
   }
 
   function escapeHtml(s) {
@@ -340,7 +407,8 @@
 
     loadedWagerAddress = address;
 
-    const pv = String(w.protocol_version || "v1").trim().toLowerCase() === "v2" ? "v2" : "v1";
+    const pvRaw = String(w.protocol_version || "v1").trim().toLowerCase();
+    const pv = pvRaw === "v2" ? "v2" : pvRaw === "freeform" ? "freeform" : "v1";
     await loadWagerAbiForProtocol(pv);
 
     const state = String(w.state || "").toUpperCase();
@@ -354,7 +422,7 @@
     } catch {
       labels = [];
     }
-    if (labels.length < 2) {
+    if (pv !== "freeform" && labels.length < 2) {
       throw new Error("Wager has fewer than two outcomes in the index.");
     }
 
@@ -372,12 +440,35 @@
     $("betState").textContent = state;
     const protEl = $("betProtocol");
     if (protEl) {
-      protEl.textContent =
-        pv === "v2"
-          ? `v2 · payoffPolicy ${w.payoff_policy != null ? w.payoff_policy : "—"} · policyParam ${
-              w.policy_param != null && w.policy_param !== "" ? w.policy_param : "—"
-            }`
-          : "v1";
+      if (pv === "v2") {
+        protEl.textContent = `v2 · payoffPolicy ${w.payoff_policy != null ? w.payoff_policy : "—"} · policyParam ${
+          w.policy_param != null && w.policy_param !== "" ? w.policy_param : "—"
+        }`;
+      } else if (pv === "freeform") {
+        protEl.textContent = "freeform (text answers)";
+      } else {
+        protEl.textContent = "v1";
+      }
+    }
+
+    const titleEl = $("betOutcomesTableTitle");
+    if (titleEl) {
+      titleEl.textContent =
+        pv === "freeform" ? "Answer IDs (hashed stakes) & implied odds" : "Outcomes & implied odds";
+    }
+    const footEl = $("betOutcomesTableFootnote");
+    if (footEl) {
+      footEl.textContent =
+        pv === "freeform"
+          ? "Each row is a keccak256 answer id from the indexer. Implied multiple assumes that answer wins and no further bets (fees applied; rounding may differ on-chain)."
+          : "Pool share uses on-chain stake totals. Implied multiple is the approximate payout per 1 unit staked on that outcome if it wins, after protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).";
+    }
+    const formLead = $("betFormLead");
+    if (formLead) {
+      formLead.textContent =
+        pv === "freeform"
+          ? "Enter the exact UTF-8 answer you want to back and a human token amount. One stake per submit (call placeBet(string,uint256))."
+          : "Enter a token amount next to each outcome you want to back (human units, e.g. 10 USDC). At least one positive amount is required. v2 markets use the same placeBets batch shape as the full dApp.";
     }
     $("betWagerAddress").textContent = address;
     $("betFactory").textContent = String(w.factory_address || "").trim() || "—";
@@ -400,7 +491,9 @@
       totals.winning_outcome !== ""
     ) {
       let winLabel;
-      if (pv === "v2") {
+      if (pv === "freeform") {
+        winLabel = `answerId ${String(totals.winning_outcome).trim()}`;
+      } else if (pv === "v2") {
         const wm = BigInt(String(totals.winning_outcome || "0"));
         winLabel = `mask ${wm.toString()}`;
         for (let i = 0; i < labels.length; i++) {
@@ -436,11 +529,19 @@
     scan.textContent = "View on Basescan";
 
     const tPools = detail.ticket_pools || [];
-    renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal, tPools, pv === "v2");
+    if (pv === "freeform") {
+      renderFreeformPoolsTable(tPools, totalPotVal, feeBpsVal);
+    } else {
+      renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal, tPools, pv === "v2");
+    }
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
-    renderOutcomeInputs(labels);
+    if (pv === "freeform") {
+      renderFreeformStakeInputs();
+    } else {
+      renderOutcomeInputs(labels);
+    }
 
     const open = state === "OPEN";
     $("betSubmitBtn").disabled = !open || !signer;
@@ -562,6 +663,21 @@
     if (!Number.isFinite(decimals) || decimals < 0 || decimals > 77) {
       throw new Error("Invalid decimals (0–77).");
     }
+    if (currentProtocolVersion === "freeform") {
+      const ansInp = $("betFreeformAnswerInput");
+      const answer = ansInp ? String(ansInp.value || "").trim() : "";
+      if (!answer) throw new Error("Enter a non-empty answer string.");
+      const amtInp = document.querySelector(".bet-amount-input[data-freeform-amount]");
+      const raw = amtInp ? String(amtInp.value || "").trim() : "";
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) throw new Error("Enter a positive stake amount.");
+      return {
+        freeform: true,
+        answer,
+        amount: parseAmountHuman(n, decimals),
+        decimals,
+      };
+    }
     const inputs = document.querySelectorAll(".bet-amount-input");
     const indices = [];
     const amounts = [];
@@ -575,7 +691,7 @@
       amounts.push(parseAmountHuman(n, decimals));
     }
     if (indices.length === 0) throw new Error("Enter at least one positive stake amount.");
-    return { indices, amounts, decimals };
+    return { indices, amounts, decimals, freeform: false };
   }
 
   async function placeBets() {
@@ -584,24 +700,34 @@
     const code = await provider.getCode(wagerContract.target);
     if (code === "0x") throw new Error("No contract at this address on the current network.");
 
-    const { indices, amounts } = collectBets();
-    let total = 0n;
-    for (const a of amounts) total += a;
-
+    const packed = collectBets();
     const erc20Abi = ["function approve(address spender,uint256 amount) external returns (bool)"];
     const token = new ethers.Contract(collateralTokenAddr, erc20Abi, signer);
-
-    $("betTxStatus").textContent = "Approving collateral…";
-    const approveTx = await token.approve(wagerContract.target, total);
-    await approveTx.wait();
-
-    $("betTxStatus").textContent = "Submitting placeBets…";
     const c = wagerContract.connect(signer);
-    const firstArr =
-      currentProtocolVersion === "v2" ? indices.map((i) => 1n << BigInt(i)) : indices;
-    const tx = await c.placeBets(firstArr, amounts);
-    await tx.wait();
-    $("betTxStatus").textContent = "Bets placed successfully.";
+
+    if (packed.freeform) {
+      const total = packed.amount;
+      $("betTxStatus").textContent = "Approving collateral…";
+      const approveTx = await token.approve(wagerContract.target, total);
+      await approveTx.wait();
+      $("betTxStatus").textContent = "Submitting placeBet…";
+      const tx = await c.placeBet(packed.answer, total);
+      await tx.wait();
+      $("betTxStatus").textContent = "Bet placed successfully.";
+    } else {
+      const { indices, amounts } = packed;
+      let total = 0n;
+      for (const a of amounts) total += a;
+      $("betTxStatus").textContent = "Approving collateral…";
+      const approveTx = await token.approve(wagerContract.target, total);
+      await approveTx.wait();
+      $("betTxStatus").textContent = "Submitting placeBets…";
+      const firstArr =
+        currentProtocolVersion === "v2" ? indices.map((i) => 1n << BigInt(i)) : indices;
+      const tx = await c.placeBets(firstArr, amounts);
+      await tx.wait();
+      $("betTxStatus").textContent = "Bets placed successfully.";
+    }
     await refreshWagerFromIndexerSilently();
   }
 

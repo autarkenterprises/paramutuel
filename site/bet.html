@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Stake on a Paramutuel wager with your wallet: approve collateral, batch placeBets." />
+  <meta name="description" content="Stake on a Paramutuel wager: v1/v2 enumerated tickets or freeform text answer — wallet approve and placeBet(s)." />
   <title>Stake with wallet — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -83,9 +83,12 @@
         <div><dt>Block explorer</dt><dd><a id="betBasescan" href="#" target="_blank" rel="noopener noreferrer">Basescan</a></dd></div>
       </dl>
 
-      <h3 class="bet-outcomes-table-title">Outcomes &amp; implied odds</h3>
-      <p class="muted bet-odds-footnote">
+      <h3 class="bet-outcomes-table-title" id="betOutcomesTableTitle">Outcomes &amp; implied odds</h3>
+      <p class="muted bet-odds-footnote" id="betOutcomesTableFootnote">
         Pool share uses on-chain stake totals. <strong>Implied multiple</strong> is the approximate payout per 1 unit staked on that outcome if it wins, <em>after</em> protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).
+      </p>
+      <p class="muted bet-protocol-note" id="betProtocolNote">
+        This page loads <strong>v1</strong> (outcome index), <strong>v2</strong> (ticket bitmask / batch <code>placeBets</code>), or <strong>freeform</strong> (typed answer + <code>placeBet(string,uint256)</code>) based on indexer <code>protocol_version</code>. Use the <a href="app.html">full dApp</a> to create wagers, preview all cases, resolve, and claim.
       </p>
       <div class="bet-outcomes-table-wrap">
         <table class="bet-outcomes-table" id="betOutcomesTable">
@@ -105,8 +108,8 @@
 
     <section class="card" id="betFormSection" hidden>
       <h2>Your stakes</h2>
-      <p class="muted">
-        Enter a token amount next to each outcome you want to back (human units, e.g. <code>10</code> USDC). At least one positive amount is required. Uses the same <code>placeBets</code> batch call as the full dApp.
+      <p class="muted" id="betFormLead">
+        Enter a token amount next to each outcome you want to back (human units, e.g. <code>10</code> USDC). At least one positive amount is required. v2 markets use the same <code>placeBets</code> batch shape as the full dApp.
       </p>
       <div class="bet-wallet-row">
         <button type="button" class="btn btn-primary" id="betConnectBtn">Connect wallet</button>

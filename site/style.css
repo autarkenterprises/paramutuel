@@ -431,6 +431,7 @@ body > footer:not(.app-shell-footer) {
   display: grid;
   grid-template-columns: 1fr auto;
   grid-template-areas:
+    "pv pv"
     "prop badge"
     "meta meta"
     "addr addr";
@@ -439,6 +440,14 @@ body > footer:not(.app-shell-footer) {
   color: inherit;
   text-decoration: none;
   transition: background 0.12s;
+}
+
+.home-bet-search-pv {
+  grid-area: pv;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .home-bet-search-link:hover {
@@ -693,6 +702,15 @@ body > footer:not(.app-shell-footer) {
 .ticker-item-chain:hover {
   color: #79b8ff;
   text-decoration: none;
+}
+
+.ticker-item-pv {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6e7a94;
+  align-self: flex-start;
 }
 
 .ticker-item-prop {
@@ -1016,6 +1034,24 @@ body > footer:not(.app-shell-footer) {
   border: 1px solid #23304a;
   border-radius: 10px;
   padding: 12px 14px;
+}
+
+.bet-freeform-row .bet-outcome-label {
+  display: block;
+}
+
+.bet-freeform-text-input {
+  display: block;
+  width: 100%;
+  max-width: min(100%, 520px);
+  margin-top: 6px;
+  box-sizing: border-box;
+  background: #121a2a;
+  color: #e6edf3;
+  border: 1px solid #2c3a5a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 15px;
 }
 
 .bet-outcome-label {

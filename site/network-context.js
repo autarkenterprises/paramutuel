@@ -90,6 +90,8 @@
     const chainId = Number(net.chainId);
     const meta = CHAIN_META[chainId] || { label: `Chain ${chainId}`, isTestnet: false };
     const factory = String(net.factoryAddress || "").trim();
+    const factoryV2 = String(net.factoryV2Address || "").trim();
+    const factoryFreeform = String(net.factoryFreeformAddress || "").trim();
     const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const isMainnetChain = chainId === 8453;
     const isTestnetChain = chainId === 84532;
@@ -132,6 +134,8 @@
       chainId,
       chainLabel: meta.label,
       factoryAddress: factory,
+      factoryV2Address: factoryV2,
+      factoryFreeformAddress: factoryFreeform,
       explorerApiBase: apiBase,
       explorerRoot,
       explorerHostLabel: explorerRoot.replace(/^https:\/\//, ""),

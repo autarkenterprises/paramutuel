@@ -124,15 +124,35 @@
   function resolvedSummary(w, labels) {
     const state = String(w.state || "").toUpperCase();
     const pot = formatPot(w.total_pot);
+    const pv = String(w.protocol_version || "v1").trim().toLowerCase();
     if (state === "RESOLVED") {
       const wi = w.winning_outcome;
-      const idx = wi === null || wi === undefined || wi === "" ? null : Number(wi);
-      const winLabel =
-        idx != null && !Number.isNaN(idx) && labels[idx] != null
-          ? String(labels[idx])
-          : idx != null && !Number.isNaN(idx)
-            ? `#${idx}`
-            : "—";
+      let winLabel = "—";
+      if (pv === "freeform") {
+        const hx = wi === null || wi === undefined ? "" : String(wi).trim();
+        winLabel = hx ? (hx.length > 20 ? `${hx.slice(0, 12)}…${hx.slice(-6)}` : hx) : "—";
+      } else if (pv === "v2") {
+        try {
+          const wm = BigInt(String(wi ?? "0"));
+          winLabel = `mask ${wm.toString()}`;
+          for (let i = 0; i < labels.length; i++) {
+            if (wm === 1n << BigInt(i)) {
+              winLabel = `${truncate(String(labels[i]), 16)} · ${winLabel}`;
+              break;
+            }
+          }
+        } catch {
+          winLabel = String(wi ?? "—");
+        }
+      } else {
+        const idx = wi === null || wi === undefined || wi === "" ? null : Number(wi);
+        winLabel =
+          idx != null && !Number.isNaN(idx) && labels[idx] != null
+            ? String(labels[idx])
+            : idx != null && !Number.isNaN(idx)
+              ? `#${idx}`
+              : "—";
+      }
       return `Winner: ${winLabel} · Pot ${pot} (raw)`;
     }
     if (state === "RETRACTED") {
@@ -182,12 +202,19 @@
       const labels = parseOutcomes(w.outcomes_json);
       const state = String(w.state || "—").toUpperCase();
       const stateSlug = state.toLowerCase().replace(/[^a-z0-9-]/g, "") || "unknown";
-      const prop = truncate(w.proposition || "(no proposition)", 140);
+      const pv = String(w.protocol_version || "v1").trim().toLowerCase();
+      const prop = truncate(w.proposition || "(no proposition)", 120);
       const href = betPageHref(addr);
       const key = addr.toLowerCase();
       let metaLine;
       if (state === "OPEN" && detailByAddr[key]) {
-        metaLine = oddsLine(detailByAddr[key].outcomes, labels);
+        if (pv === "freeform") {
+          const pools = detailByAddr[key].ticket_pools || [];
+          const n = pools.filter((p) => BigInt(String(p.pool_total || "0")) > 0n).length;
+          metaLine = n > 0 ? `Freeform · ${n} staked answer id(s)` : "Freeform · no stakes in detail";
+        } else {
+          metaLine = oddsLine(detailByAddr[key].outcomes, labels);
+        }
       } else {
         metaLine = resolvedSummary(w, labels);
       }
@@ -200,6 +227,7 @@
       a.className = "home-bet-search-link";
       a.href = href;
       a.innerHTML = `
+        <span class="home-bet-search-pv muted">${escapeHtml(pv)}</span>
         <span class="home-bet-search-prop">${escapeHtml(prop)}</span>
         <span class="home-bet-search-badge home-bet-search-badge--${escapeHtml(stateSlug)}">${escapeHtml(state)}</span>
         <span class="home-bet-search-meta">${escapeHtml(metaLine)}</span>

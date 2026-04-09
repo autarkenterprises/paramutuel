@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Find a Paramutuel wager and place a bet: search the indexer or open the wallet staking flow. Assisted signing (in development) per ADR-0007." />
+  <meta name="description" content="Find a Paramutuel wager (v1, v2, or freeform) and stake: search the indexer or open the wallet flow." />
   <title>Place a Bet — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -41,7 +41,7 @@
         <span class="muted">Paste a wager address or open a shared <code>?wager=0x…</code> link.</span>
       </p>
       <p class="muted home-bet-search-hint">
-        By default only <strong>open</strong> wagers are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the staking flow.
+        By default only <strong>open</strong> wagers are listed. Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong> (enumerated markets), <strong>protocol version</strong> (e.g. <code>v2</code>, <code>freeform</code>), proposer, resolver, factory, tx hash, or other indexed fields. Results refresh as you type; open any row to load the staking flow.
       </p>
       <div class="home-bet-search-field-row">
         <input
