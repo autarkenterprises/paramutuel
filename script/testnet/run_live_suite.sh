@@ -14,7 +14,8 @@ set -euo pipefail
 #   TESTNET_MODE=minimal-tx PRIVATE_KEY=0x... FACTORY_ADDRESS=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
 #
 # Funded transaction mode (real collateral flow):
-#   TESTNET_MODE=funded-tx PRIVATE_KEY=0x... TESTNET_COLLATERAL_TOKEN=0x... FACTORY_ADDRESS=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
+#   TESTNET_MODE=funded-tx PRIVATE_KEY=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
+#   Optional: TESTNET_COLLATERAL_TOKEN (defaults to Base Sepolia USDC in the Python suite).
 #
 # v2 factory matrices: FACTORY_V2_ADDRESS or deployments factoryV2Address; see docs/TESTNET-LIVE-SUITE.md
 # (TESTNET_V2_CASES, TESTNET_SKIP_V2, TESTNET_WAGER_ADDRESS_V2).
@@ -47,15 +48,9 @@ if [[ "$MODE" == "minimal-tx" && -z "${PRIVATE_KEY:-}" ]]; then
   echo "error: PRIVATE_KEY is required when TESTNET_MODE=minimal-tx" >&2
   exit 1
 fi
-if [[ "$MODE" == "funded-tx" ]]; then
-  if [[ -z "${PRIVATE_KEY:-}" ]]; then
-    echo "error: PRIVATE_KEY is required when TESTNET_MODE=funded-tx" >&2
-    exit 1
-  fi
-  if [[ -z "${TESTNET_COLLATERAL_TOKEN:-}" ]]; then
-    echo "error: TESTNET_COLLATERAL_TOKEN is required when TESTNET_MODE=funded-tx" >&2
-    exit 1
-  fi
+if [[ "$MODE" == "funded-tx" && -z "${PRIVATE_KEY:-}" ]]; then
+  echo "error: PRIVATE_KEY is required when TESTNET_MODE=funded-tx" >&2
+  exit 1
 fi
 
 python3 -m unittest discover -s test/testnet -p "test_live_base_sepolia.py" -v

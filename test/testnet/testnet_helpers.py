@@ -9,6 +9,9 @@ from pathlib import Path
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+# Circle USDC on Base Sepolia — default `TESTNET_COLLATERAL_TOKEN` for live funded tests when unset.
+DEFAULT_COLLATERAL_TOKEN_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 # Non-zero sentinel used in stress/minimal tests (not a real ERC-20; no funded transfers).
 DUMMY_COLLATERAL = "0x0000000000000000000000000000000000000001"
 

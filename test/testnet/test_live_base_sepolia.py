@@ -8,6 +8,7 @@ from urllib.error import URLError
 from pathlib import Path
 
 from testnet_helpers import (
+    DEFAULT_COLLATERAL_TOKEN_BASE_SEPOLIA,
     DUMMY_COLLATERAL,
     FREEFORM_CREATE_WAGER_SIG,
     V2_CREATE_WAGER_SIG,
@@ -25,6 +26,11 @@ from testnet_helpers import (
 
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
+
+
+def _live_funded_collateral_token() -> str:
+    """Explicit TESTNET_COLLATERAL_TOKEN, else canonical Base Sepolia USDC for funded live tests."""
+    return _env("TESTNET_COLLATERAL_TOKEN") or DEFAULT_COLLATERAL_TOKEN_BASE_SEPOLIA
 
 
 def _rpc_url() -> str:
@@ -286,6 +292,7 @@ def _indexer_query_wagers(base_url: str, q: str, limit: int = 20) -> list[dict]:
 
 
 def _wait_for_indexer_wager(base_url: str, q: str, timeout_seconds: int = 420) -> dict:
+    """Poll hosted indexer until `GET /wagers?q=...` returns a row (see docs/TESTNET-LIVE-SUITE.md)."""
     deadline = time.time() + timeout_seconds
     last = []
     while time.time() < deadline:
@@ -306,7 +313,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
         cls.wager_address = _env("TESTNET_WAGER_ADDRESS")
         cls.private_key = _env("PRIVATE_KEY")
-        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.collateral_token = _live_funded_collateral_token()
         cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
         cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
         cls.unauthorized_private_key = _env("TESTNET_UNAUTHORIZED_PRIVATE_KEY")
@@ -418,8 +425,6 @@ class TestBaseSepoliaLive(unittest.TestCase):
             self.skipTest("Set TESTNET_MODE=funded-tx to run funded lifecycle checks")
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY to run funded lifecycle checks")
-        if not self.collateral_token:
-            self.skipTest("Set TESTNET_COLLATERAL_TOKEN to run funded lifecycle checks")
 
         decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
         amount_raw = _parse_units(self.bet_amount, decimals)
@@ -429,7 +434,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
         sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
         if sender_balance < amount_raw:
             self.skipTest(
-                f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
+                f"Connected wallet token balance too low for {self.collateral_token}: "
+                f"have {sender_balance}, need {amount_raw} (override with TESTNET_COLLATERAL_TOKEN)"
             )
 
         before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
@@ -566,8 +572,6 @@ class TestBaseSepoliaLive(unittest.TestCase):
             self.skipTest("Set TESTNET_MODE=funded-tx to run funded lifecycle checks")
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY to run funded lifecycle checks")
-        if not self.collateral_token:
-            self.skipTest("Set TESTNET_COLLATERAL_TOKEN to run funded lifecycle checks")
         if not self.indexer_base_url:
             self.skipTest("Set TESTNET_INDEXER_BASE_URL or config baseSepolia.explorerApiBase")
 
@@ -579,7 +583,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
         sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
         if sender_balance < amount_raw:
             self.skipTest(
-                f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
+                f"Connected wallet token balance too low for {self.collateral_token}: "
+                f"have {sender_balance}, need {amount_raw} (override with TESTNET_COLLATERAL_TOKEN)"
             )
 
         before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
@@ -637,7 +642,7 @@ class TestBaseSepoliaLiveV2(unittest.TestCase):
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
         cls.private_key = _env("PRIVATE_KEY")
         cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
-        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.collateral_token = _live_funded_collateral_token()
         cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
         cls.indexer_base_url = _indexer_base_url()
         cls.wager_address_v2 = _env("TESTNET_WAGER_ADDRESS_V2")
@@ -733,8 +738,6 @@ class TestBaseSepoliaLiveV2(unittest.TestCase):
             self.skipTest("Set TESTNET_MODE=funded-tx for v2 funded policy matrix")
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY for v2 funded policy matrix")
-        if not self.collateral_token:
-            self.skipTest("Set TESTNET_COLLATERAL_TOKEN for v2 funded policy matrix")
 
         decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
         amount_raw = _parse_units(self.bet_amount, decimals)
@@ -840,7 +843,7 @@ class TestBaseSepoliaLiveFreeform(unittest.TestCase):
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
         cls.private_key = _env("PRIVATE_KEY")
         cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
-        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.collateral_token = _live_funded_collateral_token()
         cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
         cls.skip_freeform = _env("TESTNET_SKIP_FREEFORM", "").lower() in ("1", "true", "yes")
 
@@ -913,8 +916,6 @@ class TestBaseSepoliaLiveFreeform(unittest.TestCase):
             self.skipTest("Set TESTNET_MODE=funded-tx for freeform funded checks")
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY for freeform funded checks")
-        if not self.collateral_token:
-            self.skipTest("Set TESTNET_COLLATERAL_TOKEN for freeform funded checks")
 
         decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
         amount_raw = _parse_units(self.bet_amount, decimals)
@@ -924,8 +925,9 @@ class TestBaseSepoliaLiveFreeform(unittest.TestCase):
         sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
         if sender_balance < amount_raw * 4:
             self.skipTest(
-                f"Insufficient token balance for freeform funded matrix: have {sender_balance}, "
-                f"want at least {amount_raw * 4} raw"
+                f"Insufficient token balance for freeform funded matrix ({self.collateral_token}): "
+                f"have {sender_balance}, want at least {amount_raw * 4} raw "
+                f"(override with TESTNET_COLLATERAL_TOKEN)"
             )
 
         before_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
