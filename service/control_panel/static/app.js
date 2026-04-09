@@ -2,8 +2,11 @@ async function previewAction() {
   const wager = document.getElementById("wager").value.trim();
   const action = document.getElementById("action").value;
   const outcomeRaw = document.getElementById("outcomeIndex").value;
-  const body = { wager, action };
+  const pv = document.getElementById("protocolVersion").value;
+  const winAns = document.getElementById("winningAnswer").value;
+  const body = { wager, action, protocolVersion: pv };
   if (action === "resolve" && outcomeRaw !== "") body.outcomeIndex = Number(outcomeRaw);
+  if (action === "resolve" && pv === "freeform" && winAns.trim() !== "") body.winningAnswer = winAns;
 
   const res = await fetch("/api/preview/action", {
     method: "POST",

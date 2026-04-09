@@ -82,6 +82,55 @@ def build_create_wager_command(
     return CastCommand(cmd)
 
 
+FREEFORM_CREATE_SIG = (
+    "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
+)
+
+
+def build_create_freeform_wager_command(
+    *,
+    factory: str,
+    collateral: str,
+    proposition: str,
+    betting_close_time: int,
+    resolution_window: int,
+    resolver: str,
+    betting_closer: str,
+    resolution_closer: str,
+    extra_recipients: list[str],
+    extra_bps: list[int],
+    rpc_url: str,
+    private_key: str,
+) -> CastCommand:
+    if len(extra_recipients) != len(extra_bps):
+        raise ValueError("extra_recipients and extra_bps length mismatch")
+    if betting_close_time == 0 and betting_closer.lower() == ZERO_ADDRESS:
+        raise ValueError("betting_close_time=0 requires a non-zero betting_closer")
+    if resolution_window == 0 and resolution_closer.lower() == ZERO_ADDRESS:
+        raise ValueError("resolution_window=0 requires a non-zero resolution_closer")
+
+    cmd = [
+        "cast",
+        "send",
+        factory,
+        FREEFORM_CREATE_SIG,
+        collateral,
+        proposition,
+        str(betting_close_time),
+        str(resolution_window),
+        resolver,
+        betting_closer,
+        resolution_closer,
+        _json_arg(extra_recipients),
+        _json_arg(extra_bps),
+        "--rpc-url",
+        rpc_url,
+        "--private-key",
+        private_key,
+    ]
+    return CastCommand(cmd)
+
+
 def build_wager_action_command(
     *,
     wager: str,
@@ -89,6 +138,8 @@ def build_wager_action_command(
     rpc_url: str,
     private_key: str,
     outcome_index: int | None = None,
+    protocol_version: str | None = None,
+    winning_answer: str | None = None,
 ) -> CastCommand:
     action_to_sig = {
         "close-betting": "closeBetting()",
@@ -98,11 +149,19 @@ def build_wager_action_command(
         "claim": "claim()",
         "withdraw-fees": "withdrawFees()",
     }
+    pv = (protocol_version or "v1").strip().lower()
     if action == "resolve":
-        if outcome_index is None:
-            raise ValueError("outcome_index required for resolve")
-        sig = "resolve(uint256)"
-        args = [str(outcome_index)]
+        if pv == "freeform":
+            ans = (winning_answer or "").strip()
+            if not ans:
+                raise ValueError("winning_answer required for freeform resolve(string)")
+            sig = "resolve(string)"
+            args = [ans]
+        else:
+            if outcome_index is None:
+                raise ValueError("outcome_index (winning index or bitmask) required for resolve(uint256)")
+            sig = "resolve(uint256)"
+            args = [str(int(outcome_index))]
     else:
         if action not in action_to_sig:
             raise ValueError(f"unsupported action: {action}")
@@ -124,7 +183,7 @@ def build_wager_action_command(
 
 
 def lifecycle_workflow(*, no_max_betting: bool, no_max_resolution: bool) -> list[str]:
-    steps = ["createWager", "placeBet"]
+    steps = ["createWager / createFreeformWager", "placeBet / placeBet(string)"]
     if no_max_betting:
         steps.append("closeBetting")
     if no_max_resolution:

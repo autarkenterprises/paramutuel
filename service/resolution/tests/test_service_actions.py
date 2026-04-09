@@ -10,10 +10,23 @@ class TestResolutionActions(unittest.TestCase):
             action="resolve",
             rpc_url="http://localhost:8545",
             private_key="0x" + "cd" * 32,
+            protocol_version="v2",
             resolve_uint256=1 << 4,
         )
         self.assertIn("resolve(uint256)", cmd)
         self.assertIn(str(1 << 4), cmd)
+
+    def test_resolve_command_freeform_uses_string(self) -> None:
+        cmd = _action_command(
+            wager_address="0x" + "ab" * 20,
+            action="resolve",
+            rpc_url="http://localhost:8545",
+            private_key="0x" + "cd" * 32,
+            protocol_version="freeform",
+            winning_answer="yes",
+        )
+        self.assertIn("resolve(string)", cmd)
+        self.assertIn("yes", cmd)
 
     def test_resolve_command_requires_value(self) -> None:
         with self.assertRaises(ValueError):
@@ -22,7 +35,19 @@ class TestResolutionActions(unittest.TestCase):
                 action="resolve",
                 rpc_url="http://localhost:8545",
                 private_key="0x" + "cd" * 32,
+                protocol_version="v1",
                 resolve_uint256=None,
+            )
+
+    def test_resolve_command_freeform_requires_answer(self) -> None:
+        with self.assertRaises(ValueError):
+            _action_command(
+                wager_address="0x" + "ab" * 20,
+                action="resolve",
+                rpc_url="http://localhost:8545",
+                private_key="0x" + "cd" * 32,
+                protocol_version="freeform",
+                winning_answer="",
             )
 
     def test_evaluate_candidates_surfaces_winning_mask_decision(self) -> None:
@@ -31,6 +56,7 @@ class TestResolutionActions(unittest.TestCase):
             {
                 "wager_address": "0xabc1000000000000000000000000000000000001",
                 "state": "OPEN",
+                "protocol_version": "v2",
                 "resolver": resolver,
                 "betting_closed_by_authority": 1,
                 "betting_close_time": 0,

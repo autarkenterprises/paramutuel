@@ -26,6 +26,11 @@ def encode_place_bet_freeform(answer: str, amount: int) -> str | None:
     return _cast_calldata("placeBet(string,uint256)", answer, amount)
 
 
+def encode_resolve_freeform(winning_answer: str) -> str | None:
+    """ADR-0009: resolver `resolve(string)`; must match a backed answer's UTF-8 bytes."""
+    return _cast_calldata("resolve(string)", winning_answer)
+
+
 def encode_approve(spender: str, amount: int) -> str | None:
     return _cast_calldata("approve(address,uint256)", spender, amount)
 

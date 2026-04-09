@@ -97,9 +97,21 @@ cast send "$WAGER" "closeBetting()" --rpc-url "$RPC_URL" --private-key "$PRIVATE
 
 Only `resolver` may call:
 
+**Enumerated wagers (v1 / v2):**
+
 ```bash
 cast send "$WAGER" "resolve(uint256)" "$WINNING_INDEX" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
-# or
+```
+
+**Freeform wagers** ([ADR-0009 implementation](ADR-0009-IMPLEMENTATION.md)) use a string answer:
+
+```bash
+cast send "$WAGER" "resolve(string)" "$WINNING_ANSWER" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+```
+
+**Retract** (same for all protocol versions):
+
+```bash
 cast send "$WAGER" "retract()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 

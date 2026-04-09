@@ -26,8 +26,8 @@ For lightweight hosted deployments, run sync loop + API together:
 PYTHONPATH=. python3 -m service.indexer.live_api --host 0.0.0.0 --port 8090
 ```
 
-It resolves `RPC_URL_BASE_SEPOLIA`/`RPC_URL_SEPOLIA`/`RPC_URL` and factory address from
-`FACTORY_ADDRESS` or `config/deployments.json`.
+It resolves `RPC_URL_BASE_SEPOLIA`/`RPC_URL_SEPOLIA`/`RPC_URL` and factory addresses from env or
+`config/deployments.json` (v1 `factoryAddress`, optional v2 / freeform factories).
 
 ### Can this be modularly appended to the dApp?
 
@@ -62,7 +62,7 @@ python3 -m service.control_panel.cli \
   --action close-betting
 ```
 
-`create-wager` is also supported in CLI with full role and fee fields.
+`create-wager` and **`create-freeform-wager`** are supported in the CLI. For **`wager-action resolve`**, pass **`--protocol-version freeform`** and **`--winning-answer "..."`** for ADR-0009 wagers; v1/v2 use **`--outcome-index`** (v2: winning bitmask).
 
 ## Control panel (web)
 

@@ -56,6 +56,12 @@ class TestCalldataV2(unittest.TestCase):
             self.assertTrue(cd.lower().startswith("0xd76f2a1e"))
             self.assertTrue(body["execution_allowed"])
 
+    def test_encode_resolve_freeform_selector(self) -> None:
+        cd = calldata.encode_resolve_freeform("yes")
+        if cd:
+            self.assertTrue(cd.startswith("0x"))
+            self.assertGreater(len(cd), 10)
+
     def test_build_quote_v1_keeps_outcome_index_as_first_word(self) -> None:
         body = calldata.build_quote_like_payload(
             wager_address="0x" + "ab" * 20,
