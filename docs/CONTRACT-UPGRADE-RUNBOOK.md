@@ -53,7 +53,7 @@ Expected outcomes:
 ## 6) Redeploy hosted components
 
 - GitHub Pages redeploy should trigger on push (`deploy-site.yml`).
-- **Cloud Run** indexer: rebuild and deploy a new revision from the updated `master` (see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md)).
+- **Cloud Run** indexer: rebuild and deploy a new revision from the updated `master` (see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md) for factory env keys, `indexerFromBlock`, cursor resets, and **durable hosting** if `/wagers` stays empty).
 - Verify:
   - `GET /health` returns `ok`.
   - `GET /wagers` route works and reflects new factory over time.
