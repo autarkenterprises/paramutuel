@@ -91,8 +91,8 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 - [x] Define compact winner-set and ticket-selection encoding (`uint256` bitset, `MAX_DISTINCT_TICKETS`, factory `MAX_OUTCOMES = 255`).
 - [x] Draft v2 factory/wager contracts for policy-bound creation and `resolve(winningMask)`.
 - [x] Claim accounting + Foundry tests (including fuzz conservation on `ANY_OF`, extensive lifecycle/policy matrix, gas profiling harness — see `docs/ADR-0008-GAS.md`, `test/ParamutuelV2Extensive.t.sol`).
-- [ ] Add indexer schema/API changes for `winning_mask`, policy metadata, and ticket masks on bets.
+- [x] Add indexer schema/API changes for `winning_mask`, policy metadata, and ticket masks on bets (`service/indexer/`, API fields on `/wagers` and `/wagers/{addr}`).
 - [x] Update dApp UX for v2 (`dapp/`): protocol toggle, `ParamutuelFactoryV2` create + `WagerCreatedV2`, bitmask tickets / winning set via comma-separated outcome indices, payoff policy + `policyParam`, odds preview (full for `SINGLE_WINNER`; pool note for other policies). Set `factoryV2Address` in `config/deployments.json` when a network has a v2 factory deployed.
-- [ ] Update explorer / site surfaces for v2 metadata (indexer-backed).
-- [ ] Extend service/control/MCP for v2 create/resolve encodings.
+- [x] Update explorer / site surfaces for v2 metadata (indexer-backed): `service/explorer/static/`, `site/*` (ticker, search, bet page, operator copy).
+- [x] Extend service/control/MCP for v2 create/resolve encodings (`encode_create_wager_v2`, calldata helpers; control panel + resolution paths; freeform parity where applicable).
 - [ ] Gas/safety audit pass and formal limits sign-off before mainnet v2 factory.
