@@ -73,9 +73,16 @@
     const state = String(w.state || "").toUpperCase();
     const pot = formatPot(w.total_pot);
     const addr = String(w.wager_address || "").toLowerCase();
+    const pv = String(w.protocol_version || "v1").trim().toLowerCase();
 
     if (state === "OPEN") {
       const d = detailByAddr[addr];
+      if (pv === "freeform") {
+        const n = (d && d.ticket_pools && d.ticket_pools.length) || 0;
+        const sub =
+          n > 0 ? `${n} pooled answer id(s)` : "freeform · no stakes in indexer detail";
+        return `Pot ${pot} (raw) · ${sub}`;
+      }
       if (d && d.outcomes) {
         const line = oddsLine(d.outcomes, labels);
         return `Pot ${pot} (raw) · ${line}`;
@@ -84,13 +91,32 @@
     }
     if (state === "RESOLVED") {
       const wo = w.winning_outcome;
-      const wi = wo === null || wo === undefined || wo === "" ? null : Number(wo);
-      const winLabel =
-        wi != null && !Number.isNaN(wi) && labels[wi] != null
-          ? String(labels[wi])
-          : wi != null && !Number.isNaN(wi)
-            ? `#${wi}`
-            : "—";
+      let winLabel = "—";
+      if (pv === "freeform") {
+        const hx = wo === null || wo === undefined ? "" : String(wo).trim();
+        winLabel = hx ? (hx.length > 18 ? `${hx.slice(0, 10)}…${hx.slice(-6)}` : hx) : "—";
+      } else if (pv === "v2") {
+        try {
+          const wm = BigInt(String(wo ?? "0"));
+          winLabel = `mask ${wm.toString()}`;
+          for (let i = 0; i < labels.length; i++) {
+            if (wm === 1n << BigInt(i)) {
+              winLabel = `${labels[i]} · ${winLabel}`;
+              break;
+            }
+          }
+        } catch {
+          winLabel = String(wo ?? "—");
+        }
+      } else {
+        const wi = wo === null || wo === undefined || wo === "" ? null : Number(wo);
+        winLabel =
+          wi != null && !Number.isNaN(wi) && labels[wi] != null
+            ? String(labels[wi])
+            : wi != null && !Number.isNaN(wi)
+              ? `#${wi}`
+              : "—";
+      }
       const winStake = formatPot(w.total_winning_stake);
       return `Winner: ${winLabel} · Winning stake ${winStake} (raw) · Pot ${pot} (raw)`;
     }
@@ -182,7 +208,8 @@
 
   function renderItem(w, detailByAddr, chainId) {
     const labels = parseOutcomes(w.outcomes_json);
-    const prop = truncate(w.proposition || "(no proposition)", 80);
+    const pvTag = String(w.protocol_version || "v1").trim().toLowerCase();
+    const prop = truncate(w.proposition || "(no proposition)", 72);
     const state = String(w.state || "—").toLowerCase();
     const meta = stateMeta(w, detailByAddr, labels);
     const shortAddr = String(w.wager_address || "").slice(0, 10);
@@ -197,6 +224,7 @@
     main.className = "ticker-item";
     main.href = href;
     main.innerHTML = `
+      <span class="ticker-item-pv muted" title="protocol_version">${escapeHtml(pvTag)}</span>
       <span class="ticker-item-prop">${escapeHtml(prop)}</span>
       <span class="ticker-item-badge ticker-state-${escapeHtml(stateClass)}">${escapeHtml(state)}</span>
       <span class="ticker-item-meta">${escapeHtml(meta)}</span>

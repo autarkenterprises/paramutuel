@@ -14,6 +14,8 @@ broadcast/
 node_modules/
 
 # Python
+.coverage
+htmlcov/
 __pycache__/
 *.pyc
 dist/
@@ -30,6 +32,8 @@ service/proposition/data/*.db-wal
 .DS_Store
 .vscode/
 .idea/
+.claude/
+.env~
 
 # Secrets / keys
 *.pem

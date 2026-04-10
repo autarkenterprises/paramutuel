@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS wagers (
   collateral_token TEXT NOT NULL,
   proposition TEXT NOT NULL DEFAULT '',
   outcomes_json TEXT NOT NULL DEFAULT '[]',
+  protocol_version TEXT NOT NULL DEFAULT 'v1',
+  payoff_policy INTEGER,
+  policy_param TEXT,
   betting_close_time INTEGER NOT NULL,
   resolution_window INTEGER NOT NULL,
   resolution_deadline INTEGER NOT NULL,
@@ -41,6 +44,14 @@ CREATE TABLE IF NOT EXISTS wager_outcomes (
   outcome_index INTEGER NOT NULL,
   outcome_total TEXT NOT NULL DEFAULT '0',
   PRIMARY KEY (wager_address, outcome_index),
+  FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
+);
+
+CREATE TABLE IF NOT EXISTS wager_ticket_pools (
+  wager_address TEXT NOT NULL,
+  ticket_mask TEXT NOT NULL,
+  pool_total TEXT NOT NULL DEFAULT '0',
+  PRIMARY KEY (wager_address, ticket_mask),
   FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
 );
 

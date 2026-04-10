@@ -6,14 +6,14 @@ This repository is built for **bots, indexers, and LLM-driven workflows**. If yo
 
 | Surface | Purpose | Where |
 |--------|---------|--------|
-| **MCP server** | Full protocol tools: discovery, odds, ABI calldata (`quote_place_bet`, encoders). | `mcp_server/`, PyPI package **`paramutuel-mcp`**, [`docs/MACHINE.md`](docs/MACHINE.md) |
+| **MCP server** | Full protocol tools: discovery, odds, ABI calldata (`quote_place_bet`, `encode_place_bet_freeform`, other encoders). | `mcp_server/`, PyPI package **`paramutuel-mcp`**, [`docs/MACHINE.md`](docs/MACHINE.md) |
 | **Bet scout subagent** | Small **stdlib** process: scan / recommend / quote with **JSON stdin → JSON stdout** for delegation. No private keys. | PyPI **`paramutuel-bettor-agent`** (CLI `paramutuel-bettor`), `agents/paramutuel_bettor/`, [`docs/BET-AGENT.md`](docs/BET-AGENT.md), [`docs/BET-AGENT-DISTRIBUTION.md`](docs/BET-AGENT-DISTRIBUTION.md) |
 | **Machine manifest** | Stable JSON listing subagent id, ops, and complementing MCP. For registries and automated discovery. | [`agents/subagent-manifest.json`](agents/subagent-manifest.json) |
 
 ## Recommended execution loop (betting)
 
 1. Use the **bet scout** to shortlist `OPEN` wagers and rank outcomes (hypothetical size in **raw token units**).
-2. Obtain **final** calldata with MCP **`quote_place_bet`** immediately before signing (chain state can change).
+2. Obtain **final** calldata with MCP **`quote_place_bet`** (v1/v2) or **`encode_place_bet_freeform`** (ADR-0009 freeform) immediately before signing (chain state can change).
 3. A separate **wallet / signer** submits `approve` and `placeBet`. Do not embed private keys in the scout or MCP server.
 
 Details: [`docs/AGENT-LOOP.md`](docs/AGENT-LOOP.md).

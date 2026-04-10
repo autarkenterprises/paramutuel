@@ -2,6 +2,8 @@
 
 This complements the [live integration suite](TESTNET-LIVE-SUITE.md) with **many wagers** and **distinct EOAs per role** (proposer, resolver, betting closer, resolution closer).
 
+A second test class (`TestBaseSepoliaStressV2`) exercises **ParamutuelFactoryV2** with the same role separation, covering **every payoff policy**, **2- and 3-outcome** markets, **`placeBet` vs `placeBets`**, and rotating **resolve / retract / expire** branches (mirroring v1 stress).
+
 ## Modes
 
 | `STRESS_MODE` | What it does | Gas |
@@ -124,8 +126,21 @@ STRESS_BET_AMOUNT=1 \
 | `STRESS_UNAUTHORIZED_PRIVATE_KEY` | (empty) | Optional; enables negative access-control checks in `funded-tx` |
 | `STRESS_INDEXER_BASE_URL` | from `config/deployments.json` | Optional override for hosted indexer visibility checks |
 
+### Factory v2 (ADR-0008)
+
+| Variable | Default | Meaning |
+|----------|---------|--------|
+| `FACTORY_V2_ADDRESS` | from `deployments.json` `factoryV2Address` | Required for v2 tests; if empty, `TestBaseSepoliaStressV2` is skipped |
+| `STRESS_SKIP_V2` | (unset) | Set to `1` / `true` to skip v2 stress tests |
+| `STRESS_V2_WAGER_COUNT` | `5` (length of funded matrix) | Rows in `funded-tx` v2 policy matrix (cases rotate with `i % len(cases)`) |
+| `STRESS_V2_MINIMAL_COUNT` | `5` (all policies) | Rows in `tx` mode v2 minimal matrix (dummy collateral) |
+| `STRESS_V2_CASES` | (all) | Comma-separated case ids; same set as live suite (`single_winner`, `any_of`, …) |
+
+**Wallet pool sizing:** v2 `tx` minimal matrix needs **4 × `STRESS_V2_MINIMAL_COUNT`** addresses. v2 `funded-tx` needs **5 × `STRESS_V2_WAGER_COUNT`** (four role keys + one bettor per row). For the default counts, generate at least **25** funded-capable wallets (e.g. `python3 script/testnet/gen_stress_wallet_pool.py 32 …`).
+
 ## Alchemy / cost notes
 
 - **Readonly** mode only issues `eth_call`; Alchemy metered usage is cheap in practice and uses **no** test ETH.
 - **Tx** mode cost scales with `STRESS_WAGER_COUNT` (several txs per wager). Keep counts low for routine runs; raise for occasional stress campaigns.
 - **Funded-tx** mode adds ERC20 transfers + claims, so both ETH gas and funded collateral balances are required for bettor wallets.
+- **V2 funded-tx** multiplies legs per scenario (some policies use two ticket masks or `placeBets`), so bettor collateral requirements scale with `STRESS_BET_AMOUNT` and `STRESS_V2_WAGER_COUNT`.

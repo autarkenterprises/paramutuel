@@ -77,17 +77,35 @@ def _action_command(
     action: str,
     rpc_url: str,
     private_key: str,
-    outcome_index: int | None = None,
+    protocol_version: str = "v1",
+    resolve_uint256: int | None = None,
+    winning_answer: str | None = None,
 ) -> list[str]:
     if action == "resolve":
-        if outcome_index is None:
-            raise ValueError("resolve decision requires outcomeIndex")
+        pv = (protocol_version or "v1").strip().lower()
+        if pv == "freeform":
+            ans = (winning_answer or "").strip()
+            if not ans:
+                raise ValueError("freeform resolve requires decision.winningAnswer (exact UTF-8 string)")
+            return [
+                "cast",
+                "send",
+                wager_address,
+                "resolve(string)",
+                ans,
+                "--rpc-url",
+                rpc_url,
+                "--private-key",
+                private_key,
+            ]
+        if resolve_uint256 is None:
+            raise ValueError("resolve decision requires outcomeIndex or winningMask (v1/v2)")
         return [
             "cast",
             "send",
             wager_address,
             "resolve(uint256)",
-            str(outcome_index),
+            str(resolve_uint256),
             "--rpc-url",
             rpc_url,
             "--private-key",
@@ -123,6 +141,7 @@ def evaluate_candidates(
             "wager_address": wager,
             "resolver": row.get("resolver"),
             "state": row.get("state"),
+            "protocol_version": str(row.get("protocol_version") or "v1").strip().lower(),
             "betting_close_time": row.get("betting_close_time"),
             "resolution_window": row.get("resolution_window"),
             "resolution_window_closed": row.get("resolution_window_closed"),
@@ -133,6 +152,10 @@ def evaluate_candidates(
         if decision and "action" in decision:
             candidate["decision_action"] = decision.get("action")
             candidate["decision_outcome_index"] = decision.get("outcomeIndex")
+            if decision.get("winningMask") is not None:
+                candidate["decision_winning_mask"] = decision.get("winningMask")
+            if decision.get("winningAnswer") is not None:
+                candidate["decision_winning_answer"] = decision.get("winningAnswer")
         out.append(candidate)
     return out
 
@@ -223,14 +246,46 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             decision = c.get("decision") or {}
             action = str(decision.get("action") or "").strip().lower()
+            pv = str(c.get("protocol_version") or "v1").strip().lower()
             try:
-                cmd = _action_command(
-                    wager_address=c["wager_address"],
-                    action=action,
-                    outcome_index=decision.get("outcomeIndex"),
-                    rpc_url=self.rpc_url,
-                    private_key=self.private_key,
-                )
+                win = None
+                win_ans = decision.get("winningAnswer")
+                if win_ans is not None and not isinstance(win_ans, str):
+                    win_ans = str(win_ans)
+                if action == "resolve":
+                    if pv == "freeform":
+                        cmd = _action_command(
+                            wager_address=c["wager_address"],
+                            action=action,
+                            rpc_url=self.rpc_url,
+                            private_key=self.private_key,
+                            protocol_version=pv,
+                            resolve_uint256=None,
+                            winning_answer=win_ans,
+                        )
+                    else:
+                        win = decision.get("winningMask")
+                        if win is None:
+                            win = decision.get("outcomeIndex")
+                        cmd = _action_command(
+                            wager_address=c["wager_address"],
+                            action=action,
+                            rpc_url=self.rpc_url,
+                            private_key=self.private_key,
+                            protocol_version=pv,
+                            resolve_uint256=int(win) if win is not None else None,
+                            winning_answer=None,
+                        )
+                else:
+                    cmd = _action_command(
+                        wager_address=c["wager_address"],
+                        action=action,
+                        rpc_url=self.rpc_url,
+                        private_key=self.private_key,
+                        protocol_version=pv,
+                        resolve_uint256=None,
+                        winning_answer=None,
+                    )
             except Exception as exc:
                 failed += 1
                 results.append({"wager": c["wager_address"], "ok": False, "error": str(exc)})

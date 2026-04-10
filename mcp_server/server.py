@@ -52,6 +52,16 @@ FACTORY_ADDRESS = os.environ.get(
     _network_cfg.get("factoryAddress", ""),
 )
 
+FACTORY_V2_ADDRESS = os.environ.get(
+    "FACTORY_V2_ADDRESS",
+    _network_cfg.get("factoryV2Address", ""),
+).strip()
+
+FACTORY_FREEFORM_ADDRESS = os.environ.get(
+    "FACTORY_FREEFORM_ADDRESS",
+    _network_cfg.get("factoryFreeformAddress", ""),
+).strip()
+
 CHAIN_ID = int(os.environ.get("CHAIN_ID", _network_cfg.get("chainId", 84532)))
 
 # ── ABI loading ────────────────────────────────────────────────────
@@ -73,8 +83,19 @@ def _load_abi(name: str) -> list[dict]:
     return data["abi"]
 
 
+def _load_abi_optional(name: str) -> list[dict]:
+    try:
+        return _load_abi(name)
+    except (OSError, json.JSONDecodeError, KeyError):
+        return []
+
+
 FACTORY_ABI = _load_abi("ParamutuelFactory")
 WAGER_ABI = _load_abi("ParamutuelWager")
+FACTORY_V2_ABI = _load_abi_optional("ParamutuelFactoryV2")
+WAGER_V2_ABI = _load_abi_optional("ParamutuelWagerV2")
+FACTORY_FREEFORM_ABI = _load_abi_optional("ParamutuelFactoryFreeform")
+WAGER_FREEFORM_ABI = _load_abi_optional("ParamutuelWagerFreeform")
 
 # ── ABI encoding helpers ───────────────────────────────────────────
 
@@ -307,17 +328,68 @@ async def get_protocol_info() -> str:
         for e in WAGER_ABI
         if e.get("type") == "function"
     ]
+    factory_v2_functions = (
+        sorted(
+            {
+                e["name"]
+                for e in FACTORY_V2_ABI
+                if e.get("type") == "function"
+            }
+        )
+        if FACTORY_V2_ABI
+        else []
+    )
+    wager_v2_functions = (
+        sorted(
+            {
+                e["name"]
+                for e in WAGER_V2_ABI
+                if e.get("type") == "function"
+            }
+        )
+        if WAGER_V2_ABI
+        else []
+    )
+    factory_freeform_functions = (
+        sorted({e["name"] for e in FACTORY_FREEFORM_ABI if e.get("type") == "function"})
+        if FACTORY_FREEFORM_ABI
+        else []
+    )
+    wager_freeform_functions = (
+        sorted({e["name"] for e in WAGER_FREEFORM_ABI if e.get("type") == "function"})
+        if WAGER_FREEFORM_ABI
+        else []
+    )
     return json.dumps(
         {
             "factory_address": FACTORY_ADDRESS,
+            "factory_v2_address": FACTORY_V2_ADDRESS or None,
+            "factory_freeform_address": FACTORY_FREEFORM_ADDRESS or None,
             "chain_id": CHAIN_ID,
             "indexer_url": INDEXER_URL,
             "factory_functions": sorted(set(factory_functions)),
             "wager_functions": sorted(set(wager_functions)),
+            "factory_v2_functions": factory_v2_functions,
+            "wager_v2_functions": wager_v2_functions,
+            "factory_freeform_functions": factory_freeform_functions,
+            "wager_freeform_functions": wager_freeform_functions,
             "constants": {
                 "BPS_DENOMINATOR": 10_000,
                 "MAX_TOTAL_FEE_BPS": 10_000,
-                "MAX_OUTCOMES": 64,
+                "MAX_OUTCOMES": 255,
+                "FREEFORM_MAX_ANSWER_BYTES": 1024,
+                "FREEFORM_MAX_DISTINCT_ANSWERS_CAP": 1024,
+            },
+            "notes": {
+                "v2_wagers": (
+                    "Indexer marks protocol_version=v2. placeBet first uint256 is ticketMask "
+                    "(single-outcome legs use 1<<outcomeIndex). resolve(uint256) passes winningMask."
+                ),
+                "freeform_wagers": (
+                    "ADR-0009: no enumerated outcomes. placeBet(string,uint256) and resolve(string) "
+                    "use identical UTF-8 bytes for ticket id keccak256(bytes(answer)). "
+                    "Indexer protocol_version=freeform."
+                ),
             },
         },
         indent=2,
@@ -383,13 +455,30 @@ async def quote_place_bet(
     total_pot = int(totals.get("total_pot", 0) or 0)
     total_fee_bps = int(totals.get("total_fee_bps", 0) or 0)
 
-    outcome_total = None
-    for o in outcomes:
-        if int(o.get("outcome_index")) == int(outcome_index):
-            outcome_total = int(o.get("outcome_total", 0) or 0)
-            break
-    if outcome_total is None:
-        raise ValueError(f"Outcome index {outcome_index} not found in this wager.")
+    protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
+    ticket_mask: int | None = None
+    first_arg: int
+    outcome_total: int | None = None
+
+    if protocol_version == "v2":
+        ticket_mask = int(1) << int(outcome_index)
+        first_arg = ticket_mask
+        ticket_pools = data.get("ticket_pools") or []
+        key = str(ticket_mask)
+        for tp in ticket_pools:
+            if str(tp.get("ticket_mask")) == key:
+                outcome_total = int(tp.get("pool_total", 0) or 0)
+                break
+        if outcome_total is None:
+            outcome_total = 0
+    else:
+        first_arg = int(outcome_index)
+        for o in outcomes:
+            if int(o.get("outcome_index")) == int(outcome_index):
+                outcome_total = int(o.get("outcome_total", 0) or 0)
+                break
+        if outcome_total is None:
+            raise ValueError(f"Outcome index {outcome_index} not found in this wager.")
 
     odds = _compute_odds(
         total_pot=total_pot,
@@ -401,32 +490,33 @@ async def quote_place_bet(
     calldata = _encode_call(
         "placeBet(uint256,uint256)",
         ["uint256", "uint256"],
-        [outcome_index, amount],
+        [first_arg, amount],
     )
 
-    return json.dumps(
-        {
-            "wager_address": wager_address,
-            "collateral_token": collateral_token,
-            "outcome_index": outcome_index,
-            "amount": amount,
-            "betting_open": betting_open,
-            "execution_allowed": betting_open,
-            "revert_hint": revert_hint,
-            "odds": odds,
-            "placeBet": {
-                "to": wager_address,
-                "calldata": calldata,
-                "approval_required": {
-                    "token": collateral_token,
-                    "spender": wager_address,
-                    "amount": amount,
-                    "approve_calldata": _encode_erc20_approve(wager_address, amount),
-                },
+    body: dict[str, Any] = {
+        "wager_address": wager_address,
+        "collateral_token": collateral_token,
+        "protocol_version": protocol_version,
+        "outcome_index": outcome_index,
+        "amount": amount,
+        "betting_open": betting_open,
+        "execution_allowed": betting_open,
+        "revert_hint": revert_hint,
+        "odds": odds,
+        "placeBet": {
+            "to": wager_address,
+            "calldata": calldata,
+            "approval_required": {
+                "token": collateral_token,
+                "spender": wager_address,
+                "amount": amount,
+                "approve_calldata": _encode_erc20_approve(wager_address, amount),
             },
         },
-        indent=2,
-    )
+    }
+    if ticket_mask is not None:
+        body["ticket_mask"] = ticket_mask
+    return json.dumps(body, indent=2)
 
 
 @mcp_server.tool()
@@ -467,6 +557,58 @@ async def quote_place_bets(
     total_pot = int(totals.get("total_pot", 0) or 0)
     total_fee_bps = int(totals.get("total_fee_bps", 0) or 0)
 
+    protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
+
+    if protocol_version == "v2":
+        ticket_pools = data.get("ticket_pools") or []
+
+        def _pool_for_mask(m: int) -> int:
+            key = str(m)
+            for tp in ticket_pools:
+                if str(tp.get("ticket_mask")) == key:
+                    return int(tp.get("pool_total", 0) or 0)
+            return 0
+
+        ticket_masks = [int(1) << int(i) for i in outcome_indices]
+        outcome_totals = [_pool_for_mask(m) for m in ticket_masks]
+        odds = _compute_batch_odds(
+            total_pot=total_pot,
+            outcome_totals=outcome_totals,
+            total_fee_bps=total_fee_bps,
+            bet_amounts=amounts,
+        )
+        total_bet = sum(amounts)
+        calldata = _encode_call(
+            "placeBets(uint256[],uint256[])",
+            ["uint256[]", "uint256[]"],
+            [ticket_masks, amounts],
+        )
+        return json.dumps(
+            {
+                "wager_address": wager_address,
+                "collateral_token": collateral_token,
+                "protocol_version": protocol_version,
+                "outcome_indices": outcome_indices,
+                "ticket_masks": ticket_masks,
+                "amounts": amounts,
+                "betting_open": betting_open,
+                "execution_allowed": betting_open,
+                "revert_hint": revert_hint,
+                "odds": odds,
+                "placeBets": {
+                    "to": wager_address,
+                    "calldata": calldata,
+                    "approval_required": {
+                        "token": collateral_token,
+                        "spender": wager_address,
+                        "amount": total_bet,
+                        "approve_calldata": _encode_erc20_approve(wager_address, total_bet),
+                    },
+                },
+            },
+            indent=2,
+        )
+
     totals_by_outcome: dict[int, int] = {}
     for o in outcomes:
         idx = int(o.get("outcome_index"))
@@ -496,6 +638,7 @@ async def quote_place_bets(
         {
             "wager_address": wager_address,
             "collateral_token": collateral_token,
+            "protocol_version": protocol_version,
             "outcome_indices": outcome_indices,
             "amounts": amounts,
             "betting_open": betting_open,
@@ -544,7 +687,7 @@ async def encode_create_wager(
     Args:
         collateral_token: ERC-20 token address for bets.
         proposition: Human-readable wager proposition.
-        outcomes: List of outcome labels (minimum 2, max 64).
+        outcomes: List of outcome labels (minimum 2, max 255).
         betting_close_time: Absolute unix timestamp for betting close (0 = no time cap, requires betting_closer).
         resolution_window: Seconds after betting close for resolver to act (0 = no time cap, requires resolution_closer).
         resolver: Resolver address (0x0 = proposer resolves).
@@ -606,11 +749,189 @@ async def encode_create_wager(
 
 
 @mcp_server.tool()
+async def encode_create_wager_v2(
+    collateral_token: str,
+    proposition: str,
+    outcomes: list[str],
+    payoff_policy: int,
+    policy_param: int,
+    betting_close_time: int = 0,
+    resolution_window: int = 0,
+    resolver: str = _ZERO_ADDRESS,
+    betting_closer: str = _ZERO_ADDRESS,
+    resolution_closer: str = _ZERO_ADDRESS,
+    extra_fee_recipients: list[str] | None = None,
+    extra_fee_bps: list[int] | None = None,
+    seed_ticket_masks: list[int] | None = None,
+    seed_amounts: list[int] | None = None,
+) -> str:
+    """Encode calldata for ParamutuelFactoryV2.createWager (ADR-0008 v2).
+
+    `payoff_policy` is the uint8 enum value from `ParamutuelWagerV2.PayoffPolicy`
+    (0=SINGLE_WINNER, 1=ANY_OF, 2=EXACT_SET, 3=AT_LEAST_K, 4=WEIGHTED_OVERLAP).
+    For AT_LEAST_K, set `policy_param` to k. Seeds use ticket bitmasks (not outcome indices).
+    """
+    if not FACTORY_V2_ADDRESS:
+        raise ValueError(
+            "FACTORY_V2_ADDRESS is not configured (env or config/deployments.json factoryV2Address)"
+        )
+
+    fee_recipients = extra_fee_recipients or []
+    fee_bps = extra_fee_bps or []
+    masks = seed_ticket_masks or []
+    samt = seed_amounts or []
+
+    if masks or samt:
+        sig = (
+            "createWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
+            "address,address[],uint16[],uint256[],uint256[])"
+        )
+        types = [
+            "address",
+            "string",
+            "string[]",
+            "uint8",
+            "uint256",
+            "uint64",
+            "uint64",
+            "address",
+            "address",
+            "address",
+            "address[]",
+            "uint16[]",
+            "uint256[]",
+            "uint256[]",
+        ]
+        values = [
+            collateral_token,
+            proposition,
+            outcomes,
+            payoff_policy,
+            policy_param,
+            betting_close_time,
+            resolution_window,
+            resolver,
+            betting_closer,
+            resolution_closer,
+            fee_recipients,
+            fee_bps,
+            masks,
+            samt,
+        ]
+    else:
+        sig = (
+            "createWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
+            "address,address[],uint16[])"
+        )
+        types = [
+            "address",
+            "string",
+            "string[]",
+            "uint8",
+            "uint256",
+            "uint64",
+            "uint64",
+            "address",
+            "address",
+            "address",
+            "address[]",
+            "uint16[]",
+        ]
+        values = [
+            collateral_token,
+            proposition,
+            outcomes,
+            payoff_policy,
+            policy_param,
+            betting_close_time,
+            resolution_window,
+            resolver,
+            betting_closer,
+            resolution_closer,
+            fee_recipients,
+            fee_bps,
+        ]
+
+    calldata = _encode_call(sig, types, values)
+    total_seed = sum(samt)
+    result: dict[str, Any] = {
+        "to": FACTORY_V2_ADDRESS,
+        "calldata": calldata,
+        "description": f"Create v2 wager: '{proposition}' ({len(outcomes)} outcomes, policy={payoff_policy})",
+    }
+    if total_seed > 0:
+        result["approval_required"] = {
+            "token": collateral_token,
+            "spender": FACTORY_V2_ADDRESS,
+            "amount": total_seed,
+            "approve_calldata": _encode_erc20_approve(FACTORY_V2_ADDRESS, total_seed),
+        }
+    return json.dumps(result, indent=2)
+
+
+@mcp_server.tool()
+async def encode_create_freeform_wager(
+    collateral_token: str,
+    proposition: str,
+    betting_close_time: int = 0,
+    resolution_window: int = 0,
+    resolver: str = _ZERO_ADDRESS,
+    betting_closer: str = _ZERO_ADDRESS,
+    resolution_closer: str = _ZERO_ADDRESS,
+    extra_fee_recipients: list[str] | None = None,
+    extra_fee_bps: list[int] | None = None,
+) -> str:
+    """Encode `ParamutuelFactoryFreeform.createFreeformWager` (ADR-0009).
+
+    No outcome list: bettors supply text answers per `placeBet(string,uint256)` on the deployed wager.
+    """
+    if not FACTORY_FREEFORM_ADDRESS:
+        raise ValueError(
+            "FACTORY_FREEFORM_ADDRESS is not configured (env or config/deployments.json factoryFreeformAddress)"
+        )
+    fee_recipients = extra_fee_recipients or []
+    fee_bps = extra_fee_bps or []
+    sig = "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
+    types = [
+        "address",
+        "string",
+        "uint64",
+        "uint64",
+        "address",
+        "address",
+        "address",
+        "address[]",
+        "uint16[]",
+    ]
+    values = [
+        collateral_token,
+        proposition,
+        betting_close_time,
+        resolution_window,
+        resolver,
+        betting_closer,
+        resolution_closer,
+        fee_recipients,
+        fee_bps,
+    ]
+    calldata = _encode_call(sig, types, values)
+    return json.dumps(
+        {
+            "to": FACTORY_FREEFORM_ADDRESS,
+            "calldata": calldata,
+            "description": f"Create freeform wager: '{proposition}'",
+        },
+        indent=2,
+    )
+
+
+@mcp_server.tool()
 async def encode_place_bet(
     wager_address: str,
     collateral_token: str,
     outcome_index: int,
     amount: int,
+    ticket_mask: int | None = None,
 ) -> str:
     """Encode calldata for placing a single bet on a wager outcome.
 
@@ -619,19 +940,49 @@ async def encode_place_bet(
     Args:
         wager_address: The wager contract address.
         collateral_token: The ERC-20 collateral token address.
-        outcome_index: Index of the outcome to bet on (0-based).
+        outcome_index: v1: first `placeBet` uint256 (outcome index). Ignored when `ticket_mask` set.
         amount: Bet amount in raw token units.
+        ticket_mask: v2: explicit ticket bitmask for first `placeBet` uint256. When omitted, uses `outcome_index`.
     """
+    first_u256 = int(ticket_mask) if ticket_mask is not None else int(outcome_index)
     calldata = _encode_call(
         "placeBet(uint256,uint256)",
         ["uint256", "uint256"],
-        [outcome_index, amount],
+        [first_u256, amount],
     )
     return json.dumps(
         {
             "to": wager_address,
             "calldata": calldata,
-            "description": f"Bet {amount} on outcome {outcome_index}",
+            "description": f"Bet {amount} (first uint256={first_u256})",
+            "approval_required": {
+                "token": collateral_token,
+                "spender": wager_address,
+                "amount": amount,
+                "approve_calldata": _encode_erc20_approve(wager_address, amount),
+            },
+        },
+        indent=2,
+    )
+
+
+@mcp_server.tool()
+async def encode_place_bet_freeform(
+    wager_address: str,
+    collateral_token: str,
+    answer: str,
+    amount: int,
+) -> str:
+    """Encode `ParamutuelWagerFreeform.placeBet(string,uint256)`.
+
+    `answer` must match resolver `resolve(string)` bytes exactly to win (keccak256(bytes(answer)) ticket id).
+    """
+    calldata = _encode_call("placeBet(string,uint256)", ["string", "uint256"], [answer, amount])
+    return json.dumps(
+        {
+            "to": wager_address,
+            "calldata": calldata,
+            "description": f"Freeform bet amount={amount} (answer bytes hashed on-chain)",
             "approval_required": {
                 "token": collateral_token,
                 "spender": wager_address,
@@ -649,26 +1000,36 @@ async def encode_place_bets(
     collateral_token: str,
     outcome_indices: list[int],
     amounts: list[int],
+    ticket_masks: list[int] | None = None,
 ) -> str:
     """Encode calldata for placing multiple bets across outcomes in one transaction.
 
     Args:
         wager_address: The wager contract address.
         collateral_token: The ERC-20 collateral token address.
-        outcome_indices: List of outcome indices to bet on.
-        amounts: List of bet amounts in raw token units (aligned with outcome_indices).
+        outcome_indices: v1: outcome indices used as first array. Ignored when `ticket_masks` is set.
+        amounts: List of bet amounts in raw token units (aligned with the first uint256[]).
+        ticket_masks: v2: explicit ticket bitmasks array (same length as `amounts`).
     """
+    if ticket_masks is not None:
+        if len(ticket_masks) != len(amounts):
+            raise ValueError("ticket_masks and amounts length mismatch")
+        first_arr = ticket_masks
+    else:
+        if len(outcome_indices) != len(amounts):
+            raise ValueError("outcome_indices and amounts length mismatch")
+        first_arr = outcome_indices
     total = sum(amounts)
     calldata = _encode_call(
         "placeBets(uint256[],uint256[])",
         ["uint256[]", "uint256[]"],
-        [outcome_indices, amounts],
+        [first_arr, amounts],
     )
     return json.dumps(
         {
             "to": wager_address,
             "calldata": calldata,
-            "description": f"Batch bet on {len(outcome_indices)} outcomes, total {total}",
+            "description": f"Batch bet on {len(first_arr)} legs, total {total}",
             "approval_required": {
                 "token": collateral_token,
                 "spender": wager_address,
@@ -688,7 +1049,8 @@ async def encode_resolve(wager_address: str, winning_outcome_index: int) -> str:
 
     Args:
         wager_address: The wager contract address.
-        winning_outcome_index: Index of the winning outcome.
+        winning_outcome_index: v1: winning outcome index. v2: winningMask (bitmask);
+            for a single winner use 1 << outcomeIndex.
     """
     calldata = _encode_call(
         "resolve(uint256)", ["uint256"], [winning_outcome_index]
@@ -698,6 +1060,23 @@ async def encode_resolve(wager_address: str, winning_outcome_index: int) -> str:
             "to": wager_address,
             "calldata": calldata,
             "description": f"Resolve wager to outcome {winning_outcome_index}",
+        },
+        indent=2,
+    )
+
+
+@mcp_server.tool()
+async def encode_resolve_freeform(wager_address: str, winning_answer: str) -> str:
+    """Encode `ParamutuelWagerFreeform.resolve(string)`.
+
+    Reverts on-chain if no stake on `keccak256(bytes(winning_answer))`.
+    """
+    calldata = _encode_call("resolve(string)", ["string"], [winning_answer])
+    return json.dumps(
+        {
+            "to": wager_address,
+            "calldata": calldata,
+            "description": "Resolve freeform wager to exact winning answer string",
         },
         indent=2,
     )

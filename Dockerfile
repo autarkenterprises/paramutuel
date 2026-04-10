@@ -17,6 +17,8 @@ ENV INDEXER_CHUNK_SIZE=120
 # Zero-UI Cloud Run: public Base Sepolia RPC + factory deploy block (override in console if needed).
 ENV RPC_URL_BASE_SEPOLIA=https://sepolia.base.org
 ENV INDEXER_FROM_BLOCK=39608044
+# Optional: set FACTORY_V2_ADDRESS when ParamutuelFactoryV2 is deployed (also in config/deployments.json factoryV2Address).
+# Optional: set FACTORY_FREEFORM_ADDRESS when ParamutuelFactoryFreeform is deployed (also factoryFreeformAddress in deployments.json).
 ENV PORT=8080
 
 EXPOSE 8080

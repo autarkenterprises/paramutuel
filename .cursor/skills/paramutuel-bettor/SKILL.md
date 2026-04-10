@@ -14,7 +14,7 @@ description: >-
 
 - User wants an **agent** (or you as a subagent) to **find open wagers** and **propose** where to bet.
 - User wants a **small, auditable** process that **does not touch private keys**.
-- User already uses or can use the **Paramutuel MCP** server for `quote_place_bet` / transaction encoding.
+- User already uses or can use the **Paramutuel MCP** server for `quote_place_bet`, `encode_place_bet_freeform`, and related encoders.
 
 ## What to run
 
@@ -32,7 +32,7 @@ Set `INDEXER_URL` if the indexer is not the default from `config/deployments.jso
 ## How to combine with MCP (production-shaped loop)
 
 1. Use this agent for **shortlisting + rationale** (strategies are naive; treat as hints).
-2. For each chosen `wager_address` / `outcome_index` / `amount`, call MCP **`quote_place_bet`** (or `quote_place_bets`) immediately before execution so calldata matches chain state.
+2. For each chosen wager, call MCP **`quote_place_bet`** (v1/v2) or **`encode_place_bet_freeform`** (freeform / ADR-0009) immediately before execution so calldata matches chain state.
 3. Pass `approve` + `placeBet` to the user's wallet / signer. Never ask for or embed private keys in prompts.
 
 ## Safety and disclosure

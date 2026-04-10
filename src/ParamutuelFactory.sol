@@ -30,7 +30,8 @@ contract ParamutuelFactory {
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 10_000; // 100% max to support full-beneficiary/charity wagers
-    uint256 public constant MAX_OUTCOMES = 64;
+    /// @dev Maximum 255 outcomes (indices 0..254 fit in one `uint256` bitmask used by v2/tooling).
+    uint256 public constant MAX_OUTCOMES = 255;
 
     uint64 public immutable minBettingWindow;
     uint64 public immutable minResolutionWindow;

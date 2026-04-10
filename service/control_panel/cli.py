@@ -6,7 +6,11 @@ import os
 import subprocess
 import sys
 
-from .commands import build_create_wager_command, build_wager_action_command
+from .commands import (
+    build_create_freeform_wager_command,
+    build_create_wager_command,
+    build_wager_action_command,
+)
 
 
 def _split_csv(s: str) -> list[str]:
@@ -48,6 +52,18 @@ def main() -> int:
     c.add_argument("--seed-outcome-indices", default="", help="Comma-separated uint256 outcome indices")
     c.add_argument("--seed-amounts", default="", help="Comma-separated raw token amounts (uint256)")
 
+    ff = sub.add_parser("create-freeform-wager")
+    ff.add_argument("--factory", required=True)
+    ff.add_argument("--collateral", required=True)
+    ff.add_argument("--proposition", required=True)
+    ff.add_argument("--betting-close-time", type=int, required=True, help="Unix ts or 0")
+    ff.add_argument("--resolution-window", type=int, required=True, help="seconds or 0")
+    ff.add_argument("--resolver", default="0x0000000000000000000000000000000000000000")
+    ff.add_argument("--betting-closer", default="0x0000000000000000000000000000000000000000")
+    ff.add_argument("--resolution-closer", default="0x0000000000000000000000000000000000000000")
+    ff.add_argument("--extra-recipients", default="")
+    ff.add_argument("--extra-bps", default="")
+
     a = sub.add_parser("wager-action")
     a.add_argument("--wager", required=True)
     a.add_argument(
@@ -63,7 +79,13 @@ def main() -> int:
             "withdraw-fees",
         ],
     )
-    a.add_argument("--outcome-index", type=int)
+    a.add_argument("--outcome-index", type=int, help="For resolve: v1 outcome index or v2 winningMask")
+    a.add_argument(
+        "--protocol-version",
+        default="v1",
+        help="v1, v2, or freeform (freeform resolve uses --winning-answer)",
+    )
+    a.add_argument("--winning-answer", default="", help="For freeform resolve(string): exact UTF-8 winning text")
 
     args = parser.parse_args()
     if not args.rpc_url or not args.private_key:
@@ -91,10 +113,30 @@ def main() -> int:
             )
             return _run_or_print(cmd.command, args.execute)
 
+        if args.cmd == "create-freeform-wager":
+            cmd = build_create_freeform_wager_command(
+                factory=args.factory,
+                collateral=args.collateral,
+                proposition=args.proposition,
+                betting_close_time=args.betting_close_time,
+                resolution_window=args.resolution_window,
+                resolver=args.resolver,
+                betting_closer=args.betting_closer,
+                resolution_closer=args.resolution_closer,
+                extra_recipients=_split_csv(args.extra_recipients),
+                extra_bps=_split_int_csv(args.extra_bps),
+                rpc_url=args.rpc_url,
+                private_key=args.private_key,
+            )
+            return _run_or_print(cmd.command, args.execute)
+
+        wa = args.winning_answer.strip() if args.winning_answer else None
         cmd = build_wager_action_command(
             wager=args.wager,
             action=args.action,
             outcome_index=args.outcome_index,
+            protocol_version=args.protocol_version,
+            winning_answer=wa,
             rpc_url=args.rpc_url,
             private_key=args.private_key,
         )

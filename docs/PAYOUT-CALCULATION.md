@@ -5,9 +5,11 @@ This document describes how **collateral token amounts** are computed when a wag
 1. **Protocol v1** — `ParamutuelWager` (single winning **outcome index**).
 2. **Protocol v2** — `ParamutuelWagerV2` (bitmask **tickets** and **payoff policies**; ADR-0008).
 
-**Source layout:** v1 is on `master`. The v2 contract may live on branch `experiment/adr-0008-multi-winner-v2` until merged; the Part B formulas match that implementation.
+**Source layout:** v1 ships from `master`. v2 (`ParamutuelWagerV2`, `ParamutuelFactoryV2`) is developed on **`experiment/adr-0008-multi-winner-v2`** until merged after certification ([`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)). Part B matches `src/ParamutuelWagerV2.sol` on that branch.
 
-All amounts are in the wager’s **ERC-20 raw units** (wei of that token). Arithmetic uses **integer division**; rounding favors staying **at or below** the true rational value, so a few wei of collateral can remain in the contract after all claims.
+All amounts are in the wager’s **ERC-20 raw units**: the token’s **smallest indivisible unit** (for **ETH** / **WETH**, “wei”; for **USDC**, \(10^{-6}\) of a dollar — i.e. **`1e6` raw units = 1 USDC**). Arithmetic uses **integer division**; each payout line is floored, so **unclaimed collateral** after every winner has claimed is **rounding dust** only.
+
+**Production expectation:** That dust is **tiny in human terms** — on the order of **a few smallest units per floored division** (many lines across many bettors can add up, but still **far below one cent** for USDC or **far below one finney** for 18‑decimal ETH), **not** a percentage of **`netPot`**. Losing **multiple whole tokens** (e.g. 3 **USDC** or **ETH**) out of a **500**‑unit pot would **not** come from this rounding; it would imply misconfiguration, fees, or a bug, and should be investigated separately.
 
 ---
 
@@ -109,6 +111,8 @@ Let **`overlap = T & W`** (bits in both ticket and truth). Define **`popcount(x)
 | **AT_LEAST_K** | **`popcount(overlap) ≥ policyParam`** (integer **`k`** set at creation). |
 | **WEIGHTED_OVERLAP** | **`overlap ≠ 0`** (same overlap test as “in the money”; payout uses weights below). |
 
+**Product wording:** When copy says **“all of these outcomes,”** it maps to **EXACT_SET** above — the ticket must match the resolver’s set **exactly** (`T == W`). A different rule — **win if every selected option is among the true outcomes** (`T ⊆ W`, i.e. “my picks are all winners” without requiring `T == W`) — is **not** in v2; treat it as future scope and document explicitly if product needs it.
+
 If **`resolve`** would yield **no** winning ticket with positive pool, the call **reverts** (`NoWinningStake`).
 
 ### Denominator: `totalWinningUnits`
@@ -155,6 +159,61 @@ Summed over all of the bettor’s tickets. If the sum is **0** (e.g. only losing
 - **ANY_OF** / **EXACT_SET** / **AT_LEAST_K** / **SINGLE_WINNER**: same idea as v1 — **`netPot`** is split among **winning stakes** in proportion to each **winning ticket’s pool share**; each bettor’s share is proportional to their stake on each winning mask.
 - **WEIGHTED_OVERLAP**: larger **overlap** between **`T`** and **`W`** multiplies that ticket’s contribution to the denominator and to the bettor’s claim (partial credit).
 
+#### Worked example (`ANY_OF`)
+
+Assume **fees are 0**. The numbers **100**, **50**, … are **only** illustrative **raw integers** (they could mean **100 wei** in a test, or **100** of any token’s smallest unit). They are **not** “100 ETH” or “100 USDC” unless you scale the whole worked example consistently.
+
+- Five base options **A–E** (indices `0 … 4`).
+- Resolver sets **`W = {A, C, E}`**.
+- **Alice** stakes **100** on ticket **`{A, C}`** and **50** on **`{E, D}`**. Under **ANY_OF**, both tickets **win**: the first overlaps **A** and **C**; the second overlaps **E** (even though **D** is not in **`W`**).
+- **Bob** stakes **200** on ticket **`{A}`** only (wins).
+- **Carol** stakes **150** on **`{B}`** (loses; no overlap with **`W`**).
+
+Then **`totalPot`** = 100 + 50 + 200 + 150 = **500**, and with no fees **`netPot`** = **500**.
+
+**`totalWinningUnits`** counts only **winning** ticket pools: 100 + 50 + 200 = **350** (Carol’s losing pool is excluded).
+
+Per-ticket claims (integer division, then summed per bettor):
+
+- **Alice:** ⌊100 × 500 / 350⌋ + ⌊50 × 500 / 350⌋ = **142** + **71** = **213**.
+- **Bob:** ⌊200 × 500 / 350⌋ = **285**.
+
+**Alice + Bob** receive **498** of **`netPot`**; **2** of the **same smallest units** remain in the contract as **rounding dust** (in the toy table, that is literally **2 wei** if stakes were **100 wei**, **50 wei**, … — **not** 2 whole USDC or 2 ETH). **Carol** has no winning ticket, so **`claim()`** reverts (`NothingToClaim`) in the resolved-winner path.
+
+**On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw amounts passed to `placeBet` (as in the Foundry regression). If you use **human-scale** stakes (e.g. **`500e6`** raw for **500 USDC**), **`netPot`** is also in **raw** form; Alice’s lines are still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) — the **remainder** left on the contract stays **dust on the smallest-unit scale**, not “a few dollars” or “a few ETH.” You **cannot** derive payouts by multiplying the toy integers **213** × **`10^6`** unless you repeat the same floor math on full-precision integers. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+
+#### Worked example (`EXACT_SET`)
+
+Same **raw integer** convention as the **ANY_OF** example above (toy amounts in **smallest token units**; see the **ERC-20 raw units** and **rounding dust** paragraphs at the top of this document).
+
+- Three base options **A, B, C** (indices `0 … 2`). Ticket masks: **`{A}=1`**, **`{B}=2`**, **`{C}=4`**, **`{A,C}=5`**, **`{A,B,C}=7`**.
+- **`payoffPolicy = EXACT_SET`**, **`policyParam = 0`**.
+- Resolver sets **`W = {A, C}`**, i.e. **`winningMask = 5`**.
+
+Under **EXACT_SET**, a ticket **`T`** wins **only if** **`T == W`**. Overlap is **not** enough: a ticket on **`{A}`** or on the full **`{A,B,C}`** **loses** because those masks are **not** exactly **`5`**.
+
+| Bettor | Ticket (set) | Mask | Stake (raw) | vs `W = {A,C}` |
+|--------|----------------|------|-------------|----------------|
+| Alice | `{A, C}` | **5** | **60** | **Win** (`5 == 5`) |
+| Bob | `{A}` | **1** | **100** | **Lose** (`1 ≠ 5`) |
+| Carol | `{A, B, C}` | **7** | **140** | **Lose** (`7 ≠ 5`) |
+| Dave | `{A, C}` | **5** | **40** | **Win** (`5 == 5`) |
+
+**`totalPot`** = 60 + 100 + 140 + 40 = **340**; with **no fees**, **`netPot` = 340**.
+
+Only one **distinct winning mask** appears: **`5`**. Its pool is **`ticketPoolTotal[5]`** = 60 + 40 = **100**, so **`totalWinningUnits` = 100**. Losers’ stakes remain in **`netPot`** but do **not** enter the denominator — they are effectively forfeit to the winning side of the pool (same parimutuel idea as v1 losers funding winners).
+
+**Claims** (each winning line: \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\)):
+
+- **Alice:** ⌊60 × 340 / 100⌋ = **204**.
+- **Dave:** ⌊40 × 340 / 100⌋ = **136**.
+
+**204 + 136 = 340 = `netPot`**: in this table the floors **close exactly** (no dust). **Bob** and **Carol** have **no** winning ticket, so **`claim()`** reverts (`NothingToClaim`).
+
+**Contrast with `ANY_OF`:** If this were **`ANY_OF`** and the same **`W`**, tickets **`{A}`** and **`{A,B,C}`** would **win** (non-zero overlap); under **`EXACT_SET`** they **lose** because they did not name **exactly** **`{A,C}`**.
+
+Regression: **`testExactSet_documentationWorkedExample_threeOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+
 ### Retracted or expired (refund)
 
 Identical formula to **v1**:
@@ -177,6 +236,7 @@ Identical formula to **v1**:
 
 ## References
 
-- Contracts: `src/ParamutuelWager.sol`; `src/ParamutuelWagerV2.sol` (v2 branch; see note at top)
+- Contracts: `src/ParamutuelWager.sol`, `src/ParamutuelWagerV2.sol`
 - Machine / API context: [`MACHINE.md`](MACHINE.md)
-- v2 prototype docs (on branch `experiment/adr-0008-multi-winner-v2`): `docs/ADR-0008-IMPLEMENTATION.md`, ADR-0008 in `research/adr/`
+- v2 policies, gas, templates: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)
+- ADR: `research/adr/ADR-0008-multi-winner-and-settlement-generalization.md`

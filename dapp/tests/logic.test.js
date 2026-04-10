@@ -9,6 +9,11 @@ const {
   resolveTemplate,
   computeAbsoluteTemplateClose,
   planWagerAction,
+  PAYOFF_POLICY,
+  popcountMask,
+  parseOutcomeIndicesCsvToTicketMask,
+  seedOutcomeIndicesToTicketMasks,
+  validatePolicyParamForCreate,
 } = require("../logic.js");
 
 test("template lookup falls back to custom", () => {
@@ -185,4 +190,39 @@ test("resolveTemplate computes absolute close for weekly UTC cutoff", () => {
 
 test("computeAbsoluteTemplateClose rejects unknown rules", () => {
   assert.throws(() => computeAbsoluteTemplateClose(0, "unknown"), /Unknown absolute template rule/);
+});
+
+test("parseOutcomeIndicesCsvToTicketMask builds bitmask", () => {
+  assert.equal(parseOutcomeIndicesCsvToTicketMask("0", 3), 1n);
+  assert.equal(parseOutcomeIndicesCsvToTicketMask("0, 2", 3), 5n);
+  assert.equal(parseOutcomeIndicesCsvToTicketMask("2", 5), 4n);
+});
+
+test("parseOutcomeIndicesCsvToTicketMask rejects invalid indices", () => {
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("", 3), /at least one/);
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("3", 3), /out of range/);
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("0,0", 3), /Duplicate/);
+});
+
+test("popcountMask counts bits", () => {
+  assert.equal(popcountMask(0n), 0);
+  assert.equal(popcountMask(5n), 2);
+  assert.equal(popcountMask(7n), 3);
+});
+
+test("seedOutcomeIndicesToTicketMasks maps to single-bit masks", () => {
+  assert.deepEqual(seedOutcomeIndicesToTicketMasks([0, 2]), [1n, 4n]);
+});
+
+test("validatePolicyParamForCreate enforces AT_LEAST_K k", () => {
+  validatePolicyParamForCreate(PAYOFF_POLICY.ANY_OF, 0, 3);
+  validatePolicyParamForCreate(PAYOFF_POLICY.AT_LEAST_K, 2, 3);
+  assert.throws(
+    () => validatePolicyParamForCreate(PAYOFF_POLICY.AT_LEAST_K, 0, 3),
+    /AT_LEAST_K requires k/
+  );
+  assert.throws(
+    () => validatePolicyParamForCreate(PAYOFF_POLICY.ANY_OF, 1, 3),
+    /must be 0/
+  );
 });

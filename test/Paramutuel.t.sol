@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 
 import {ParamutuelFactory} from "../src/ParamutuelFactory.sol";
+import {ParamutuelFactoryMax64} from "./mocks/ParamutuelFactoryMax64.sol";
 import {ParamutuelWager} from "../src/ParamutuelWager.sol";
 
 contract MockERC20 {
@@ -106,6 +107,13 @@ contract ParamutuelTest is Test {
         token.mint(bettor2, initial);
         token.mint(bettor3, initial);
         token.mint(bettor4, initial);
+    }
+
+    function _repeatOutcomes(uint256 n) internal pure returns (string[] memory outcomes) {
+        outcomes = new string[](n);
+        for (uint256 i; i < n; i++) {
+            outcomes[i] = "O";
+        }
     }
 
     function _createBasicWager() internal returns (ParamutuelWager wager) {
@@ -1102,12 +1110,37 @@ contract ParamutuelTest is Test {
         assertEq(wager.feeBalances(extraFeeRecipient), 99 ether, "beneficiary gets remainder of 100% fees");
     }
 
-    function testTooManyOutcomesReverts() public {
-        uint256 n = 65; // > MAX_OUTCOMES (64)
-        string[] memory outcomes = new string[](n);
-        for (uint256 i; i < n; i++) {
-            outcomes[i] = "O";
-        }
+    function test_v1_factory_MAX_OUTCOMES_is_255() public view {
+        assertEq(factory.MAX_OUTCOMES(), 255);
+    }
+
+    /// @notice `MAX_OUTCOMES` was raised from 64 to 255; 65 outcomes used to revert with `TooManyOutcomes`.
+    function test_v1_create_succeeds_with_65_outcomes_past_old_cap() public {
+        string[] memory outcomes = _repeatOutcomes(65);
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        uint256 before = factory.wagersCount();
+        vm.prank(proposer);
+        factory.createWager(
+            address(token),
+            "65 outcomes",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+        assertEq(factory.wagersCount(), before + 1);
+    }
+
+    function test_v1_reverts_when_outcomes_length_exceeds_MAX_OUTCOMES() public {
+        string[] memory outcomes = _repeatOutcomes(256);
 
         uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
         uint64 resolutionWindow = 2 hours;
@@ -1118,6 +1151,32 @@ contract ParamutuelTest is Test {
         vm.expectRevert(ParamutuelFactory.TooManyOutcomes.selector);
         vm.prank(proposer);
         factory.createWager(
+            address(token),
+            "Too many outcomes",
+            outcomes,
+            bettingCloseTime,
+            resolutionWindow,
+            address(0),
+            address(0),
+            address(0),
+            extraRecipients,
+            extraBps
+        );
+    }
+
+    /// @dev Uses `test/mocks/ParamutuelFactoryMax64.sol` (local-only, not deployed) to assert the old 64-outcome cap behavior.
+    function test_legacy_v1_65_outcomes_revert_under_Max64_mock_factory() public {
+        ParamutuelFactoryMax64 f =
+            new ParamutuelFactoryMax64(treasury, protocolFeeBps, minBettingWindow, minResolutionWindow);
+        string[] memory outcomes = _repeatOutcomes(65);
+        uint64 bettingCloseTime = uint64(block.timestamp + 2 hours);
+        uint64 resolutionWindow = 2 hours;
+        address[] memory extraRecipients = new address[](0);
+        uint16[] memory extraBps = new uint16[](0);
+
+        vm.expectRevert(ParamutuelFactoryMax64.TooManyOutcomes.selector);
+        vm.prank(proposer);
+        f.createWager(
             address(token),
             "Too many outcomes",
             outcomes,

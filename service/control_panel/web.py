@@ -8,7 +8,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .commands import build_create_wager_command, build_wager_action_command
+from .commands import (
+    build_create_freeform_wager_command,
+    build_create_wager_command,
+    build_wager_action_command,
+)
 from .security import token_authorized
 
 
@@ -83,11 +87,28 @@ class Handler(BaseHTTPRequestHandler):
                     rpc_url=self.rpc_url,
                     private_key=self.private_key,
                 )
+            elif path == "/api/preview/create-freeform-wager":
+                cmd = build_create_freeform_wager_command(
+                    factory=payload["factory"],
+                    collateral=payload["collateral"],
+                    proposition=payload["proposition"],
+                    betting_close_time=int(payload["bettingCloseTime"]),
+                    resolution_window=int(payload["resolutionWindow"]),
+                    resolver=payload.get("resolver", "0x0000000000000000000000000000000000000000"),
+                    betting_closer=payload.get("bettingCloser", "0x0000000000000000000000000000000000000000"),
+                    resolution_closer=payload.get("resolutionCloser", "0x0000000000000000000000000000000000000000"),
+                    extra_recipients=payload.get("extraRecipients", []),
+                    extra_bps=payload.get("extraBps", []),
+                    rpc_url=self.rpc_url,
+                    private_key=self.private_key,
+                )
             elif path == "/api/preview/action":
                 cmd = build_wager_action_command(
                     wager=payload["wager"],
                     action=payload["action"],
                     outcome_index=payload.get("outcomeIndex"),
+                    protocol_version=payload.get("protocolVersion"),
+                    winning_answer=payload.get("winningAnswer"),
                     rpc_url=self.rpc_url,
                     private_key=self.private_key,
                 )

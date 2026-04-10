@@ -57,7 +57,7 @@ The honest answer: the SAM is early and hard to size. Our thesis is that **forma
 | | This protocol | Polymarket | Paradox | OpenTote | Twitch Predictions |
 |---|---|---|---|---|---|
 | **Permissionless creation** | Yes | Limited | Unclear | Yes | No (platform-only) |
-| **Arbitrary propositions** | Yes (text-defined, 2-64 outcomes) | Limited to curated | Sports-focused | Racing-focused | Platform-curated |
+| **Arbitrary propositions** | Yes (text-defined, 2–255 outcomes) | Limited to curated | Sports-focused | Racing-focused | Platform-curated |
 | **Parimutuel mechanics** | Yes | No (CLOB/AMM) | Yes | Yes | Channel points (no value) |
 | **Real money** | Yes (ERC-20) | Yes | Yes | Yes | No |
 | **Immutable contracts** | Yes | No (upgradeable) | Unclear | Unclear | N/A |
@@ -162,7 +162,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 ### Slide 4 — The solution
 - One-sentence: "A permissionless, immutable smart contract protocol for arbitrary parimutuel prop bets"
 - Visual: simple flow diagram — Propose -> Bet -> Resolve -> Claim
-- Key stats: 2-64 outcomes, any ERC-20, 1% fee, ~$0.02 to create a wager
+- Key stats: 2–255 outcomes, any ERC-20, 1% fee, ~$0.02 to create a wager
 
 ### Slide 5 — How it works
 - Visual walkthrough of wager lifecycle

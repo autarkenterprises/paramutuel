@@ -7,13 +7,30 @@ from urllib import parse, request
 from urllib.error import URLError
 from pathlib import Path
 
-
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-WAGER_CREATED_TOPIC = "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37bc7e35f28def"
+from testnet_helpers import (
+    DEFAULT_COLLATERAL_TOKEN_BASE_SEPOLIA,
+    DUMMY_COLLATERAL,
+    FREEFORM_CREATE_WAGER_SIG,
+    V2_CREATE_WAGER_SIG,
+    V2_FUNDED_RESOLVE_CASES,
+    V2_MINIMAL_EXPIRE_POLICIES,
+    WAGER_CREATED_TOPIC_V1,
+    WAGER_CREATED_TOPIC_FREEFORM,
+    WAGER_CREATED_TOPIC_V2,
+    ZERO_ADDRESS,
+    default_factory_freeform_address,
+    default_factory_v2_address,
+    extract_wager_address_from_receipt,
+)
 
 
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
+
+
+def _live_funded_collateral_token() -> str:
+    """Explicit TESTNET_COLLATERAL_TOKEN, else canonical Base Sepolia USDC for funded live tests."""
+    return _env("TESTNET_COLLATERAL_TOKEN") or DEFAULT_COLLATERAL_TOKEN_BASE_SEPOLIA
 
 
 def _rpc_url() -> str:
@@ -154,23 +171,22 @@ def _receipt(tx_hash: str) -> dict:
     return json.loads(out)
 
 
-def _topic_to_address(topic_word: str) -> str:
-    cleaned = topic_word.lower().replace("0x", "")
-    return "0x" + cleaned[-40:]
-
-
 def _extract_created_wager_from_receipt(tx_hash: str, factory_address: str) -> str:
-    payload = _receipt(tx_hash)
-    for log in payload.get("logs", []):
-        if str(log.get("address", "")).lower() != factory_address.lower():
-            continue
-        topics = log.get("topics") or []
-        if len(topics) < 2:
-            continue
-        if str(topics[0]).lower() != WAGER_CREATED_TOPIC:
-            continue
-        return _topic_to_address(str(topics[1]))
-    raise AssertionError(f"WagerCreated event not found in receipt for tx {tx_hash}")
+    return extract_wager_address_from_receipt(
+        _receipt(tx_hash), factory_address, WAGER_CREATED_TOPIC_V1
+    )
+
+
+def _extract_created_wager_v2_from_receipt(tx_hash: str, factory_v2_address: str) -> str:
+    return extract_wager_address_from_receipt(
+        _receipt(tx_hash), factory_v2_address, WAGER_CREATED_TOPIC_V2
+    )
+
+
+def _extract_created_wager_freeform_from_receipt(tx_hash: str, factory_freeform_address: str) -> str:
+    return extract_wager_address_from_receipt(
+        _receipt(tx_hash), factory_freeform_address, WAGER_CREATED_TOPIC_FREEFORM
+    )
 
 
 def _as_int(value: str) -> int:
@@ -276,6 +292,7 @@ def _indexer_query_wagers(base_url: str, q: str, limit: int = 20) -> list[dict]:
 
 
 def _wait_for_indexer_wager(base_url: str, q: str, timeout_seconds: int = 420) -> dict:
+    """Poll hosted indexer until `GET /wagers?q=...` returns a row (see docs/TESTNET-LIVE-SUITE.md)."""
     deadline = time.time() + timeout_seconds
     last = []
     while time.time() < deadline:
@@ -296,7 +313,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
         cls.mode = _env("TESTNET_MODE", "readonly").lower()
         cls.wager_address = _env("TESTNET_WAGER_ADDRESS")
         cls.private_key = _env("PRIVATE_KEY")
-        cls.collateral_token = _env("TESTNET_COLLATERAL_TOKEN")
+        cls.collateral_token = _live_funded_collateral_token()
         cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
         cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
         cls.unauthorized_private_key = _env("TESTNET_UNAUTHORIZED_PRIVATE_KEY")
@@ -331,6 +348,7 @@ class TestBaseSepoliaLive(unittest.TestCase):
     def test_existing_wager_views(self) -> None:
         if not self.wager_address:
             self.skipTest("Set TESTNET_WAGER_ADDRESS to run wager read checks")
+        # Intentionally v1: factory() must match the v1 ParamutuelFactory, not ParamutuelFactoryV2.
 
         factory_on_wager = _call(self.wager_address, "factory()(address)")
         betting_close_time = _as_int(_call(self.wager_address, "bettingCloseTime()(uint64)"))
@@ -407,8 +425,6 @@ class TestBaseSepoliaLive(unittest.TestCase):
             self.skipTest("Set TESTNET_MODE=funded-tx to run funded lifecycle checks")
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY to run funded lifecycle checks")
-        if not self.collateral_token:
-            self.skipTest("Set TESTNET_COLLATERAL_TOKEN to run funded lifecycle checks")
 
         decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
         amount_raw = _parse_units(self.bet_amount, decimals)
@@ -418,7 +434,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
         sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
         if sender_balance < amount_raw:
             self.skipTest(
-                f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
+                f"Connected wallet token balance too low for {self.collateral_token}: "
+                f"have {sender_balance}, need {amount_raw} (override with TESTNET_COLLATERAL_TOKEN)"
             )
 
         before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
@@ -555,8 +572,6 @@ class TestBaseSepoliaLive(unittest.TestCase):
             self.skipTest("Set TESTNET_MODE=funded-tx to run funded lifecycle checks")
         if not self.private_key:
             self.skipTest("Set PRIVATE_KEY to run funded lifecycle checks")
-        if not self.collateral_token:
-            self.skipTest("Set TESTNET_COLLATERAL_TOKEN to run funded lifecycle checks")
         if not self.indexer_base_url:
             self.skipTest("Set TESTNET_INDEXER_BASE_URL or config baseSepolia.explorerApiBase")
 
@@ -568,7 +583,8 @@ class TestBaseSepoliaLive(unittest.TestCase):
         sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
         if sender_balance < amount_raw:
             self.skipTest(
-                f"Connected wallet token balance too low: have {sender_balance}, need {amount_raw}"
+                f"Connected wallet token balance too low for {self.collateral_token}: "
+                f"have {sender_balance}, need {amount_raw} (override with TESTNET_COLLATERAL_TOKEN)"
             )
 
         before_count = _as_int(_call(self.factory, "wagersCount()(uint256)"))
@@ -606,6 +622,412 @@ class TestBaseSepoliaLive(unittest.TestCase):
         except AssertionError as exc:
             self.skipTest(f"Hosted indexer has not yet indexed wager {wager}: {exc}")
         self.assertEqual(str(indexed.get("wager_address", "")).lower(), wager.lower())
+
+
+def _filtered_live_v2_cases():
+    raw = _env("TESTNET_V2_CASES", "").strip()
+    if not raw:
+        return V2_FUNDED_RESOLVE_CASES
+    want = {x.strip() for x in raw.split(",") if x.strip()}
+    return tuple(c for c in V2_FUNDED_RESOLVE_CASES if c.case_id in want)
+
+
+class TestBaseSepoliaLiveV2(unittest.TestCase):
+    """ParamutuelFactoryV2 / ParamutuelWagerV2 coverage (skipped when factory v2 not configured)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.rpc = _rpc_url()
+        cls.factory_v2 = _env("FACTORY_V2_ADDRESS") or default_factory_v2_address()
+        cls.mode = _env("TESTNET_MODE", "readonly").lower()
+        cls.private_key = _env("PRIVATE_KEY")
+        cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
+        cls.collateral_token = _live_funded_collateral_token()
+        cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
+        cls.indexer_base_url = _indexer_base_url()
+        cls.wager_address_v2 = _env("TESTNET_WAGER_ADDRESS_V2")
+        cls.skip_v2 = _env("TESTNET_SKIP_V2", "").lower() in ("1", "true", "yes")
+
+        if cls.skip_v2:
+            raise unittest.SkipTest("TESTNET_SKIP_V2 set — skipping all v2 live tests")
+        if not cls.rpc:
+            raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
+        if not cls.factory_v2:
+            raise unittest.SkipTest(
+                "Set FACTORY_V2_ADDRESS or config/deployments.json baseSepolia.factoryV2Address for v2 tests"
+            )
+
+        cls.sender = ""
+        if cls.private_key:
+            cls.sender = _run_cast(["wallet", "address", "--private-key", cls.private_key])
+        cls.secondary_sender = ""
+        if cls.secondary_private_key:
+            cls.secondary_sender = _run_cast(["wallet", "address", "--private-key", cls.secondary_private_key])
+
+    def test_factory_v2_view_invariants(self) -> None:
+        treasury = _call(self.factory_v2, "treasury()(address)")
+        protocol_fee_bps = _as_int(_call(self.factory_v2, "protocolFeeBps()(uint16)"))
+        min_betting_window = _as_int(_call(self.factory_v2, "minBettingWindow()(uint64)"))
+        min_resolution_window = _as_int(_call(self.factory_v2, "minResolutionWindow()(uint64)"))
+        wagers_count = _as_int(_call(self.factory_v2, "wagersCount()(uint256)"))
+
+        self.assertNotEqual(treasury.lower(), ZERO_ADDRESS)
+        self.assertGreaterEqual(protocol_fee_bps, 0)
+        self.assertLessEqual(protocol_fee_bps, 10000)
+        self.assertGreaterEqual(min_betting_window, 0)
+        self.assertGreaterEqual(min_resolution_window, 0)
+        self.assertGreaterEqual(wagers_count, 0)
+
+    def test_optional_known_v2_wager_reads(self) -> None:
+        if not self.wager_address_v2:
+            self.skipTest("Set TESTNET_WAGER_ADDRESS_V2 to run v2 wager read checks")
+
+        factory_on_wager = _call(self.wager_address_v2, "factory()(address)")
+        policy = _as_int(_call(self.wager_address_v2, "payoffPolicy()(uint8)"))
+        pparam = _as_int(_call(self.wager_address_v2, "policyParam()(uint256)"))
+        nopt = _as_int(_call(self.wager_address_v2, "numOptions()(uint256)"))
+        state = _as_int(_call(self.wager_address_v2, "state()(uint8)"))
+
+        self.assertEqual(factory_on_wager.lower(), self.factory_v2.lower())
+        self.assertIn(policy, (0, 1, 2, 3, 4))
+        self.assertGreaterEqual(nopt, 2)
+        self.assertIn(state, (0, 1, 2))
+
+    def test_minimal_tx_v2_payoff_policy_expire_matrix(self) -> None:
+        if self.mode != "minimal-tx":
+            self.skipTest("Set TESTNET_MODE=minimal-tx to run v2 minimal transaction matrix")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for v2 minimal transaction matrix")
+
+        for policy, param, outcomes_json in V2_MINIMAL_EXPIRE_POLICIES:
+            with self.subTest(policy=policy, outcomes=outcomes_json):
+                proposition = f"live-v2-min-{policy}-{int(time.time())}"
+                create_tx = _send(
+                    self.factory_v2,
+                    V2_CREATE_WAGER_SIG,
+                    DUMMY_COLLATERAL,
+                    proposition,
+                    outcomes_json,
+                    str(policy),
+                    str(param),
+                    "0",
+                    "0",
+                    ZERO_ADDRESS,
+                    self.sender,
+                    self.sender,
+                    "[]",
+                    "[]",
+                )
+                wager = _extract_created_wager_v2_from_receipt(create_tx, self.factory_v2)
+                po = _as_int(_call(wager, "payoffPolicy()(uint8)"))
+                self.assertEqual(po, policy)
+
+                _send(wager, "closeBetting()")
+                _wait_for_bool_value(wager, "bettingClosedByAuthority()(bool)", True)
+                _send(wager, "closeResolutionWindow()")
+                _wait_for_bool_value(
+                    wager,
+                    "resolutionWindowClosedByAuthority()(bool)",
+                    True,
+                )
+                _send(wager, "expire()")
+                self.assertEqual(_wait_for_state(wager, 2), 2)
+
+    def test_funded_tx_v2_payoff_policy_resolve_matrix(self) -> None:
+        if self.mode != "funded-tx":
+            self.skipTest("Set TESTNET_MODE=funded-tx for v2 funded policy matrix")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for v2 funded policy matrix")
+
+        decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
+        amount_raw = _parse_units(self.bet_amount, decimals)
+        if amount_raw <= 0:
+            self.skipTest("TESTNET_BET_AMOUNT must parse to a positive amount")
+
+        sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
+        cases = _filtered_live_v2_cases()
+        max_per_wager = max(amount_raw * len(c.ticket_masks) for c in cases) if cases else amount_raw
+        if sender_balance < max_per_wager:
+            self.skipTest(
+                "Insufficient collateral for largest v2 scenario "
+                f"(have {sender_balance}, need at least {max_per_wager} raw)"
+            )
+
+        last_wager = ""
+        for case in _filtered_live_v2_cases():
+            with self.subTest(case_id=case.case_id):
+                legs = len(case.ticket_masks)
+                total_stake = amount_raw * legs
+                if sender_balance < total_stake:
+                    self.skipTest(f"Insufficient balance for case {case.case_id} (need {total_stake} raw)")
+
+                proposition = f"live-v2-{case.case_id}-{int(time.time())}"
+                create_tx = _send(
+                    self.factory_v2,
+                    V2_CREATE_WAGER_SIG,
+                    self.collateral_token,
+                    proposition,
+                    case.outcomes_json,
+                    str(case.payoff_policy),
+                    str(case.policy_param),
+                    "0",
+                    "0",
+                    ZERO_ADDRESS,
+                    self.sender,
+                    self.sender,
+                    "[]",
+                    "[]",
+                )
+                wager = _extract_created_wager_v2_from_receipt(create_tx, self.factory_v2)
+                last_wager = wager
+
+                self.assertEqual(_as_int(_call(wager, "payoffPolicy()(uint8)")), case.payoff_policy)
+
+                _send(self.collateral_token, "approve(address,uint256)", wager, str(total_stake))
+
+                if case.use_place_bets and legs > 1:
+                    masks_lit = "[" + ",".join(str(m) for m in case.ticket_masks) + "]"
+                    amts_lit = "[" + ",".join(str(amount_raw) for _ in case.ticket_masks) + "]"
+                    _send(
+                        wager,
+                        "placeBets(uint256[],uint256[])",
+                        masks_lit,
+                        amts_lit,
+                    )
+                else:
+                    for idx, mask in enumerate(case.ticket_masks):
+                        if idx > 0 and self.secondary_private_key:
+                            _send_with_key(
+                                self.secondary_private_key,
+                                self.collateral_token,
+                                "approve(address,uint256)",
+                                wager,
+                                str(amount_raw),
+                            )
+                            _send_with_key(
+                                self.secondary_private_key,
+                                wager,
+                                "placeBet(uint256,uint256)",
+                                str(mask),
+                                str(amount_raw),
+                            )
+                        else:
+                            _send(
+                                wager,
+                                "placeBet(uint256,uint256)",
+                                str(mask),
+                                str(amount_raw),
+                            )
+
+                _send(wager, "closeBetting()")
+                _send(wager, "resolve(uint256)", str(case.winning_mask))
+                self.assertEqual(_wait_for_state(wager, 1), 1)
+                _send(wager, "claim()")
+
+        if self.indexer_base_url and last_wager:
+            try:
+                detail = _wait_for_indexer_wager(self.indexer_base_url, last_wager, timeout_seconds=180)
+            except AssertionError as exc:
+                self.skipTest(f"Indexer did not surface last v2 wager: {exc}")
+            w = detail.get("wager") or {}
+            self.assertEqual(str(w.get("protocol_version", "")).lower(), "v2")
+
+
+class TestBaseSepoliaLiveFreeform(unittest.TestCase):
+    """ParamutuelFactoryFreeform / ParamutuelWagerFreeform (skipped when freeform factory unset)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.rpc = _rpc_url()
+        cls.factory_ff = _env("FACTORY_FREEFORM_ADDRESS") or default_factory_freeform_address()
+        cls.mode = _env("TESTNET_MODE", "readonly").lower()
+        cls.private_key = _env("PRIVATE_KEY")
+        cls.secondary_private_key = _env("TESTNET_SECONDARY_PRIVATE_KEY")
+        cls.collateral_token = _live_funded_collateral_token()
+        cls.bet_amount = _env("TESTNET_BET_AMOUNT", "1")
+        cls.skip_freeform = _env("TESTNET_SKIP_FREEFORM", "").lower() in ("1", "true", "yes")
+
+        if cls.skip_freeform:
+            raise unittest.SkipTest("TESTNET_SKIP_FREEFORM set — skipping freeform live tests")
+        if not cls.rpc:
+            raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
+        if not cls.factory_ff:
+            raise unittest.SkipTest(
+                "Set FACTORY_FREEFORM_ADDRESS or config/deployments.json baseSepolia.factoryFreeformAddress"
+            )
+
+        cls.sender = ""
+        if cls.private_key:
+            cls.sender = _run_cast(["wallet", "address", "--private-key", cls.private_key])
+        cls.secondary_sender = ""
+        if cls.secondary_private_key:
+            cls.secondary_sender = _run_cast(["wallet", "address", "--private-key", cls.secondary_private_key])
+
+    def test_factory_freeform_view_invariants(self) -> None:
+        treasury = _call(self.factory_ff, "treasury()(address)")
+        protocol_fee_bps = _as_int(_call(self.factory_ff, "protocolFeeBps()(uint16)"))
+        min_betting_window = _as_int(_call(self.factory_ff, "minBettingWindow()(uint64)"))
+        min_resolution_window = _as_int(_call(self.factory_ff, "minResolutionWindow()(uint64)"))
+        wagers_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
+
+        self.assertNotEqual(treasury.lower(), ZERO_ADDRESS)
+        self.assertGreaterEqual(protocol_fee_bps, 0)
+        self.assertLessEqual(protocol_fee_bps, 10000)
+        self.assertGreaterEqual(min_betting_window, 0)
+        self.assertGreaterEqual(min_resolution_window, 0)
+        self.assertGreaterEqual(wagers_count, 0)
+
+    def test_minimal_tx_freeform_expire(self) -> None:
+        if self.mode != "minimal-tx":
+            self.skipTest("Set TESTNET_MODE=minimal-tx for freeform minimal transaction checks")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for freeform minimal transaction checks")
+
+        before_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
+        proposition = f"ff-min-{int(time.time())}"
+        create_tx = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            DUMMY_COLLATERAL,
+            proposition,
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        after_count = _wait_for_wagers_count(self.factory_ff, before_count + 1)
+        self.assertGreaterEqual(after_count, before_count + 1)
+
+        wager = _extract_created_wager_freeform_from_receipt(create_tx, self.factory_ff)
+        self.assertEqual(_as_int(_call(wager, "outcomesCount()(uint256)")), 0)
+
+        _send(wager, "closeBetting()")
+        _wait_for_bool_value(wager, "bettingClosedByAuthority()(bool)", True)
+        _send(wager, "closeResolutionWindow()")
+        _wait_for_bool_value(wager, "resolutionWindowClosedByAuthority()(bool)", True)
+        _send(wager, "expire()")
+        self.assertEqual(_wait_for_state(wager, 2), 2)
+
+    def test_funded_tx_freeform_resolve_retract_expire(self) -> None:
+        if self.mode != "funded-tx":
+            self.skipTest("Set TESTNET_MODE=funded-tx for freeform funded checks")
+        if not self.private_key:
+            self.skipTest("Set PRIVATE_KEY for freeform funded checks")
+
+        decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
+        amount_raw = _parse_units(self.bet_amount, decimals)
+        if amount_raw <= 0:
+            self.skipTest("TESTNET_BET_AMOUNT must parse to a positive amount")
+
+        sender_balance = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.sender))
+        if sender_balance < amount_raw * 4:
+            self.skipTest(
+                f"Insufficient token balance for freeform funded matrix ({self.collateral_token}): "
+                f"have {sender_balance}, want at least {amount_raw * 4} raw "
+                f"(override with TESTNET_COLLATERAL_TOKEN)"
+            )
+
+        before_count = _as_int(_call(self.factory_ff, "wagersCount()(uint256)"))
+        protocol_fee_bps = _as_int(_call(self.factory_ff, "protocolFeeBps()(uint16)"))
+        extra_bps = 1 if protocol_fee_bps < 10000 else 0
+        extra_recipients = f"[{self.sender}]" if extra_bps > 0 else "[]"
+        extra_bps_json = f"[{extra_bps}]" if extra_bps > 0 else "[]"
+
+        # Resolve + claim (+ optional fee withdraw).
+        create_tx_r = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            self.collateral_token,
+            f"ff-funded-resolve-{int(time.time())}",
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            extra_recipients,
+            extra_bps_json,
+        )
+        _wait_for_wagers_count(self.factory_ff, before_count + 1)
+        wager_r = _extract_created_wager_freeform_from_receipt(create_tx_r, self.factory_ff)
+
+        _send(self.collateral_token, "approve(address,uint256)", wager_r, str(amount_raw * 2))
+        _send(wager_r, "placeBet(string,uint256)", "YES", str(amount_raw))
+        if self.secondary_private_key:
+            sb = _as_int(_call(self.collateral_token, "balanceOf(address)(uint256)", self.secondary_sender))
+            if sb >= amount_raw:
+                _send_with_key(
+                    self.secondary_private_key,
+                    self.collateral_token,
+                    "approve(address,uint256)",
+                    wager_r,
+                    str(amount_raw),
+                )
+                _send_with_key(
+                    self.secondary_private_key,
+                    wager_r,
+                    "placeBet(string,uint256)",
+                    "NO",
+                    str(amount_raw),
+                )
+
+        _send(wager_r, "closeBetting()")
+        _send(wager_r, "resolve(string)", "YES")
+        self.assertEqual(_wait_for_state(wager_r, 1), 1)
+        _send(wager_r, "claim()")
+        if extra_bps > 0:
+            fb = _as_int(_call(wager_r, "feeBalances(address)(uint256)", self.sender))
+            if fb > 0:
+                _send(wager_r, "withdrawFees()")
+
+        # Retract + claim.
+        create_tx_t = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            self.collateral_token,
+            f"ff-funded-retract-{int(time.time())}",
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        _wait_for_wagers_count(self.factory_ff, before_count + 2)
+        wager_t = _extract_created_wager_freeform_from_receipt(create_tx_t, self.factory_ff)
+        _send(self.collateral_token, "approve(address,uint256)", wager_t, str(amount_raw))
+        _send(wager_t, "placeBet(string,uint256)", "BRANCH2", str(amount_raw))
+        _send(wager_t, "closeBetting()")
+        _send(wager_t, "retract()")
+        self.assertEqual(_wait_for_state(wager_t, 2), 2)
+        _send(wager_t, "claim()")
+
+        # Expire + claim.
+        create_tx_e = _send(
+            self.factory_ff,
+            FREEFORM_CREATE_WAGER_SIG,
+            self.collateral_token,
+            f"ff-funded-expire-{int(time.time())}",
+            "0",
+            "0",
+            ZERO_ADDRESS,
+            self.sender,
+            self.sender,
+            "[]",
+            "[]",
+        )
+        _wait_for_wagers_count(self.factory_ff, before_count + 3)
+        wager_e = _extract_created_wager_freeform_from_receipt(create_tx_e, self.factory_ff)
+        _send(self.collateral_token, "approve(address,uint256)", wager_e, str(amount_raw))
+        _send(wager_e, "placeBet(string,uint256)", "BRANCH3", str(amount_raw))
+        _send(wager_e, "closeBetting()")
+        _send(wager_e, "closeResolutionWindow()")
+        _send(wager_e, "expire()")
+        self.assertEqual(_wait_for_state(wager_e, 2), 2)
+        _send(wager_e, "claim()")
 
 
 if __name__ == "__main__":

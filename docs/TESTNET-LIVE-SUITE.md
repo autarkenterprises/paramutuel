@@ -23,15 +23,43 @@ It has three modes:
 
 Optional:
 
-- `TESTNET_WAGER_ADDRESS` (to run additional read checks on a known wager)
+- `TESTNET_WAGER_ADDRESS` (to run additional read checks on a known **v1** wager — `factory()` must match the v1 factory)
 - `TESTNET_MODE=minimal-tx` (for transaction checks)
 - `PRIVATE_KEY` (required for `minimal-tx`)
 - `TESTNET_MODE=funded-tx` (for funded lifecycle checks)
-- `TESTNET_COLLATERAL_TOKEN` (required for `funded-tx`, ERC20 with `decimals()/approve()/balanceOf()`)
+- `TESTNET_COLLATERAL_TOKEN` (optional for `funded-tx`; if unset, the suite defaults to **Base Sepolia USDC** `0x036CbD53842c5426634e7929541eC2318f3dCF7e`. Override when you want another ERC-20 with `decimals()/approve()/balanceOf()`.)
 - `TESTNET_BET_AMOUNT` (optional, default `1`; human token units)
 - `TESTNET_SECONDARY_PRIVATE_KEY` (optional; if funded, places a second bet on opposite outcome)
 - `TESTNET_UNAUTHORIZED_PRIVATE_KEY` (optional; enables negative access-control tx checks)
 - `TESTNET_INDEXER_BASE_URL` (optional; defaults to `config/deployments.json` -> `baseSepolia.explorerApiBase` for hosted indexer visibility checks)
+
+**ParamutuelFactoryV2 / v2 wagers** (class `TestBaseSepoliaLiveV2` in `test/testnet/test_live_base_sepolia.py`):
+
+- Factory address: `FACTORY_V2_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryV2Address`. If unset, all v2 tests are skipped.
+- `TESTNET_SKIP_V2=1` — force-skip v2 tests even when a v2 factory is configured.
+- `TESTNET_WAGER_ADDRESS_V2` — optional on-chain read checks against a known v2 wager (`payoffPolicy`, `numOptions`, …).
+- `TESTNET_MODE=minimal-tx` — runs a **matrix over all `PayoffPolicy` values** (dummy collateral): create → authority closes → `expire()` (no ERC-20).
+- `TESTNET_MODE=funded-tx` — runs a **funded resolve matrix**: for each policy, creates a v2 wager with real collateral, places **`placeBet` or `placeBets`** (per scenario), `resolve(winningMask)`, `claim()`. Cases cover `SINGLE_WINNER`, `ANY_OF` (+ batch `placeBets`), `EXACT_SET`, `AT_LEAST_K` (3 outcomes, `policyParam=2`), and `WEIGHTED_OVERLAP`.
+- `TESTNET_V2_CASES` — comma-separated subset of case ids: `single_winner`, `any_of`, `exact_set`, `at_least_k`, `weighted_overlap` (default: all).
+
+**ParamutuelFactoryFreeform** (`TestBaseSepoliaLiveFreeform` in `test/testnet/test_live_base_sepolia.py`):
+
+- Factory: `FACTORY_FREEFORM_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryFreeformAddress`.
+- `TESTNET_SKIP_FREEFORM=1` — skip all freeform live tests.
+- `TESTNET_MODE=minimal-tx` — create (dummy collateral) → authority close → `expire()`.
+- `TESTNET_MODE=funded-tx` — resolve / retract / expire matrix with real collateral (default USDC if `TESTNET_COLLATERAL_TOKEN` unset) and `placeBet(string,uint256)` / `resolve(string)`.
+
+## Hosted indexer visibility (`test_funded_tx_resolution_window_guards_and_indexer_visibility`)
+
+One funded test polls the **remote** HTTP API configured as `TESTNET_INDEXER_BASE_URL` or `config/deployments.json` → `baseSepolia.explorerApiBase`. It creates a fresh on-chain wager, then searches `/wagers?q=<wager_address>` until a row appears.
+
+That step is **best-effort**, not a hard guarantee of your local run:
+
+- **Lag:** The indexer follows chain logs on its own schedule (poll interval, RPC batching, catch-up). A wager can exist on-chain for minutes before the API returns it.
+- **Deployment drift:** The hosted URL in the repo may index a fixed set of factory addresses and `fromBlock` values. Wagers created from factories or blocks that instance does **not** watch will never appear, so the poll times out even though the chain state is valid.
+- **Outcome:** On timeout the test **skips** with a clear message instead of failing the whole suite—on-chain guards in the same test still ran; only the “indexer caught up” assertion is skipped.
+
+To tighten this check, point `TESTNET_INDEXER_BASE_URL` at an indexer you control that watches the same factories you use in the test, or run a local `live_api` against your `deployments.json`.
 
 ## Run
 
@@ -71,13 +99,12 @@ PRIVATE_KEY=0x... \
 ./script/testnet/run_live_suite.sh
 ```
 
-Funded tx mode:
+Funded tx mode (collateral defaults to Base Sepolia USDC if `TESTNET_COLLATERAL_TOKEN` is unset):
 
 ```bash
 RPC_URL_BASE_SEPOLIA=https://base-sepolia.g.alchemy.com/v2/<key> \
 TESTNET_MODE=funded-tx \
 PRIVATE_KEY=0x... \
-TESTNET_COLLATERAL_TOKEN=0x... \
 TESTNET_BET_AMOUNT=1 \
 ./script/testnet/run_live_suite.sh
 ```
