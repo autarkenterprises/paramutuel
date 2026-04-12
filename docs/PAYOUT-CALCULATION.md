@@ -5,7 +5,7 @@ This document describes how **collateral token amounts** are computed when a wag
 1. **Protocol v1** — `ParamutuelWager` (single winning **outcome index**).
 2. **Protocol v2** — `ParamutuelWagerV2` (bitmask **tickets** and **payoff policies**; ADR-0008).
 
-**Source layout:** v1 ships from `master`. v2 (`ParamutuelWagerV2`, `ParamutuelFactoryV2`) is developed on **`experiment/adr-0008-multi-winner-v2`** until merged after certification ([`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)). Part B matches `src/ParamutuelWagerV2.sol` on that branch.
+**Source layout:** v1 and v2 both live on `master`: `ParamutuelWager` / `ParamutuelFactory` and `ParamutuelWagerV2` / `ParamutuelFactoryV2` under `src/`. Integration history for v2 tracked on branch **`experiment/adr-0008-multi-winner-v2`**. Part B matches `src/ParamutuelWagerV2.sol` in-tree ([`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)).
 
 All amounts are in the wager’s **ERC-20 raw units**: the token’s **smallest indivisible unit** (for **ETH** / **WETH**, “wei”; for **USDC**, \(10^{-6}\) of a dollar — i.e. **`1e6` raw units = 1 USDC**). Arithmetic uses **integer division**; each payout line is floored, so **unclaimed collateral** after every winner has claimed is **rounding dust** only.
 
@@ -89,7 +89,7 @@ After **`retract()`** or **`expire()`**, state is **Retracted**. Every bettor wi
 
 ## Part B — v2 (`ParamutuelWagerV2`)
 
-*(Contract: `src/ParamutuelWagerV2.sol` — on `experiment/adr-0008-multi-winner-v2` until merged to `master`.)*
+*(Contract: `src/ParamutuelWagerV2.sol`.)*
 
 ### Tickets and winning set
 
@@ -111,7 +111,21 @@ Let **`overlap = T & W`** (bits in both ticket and truth). Define **`popcount(x)
 | **AT_LEAST_K** | **`popcount(overlap) ≥ policyParam`** (integer **`k`** set at creation). |
 | **WEIGHTED_OVERLAP** | **`overlap ≠ 0`** (same overlap test as “in the money”; payout uses weights below). |
 
-**Product wording:** When copy says **“all of these outcomes,”** it maps to **EXACT_SET** above — the ticket must match the resolver’s set **exactly** (`T == W`). A different rule — **win if every selected option is among the true outcomes** (`T ⊆ W`, i.e. “my picks are all winners” without requiring `T == W`) — is **not** in v2; treat it as future scope and document explicitly if product needs it.
+### Glossary: “any of” / “all of” (product copy → policy)
+
+| Colloquial intent | Formal idea | Policy to use | On-chain win test |
+|-------------------|-------------|---------------|-------------------|
+| **“Any of these”** / at least one pick is true | Overlap with **`W`** | **ANY_OF** | **`(T & W) ≠ 0`** |
+| **“Exactly this combination”** / full slate | Ticket equals the resolver’s full set | **EXACT_SET** | **`T == W`** |
+| **“All my picks are winners”** (each picked option is in **`W`**) | **Subset-of-truth** **`T ⊆ W`** (equivalently **`T & W == T`**) | **No dedicated enum value** — see below | — |
+| **Legacy single outcome** | One true option, one-bit tickets | **SINGLE_WINNER** | **`T == W`**, single-bit **`W`** |
+
+**Disambiguating “all of”:** Marketing phrase **“all of these outcomes”** usually means **EXACT_SET** — the bettor’s ticket must match **`W` exactly** (`T == W`). That is **stricter** than **“every option I picked is among the true ones”** (**`T ⊆ W`**): e.g. **`T = {A}`** and **`W = {A,B}`** satisfies **`T ⊆ W`** but **fails** **EXACT_SET**.
+
+**Subset-of-truth (`T ⊆ W`) without a new policy:** The baseline v2 enum does **not** include **`ALL_PICKS_TRUE`**-style semantics. Practical options:
+
+1. **Uniform ticket size:** If **every** stake uses a mask with **exactly `k`** bits (enforce in UI / market rules), then **`AT_LEAST_K`** with **`policyParam = k`** matches **`T ⊆ W`** for those tickets: **`popcount(T & W) ≥ k`** with **`popcount(T) = k`** iff every bit of **`T`** appears in **`W`**.
+2. **Variable ticket sizes:** A **single** global **`k`** cannot express per-ticket subset semantics for all masks. Split markets by ticket shape, or specify a **new `PayoffPolicy`** in a follow-up ADR.
 
 If **`resolve`** would yield **no** winning ticket with positive pool, the call **reverts** (`NoWinningStake`).
 

@@ -1,6 +1,6 @@
 # Paramutuel v2 wager templates (product patterns)
 
-These are **recommended combinations** of `PayoffPolicy`, `policyParam`, and ticket construction for common markets. Encode tickets with `WagerV2Masks` (`src/libraries/WagerV2Masks.sol`) or equivalent off-chain logic.
+These are **recommended combinations** of `PayoffPolicy`, `policyParam`, and ticket construction for common markets. Encode tickets with `WagerV2Masks` (`src/libraries/WagerV2Masks.sol`) or equivalent off-chain logic. For **“any of” / “all of”** product wording vs **`EXACT_SET`** vs subset-of-truth **`T ⊆ W`**, see the glossary in [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B.
 
 | Template | Policy | `policyParam` | Ticket shape | Resolver submits |
 |----------|--------|---------------|--------------|------------------|

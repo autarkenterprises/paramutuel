@@ -1,7 +1,7 @@
 # ADR-0008: Multi-winner resolution and generalized settlement semantics
 
 Date: 2026-03-31  
-Status: Proposed (reference); **prototype contracts** on git branch `experiment/adr-0008-multi-winner-v2` — see [`docs/ADR-0008-IMPLEMENTATION.md`](../../docs/ADR-0008-IMPLEMENTATION.md)
+Status: Proposed (reference); **contracts** merged to **`master`** (developed on `experiment/adr-0008-multi-winner-v2`) — see [`docs/ADR-0008-IMPLEMENTATION.md`](../../docs/ADR-0008-IMPLEMENTATION.md). Product semantics (**`ANY_OF`** vs **`EXACT_SET`** vs **`T ⊆ W`**) — [`docs/PAYOUT-CALCULATION.md`](../../docs/PAYOUT-CALCULATION.md) Part B glossary.
 
 ## Context
 
@@ -104,13 +104,11 @@ Adopt a staged architecture that introduces **generalized payoff policies** whil
 - **Patch deployed v1 contracts in place:** rejected; conflicts with immutable-core posture and existing deployments.
 - **Allow resolver to submit multiple winners but still use single-bucket payout logic:** rejected; semantically ambiguous and economically unsafe.
 
-## Integration branch (v2 isolation)
+## Integration history (v2)
 
-All ADR-0008 work — **v2 contracts, Foundry tests, gas reports, and (when added) indexer / dApp / explorer / MCP changes** — is integrated on git branch **`experiment/adr-0008-multi-winner-v2`** until a **single coordinated merge** to `master` after testnet certification and migration sign-off.
+**v2 contracts, Foundry tests, gas reports, indexer / dApp / explorer / MCP** landed on `master` via branch **`experiment/adr-0008-multi-winner-v2`**. Further v2-only experiments may continue on that branch name; **`master`** is the default integration line.
 
-`master` remains the **v1** deployment and product default until that merge. Avoid partial v2 landings on `master` that would break the live indexer or site without an explicit dual-version plan.
-
-Implementation notes and policy tables: [`docs/ADR-0008-IMPLEMENTATION.md`](../../docs/ADR-0008-IMPLEMENTATION.md).
+Implementation notes and policy tables: [`docs/ADR-0008-IMPLEMENTATION.md`](../../docs/ADR-0008-IMPLEMENTATION.md). **“Any of” / “all of”** copy ↔ policies: [`docs/PAYOUT-CALCULATION.md`](../../docs/PAYOUT-CALCULATION.md) Part B glossary.
 
 ## Rollout plan
 

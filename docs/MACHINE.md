@@ -247,9 +247,9 @@ event FeeAccrued(address indexed recipient, uint256 amount);
 event FeeWithdrawn(address indexed recipient, uint256 amount);
 ```
 
-### ParamutuelWagerV2 (experimental, ADR-0008)
+### ParamutuelWagerV2 (ADR-0008, v2)
 
-A separate deployable on branch **`experiment/adr-0008-multi-winner-v2`**: bitmask **tickets**, `resolve(uint256 winningMask)`, and **`PayoffPolicy`** (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`). v1 bytecode and deployments are unaffected. Spec: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md). Gas: [`ADR-0008-GAS.md`](ADR-0008-GAS.md). Templates / mask helpers: [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md), `src/libraries/WagerV2Masks.sol`.
+In `src/` on **`master`** (integrated from **`experiment/adr-0008-multi-winner-v2`**): bitmask **tickets**, `resolve(uint256 winningMask)`, and **`PayoffPolicy`** (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`). Deploy **v2 factories** separately from v1; v1 bytecode and deployments remain valid. Colloquial **“any of” / “all of”** ↔ policy mapping: [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B glossary. Spec: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md). Gas: [`ADR-0008-GAS.md`](ADR-0008-GAS.md). Templates: [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md), `src/libraries/WagerV2Masks.sol`.
 
 ### Error reference
 

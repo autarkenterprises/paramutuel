@@ -1,7 +1,7 @@
 # ADR-0008 implementation notes (v2 contracts)
 
-**Branch:** `experiment/adr-0008-multi-winner-v2` (canonical line for all v2 work until merge to `master`)  
-**Status:** Prototype — Solidity + Foundry tests; v1 `ParamutuelFactory` / `ParamutuelWager` on `master` unchanged. This branch is periodically merged **from** `master` for site/dApp/indexer shell updates while v2 contracts and tests live here.
+**Branch:** `experiment/adr-0008-multi-winner-v2` was the integration line for v2; **`master` now carries** `ParamutuelWagerV2` / `ParamutuelFactoryV2` alongside v1.  
+**Status:** Solidity + Foundry tests in-repo; treat deployments as testnet-first until audited.
 
 ## Rationale
 
@@ -30,7 +30,7 @@ Settlement iterates **`_usedMasks`** — the distinct ticket masks that received
 
 **Overlap semantics:** Under `ANY_OF` / `AT_LEAST_K` / `WEIGHTED_OVERLAP`, a ticket that hits multiple true outcomes is still **one** ticket — it does not “double count” outcomes except under `WEIGHTED_OVERLAP`, where **more overlap ⇒ higher weight** (intentional partial payout curve).
 
-**Exact-set vs overlap:** Under `EXACT_SET`, only bettors who staked **exactly** the resolved set participate in the winner pool; overlapping subsets (e.g. `{A}` when `W={A,B}`) **lose** — expected for “you must call the full combination” markets. Product phrase **“all of these outcomes”** means **exactly this set** (`T == W`), not “all my picks are true” (`T ⊆ W`); the latter is **out of scope** for v2 unless added as a new policy in a follow-up ADR.
+**Exact-set vs overlap vs subset-of-truth:** Under `EXACT_SET`, only bettors who staked **exactly** the resolved set participate; overlapping subsets (e.g. `{A}` when `W={A,B}`) **lose** — “full combination” markets. Phrase **“all of these outcomes”** in copy should default to **`EXACT_SET`** (`T == W`), not **subset-of-truth** **`T ⊆ W`** (“every pick is in `W`”). **`T ⊆ W`** is **not** a named policy; use **`AT_LEAST_K` with `policyParam = k`** when **every** ticket mask has **exactly `k`** bits (then `popcount(T & W) ≥ k` ⇔ `T ⊆ W` for valid `T`). Variable ticket sizes need a **future policy** or split markets — see **Glossary** in [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B.
 
 ## Resolver constraints
 
