@@ -100,4 +100,4 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 
 ## Mainnet
 
-- [ ] Gas/safety audit pass and formal limits sign-off before deploying Paramutuel factories to mainnet (applies to whatever protocol version is live—v1, v2, freeform, V3, or successor).
+- [ ] Gas/safety audit pass and formal limits sign-off before deploying Paramutuel factories to mainnet (applies to whatever protocol version is live—v1, v2, freeform, V3, or successor). **V3 gas profile (Foundry, reproducible):** [`docs/PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md).

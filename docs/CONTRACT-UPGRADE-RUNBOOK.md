@@ -13,6 +13,7 @@ This runbook is the canonical checklist for factory/wager contract upgrades and 
 
 - `forge build`
 - `forge test`
+- After **V3** bytecode changes, refresh the gas write-up: `forge test --match-contract ParamutuelV3GasReport -vv` and update [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md) (full table: `bash script/profile_v3_gas.sh`).
 - `python3 -m unittest discover -s service/indexer/tests` (includes HTTP API routes, `apply_log` v1/v2, live_api factory config)
 - `python3 -m unittest discover -s service/control_panel/tests`
 - `python3 -m unittest discover -s service/resolution/tests`

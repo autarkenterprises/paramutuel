@@ -59,6 +59,7 @@ Freeform markets cannot reuse `ParamutuelWagerV2`’s **enumerated bitmask** mod
 
 - [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md) — v2 bitmask implementation (distinct from freeform).
 - [`ADR-0008-GAS.md`](ADR-0008-GAS.md) — how v2 gas scales (distinct tickets, not `numOptions`).
+- [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md) — **V3** combined factory: freeform `placeBet` / `resolve` / `claim` gas (domain-separated `answerId`).
 
 ---
 

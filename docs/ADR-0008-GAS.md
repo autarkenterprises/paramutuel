@@ -56,4 +56,5 @@ Rule of thumb: **~4–5k gas per extra distinct ticket mask** in the resolve loo
 ## Related
 
 - [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)  
-- [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md)
+- [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md)  
+- **V3** (enumerated + freeform, one factory): [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md)
