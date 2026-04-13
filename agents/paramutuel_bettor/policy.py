@@ -46,7 +46,7 @@ def pick_outcome(
     per_outcome: list[dict[str, Any]] = []
     protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
 
-    if protocol_version == "v2":
+    if protocol_version in ("v2", "v3_enum"):
         labels = _outcome_labels(wager)
         ticket_pools = wager_detail.get("ticket_pools") or []
         for idx in range(len(labels)):
@@ -68,7 +68,7 @@ def pick_outcome(
                     "score": post if isinstance(post, (int, float)) else -1.0,
                 }
             )
-    elif protocol_version == "freeform":
+    elif protocol_version in ("freeform", "v3_freeform"):
         raw_pools = wager_detail.get("ticket_pools") or []
         ticket_pools = [p for p in raw_pools if isinstance(p, dict)]
         ticket_pools.sort(key=lambda p: str(p.get("ticket_mask") or "").lower())
@@ -137,6 +137,12 @@ def pick_outcome(
             "Indexer stores answer ids (bytes32), not plaintext. To sign `placeBet`, you need the exact "
             "UTF-8 string that hashes to this id, or use MCP `encode_place_bet_freeform` with that string."
         )
+    elif protocol_version == "v3_freeform":
+        out["answer_id_hex"] = str(best.get("answer_id_hex") or "")
+        out["freeform_note"] = (
+            "v3_freeform: ticket id = keccak256(abi.encodePacked(bytes1(0x03), bytes(answer))) — not legacy "
+            "freeform. Indexer stores ids only; pass the exact UTF-8 answer in `quote.freeform_answer` or use MCP."
+        )
     return out
 
 
@@ -153,5 +159,6 @@ def summarize_list_row(row: dict[str, Any]) -> dict[str, Any]:
         "total_fee_bps": str(row.get("total_fee_bps") or "0"),
         "outcome_count": len(labels),
         "outcome_labels_preview": labels[:8],
-        "freeform": pv == "freeform",
+        "freeform": pv in ("freeform", "v3_freeform"),
+        "v3": pv.startswith("v3_"),
     }

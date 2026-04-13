@@ -27,7 +27,9 @@ from mcp_server.server import (
     encode_close_resolution_window,
     encode_create_wager,
     encode_create_wager_v2,
+    encode_create_enumerated_wager_v3,
     encode_create_freeform_wager,
+    encode_create_freeform_wager_v3,
     encode_expire,
     encode_place_bet,
     encode_place_bet_freeform,
@@ -39,16 +41,38 @@ from mcp_server.server import (
     get_protocol_info,
     FACTORY_ABI,
     FACTORY_ADDRESS,
+    FACTORY_V3_ADDRESS,
     FACTORY_V2_ABI,
+    FACTORY_V3_ABI,
     FACTORY_FREEFORM_ABI,
     WAGER_ABI,
     WAGER_V2_ABI,
+    WAGER_V3_ABI,
     WAGER_FREEFORM_ABI,
 )
 
 
 def _run(coro):
     return asyncio.get_event_loop().run_until_complete(coro)
+
+
+class TestFreeformV3AnswerId(unittest.TestCase):
+    def test_answer_id_matches_known_vector_paris(self):
+        from mcp_server.server import _freeform_v3_answer_id_hex
+
+        self.assertEqual(
+            _freeform_v3_answer_id_hex("Paris").lower(),
+            "0x1912e91243cbc3b42ab17ada47d57ab68ed946bc24de33ae4f6c13bdad067953",
+        )
+
+    def test_answer_id_differs_from_legacy_freeform_digest(self):
+        from mcp_server.server import _freeform_v3_answer_id_hex
+        from eth_hash.auto import keccak as _keccak256
+
+        s = "same-string"
+        legacy = "0x" + _keccak256(s.encode("utf-8")).hex()
+        v3 = _freeform_v3_answer_id_hex(s)
+        self.assertNotEqual(legacy.lower(), v3.lower())
 
 
 class TestSelectors(unittest.TestCase):
@@ -69,6 +93,7 @@ class TestSelectors(unittest.TestCase):
         "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])": "cecc699e",
         "placeBet(string,uint256)": "d76f2a1e",
         "resolve(string)": "461a4478",
+        "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[])": "0856f578",
     }
 
     def test_known_selectors(self):
@@ -165,17 +190,21 @@ class TestTools(unittest.TestCase):
         self.assertIn("factory_address", info)
         self.assertIn("factory_v2_address", info)
         self.assertIn("factory_freeform_address", info)
+        self.assertIn("factory_v3_address", info)
         self.assertIn("chain_id", info)
         self.assertIn("constants", info)
         self.assertIn("factory_v2_functions", info)
         self.assertIn("wager_v2_functions", info)
         self.assertIn("factory_freeform_functions", info)
         self.assertIn("wager_freeform_functions", info)
+        self.assertIn("factory_v3_functions", info)
+        self.assertIn("wager_v3_functions", info)
         self.assertIn("notes", info)
         self.assertEqual(info["constants"]["MAX_OUTCOMES"], 255)
         self.assertEqual(info["constants"]["FREEFORM_MAX_ANSWER_BYTES"], 1024)
         self.assertEqual(info["constants"]["FREEFORM_MAX_DISTINCT_ANSWERS_CAP"], 1024)
         self.assertIn("freeform_wagers", info["notes"])
+        self.assertIn("v3_wagers", info["notes"])
 
     @unittest.expectedFailure
     def test_XFAIL_DEPRECATED_get_protocol_info_lacked_freeform_surface(self):
@@ -310,38 +339,65 @@ class TestTools(unittest.TestCase):
         )
         self.assertTrue(result["calldata"].startswith("0x476343ee"))
 
+    def test_encode_create_wager_requires_factory(self):
+        prev = server_mod.FACTORY_ADDRESS
+        server_mod.FACTORY_ADDRESS = ""
+        try:
+            with self.assertRaises(ValueError):
+                _run(
+                    encode_create_wager(
+                        collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                        proposition="Test?",
+                        outcomes=["A", "B"],
+                        betting_closer="0x" + "aa" * 20,
+                        resolution_closer="0x" + "bb" * 20,
+                    )
+                )
+        finally:
+            server_mod.FACTORY_ADDRESS = prev
+
     def test_encode_create_wager_no_seeds(self):
-        result = json.loads(
-            _run(
-                encode_create_wager(
-                    collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
-                    proposition="Test?",
-                    outcomes=["A", "B"],
-                    betting_closer="0x" + "aa" * 20,
-                    resolution_closer="0x" + "bb" * 20,
+        prev = server_mod.FACTORY_ADDRESS
+        server_mod.FACTORY_ADDRESS = "0x" + "cd" * 20
+        try:
+            result = json.loads(
+                _run(
+                    encode_create_wager(
+                        collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                        proposition="Test?",
+                        outcomes=["A", "B"],
+                        betting_closer="0x" + "aa" * 20,
+                        resolution_closer="0x" + "bb" * 20,
+                    )
                 )
             )
-        )
-        self.assertIn("calldata", result)
-        self.assertNotIn("approval_required", result)
-        self.assertEqual(result["to"], FACTORY_ADDRESS)
+            self.assertIn("calldata", result)
+            self.assertNotIn("approval_required", result)
+            self.assertEqual(result["to"], server_mod.FACTORY_ADDRESS)
+        finally:
+            server_mod.FACTORY_ADDRESS = prev
 
     def test_encode_create_wager_with_seeds(self):
-        result = json.loads(
-            _run(
-                encode_create_wager(
-                    collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
-                    proposition="Test?",
-                    outcomes=["A", "B"],
-                    betting_closer="0x" + "aa" * 20,
-                    resolution_closer="0x" + "bb" * 20,
-                    seed_outcome_indices=[0, 1],
-                    seed_amounts=[100_000, 200_000],
+        prev = server_mod.FACTORY_ADDRESS
+        server_mod.FACTORY_ADDRESS = "0x" + "cd" * 20
+        try:
+            result = json.loads(
+                _run(
+                    encode_create_wager(
+                        collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                        proposition="Test?",
+                        outcomes=["A", "B"],
+                        betting_closer="0x" + "aa" * 20,
+                        resolution_closer="0x" + "bb" * 20,
+                        seed_outcome_indices=[0, 1],
+                        seed_amounts=[100_000, 200_000],
+                    )
                 )
             )
-        )
-        self.assertIn("approval_required", result)
-        self.assertEqual(result["approval_required"]["amount"], 300_000)
+            self.assertIn("approval_required", result)
+            self.assertEqual(result["approval_required"]["amount"], 300_000)
+        finally:
+            server_mod.FACTORY_ADDRESS = prev
 
     def test_encode_create_wager_v2_requires_factory(self):
         prev = server_mod.FACTORY_V2_ADDRESS
@@ -422,6 +478,66 @@ class TestTools(unittest.TestCase):
         finally:
             server_mod.FACTORY_FREEFORM_ADDRESS = prev
 
+    def test_encode_create_enumerated_wager_v3_requires_factory(self):
+        prev = server_mod.FACTORY_V3_ADDRESS
+        server_mod.FACTORY_V3_ADDRESS = ""
+        try:
+            with self.assertRaises(ValueError):
+                _run(
+                    encode_create_enumerated_wager_v3(
+                        collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                        proposition="V3?",
+                        outcomes=["A", "B"],
+                        payoff_policy=0,
+                        policy_param=0,
+                        betting_closer="0x" + "aa" * 20,
+                        resolution_closer="0x" + "bb" * 20,
+                    )
+                )
+        finally:
+            server_mod.FACTORY_V3_ADDRESS = prev
+
+    def test_encode_create_enumerated_wager_v3_shape(self):
+        prev = server_mod.FACTORY_V3_ADDRESS
+        server_mod.FACTORY_V3_ADDRESS = "0x" + "ee" * 20
+        try:
+            result = json.loads(
+                _run(
+                    encode_create_enumerated_wager_v3(
+                        collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                        proposition="V3?",
+                        outcomes=["A", "B"],
+                        payoff_policy=0,
+                        policy_param=0,
+                        betting_closer="0x" + "aa" * 20,
+                        resolution_closer="0x" + "bb" * 20,
+                    )
+                )
+            )
+            self.assertTrue(result["calldata"].lower().startswith("0x0856f578"))
+            self.assertEqual(result["to"], server_mod.FACTORY_V3_ADDRESS)
+        finally:
+            server_mod.FACTORY_V3_ADDRESS = prev
+
+    def test_encode_create_freeform_wager_v3_shape(self):
+        prev = server_mod.FACTORY_V3_ADDRESS
+        server_mod.FACTORY_V3_ADDRESS = "0x" + "ee" * 20
+        try:
+            result = json.loads(
+                _run(
+                    encode_create_freeform_wager_v3(
+                        collateral_token="0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                        proposition="FF v3?",
+                        betting_closer="0x" + "aa" * 20,
+                        resolution_closer="0x" + "bb" * 20,
+                    )
+                )
+            )
+            self.assertTrue(result["calldata"].lower().startswith("0xcecc699e"))
+            self.assertEqual(result["to"], server_mod.FACTORY_V3_ADDRESS)
+        finally:
+            server_mod.FACTORY_V3_ADDRESS = prev
+
 
 def _mock_httpx_indexer_payload(payload: dict):
     """Return a patch target so _indexer_get returns `payload`."""
@@ -485,6 +601,70 @@ class TestQuoteToolsMockedIndexer(unittest.TestCase):
         self.assertEqual(body.get("ticket_masks"), [4])
         self.assertIn("placeBets", body)
 
+    _v3_enum_detail = {
+        "wager": {
+            "collateral_token": "0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+            "protocol_version": "v3_enum",
+            "state": "OPEN",
+            "betting_closed_by_authority": 0,
+            "betting_close_time": 9_999_999_999,
+        },
+        "totals": {"total_pot": "1000", "total_fee_bps": "0"},
+        "outcomes": [],
+        "ticket_pools": [{"ticket_mask": "4", "pool_total": "250"}],
+    }
+
+    def test_quote_place_bet_v3_enum_matches_v2_ticket_mask_semantics(self):
+        with _mock_httpx_indexer_payload(self._v3_enum_detail):
+            raw = _run(
+                quote_place_bet(
+                    "0x" + "ab" * 20,
+                    outcome_index=2,
+                    amount=100,
+                    require_open=False,
+                )
+            )
+        body = json.loads(raw)
+        self.assertEqual(body.get("protocol_version"), "v3_enum")
+        self.assertEqual(body.get("ticket_mask"), 4)
+
+    _v3_ff_detail = {
+        "wager": {
+            "collateral_token": "0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+            "protocol_version": "v3_freeform",
+            "state": "OPEN",
+            "betting_closed_by_authority": 0,
+            "betting_close_time": 9_999_999_999,
+        },
+        "totals": {"total_pot": "1000", "total_fee_bps": "0"},
+        "outcomes": [],
+        "ticket_pools": [],
+    }
+
+    def test_quote_place_bet_v3_freeform_requires_answer(self):
+        with _mock_httpx_indexer_payload(self._v3_ff_detail):
+            with self.assertRaises(ValueError):
+                _run(
+                    quote_place_bet(
+                        "0x" + "ab" * 20,
+                        outcome_index=0,
+                        amount=10,
+                        require_open=False,
+                    )
+                )
+
+    def test_quote_place_bets_v3_freeform_raises(self):
+        with _mock_httpx_indexer_payload(self._v3_ff_detail):
+            with self.assertRaises(ValueError):
+                _run(
+                    quote_place_bets(
+                        "0x" + "ab" * 20,
+                        outcome_indices=[0],
+                        amounts=[10],
+                        require_open=False,
+                    )
+                )
+
     _v1_detail = {
         "wager": {
             "collateral_token": "0x036CbD53842c5426634e7929541eC2318f3dCf7e",
@@ -526,9 +706,9 @@ class TestABILoading(unittest.TestCase):
     def test_wager_abi_count(self):
         self.assertEqual(len(WAGER_ABI), 63)
 
-    def test_factory_address_set(self):
-        self.assertTrue(FACTORY_ADDRESS.startswith("0x"))
-        self.assertEqual(len(FACTORY_ADDRESS), 42)
+    def test_factory_v3_address_set(self):
+        self.assertTrue(FACTORY_V3_ADDRESS.startswith("0x"))
+        self.assertEqual(len(FACTORY_V3_ADDRESS), 42)
 
     def test_v2_abis_bundled(self):
         self.assertGreater(len(FACTORY_V2_ABI), 5)
@@ -537,6 +717,10 @@ class TestABILoading(unittest.TestCase):
     def test_freeform_abis_bundled(self):
         self.assertGreater(len(FACTORY_FREEFORM_ABI), 5)
         self.assertGreater(len(WAGER_FREEFORM_ABI), 5)
+
+    def test_v3_abis_bundled(self):
+        self.assertGreater(len(FACTORY_V3_ABI), 5)
+        self.assertGreater(len(WAGER_V3_ABI), 5)
 
 
 if __name__ == "__main__":

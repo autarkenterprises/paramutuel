@@ -52,6 +52,7 @@ PYTHONPATH=. python3 -m unittest discover -s service/indexer/tests -p "test_*.py
 PYTHONPATH=. python3 -m unittest discover -s service/explorer/tests -p "test_*.py" -q
 PYTHONPATH=. python3 -m unittest discover -s service/control_panel/tests -p "test_*.py" -q
 node --check dapp/app.js
+( cd dapp && npm ci --silent ) || ( cd dapp && npm install --silent )
 node --test dapp/tests/logic.test.js >/dev/null
 
 echo "==> Deploying factory to testnet"

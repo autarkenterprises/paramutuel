@@ -2,10 +2,11 @@
   "defaultNetwork": "baseSepolia",
   "baseSepolia": {
     "chainId": 84532,
-    "factoryAddress": "0x655f6c5a3dc4cb3bf68173952bca9dac1bb5bf39",
-    "factoryV2Address": "0xA42DAE9FaAc8178203ec75e83c0809BAdfA6bafd",
-    "factoryFreeformAddress": "0x687CCa1E94f39A91b80062EEB007176dF737d706",
-    "indexerFromBlock": 39608044,
+    "factoryAddress": "",
+    "factoryV2Address": "",
+    "factoryFreeformAddress": "",
+    "factoryV3Address": "0x11F036ab9C2621a21892E37E9d372d1b2Fe1dCD6",
+    "indexerFromBlock": 40147601,
     "explorerApiBase": "https://paramutuel-git-406244230167.europe-west1.run.app"
   },
   "baseMainnet": {
@@ -13,6 +14,7 @@
     "factoryAddress": "",
     "factoryV2Address": "",
     "factoryFreeformAddress": "",
+    "factoryV3Address": "",
     "explorerApiBase": ""
   }
 }

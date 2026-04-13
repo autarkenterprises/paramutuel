@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument(
         "--freeform-answer",
         default="",
-        help="ADR-0009: exact UTF-8 answer string for placeBet(string,...) calldata when protocol_version is freeform.",
+        help="Exact UTF-8 answer for placeBet(string,...) when protocol_version is freeform or v3_freeform.",
     )
 
     sub.add_parser("json", help="Read one JSON object from stdin (subagent / tool bridge)")

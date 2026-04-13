@@ -19,8 +19,9 @@ class TestSubagentManifest(unittest.TestCase):
             "manifest should point integrators at MCP quote_place_bet",
         )
         self.assertTrue(
-            any("protocol_version" in str(c.get("note", "")) for c in complements),
-            "manifest MCP note should mention indexer protocol_version / v2 awareness",
+            any("v3" in str(c.get("note", "")).lower() for c in complements)
+            or any("protocol_version" in str(c.get("note", "")) for c in complements),
+            "manifest MCP note should mention v3 or protocol_version awareness",
         )
 
 

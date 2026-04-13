@@ -92,6 +92,7 @@
     const factory = String(net.factoryAddress || "").trim();
     const factoryV2 = String(net.factoryV2Address || "").trim();
     const factoryFreeform = String(net.factoryFreeformAddress || "").trim();
+    const factoryV3 = String(net.factoryV3Address || "").trim();
     const apiBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const isMainnetChain = chainId === 8453;
     const isTestnetChain = chainId === 84532;
@@ -127,7 +128,7 @@
     const homeNetworkSummaryLine = Number.isFinite(chainId)
       ? `${meta.label} (chain ID ${chainId})`
       : meta.label;
-    const homeFactorySummaryText = factory || copy.factoryNotPublished;
+    const homeFactorySummaryText = factoryV3 || factory || copy.factoryNotPublished;
 
     return {
       activeKey,
@@ -136,6 +137,7 @@
       factoryAddress: factory,
       factoryV2Address: factoryV2,
       factoryFreeformAddress: factoryFreeform,
+      factoryV3Address: factoryV3,
       explorerApiBase: apiBase,
       explorerRoot,
       explorerHostLabel: explorerRoot.replace(/^https:\/\//, ""),

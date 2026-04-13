@@ -48,7 +48,7 @@ def build_quote_like_payload(
     freeform_answer: str | None = None,
 ) -> dict[str, Any]:
     pv = protocol_version.strip().lower()
-    if pv == "freeform":
+    if pv in ("freeform", "v3_freeform"):
         place_data = (
             encode_place_bet_freeform(freeform_answer, amount)
             if freeform_answer is not None and str(freeform_answer).strip() != ""
@@ -57,12 +57,12 @@ def build_quote_like_payload(
         calldata_note = None
         if place_data is None:
             calldata_note = (
-                "Freeform wagers need the exact UTF-8 answer string (same bytes as on-chain). "
-                "Pass `freeform_answer` in JSON `quote` or use MCP `encode_place_bet_freeform`."
+                "Freeform / v3_freeform wagers need the exact UTF-8 answer string (same bytes as on-chain). "
+                "Pass `freeform_answer` in JSON `quote` or use MCP `encode_place_bet_freeform` / `quote_place_bet`."
             )
         first_u256 = int(outcome_index)
     else:
-        first_u256 = int(1 << int(outcome_index)) if pv == "v2" else int(outcome_index)
+        first_u256 = int(1 << int(outcome_index)) if pv in ("v2", "v3_enum") else int(outcome_index)
         place_data = encode_place_bet(first_u256, amount)
         calldata_note = None if place_data else "Install Foundry `cast` or use MCP `quote_place_bet` for calldata."
     approve_data = encode_approve(wager_address, amount) if collateral_token else None
@@ -73,7 +73,8 @@ def build_quote_like_payload(
         "outcome_index": outcome_index,
         "amount": amount,
         "betting_open": betting_open,
-        "execution_allowed": betting_open and (pv != "freeform" or place_data is not None),
+        "execution_allowed": betting_open
+        and (pv not in ("freeform", "v3_freeform") or place_data is not None),
         "revert_hint": revert_hint,
         "odds": odds,
         "placeBet": {
@@ -88,9 +89,9 @@ def build_quote_like_payload(
             },
         },
     }
-    if pv == "v2":
+    if pv in ("v2", "v3_enum"):
         body["ticket_mask"] = first_u256
-    if pv == "freeform":
+    if pv in ("freeform", "v3_freeform"):
         body["freeform_answer_supplied"] = bool(
             freeform_answer is not None and str(freeform_answer).strip() != ""
         )

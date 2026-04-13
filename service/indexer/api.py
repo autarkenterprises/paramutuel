@@ -119,6 +119,7 @@ class Handler(BaseHTTPRequestHandler):
     indexer_factory_address: str | None = None
     indexer_factory_v2_address: str | None = None
     indexer_factory_freeform_address: str | None = None
+    indexer_factory_v3_address: str | None = None
 
     def _send_json(self, code: int, body: dict) -> None:
         payload = json.dumps(body).encode()
@@ -170,7 +171,8 @@ class Handler(BaseHTTPRequestHandler):
             err = get_meta_str(self.conn, "last_sync_error")
             fac1 = getattr(self.__class__, "indexer_factory_address", None)
             fac2 = getattr(self.__class__, "indexer_factory_v2_address", None)
-            fac3 = getattr(self.__class__, "indexer_factory_freeform_address", None)
+            fac_ff = getattr(self.__class__, "indexer_factory_freeform_address", None)
+            fac_v3 = getattr(self.__class__, "indexer_factory_v3_address", None)
             self._send_json(
                 200,
                 {
@@ -182,7 +184,8 @@ class Handler(BaseHTTPRequestHandler):
                     "last_sync_error": err if err else None,
                     "factory_address": fac1,
                     "factory_v2_address": fac2,
-                    "factory_freeform_address": fac3,
+                    "factory_freeform_address": fac_ff,
+                    "factory_v3_address": fac_v3,
                 },
             )
             return

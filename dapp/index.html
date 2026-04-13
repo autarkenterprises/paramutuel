@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Paramutuel self-custody dApp: v1, v2 (ADR-0008 bitmask), and freeform text answers (ADR-0009) — create, bet, resolve, claim on Base." />
+  <meta name="description" content="Paramutuel protocol — self-custody dApp on Base: create, bet, resolve, and claim across enumerated and freeform wagers." />
   <title>Paramutuel MVP dApp</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -25,11 +25,10 @@
 
       <div class="grid">
         <label>
-          Protocol
+          Market type
           <select id="protocolVersion">
-            <option value="v1" selected>v1 — ParamutuelFactory / single winning outcome</option>
-            <option value="v2">v2 — ParamutuelFactoryV2 / bitmask tickets &amp; payoff policies (ADR-0008)</option>
-            <option value="freeform">freeform — ParamutuelFactoryFreeform / text answers (ADR-0009)</option>
+            <option value="v3_enum" selected>Enumerated — fixed outcomes, bitmask tickets &amp; payoff policies</option>
+            <option value="v3_freeform">Freeform — open text answers</option>
           </select>
         </label>
         <div id="factoryProtocolHint" class="muted span-2"></div>
@@ -80,7 +79,7 @@
             <input id="policyParam" type="number" value="0" min="0" step="1" />
           </label>
           <p class="muted span-2" style="margin:0;">
-            See <a href="../docs/PAYOUT-CALCULATION.md" target="_blank" rel="noopener">docs/PAYOUT-CALCULATION.md</a> Part B. Factory v2 caps at 255 outcomes.
+            See <a href="../docs/PAYOUT-CALCULATION.md" target="_blank" rel="noopener">docs/PAYOUT-CALCULATION.md</a> Part B. Factory caps at 255 outcomes.
           </p>
         </div>
 
@@ -193,8 +192,8 @@
           <summary>Seed liquidity help</summary>
           <div class="muted">
             Optional initial liquidity at create-time. Provide aligned index and amount lists (for example: indices <code>0,2</code> and amounts <code>10,3.5</code>). The dApp approves the total once and submits one create transaction.
-            For <strong>v2</strong>, each index is seeded as a <strong>single-outcome ticket</strong> (bit mask <code>1 &lt;&lt; index</code>). <strong>SINGLE_WINNER</strong> v2 seeds must stay single-index per row.
-            <strong>Freeform</strong> factory has no create-time seeds.
+            For <strong>enumerated</strong> markets, each index is seeded as a <strong>single-outcome ticket</strong> (bit mask <code>1 &lt;&lt; index</code>). <strong>SINGLE_WINNER</strong> seeds must stay single-index per row.
+            <strong>Freeform</strong> markets have no create-time seeds.
           </div>
         </details>
         </div>
@@ -224,7 +223,7 @@
 
     <section class="card">
       <h2>Betting</h2>
-      <div class="row muted">Load any existing wager address to bet/resolve/claim against it.</div>
+      <div class="row muted">Load a Paramutuel protocol wager (from the current factory) to bet, resolve, or claim.</div>
       <div class="row">
         <input id="activeWagerAddress" placeholder="Active wager address (0x...)" />
         <button id="loadWagerBtn">Load Wager</button>
@@ -251,8 +250,7 @@
         </label>
       </div>
       <div class="muted">
-        Batch mode places multiple legs in one <code>placeBets()</code> call. <strong>v1:</strong> one outcome index per leg.
-        <strong>v2:</strong> each index becomes a <strong>single-outcome ticket</strong> (use the field above for multi-outcome combo tickets).
+        Batch mode places multiple legs in one <code>placeBets()</code> call. Each index becomes a <strong>single-outcome ticket</strong> (use the field above for multi-outcome combo tickets).
       </div>
       <div class="grid">
         <label>

@@ -4,13 +4,18 @@
   const CONFIG_URL = "config/deployments.json";
   const PSN = window.ParamutuelSiteNetwork;
   const DEBOUNCE_MS = 320;
-  const SEARCH_LIMIT = 15;
+  const SEARCH_LIMIT = 40;
   const OPEN_DETAIL_CAP = 15;
 
   let apiBase = "";
   let chainId = null;
   let debounceTimer = null;
   let fetchGen = 0;
+
+  function wagerIsCurrentProtocol(w) {
+    const pv = String(w.protocol_version || "").trim().toLowerCase();
+    return pv === "v3_enum" || pv === "v3_freeform";
+  }
 
   function $(id) {
     return document.getElementById(id);
@@ -124,14 +129,14 @@
   function resolvedSummary(w, labels) {
     const state = String(w.state || "").toUpperCase();
     const pot = formatPot(w.total_pot);
-    const pv = String(w.protocol_version || "v1").trim().toLowerCase();
+    const pv = String(w.protocol_version || "").trim().toLowerCase();
     if (state === "RESOLVED") {
       const wi = w.winning_outcome;
       let winLabel = "—";
-      if (pv === "freeform") {
+      if (pv === "v3_freeform") {
         const hx = wi === null || wi === undefined ? "" : String(wi).trim();
         winLabel = hx ? (hx.length > 20 ? `${hx.slice(0, 12)}…${hx.slice(-6)}` : hx) : "—";
-      } else if (pv === "v2") {
+      } else if (pv === "v3_enum") {
         try {
           const wm = BigInt(String(wi ?? "0"));
           winLabel = `mask ${wm.toString()}`;
@@ -144,14 +149,6 @@
         } catch {
           winLabel = String(wi ?? "—");
         }
-      } else {
-        const idx = wi === null || wi === undefined || wi === "" ? null : Number(wi);
-        winLabel =
-          idx != null && !Number.isNaN(idx) && labels[idx] != null
-            ? String(labels[idx])
-            : idx != null && !Number.isNaN(idx)
-              ? `#${idx}`
-              : "—";
       }
       return `Winner: ${winLabel} · Pot ${pot} (raw)`;
     }
@@ -183,8 +180,8 @@
     if (!wagers.length) {
       if (status) {
         status.textContent = openOnly
-          ? "No open wagers match. Try a different search or include resolved and retracted."
-          : "No matching wagers.";
+          ? "No open Paramutuel protocol wagers match. Try another search or include resolved and retracted."
+          : "No matching Paramutuel protocol wagers.";
       }
       return;
     }
@@ -202,16 +199,16 @@
       const labels = parseOutcomes(w.outcomes_json);
       const state = String(w.state || "—").toUpperCase();
       const stateSlug = state.toLowerCase().replace(/[^a-z0-9-]/g, "") || "unknown";
-      const pv = String(w.protocol_version || "v1").trim().toLowerCase();
+      const pv = String(w.protocol_version || "").trim().toLowerCase();
       const prop = truncate(w.proposition || "(no proposition)", 120);
       const href = betPageHref(addr);
       const key = addr.toLowerCase();
       let metaLine;
       if (state === "OPEN" && detailByAddr[key]) {
-        if (pv === "freeform") {
+        if (pv === "v3_freeform") {
           const pools = detailByAddr[key].ticket_pools || [];
           const n = pools.filter((p) => BigInt(String(p.pool_total || "0")) > 0n).length;
-          metaLine = n > 0 ? `Freeform · ${n} staked answer id(s)` : "Freeform · no stakes in detail";
+          metaLine = n > 0 ? `${n} staked answer id(s)` : "No stakes in detail";
         } else {
           metaLine = oddsLine(detailByAddr[key].outcomes, labels);
         }
@@ -227,7 +224,6 @@
       a.className = "home-bet-search-link";
       a.href = href;
       a.innerHTML = `
-        <span class="home-bet-search-pv muted">${escapeHtml(pv)}</span>
         <span class="home-bet-search-prop">${escapeHtml(prop)}</span>
         <span class="home-bet-search-badge home-bet-search-badge--${escapeHtml(stateSlug)}">${escapeHtml(state)}</span>
         <span class="home-bet-search-meta">${escapeHtml(metaLine)}</span>
@@ -286,7 +282,7 @@
     const data = await res.json();
     if (gen !== fetchGen) return;
 
-    const wagers = data.wagers || [];
+    const wagers = (data.wagers || []).filter(wagerIsCurrentProtocol);
     let detailByAddr = {};
     try {
       detailByAddr = await enrichOpenWagers(wagers);

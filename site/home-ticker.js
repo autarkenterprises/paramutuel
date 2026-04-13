@@ -4,11 +4,16 @@
   const CONFIG_URL = "config/deployments.json";
   const PSN = window.ParamutuelSiteNetwork;
   const REFRESH_MS = 45_000;
-  const LIST_LIMIT = 14;
+  const LIST_LIMIT = 40;
   const OPEN_DETAIL_CAP = 8;
 
   let runGeneration = 0;
   let refreshTimer = null;
+
+  function wagerIsCurrentProtocol(w) {
+    const pv = String(w.protocol_version || "").trim().toLowerCase();
+    return pv === "v3_enum" || pv === "v3_freeform";
+  }
 
   function betPageHref(wagerAddress) {
     const a = String(wagerAddress || "").trim();
@@ -77,10 +82,10 @@
 
     if (state === "OPEN") {
       const d = detailByAddr[addr];
-      if (pv === "freeform") {
+      if (pv === "v3_freeform") {
         const n = (d && d.ticket_pools && d.ticket_pools.length) || 0;
         const sub =
-          n > 0 ? `${n} pooled answer id(s)` : "freeform · no stakes in indexer detail";
+          n > 0 ? `${n} pooled answer id(s)` : "no stakes in indexer detail";
         return `Pot ${pot} (raw) · ${sub}`;
       }
       if (d && d.outcomes) {
@@ -92,10 +97,10 @@
     if (state === "RESOLVED") {
       const wo = w.winning_outcome;
       let winLabel = "—";
-      if (pv === "freeform") {
+      if (pv === "v3_freeform") {
         const hx = wo === null || wo === undefined ? "" : String(wo).trim();
         winLabel = hx ? (hx.length > 18 ? `${hx.slice(0, 10)}…${hx.slice(-6)}` : hx) : "—";
-      } else if (pv === "v2") {
+      } else if (pv === "v3_enum") {
         try {
           const wm = BigInt(String(wo ?? "0"));
           winLabel = `mask ${wm.toString()}`;
@@ -208,7 +213,6 @@
 
   function renderItem(w, detailByAddr, chainId) {
     const labels = parseOutcomes(w.outcomes_json);
-    const pvTag = String(w.protocol_version || "v1").trim().toLowerCase();
     const prop = truncate(w.proposition || "(no proposition)", 72);
     const state = String(w.state || "—").toLowerCase();
     const meta = stateMeta(w, detailByAddr, labels);
@@ -224,7 +228,6 @@
     main.className = "ticker-item";
     main.href = href;
     main.innerHTML = `
-      <span class="ticker-item-pv muted" title="protocol_version">${escapeHtml(pvTag)}</span>
       <span class="ticker-item-prop">${escapeHtml(prop)}</span>
       <span class="ticker-item-badge ticker-state-${escapeHtml(stateClass)}">${escapeHtml(state)}</span>
       <span class="ticker-item-meta">${escapeHtml(meta)}</span>
@@ -338,12 +341,13 @@
       return;
     }
 
-    const wagers = body?.wagers || [];
+    const wagers = (body?.wagers || []).filter(wagerIsCurrentProtocol);
     if (!wagers.length) {
       if (gen !== runGeneration) return;
       viewport.classList.remove("ticker-updating");
       track.innerHTML = "";
-      status.textContent = "No wagers indexed yet. Create one in the app.";
+      status.textContent =
+        "No Paramutuel protocol wagers in the latest indexer page. Create one in the app or wait for sync.";
       startRefreshLoop();
       return;
     }

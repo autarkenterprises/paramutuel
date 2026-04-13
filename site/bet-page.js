@@ -3,9 +3,7 @@
 
   const ethers = globalThis.ethers;
   const CONFIG_URL = "config/deployments.json";
-  const WAGER_ABI_V1_URL = "dapp/abi/ParamutuelWager.json";
-  const WAGER_ABI_V2_URL = "dapp/abi/ParamutuelWagerV2.json";
-  const WAGER_ABI_FREEFORM_URL = "dapp/abi/ParamutuelWagerFreeform.json";
+  const WAGER_ABI_V3_URL = "dapp/abi/ParamutuelWagerV3.json";
 
   const CHAIN_NAMES = {
     8453: "Base Mainnet",
@@ -33,8 +31,8 @@
   let deployments = null;
   let expectedChainId = null;
   let wagerAbi = null;
-  /** @type {"v1"|"v2"|"freeform"} */
-  let currentProtocolVersion = "v1";
+  /** @type {"v3_enum"|"v3_freeform"} */
+  let currentProtocolVersion = "v3_enum";
   let indexerBase = "";
   let provider = null;
   let signer = null;
@@ -103,19 +101,10 @@
   }
 
   async function loadWagerAbiForProtocol(pv) {
-    const p = String(pv || "v1").trim().toLowerCase();
-    let v = "v1";
-    let url = WAGER_ABI_V1_URL;
-    if (p === "v2") {
-      v = "v2";
-      url = WAGER_ABI_V2_URL;
-    } else if (p === "freeform") {
-      v = "freeform";
-      url = WAGER_ABI_FREEFORM_URL;
-    }
-    const j = await loadJson(url);
+    const p = String(pv || "v3_enum").trim().toLowerCase();
+    const j = await loadJson(WAGER_ABI_V3_URL);
     wagerAbi = j.abi;
-    currentProtocolVersion = v;
+    currentProtocolVersion = p === "v3_freeform" ? "v3_freeform" : "v3_enum";
   }
 
   function basescanUrl(addr) {
@@ -407,8 +396,22 @@
 
     loadedWagerAddress = address;
 
-    const pvRaw = String(w.protocol_version || "v1").trim().toLowerCase();
-    const pv = pvRaw === "v2" ? "v2" : pvRaw === "freeform" ? "freeform" : "v1";
+    const pvRaw = String(w.protocol_version || "").trim().toLowerCase();
+    let pv = "v3_enum";
+    if (pvRaw === "v3_freeform") pv = "v3_freeform";
+    else if (pvRaw === "v3_enum") pv = "v3_enum";
+    else {
+      clearLoading();
+      showEl("betError", true);
+      const errEl = $("betError");
+      if (errEl) {
+        errEl.textContent =
+          "This wager is not indexed as a Paramutuel protocol market on this site. Open wagers from the live list or explorer, or verify the address with a block explorer.";
+      }
+      showEl("betSummary", false);
+      showEl("betFormSection", false);
+      return;
+    }
     await loadWagerAbiForProtocol(pv);
 
     const state = String(w.state || "").toUpperCase();
@@ -422,7 +425,7 @@
     } catch {
       labels = [];
     }
-    if (pv !== "freeform" && labels.length < 2) {
+    if (pv !== "v3_freeform" && labels.length < 2) {
       throw new Error("Wager has fewer than two outcomes in the index.");
     }
 
@@ -440,35 +443,33 @@
     $("betState").textContent = state;
     const protEl = $("betProtocol");
     if (protEl) {
-      if (pv === "v2") {
-        protEl.textContent = `v2 · payoffPolicy ${w.payoff_policy != null ? w.payoff_policy : "—"} · policyParam ${
+      if (pv === "v3_enum") {
+        protEl.textContent = `Paramutuel · enumerated · payoffPolicy ${w.payoff_policy != null ? w.payoff_policy : "—"} · policyParam ${
           w.policy_param != null && w.policy_param !== "" ? w.policy_param : "—"
         }`;
-      } else if (pv === "freeform") {
-        protEl.textContent = "freeform (text answers)";
       } else {
-        protEl.textContent = "v1";
+        protEl.textContent = "Paramutuel · freeform";
       }
     }
 
     const titleEl = $("betOutcomesTableTitle");
     if (titleEl) {
       titleEl.textContent =
-        pv === "freeform" ? "Answer IDs (hashed stakes) & implied odds" : "Outcomes & implied odds";
+        pv === "v3_freeform" ? "Answer IDs (hashed stakes) & implied odds" : "Outcomes & implied odds";
     }
     const footEl = $("betOutcomesTableFootnote");
     if (footEl) {
       footEl.textContent =
-        pv === "freeform"
-          ? "Each row is a keccak256 answer id from the indexer. Implied multiple assumes that answer wins and no further bets (fees applied; rounding may differ on-chain)."
+        pv === "v3_freeform"
+          ? "Freeform: each row is a domain-separated answer id (0x03 ‖ UTF-8 bytes, then keccak). Implied multiple assumes that answer wins and no further bets."
           : "Pool share uses on-chain stake totals. Implied multiple is the approximate payout per 1 unit staked on that outcome if it wins, after protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).";
     }
     const formLead = $("betFormLead");
     if (formLead) {
       formLead.textContent =
-        pv === "freeform"
+        pv === "v3_freeform"
           ? "Enter the exact UTF-8 answer you want to back and a human token amount. One stake per submit (call placeBet(string,uint256))."
-          : "Enter a token amount next to each outcome you want to back (human units, e.g. 10 USDC). At least one positive amount is required. v2 markets use the same placeBets batch shape as the full dApp.";
+          : "Enter a token amount next to each outcome you want to back (human units, e.g. 10 USDC). At least one positive amount is required. Batch stakes use placeBets with single-outcome ticket masks, matching the Paramutuel dApp.";
     }
     $("betWagerAddress").textContent = address;
     $("betFactory").textContent = String(w.factory_address || "").trim() || "—";
@@ -491,9 +492,9 @@
       totals.winning_outcome !== ""
     ) {
       let winLabel;
-      if (pv === "freeform") {
+      if (pv === "v3_freeform") {
         winLabel = `answerId ${String(totals.winning_outcome).trim()}`;
-      } else if (pv === "v2") {
+      } else if (pv === "v3_enum") {
         const wm = BigInt(String(totals.winning_outcome || "0"));
         winLabel = `mask ${wm.toString()}`;
         for (let i = 0; i < labels.length; i++) {
@@ -529,15 +530,22 @@
     scan.textContent = "View on Basescan";
 
     const tPools = detail.ticket_pools || [];
-    if (pv === "freeform") {
+    if (pv === "v3_freeform") {
       renderFreeformPoolsTable(tPools, totalPotVal, feeBpsVal);
     } else {
-      renderOutcomesOddsTable(labels, detail.outcomes, totalPotVal, feeBpsVal, tPools, pv === "v2");
+      renderOutcomesOddsTable(
+        labels,
+        detail.outcomes,
+        totalPotVal,
+        feeBpsVal,
+        tPools,
+        pv === "v3_enum"
+      );
     }
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
-    if (pv === "freeform") {
+    if (pv === "v3_freeform") {
       renderFreeformStakeInputs();
     } else {
       renderOutcomeInputs(labels);
@@ -663,7 +671,7 @@
     if (!Number.isFinite(decimals) || decimals < 0 || decimals > 77) {
       throw new Error("Invalid decimals (0–77).");
     }
-    if (currentProtocolVersion === "freeform") {
+    if (currentProtocolVersion === "v3_freeform") {
       const ansInp = $("betFreeformAnswerInput");
       const answer = ansInp ? String(ansInp.value || "").trim() : "";
       if (!answer) throw new Error("Enter a non-empty answer string.");
@@ -722,8 +730,7 @@
       const approveTx = await token.approve(wagerContract.target, total);
       await approveTx.wait();
       $("betTxStatus").textContent = "Submitting placeBets…";
-      const firstArr =
-        currentProtocolVersion === "v2" ? indices.map((i) => 1n << BigInt(i)) : indices;
+      const firstArr = indices.map((i) => 1n << BigInt(i));
       const tx = await c.placeBets(firstArr, amounts);
       await tx.wait();
       $("betTxStatus").textContent = "Bets placed successfully.";

@@ -323,6 +323,21 @@
     withdrawFees: { section: "claims", method: "withdrawFees" },
   };
 
+  /**
+   * Domain-separated freeform ticket id (current Paramutuel deployment):
+   * keccak256(abi.encodePacked(bytes1(0x03), bytes(answer))).
+   * @param {string} answer UTF-8 answer string
+   * @param {object} [ethersLib] ethers v6 (default: globalThis.ethers)
+   */
+  function freeformV3AnswerId(answer, ethersLib) {
+    const E = ethersLib || (typeof globalThis !== "undefined" && globalThis.ethers);
+    if (!E || typeof E.keccak256 !== "function") {
+      throw new Error("freeformV3AnswerId requires ethers (load ethers before logic.js, or pass ethers as 2nd arg).");
+    }
+    const domain = E.hexlify(new Uint8Array([3]));
+    return E.keccak256(E.concat([domain, E.toUtf8Bytes(answer)]));
+  }
+
   function planWagerAction(
     actionName,
     { resolutionWagerAddress = "", claimsWagerAddress = "", activeWagerAddress = "" } = {}
@@ -359,6 +374,7 @@
     parseOutcomeIndicesCsvToTicketMask,
     seedOutcomeIndicesToTicketMasks,
     validatePolicyParamForCreate,
+    freeformV3AnswerId,
   };
 
   if (typeof module !== "undefined" && module.exports) {

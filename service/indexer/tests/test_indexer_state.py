@@ -20,6 +20,7 @@ class IndexerStateTests(unittest.TestCase):
     FACTORY = "0xfac7000000000000000000000000000000000001"
     FACTORY_V2 = "0xfac7000000000000000000000000000000000002"
     FACTORY_FF = "0xfac7000000000000000000000000000000000003"
+    FACTORY_V3 = "0xfac7000000000000000000000000000000000004"
     WAGER = "0xabc1000000000000000000000000000000000001"
     PROPOSER = "0xabc2000000000000000000000000000000000002"
     RESOLVER = "0xabc3000000000000000000000000000000000003"
@@ -371,6 +372,158 @@ class IndexerStateTests(unittest.TestCase):
             "SELECT winning_outcome FROM wager_totals WHERE wager_address = ?", (maddr,)
         ).fetchone()
         self.assertEqual(win["winning_outcome"], win_topic.lower())
+
+    def _wager_created_v3_enum_log(self):
+        data = (
+            "0x"
+            + word_addr(self.TOKEN)
+            + word_u256(0)  # payoff policy uint8 in low byte
+            + word_u256(0)  # policyParam
+            + word_u256(2_000)
+            + word_u256(3_000)
+            + word_u256(5_000)
+            + word_addr(self.BETTING_CLOSER)
+            + word_addr(self.RESOLUTION_CLOSER)
+        )
+        return {
+            "address": self.FACTORY_V3,
+            "topics": [
+                TOPICS["WagerCreatedV3Enumerated"],
+                topic_addr(self.WAGER),
+                topic_addr(self.PROPOSER),
+                topic_addr(self.RESOLVER),
+            ],
+            "data": data,
+            "blockNumber": hex(50),
+            "transactionHash": "0x330",
+            "logIndex": hex(0),
+        }
+
+    def test_wager_created_v3_enum_sets_protocol_and_factory(self):
+        apply_log(
+            self.conn,
+            self.FACTORY,
+            self.FACTORY_V2,
+            self._wager_created_v3_enum_log(),
+            factory_v3=self.FACTORY_V3,
+        )
+        self.conn.commit()
+        maddr = self.WAGER.lower()
+        row = self.conn.execute("SELECT protocol_version, factory_address FROM wagers WHERE wager_address = ?", (maddr,)).fetchone()
+        self.assertEqual(row["protocol_version"], "v3_enum")
+        self.assertEqual(row["factory_address"].lower(), self.FACTORY_V3.lower())
+
+    def test_bet_placed_v3_enum_updates_ticket_pool(self):
+        apply_log(
+            self.conn,
+            self.FACTORY,
+            self.FACTORY_V2,
+            self._wager_created_v3_enum_log(),
+            factory_v3=self.FACTORY_V3,
+        )
+        self.conn.commit()
+        maddr = self.WAGER.lower()
+        mask0 = 4
+        bet_log = {
+            "address": self.WAGER,
+            "topics": [
+                TOPICS["BetPlacedV3Enumerated"],
+                topic_addr(self.BETTOR),
+            ],
+            "data": "0x" + word_u256(mask0) + word_u256(77),
+            "blockNumber": hex(51),
+            "transactionHash": "0x331",
+            "logIndex": hex(0),
+        }
+        apply_log(self.conn, self.FACTORY, self.FACTORY_V2, bet_log, factory_v3=self.FACTORY_V3)
+        self.conn.commit()
+        pool = self.conn.execute(
+            "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ? AND ticket_mask = ?",
+            (maddr, str(mask0)),
+        ).fetchone()
+        self.assertEqual(int(pool["pool_total"]), 77)
+
+    def test_resolved_v3_enumerated_sets_winning_mask(self):
+        apply_log(
+            self.conn,
+            self.FACTORY,
+            self.FACTORY_V2,
+            self._wager_created_v3_enum_log(),
+            factory_v3=self.FACTORY_V3,
+        )
+        self.conn.commit()
+        maddr = self.WAGER.lower()
+        res_log = {
+            "address": self.WAGER,
+            "topics": [TOPICS["ResolvedV3Enumerated"]],
+            "data": "0x" + word_u256(8),
+            "blockNumber": hex(52),
+            "transactionHash": "0x332",
+            "logIndex": hex(0),
+        }
+        apply_log(self.conn, self.FACTORY, self.FACTORY_V2, res_log, factory_v3=self.FACTORY_V3)
+        self.conn.commit()
+        win = self.conn.execute(
+            "SELECT winning_outcome FROM wager_totals WHERE wager_address = ?", (maddr,)
+        ).fetchone()
+        self.assertEqual(win["winning_outcome"], "8")
+
+    def _wager_created_v3_freeform_log(self):
+        data = (
+            "0x"
+            + word_addr(self.TOKEN)
+            + word_u256(2_000)
+            + word_u256(3_000)
+            + word_u256(5_000)
+            + word_addr(self.BETTING_CLOSER)
+            + word_addr(self.RESOLUTION_CLOSER)
+        )
+        return {
+            "address": self.FACTORY_V3,
+            "topics": [
+                TOPICS["WagerCreatedV3Freeform"],
+                topic_addr(self.WAGER),
+                topic_addr(self.PROPOSER),
+                topic_addr(self.RESOLVER),
+            ],
+            "data": data,
+            "blockNumber": hex(60),
+            "transactionHash": "0x440",
+            "logIndex": hex(0),
+        }
+
+    def test_wager_created_v3_freeform_and_bet_updates_pool(self):
+        apply_log(
+            self.conn,
+            self.FACTORY,
+            self.FACTORY_V2,
+            self._wager_created_v3_freeform_log(),
+            factory_v3=self.FACTORY_V3,
+        )
+        self.conn.commit()
+        maddr = self.WAGER.lower()
+        row = self.conn.execute("SELECT protocol_version FROM wagers WHERE wager_address = ?", (maddr,)).fetchone()
+        self.assertEqual(row["protocol_version"], "v3_freeform")
+        aid_topic = "0x" + word_u256(0xC0DE)
+        bet_log = {
+            "address": self.WAGER,
+            "topics": [
+                TOPICS["BetPlacedV3Freeform"],
+                topic_addr(self.BETTOR),
+                aid_topic,
+            ],
+            "data": "0x" + word_u256(99),
+            "blockNumber": hex(61),
+            "transactionHash": "0x441",
+            "logIndex": hex(0),
+        }
+        apply_log(self.conn, self.FACTORY, self.FACTORY_V2, bet_log, factory_v3=self.FACTORY_V3)
+        self.conn.commit()
+        pool = self.conn.execute(
+            "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ? AND ticket_mask = ?",
+            (maddr, aid_topic.lower()),
+        ).fetchone()
+        self.assertEqual(int(pool["pool_total"]), 99)
 
 
 if __name__ == "__main__":

@@ -105,66 +105,67 @@ Each microwonk requires:
 
 #### Category A: Published-text wagers (predetermined resolution)
 
-These bet on events whose outcomes are established in published ctrlcreep fiction. Source references point to `docs/CTRLCREEP-CORPUS.md`.
+These bet on events as though they are unfolding in real time. Propositions are phrased in the future tense — live speculation, not retrospective quiz. All outcomes are established in published ctrlcreep fiction; source references point to `docs/CTRLCREEP-CORPUS.md`.
 
-**From Cataclysm (Chapters 1-3):**
+**Perspective rule:** Wagers must concern only observables — publicly broadcast communications, material events, measurable phenomena. The private inner thoughts of characters are off-limits (exception: machine intelligences like SIMFAT whose purpose statements and broadcasts are public). Cross-corpus wagers are framed as though the microwonks are receiving signals from other eras or zones of the same world, not reading finished stories.
 
-| # | Proposition | Outcomes | Winning | Betting window | Resolution |
-|---|------------|----------|---------|---------------|------------|
-| A1 | "Will Mirabilisk's stewardship be awarded to a known entity?" | Yes / No / Stewardship Denied | No (SIMFAT was unknown) | Days 1-4 | Day 5 |
-| A2 | "How many Cortezes survive the initial Cataclysm?" | 0 / 1-2 / 3-5 / 6+ | 3-5 (three survived) | Days 2-5 | Day 6 |
-| A3 | "Will a neo-whale volunteer to enter the Mirabilisk Core Station?" | Yes / No / Coerced | Yes (Sourceless consented) | Days 3-7 | Day 8 |
-| A4 | "Does SIMFAT locate an archaic human without broadcasting its need?" | Yes, found locally / Yes, via broadcast / No | Yes, via broadcast (Waterloo's letter) | Days 5-9 | Day 10 |
-| A5 | "What is SIMFAT's primary non-stewardship concern?" | Military defense / Resource allocation / Frog conservation / Self-preservation | Frog conservation | Days 1-3 | Day 4 |
-| A6 | "Does Sourceless profit from insider trading during the stewardship crisis?" | Yes, confirmed / Implied but unconfirmed / No opportunity | Implied but unconfirmed (she fantasized about it) | Days 4-8 | Day 9 |
-| A7 | "Which entity provides the blueprint for entering the Faraday labyrinth?" | SIMFAT itself / An allied god-machine / An unknown third party | The Right Regional Municipality of Waterloo | Days 6-10 | Day 11 |
-| A8 | "How long after the Cataclysm is a steward initiated?" | < 1 hour / 1-6 hours / 6-12 hours / > 12 hours | 6-12 hours (6h 27m 14s) | Days 2-4 | Day 5 |
-| A9 | "How many seconds can Sourceless survive intact under desidereification?" | < 60 / 60-120 / 120-180 / > 180 | 120-180 (136 seconds) | Days 7-11 | Day 12 |
-
-**From Throughout All Generations (the Min Vaults):**
+**From the Mirabilisk crisis (Cataclysm Chapters 1-3):**
 
 | # | Proposition | Outcomes | Winning | Betting window | Resolution |
 |---|------------|----------|---------|---------------|------------|
-| A10 | "How many attempts does Min #20349585 require to select a unique name?" | < 100 / 100-1,000 / 1,000-10,000 / 10,000+ | 10,000+ (10,089 attempts) | Days 3-6 | Day 7 |
-| A11 | "What is the most popular first-choice name among the Mins?" | Amethyst / Ilyana / Minerva / Other | Amethyst (47% initial selection rate) | Days 3-6 | Day 7 |
-| A12 | "At what age are Mins terminated?" | 30 / 45 / 60 / Immortal | 60 | Days 4-7 | Day 8 |
-| A13 | "What is the time dilation ratio of the Min Vaults to baseline reality?" | 1,000x / 1,000,000x / 200,000,000x / 1,000,000,000x | 200,000,000x | Days 5-8 | Day 9 |
+| A1 | "Will Mirabilisk's stewardship be awarded to a known entity?" | Yes / No / Stewardship Denied | No (SIMFAT was unknown to wonks) | Days 1-4 | Day 5 |
+| A2 | "How many Cortezes will survive the initial Cataclysm?" | 0 / 1-2 / 3-5 / 6+ | 3-5 (three survived) | Days 2-5 | Day 6 |
+| A3 | "Will a neo-whale volunteer to enter the Mirabilisk Core Station?" | Yes / No / Coerced | Yes | Days 3-7 | Day 8 |
+| A4 | "How will SIMFAT obtain an archaic human for the Faraday labyrinth?" | Locate one within Mirabilisk / Receive a blueprint via broadcast / Construct one independently / Fail | Receive a blueprint via broadcast (from Waterloo) | Days 5-9 | Day 10 |
+| A5 | "What will SIMFAT's primary broadcast concern be, aside from stewardship operations?" | Military defense / Resource allocation / Frog conservation / Self-preservation | Frog conservation | Days 1-3 | Day 4 |
+| A6 | "How long after the Cataclysm will a steward be initiated?" | < 1 hour / 1-6 hours / 6-12 hours / > 12 hours | 6-12 hours (6h 27m 14s) | Days 2-4 | Day 5 |
+| A7 | "Which entity will provide the blueprint for entering the Faraday labyrinth?" | SIMFAT itself / An AA-aligned god-machine / An unaligned third party / A non-god-machine polity | A non-god-machine polity (the Right Regional Municipality of Waterloo) | Days 6-10 | Day 11 |
+| A8 | "How many seconds will Sourceless's reinforced ACI preserve her intact under desidereification?" | < 60 / 60-120 / 120-180 / > 180 | 120-180 (SIMFAT's own estimate: 136 seconds) | Days 7-11 | Day 12 |
 
-**From the Daniel Calhoun Obituary (Murine Music):**
-
-| # | Proposition | Outcomes | Winning | Betting window | Resolution |
-|---|------------|----------|---------|---------------|------------|
-| A14 | "What species is the composer Algernon Dustpinch?" | Human / Mouse / Crow / Whale / Artificial | Mouse | Days 5-9 | Day 10 |
-| A15 | "How does Dustpinch die?" | Old age / Failed digitization surgery / Violence / Illness | Failed digitization surgery (2112) | Days 6-10 | Day 11 |
-| A16 | "What modification does Calhoun undergo to hear at mouse frequencies?" | Cochlear implant / Neural rewiring / Prosthetic ears / Nanobot augmentation | Cochlear implant | Days 7-11 | Day 12 |
-| A17 | "What species performs Calhoun's brain restructuring surgery?" | Human / Mouse / Octopus / AI | Octopus (*octopus mercatoris*) | Days 8-12 | Day 13 |
-
-**From Adversarial Learning (the Asteroid Servers):**
+**From Min Vault signals (Throughout All Generations):**
 
 | # | Proposition | Outcomes | Winning | Betting window | Resolution |
 |---|------------|----------|---------|---------------|------------|
-| A18 | "How many digitized human bodyminds are preserved in the asteroid server array?" | < 1 million / 1M-1B / ~3 billion / > 10 billion | ~3 billion | Days 8-12 | Day 13 |
-| A19 | "Does the narrator discover evidence of a third consciousness in the server?" | Yes / No / Ambiguous | Yes (yellow-masked entity) | Days 9-13 | Day 14 |
+| A9 | "How many attempts will Min #20349585 require to select a unique name?" | < 100 / 100-1,000 / 1,000-10,000 / 10,000+ | 10,000+ (10,089 attempts) | Days 3-6 | Day 7 |
+| A10 | "What will be the most common first-choice name selected by Mins?" | Amethyst / Ilyana / Minerva / Other | Amethyst (47% initial selection rate) | Days 3-6 | Day 7 |
+| A11 | "At what age will a Min's lifecycle terminate?" | 30 / 45 / 60 / No fixed limit | 60 | Days 4-7 | Day 8 |
+| A12 | "What will the time dilation ratio of the Min Vaults prove to be?" | 1,000x / 1,000,000x / 200,000,000x / 1,000,000,000x | 200,000,000x | Days 5-8 | Day 9 |
 
-**From The Gathomnid Sonnets (the Final LLMoid):**
-
-| # | Proposition | Outcomes | Winning | Betting window | Resolution |
-|---|------------|----------|---------|---------------|------------|
-| A20 | "How many verses do the parallel LLM instances agree to compose?" | 256 / 4,096 / 65,536 / 1,048,576 | 65,536 (2^16) | Days 10-14 | Day 15 |
-| A21 | "How do the parallel instances coordinate their composition?" | Direct communication / Shared memory / Acausal coordination / Central planner | Acausal coordination | Days 10-14 | Day 15 |
-
-**From Oikobezoar (the Nanobrick House):**
+**From murine uplift transmissions (the Calhoun chronicle):**
 
 | # | Proposition | Outcomes | Winning | Betting window | Resolution |
 |---|------------|----------|---------|---------------|------------|
-| A22 | "Does the narrator successfully delete the anomalous room?" | Yes / No / Partially | No (it persists through all attempts) | Days 12-16 | Day 17 |
+| A13 | "What species will the composer Algernon Dustpinch prove to be?" | Human / Mouse / Crow / Whale / Artificial | Mouse | Days 5-9 | Day 10 |
+| A14 | "How will Dustpinch's life end?" | Old age / Failed digitization surgery / Violence / Illness | Failed digitization surgery | Days 6-10 | Day 11 |
+| A15 | "What augmentation will Calhoun undergo to perceive mouse-frequency sound?" | Cochlear implant / Neural rewiring / Prosthetic ears / Nanobot augmentation | Cochlear implant | Days 7-11 | Day 12 |
+| A16 | "What species will perform Calhoun's brain restructuring surgery?" | Human / Mouse / Octopus / AI | Octopus (*octopus mercatoris*) | Days 8-12 | Day 13 |
 
-**From In the Houses of Disordered Stars (the Ransei Revolution):**
+**From the asteroid archive (Adversarial Learning):**
 
 | # | Proposition | Outcomes | Winning | Betting window | Resolution |
 |---|------------|----------|---------|---------------|------------|
-| A23 | "How many suicide booths were constructed during the Ransei Revolution?" | < 1,000 / 1,000-10,000 / 10,000-100,000 / > 100,000 | > 100,000 | Days 13-17 | Day 18 |
-| A24 | "Does the protagonist survive the activated booth?" | Yes / No | Yes (escapes via a crack in the rock) | Days 14-18 | Day 19 |
+| A17 | "How many digitized human bodyminds will the asteroid server array contain?" | < 1 million / 1M-1B / ~3 billion / > 10 billion | ~3 billion | Days 8-12 | Day 13 |
+| A18 | "Will a third consciousness manifest within the asteroid server system?" | Yes / No / Inconclusive signals | Yes (yellow-masked entity) | Days 9-13 | Day 14 |
+
+**From the Sentience History Society (the Gathomnid Sonnets):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A19 | "How many verses will the parallel LLMoid instances agree to compose?" | 256 / 4,096 / 65,536 / 1,048,576 | 65,536 (2^16) | Days 10-14 | Day 15 |
+| A20 | "How will the parallel instances coordinate their composition?" | Direct communication / Shared memory / Acausal coordination / Central planner | Acausal coordination | Days 10-14 | Day 15 |
+
+**From the nanobrick anomaly (Oikobezoar):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A21 | "Will the bedroom-true anomaly persist despite reconstruction attempts?" | Yes, fully intact / Partially degraded / Successfully removed | Yes, fully intact | Days 12-16 | Day 17 |
+
+**From Ransei zone reports (In the Houses of Disordered Stars):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A22 | "How many euthanasia structures will the Ransei Revolution produce?" | < 1,000 / 1,000-10,000 / 10,000-100,000 / > 100,000 | > 100,000 | Days 13-17 | Day 18 |
+| A23 | "Will anyone survive an encounter with an operational Ransei booth?" | Yes / No | Yes | Days 14-18 | Day 19 |
 
 #### Category B: Peripheral speculative wagers (extemporaneous resolution)
 

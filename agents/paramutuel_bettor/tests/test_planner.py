@@ -37,6 +37,31 @@ class TestPlannerQuoteV2(unittest.TestCase):
         self.assertEqual(q["outcome_total_raw"], 400)
         self.assertEqual(q["quote"].get("ticket_mask"), 2)
 
+    def test_quote_wager_v3_freeform_matches_freeform_pool_indexing(self) -> None:
+        detail = {
+            "wager": {
+                "protocol_version": "v3_freeform",
+                "collateral_token": "0x036CbD53842c5426634e7929541eC2318f3dCf7e",
+                "state": "OPEN",
+                "betting_close_time": 9_999_999_999,
+            },
+            "totals": {"total_pot": "500", "total_fee_bps": "0"},
+            "outcomes": [],
+            "ticket_pools": [
+                {"ticket_mask": "0xbb", "pool_total": "100"},
+                {"ticket_mask": "0xaa", "pool_total": "200"},
+            ],
+        }
+        out = planner.quote_wager(
+            _FakeIndexer(detail),
+            wager_address="0x" + "ab" * 20,
+            outcome_index=0,
+            bet_amount_raw=10,
+            freeform_answer="hello",
+        )
+        self.assertEqual(out["answer_id_hex"], "0xaa")
+        self.assertEqual(out["quote"]["protocol_version"], "v3_freeform")
+
     def test_quote_wager_freeform_sorts_pools_by_answer_id(self) -> None:
         detail = {
             "wager": {

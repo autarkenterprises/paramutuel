@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { ethers } = require("ethers");
 const {
   getTemplate,
   computeWindowArgs,
@@ -14,6 +15,7 @@ const {
   parseOutcomeIndicesCsvToTicketMask,
   seedOutcomeIndicesToTicketMasks,
   validatePolicyParamForCreate,
+  freeformV3AnswerId,
 } = require("../logic.js");
 
 test("template lookup falls back to custom", () => {
@@ -212,6 +214,14 @@ test("popcountMask counts bits", () => {
 
 test("seedOutcomeIndicesToTicketMasks maps to single-bit masks", () => {
   assert.deepEqual(seedOutcomeIndicesToTicketMasks([0, 2]), [1n, 4n]);
+});
+
+test("freeformV3AnswerId domain-separates from legacy keccak(bytes(answer))", () => {
+  const answer = "Paris";
+  const v3 = freeformV3AnswerId(answer, ethers);
+  const legacy = ethers.keccak256(ethers.toUtf8Bytes(answer));
+  assert.notEqual(v3.toLowerCase(), legacy.toLowerCase());
+  assert.equal(v3.toLowerCase(), "0x1912e91243cbc3b42ab17ada47d57ab68ed946bc24de33ae4f6c13bdad067953");
 });
 
 test("validatePolicyParamForCreate enforces AT_LEAST_K k", () => {

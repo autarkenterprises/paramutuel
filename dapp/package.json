@@ -1,0 +1,8 @@
+{
+  "name": "paramutuel-dapp",
+  "private": true,
+  "description": "Dev deps for dApp unit tests (logic.js); browser loads ethers from CDN.",
+  "devDependencies": {
+    "ethers": "^6.13.5"
+  }
+}

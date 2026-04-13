@@ -4,6 +4,11 @@ const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
 const API_BASE_NORMALIZED = API_BASE.replace(/\/$/, "");
 const PAGE_SIZE = 20;
 
+function wagerIsCurrentProtocol(w) {
+  const pv = String(w.protocol_version || "").trim().toLowerCase();
+  return pv === "v3_enum" || pv === "v3_freeform";
+}
+
 let currentOffset = 0;
 let lastQueryText = "";
 let lastOrder = "desc";
@@ -34,7 +39,6 @@ const FIELD_DEFS = [
   { key: "state", label: "State", core: true },
   { key: "proposition", label: "Proposition", core: true },
   { key: "outcomes_json", label: "Outcomes", core: true },
-  { key: "protocol_version", label: "Protocol", core: false },
   { key: "payoff_policy", label: "Payoff policy", core: false },
   { key: "policy_param", label: "Policy param", core: false },
   { key: "proposer", label: "Proposer", core: true },
@@ -224,7 +228,7 @@ async function loadConfiguredFactoryAddress() {
     const cid = net.chainId;
     const parsed = typeof cid === "number" ? cid : Number(cid);
     if (!Number.isNaN(parsed)) explorerChainId = parsed;
-    const addr = String((net.factoryAddress || "")).trim();
+    const addr = String((net.factoryV3Address || net.factoryAddress || "")).trim();
     if (node && addr) node.textContent = addr;
   } catch (_) {
     // Optional when explorer is served standalone without deployments config.
@@ -273,7 +277,7 @@ function renderWagers(wagers, { append = false } = {}) {
     }
   }
   if (!append && wagers.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}">No wagers found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspan}">No Paramutuel protocol wagers in this result page.</td></tr>`;
   }
 }
 
@@ -347,9 +351,10 @@ async function loadWagers({ append = false } = {}) {
   }
   const data = await res.json();
   if (gen !== loadGeneration) return;
-  const wagers = data.wagers || [];
+  const rawWagers = data.wagers || [];
+  const wagers = rawWagers.filter(wagerIsCurrentProtocol);
   lastIndexerHint = "";
-  if (!append && wagers.length === 0 && API_BASE_NORMALIZED) {
+  if (!append && rawWagers.length === 0 && API_BASE_NORMALIZED) {
     try {
       const hr = await fetch(apiUrl("/health"));
       if (hr.ok) {
@@ -381,8 +386,8 @@ async function loadWagers({ append = false } = {}) {
     }
   }
   renderWagers(wagers, { append });
-  currentOffset += wagers.length;
-  exhausted = wagers.length < PAGE_SIZE;
+  currentOffset += rawWagers.length;
+  exhausted = rawWagers.length < PAGE_SIZE;
   setLoadMoreEnabled(!exhausted);
   setIndexerBusy("");
   updateResultMeta();

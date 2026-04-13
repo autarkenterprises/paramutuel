@@ -4,6 +4,20 @@ from agents.paramutuel_bettor import calldata
 
 
 class TestCalldataV2(unittest.TestCase):
+    def test_build_quote_v3_enum_uses_ticket_mask(self) -> None:
+        body = calldata.build_quote_like_payload(
+            wager_address="0x" + "ab" * 20,
+            collateral_token="0x" + "cd" * 20,
+            outcome_index=1,
+            amount=50,
+            odds={},
+            betting_open=True,
+            revert_hint="",
+            protocol_version="v3_enum",
+        )
+        self.assertEqual(body["protocol_version"], "v3_enum")
+        self.assertEqual(body["ticket_mask"], 2)
+
     def test_build_quote_v2_uses_ticket_mask_for_place_bet_word(self) -> None:
         body = calldata.build_quote_like_payload(
             wager_address="0x" + "ab" * 20,

@@ -51,6 +51,8 @@ jobs:
               'ParamutuelWagerV2',
               'ParamutuelFactoryFreeform',
               'ParamutuelWagerFreeform',
+              'ParamutuelFactoryV3',
+              'ParamutuelWagerV3',
           ]:
               data = json.load(open(f'out/{name}.sol/{name}.json'))
               with open(f'_site/dapp/abi/{name}.json', 'w') as f:

@@ -68,7 +68,7 @@
           "type": "mcp_server",
           "package": "paramutuel-mcp",
           "pypi": "https://pypi.org/project/paramutuel-mcp/",
-          "note": "Use MCP quote_place_bet / encode_place_bet_freeform before signing (v2 ticket masks and freeform UTF-8 answers per indexer protocol_version); see docs/AGENT-LOOP.md"
+          "note": "Use MCP quote_place_bet / encode_place_bet_freeform / encode_create_enumerated_wager_v3 before signing (indexer protocol_version v1, v2, freeform, v3_enum, v3_freeform); see docs/AGENT-LOOP.md"
         }
       ],
       "cursor_skill_path": ".cursor/skills/paramutuel-bettor/SKILL.md"

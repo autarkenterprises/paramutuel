@@ -18,6 +18,20 @@ TOPICS = {
     "BetPlacedFreeform": "0xb4f2b7294a555732d5c73cc34940c46431b31aad34a947d1b6210a5cc5d1e6d5",
     # cast sig-event "ResolvedFreeform(bytes32)"
     "ResolvedFreeform": "0x9b6a781a3f554541bb561aebff6265bd272889b31a17ffc0cff68b587f1023f9",
+    # Paramutuel v3 (ParamutuelFactoryV3 / ParamutuelWagerV3)
+    "WagerCreatedV3Enumerated": "0xff766b6fc8dd2e2b1c7be675a874f160c4cada5bf32dac8b1b2e0d6ae7bdb0da",
+    "WagerCreatedV3Freeform": "0xf59da875d5b5de3b09728f042bebc2a20357ee08ca31bbaf584efd9cb0ec4c53",
+    "BetPlacedV3Enumerated": "0xd49e0d995d5bc2e9cc268a6a482b0d8ec9ed18ddeae89fc67001c2efa6fee5b0",
+    "BetPlacedV3Freeform": "0xecda6e726cfee6e62f696fb6fc02e680aa5742138f2635d615d7b8bca3db15c4",
+    "ResolvedV3Enumerated": "0x0a2e969cad318ad34168d32c8cbce850c7903442301e6e8d824116385833f290",
+    "ResolvedV3Freeform": "0xfeae22eca71fbae658ba63b5add1f9f5371e7fd5bf7597f8b97cdaf24a29a922",
+    "BettingClosedByAuthorityV3": "0x309f6e1169f98c711fa766027cd3ca7a3faa5d73827678a743758b5e0a19593f",
+    "ResolutionWindowClosedByAuthorityV3": "0xee6e1578965b067c63388674310a835bfa8973df58b6fe92892eee8ddf9c03fa",
+    "RetractedV3": "0xebabcf541ed74aefa8ba4e51e11c11b14add951948fb15973a044658cf583ba3",
+    "ExpiredV3": "0x2cd032a0386e334d4ec0a27e3922b8673bbc85a3938f1d9e39aaf827ee803cbc",
+    "ClaimedV3": "0x18f56b95da8109fe45e8ff222168c73ba869a66cdb44a1d68d00576efc4377f6",
+    "FeeAccruedV3": "0x61e2d065e1dccf6ff8fc518812577d7c01bb33d905b7975c1776a9c2b386cf16",
+    "FeeWithdrawnV3": "0xa1f7a7f54e12a1df5b55a8b583db7040559f7fa32576e9ecdacf7dbd49c99e75",
     "BettingClosedByAuthority": "0xee66a0cc21397ffefe70cadd94333bb96aa93548aaf0d7680d09ee50a5112898",
     "ResolutionWindowClosedByAuthority": "0x3a016249126bba7044eec394afa8eba111d1ea6bda5a42b663f7d86944fd1f87",
     "BetPlaced": "0x001ecf1d0c4d22f324b3ecb9cdf0e5f772bc74ac104e6626f4b3845433d03105",
@@ -232,10 +246,12 @@ def apply_log(
     log: Dict[str, Any],
     rpc_url: Optional[str] = None,
     factory_freeform: str = "",
+    factory_v3: str = "",
 ) -> None:
     fac1 = normalize_address(factory_v1) if factory_v1 else ""
     fac2 = normalize_address(factory_v2) if factory_v2 else ""
     fac3 = normalize_address(factory_freeform) if factory_freeform else ""
+    fac_v3 = normalize_address(factory_v3) if factory_v3 else ""
     address = normalize_address(log["address"])
     topics = log.get("topics", [])
     if not topics:
@@ -472,6 +488,156 @@ def apply_log(
         )
         return
 
+    # WAGER CREATED v3 enumerated (ParamutuelFactoryV3)
+    if event_name == "WagerCreatedV3Enumerated":
+        if not fac_v3 or address != fac_v3:
+            return
+        wager = topic_to_address(topics[1])
+        proposer = topic_to_address(topics[2])
+        resolver = topic_to_address(topics[3])
+        collateral_token = topic_to_address(data_word(log["data"], 0))
+        payoff_policy = to_int(data_word(log["data"], 1))
+        policy_param = to_int(data_word(log["data"], 2))
+        betting_close_time = to_int(data_word(log["data"], 3))
+        resolution_window = to_int(data_word(log["data"], 4))
+        resolution_deadline = to_int(data_word(log["data"], 5))
+        betting_closer = topic_to_address(data_word(log["data"], 6))
+        resolution_closer = topic_to_address(data_word(log["data"], 7))
+        metadata = {"proposition": "", "outcomes": []}
+        if rpc_url:
+            metadata = fetch_wager_metadata(rpc_url, wager)
+
+        inserted = insert_event_log(
+            conn,
+            eid,
+            wager,
+            event_name,
+            block_number,
+            tx_hash,
+            log_index,
+            {
+                "wager": wager,
+                "proposer": proposer,
+                "resolver": resolver,
+                "collateralToken": collateral_token,
+                "payoffPolicy": payoff_policy,
+                "policyParam": policy_param,
+                "bettingCloseTime": betting_close_time,
+                "resolutionWindow": resolution_window,
+                "resolutionDeadline": resolution_deadline,
+                "bettingCloser": betting_closer,
+                "resolutionCloser": resolution_closer,
+            },
+        )
+        if not inserted:
+            return
+
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO wagers(
+              wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+              collateral_token, proposition, outcomes_json, betting_close_time, resolution_window, resolution_deadline,
+              protocol_version, payoff_policy, policy_param, state, created_block, created_tx_hash
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'v3_enum', ?, ?, 'OPEN', ?, ?)
+            """,
+            (
+                wager,
+                fac_v3,
+                proposer,
+                resolver,
+                betting_closer,
+                resolution_closer,
+                collateral_token,
+                metadata["proposition"],
+                json.dumps(metadata["outcomes"]),
+                betting_close_time,
+                resolution_window,
+                resolution_deadline,
+                payoff_policy,
+                str(policy_param),
+                block_number,
+                tx_hash.lower(),
+            ),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
+            (wager,),
+        )
+        return
+
+    # WAGER CREATED v3 freeform (ParamutuelFactoryV3)
+    if event_name == "WagerCreatedV3Freeform":
+        if not fac_v3 or address != fac_v3:
+            return
+        wager = topic_to_address(topics[1])
+        proposer = topic_to_address(topics[2])
+        resolver = topic_to_address(topics[3])
+        collateral_token = topic_to_address(data_word(log["data"], 0))
+        betting_close_time = to_int(data_word(log["data"], 1))
+        resolution_window = to_int(data_word(log["data"], 2))
+        resolution_deadline = to_int(data_word(log["data"], 3))
+        betting_closer = topic_to_address(data_word(log["data"], 4))
+        resolution_closer = topic_to_address(data_word(log["data"], 5))
+        metadata = {"proposition": "", "outcomes": []}
+        if rpc_url:
+            metadata = fetch_wager_metadata(rpc_url, wager)
+
+        inserted = insert_event_log(
+            conn,
+            eid,
+            wager,
+            event_name,
+            block_number,
+            tx_hash,
+            log_index,
+            {
+                "wager": wager,
+                "proposer": proposer,
+                "resolver": resolver,
+                "collateralToken": collateral_token,
+                "bettingCloseTime": betting_close_time,
+                "resolutionWindow": resolution_window,
+                "resolutionDeadline": resolution_deadline,
+                "bettingCloser": betting_closer,
+                "resolutionCloser": resolution_closer,
+            },
+        )
+        if not inserted:
+            return
+
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO wagers(
+              wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
+              collateral_token, proposition, outcomes_json, betting_close_time, resolution_window, resolution_deadline,
+              protocol_version, state, created_block, created_tx_hash
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'v3_freeform', 'OPEN', ?, ?)
+            """,
+            (
+                wager,
+                fac_v3,
+                proposer,
+                resolver,
+                betting_closer,
+                resolution_closer,
+                collateral_token,
+                metadata["proposition"],
+                json.dumps(metadata["outcomes"]),
+                betting_close_time,
+                resolution_window,
+                resolution_deadline,
+                block_number,
+                tx_hash.lower(),
+            ),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
+            (wager,),
+        )
+        return
+
     # all other events are emitted by wager contracts
     wager = address
     if not conn.execute("SELECT 1 FROM wagers WHERE wager_address = ?", (wager,)).fetchone():
@@ -501,6 +667,95 @@ def apply_log(
         conn.execute(
             "UPDATE wagers SET resolution_window_closed = 1, resolution_window_closed_at = ? WHERE wager_address = ?",
             (closed_at, wager),
+        )
+        return
+
+    if event_name == "BettingClosedByAuthorityV3":
+        closed_at = to_int(data_word(log["data"], 0))
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "UPDATE wagers SET betting_closed_by_authority = 1, betting_closed_at = ? WHERE wager_address = ?",
+            (closed_at, wager),
+        )
+        return
+
+    if event_name == "ResolutionWindowClosedByAuthorityV3":
+        closed_at = to_int(data_word(log["data"], 0))
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, {"closedAt": closed_at}
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "UPDATE wagers SET resolution_window_closed = 1, resolution_window_closed_at = ? WHERE wager_address = ?",
+            (closed_at, wager),
+        )
+        return
+
+    if event_name == "BetPlacedV3Enumerated":
+        bettor = topic_to_address(topics[1])
+        ticket_mask = to_int(data_word(log["data"], 0))
+        amount = to_int(data_word(log["data"], 1))
+        mask_key = str(ticket_mask)
+        payload_v3e: Dict[str, Any] = {"bettor": bettor, "ticketMask": ticket_mask, "amount": amount}
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, payload_v3e
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "INSERT OR IGNORE INTO wager_ticket_pools(wager_address, ticket_mask, pool_total) VALUES (?, ?, '0')",
+            (wager, mask_key),
+        )
+        row = conn.execute(
+            "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ? AND ticket_mask = ?",
+            (wager, mask_key),
+        ).fetchone()
+        prev = int(row["pool_total"] or 0) if row else 0
+        conn.execute(
+            "UPDATE wager_ticket_pools SET pool_total = ? WHERE wager_address = ? AND ticket_mask = ?",
+            (str(prev + amount), wager, mask_key),
+        )
+        conn.execute(
+            "UPDATE wager_totals SET total_pot = CAST(total_pot AS INTEGER) + ? WHERE wager_address = ?",
+            (amount, wager),
+        )
+        return
+
+    if event_name == "BetPlacedV3Freeform":
+        bettor = topic_to_address(topics[1])
+        answer_id_key = topics[2].lower()
+        amount = to_int(data_word(log["data"], 0))
+        payload_v3f: Dict[str, Any] = {
+            "bettor": bettor,
+            "answerId": answer_id_key,
+            "amount": amount,
+        }
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, payload_v3f
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "INSERT OR IGNORE INTO wager_ticket_pools(wager_address, ticket_mask, pool_total) VALUES (?, ?, '0')",
+            (wager, answer_id_key),
+        )
+        row = conn.execute(
+            "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ? AND ticket_mask = ?",
+            (wager, answer_id_key),
+        ).fetchone()
+        prev = int(row["pool_total"] or 0) if row else 0
+        conn.execute(
+            "UPDATE wager_ticket_pools SET pool_total = ? WHERE wager_address = ? AND ticket_mask = ?",
+            (str(prev + amount), wager, answer_id_key),
+        )
+        conn.execute(
+            "UPDATE wager_totals SET total_pot = CAST(total_pot AS INTEGER) + ? WHERE wager_address = ?",
+            (amount, wager),
         )
         return
 
@@ -633,7 +888,46 @@ def apply_log(
         conn.execute("UPDATE wager_totals SET winning_outcome = ? WHERE wager_address = ?", (str(winning_val), wager))
         return
 
+    if event_name == "ResolvedV3Enumerated":
+        winning_val = to_int(data_word(log["data"], 0))
+        res_v3e: Dict[str, Any] = {"winningMask": winning_val, "layout": "v3_enum"}
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, res_v3e
+        )
+        if not inserted:
+            return
+        conn.execute("UPDATE wagers SET state = 'RESOLVED' WHERE wager_address = ?", (wager,))
+        conn.execute(
+            "UPDATE wager_totals SET winning_outcome = ? WHERE wager_address = ?",
+            (str(winning_val), wager),
+        )
+        return
+
+    if event_name == "ResolvedV3Freeform":
+        winning_key = topics[1].lower()
+        res_v3ff: Dict[str, Any] = {"winningAnswerId": winning_key, "layout": "v3_freeform"}
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, res_v3ff
+        )
+        if not inserted:
+            return
+        conn.execute("UPDATE wagers SET state = 'RESOLVED' WHERE wager_address = ?", (wager,))
+        conn.execute(
+            "UPDATE wager_totals SET winning_outcome = ? WHERE wager_address = ?",
+            (winning_key, wager),
+        )
+        return
+
     if event_name in ("Retracted", "Expired"):
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index, {}
+        )
+        if not inserted:
+            return
+        conn.execute("UPDATE wagers SET state = 'RETRACTED' WHERE wager_address = ?", (wager,))
+        return
+
+    if event_name in ("RetractedV3", "ExpiredV3"):
         inserted = insert_event_log(
             conn, eid, wager, event_name, block_number, tx_hash, log_index, {}
         )
@@ -657,7 +951,37 @@ def apply_log(
         )
         return
 
+    if event_name == "ClaimedV3":
+        bettor = topic_to_address(topics[1])
+        amount = to_int(data_word(log["data"], 0))
+        insert_event_log(
+            conn,
+            eid,
+            wager,
+            event_name,
+            block_number,
+            tx_hash,
+            log_index,
+            {"bettor": bettor, "amount": amount},
+        )
+        return
+
     if event_name in ("FeeAccrued", "FeeWithdrawn"):
+        recipient = topic_to_address(topics[1])
+        amount = to_int(data_word(log["data"], 0))
+        insert_event_log(
+            conn,
+            eid,
+            wager,
+            event_name,
+            block_number,
+            tx_hash,
+            log_index,
+            {"recipient": recipient, "amount": amount},
+        )
+        return
+
+    if event_name in ("FeeAccruedV3", "FeeWithdrawnV3"):
         recipient = topic_to_address(topics[1])
         amount = to_int(data_word(log["data"], 0))
         insert_event_log(
@@ -733,11 +1057,13 @@ def sync_logs(
     *,
     factory_v2_address: str = "",
     factory_freeform_address: str = "",
+    factory_v3_address: str = "",
     allow_genesis_start: bool = False,
 ) -> int:
-    factory_address = normalize_address(factory_address)
+    factory_address = normalize_address(factory_address) if factory_address else ""
     factory_v2_norm = normalize_address(factory_v2_address) if factory_v2_address else ""
     factory_ff_norm = normalize_address(factory_freeform_address) if factory_freeform_address else ""
+    factory_v3_norm = normalize_address(factory_v3_address) if factory_v3_address else ""
 
     latest = to_int(rpc_call(rpc_url, "eth_blockNumber", []))
     set_meta_int(conn, "chain_head", latest)
@@ -795,6 +1121,7 @@ def sync_logs(
                     log,
                     rpc_url=rpc_url,
                     factory_freeform=factory_ff_norm,
+                    factory_v3=factory_v3_norm,
                 )
                 processed += 1
             except Exception as exc:
@@ -814,17 +1141,36 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Minimal Paramutuel indexer")
     parser.add_argument("--rpc-url", required=True)
     parser.add_argument("--db-path", default="service/indexer/indexer.db")
-    parser.add_argument("--factory-address", required=True, help="ParamutuelFactory (v1) address")
+    parser.add_argument(
+        "--factory-address",
+        default="",
+        help="ParamutuelFactory (v1) address (optional if v2/freeform/v3 configured)",
+    )
     parser.add_argument("--factory-v2-address", default="", help="ParamutuelFactoryV2 address (optional)")
     parser.add_argument(
         "--factory-freeform-address",
         default="",
         help="ParamutuelFactoryFreeform address (optional, ADR-0009)",
     )
+    parser.add_argument(
+        "--factory-v3-address",
+        default="",
+        help="ParamutuelFactoryV3 address (optional; enumerated + freeform wagers)",
+    )
     parser.add_argument("--from-block", type=int, default=None)
     parser.add_argument("--to-block", type=int, default=None)
     parser.add_argument("--chunk-size", type=int, default=2_000)
     args = parser.parse_args()
+
+    fac1 = normalize_address(args.factory_address) if args.factory_address else ""
+    fac2 = normalize_address(args.factory_v2_address) if args.factory_v2_address else ""
+    fac_ff = normalize_address(args.factory_freeform_address) if args.factory_freeform_address else ""
+    fac_v3 = normalize_address(args.factory_v3_address) if args.factory_v3_address else ""
+    if not (fac1 or fac2 or fac_ff or fac_v3):
+        raise SystemExit(
+            "At least one factory address is required: "
+            "--factory-address, --factory-v2-address, --factory-freeform-address, or --factory-v3-address"
+        )
 
     conn = db_connect(args.db_path)
     init_db(conn)
@@ -837,6 +1183,7 @@ def main() -> None:
         chunk_size=args.chunk_size,
         factory_v2_address=args.factory_v2_address,
         factory_freeform_address=args.factory_freeform_address,
+        factory_v3_address=args.factory_v3_address,
         allow_genesis_start=True,
     )
     print(f"Processed logs: {count}")

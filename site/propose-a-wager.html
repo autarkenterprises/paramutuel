@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Propose a Paramutuel wager: templates for v1/v2 enumerated markets and freeform pools. Assisted wallet flows (in development)." />
+  <meta name="description" content="Propose a Paramutuel protocol wager: templates for enumerated and freeform pools. Assisted wallet flows (in development)." />
   <title>Propose a Wager — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -27,7 +27,7 @@
     <header class="propose-wager-header">
       <h1>Propose a Wager</h1>
       <p class="onboarding-lead propose-wager-lead">
-        This page is for <strong>facilitated wager creation</strong>: common templates for <strong>enumerated</strong> markets (v1/v2) and <strong>freeform</strong> pools, a streamlined subset of options, and (once live) assisted signing. The full <a href="app.html">self-custody app</a> already supports choosing protocol version, payoff policy (v2), and every factory parameter.
+        This page is for <strong>facilitated wager creation</strong>: common templates for <strong>enumerated</strong> and <strong>freeform</strong> pools, a streamlined subset of options, and (once live) assisted signing. The full <a href="app.html">self-custody app</a> already supports choosing deployment, bitmask payoff policy, and factory parameters.
       </p>
       <div class="propose-wager-actions propose-wager-actions--header">
         <a href="explorer.html" class="btn btn-secondary">Browse existing wagers</a>
@@ -51,7 +51,7 @@
     <section class="card" aria-labelledby="templates-heading">
       <h2 id="templates-heading" class="propose-section-title">Templates for common wagers</h2>
       <p class="muted" style="margin-bottom: 20px;">
-        Enumerated templates pre-structure outcome labels and timing (v1 or v2). A freeform template skips fixed outcomes: bettors supply text answers at stake time. The streamlined form (below) will apply defaults you can adjust before submit.
+        Enumerated templates pre-structure outcome labels and timing (classic or bitmask rules). A freeform template skips fixed outcomes: bettors supply text answers at stake time. The streamlined form (below) will apply defaults you can adjust before submit.
       </p>
       <div class="propose-template-grid">
         <article class="propose-template-card">
@@ -67,10 +67,10 @@
         </article>
         <article class="propose-template-card">
           <h3 class="propose-template-card__title">Pick one</h3>
-          <p class="propose-template-card__desc">Three to five named options; v1 single-winner or v2 payoff rule (e.g. any-of) after resolution.</p>
+          <p class="propose-template-card__desc">Three to five named options; classic single-winner or bitmask payoff rule (e.g. any-of) after resolution.</p>
           <ul class="propose-template-card__fields">
             <li>Proposition text</li>
-            <li>Outcome labels (3–5) · protocol v1 or v2</li>
+            <li>Outcome labels (3–5) · classic or bitmask enumerated</li>
             <li>Betting close · Resolution window</li>
             <li>Collateral</li>
           </ul>

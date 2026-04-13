@@ -83,10 +83,12 @@ def _action_command(
 ) -> list[str]:
     if action == "resolve":
         pv = (protocol_version or "v1").strip().lower()
-        if pv == "freeform":
+        if pv in ("freeform", "v3_freeform"):
             ans = (winning_answer or "").strip()
             if not ans:
-                raise ValueError("freeform resolve requires decision.winningAnswer (exact UTF-8 string)")
+                raise ValueError(
+                    "freeform/v3_freeform resolve requires decision.winningAnswer (exact UTF-8 string)"
+                )
             return [
                 "cast",
                 "send",
@@ -99,7 +101,7 @@ def _action_command(
                 private_key,
             ]
         if resolve_uint256 is None:
-            raise ValueError("resolve decision requires outcomeIndex or winningMask (v1/v2)")
+            raise ValueError("resolve decision requires outcomeIndex or winningMask (v1/v2/v3_enum)")
         return [
             "cast",
             "send",
@@ -253,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
                 if win_ans is not None and not isinstance(win_ans, str):
                     win_ans = str(win_ans)
                 if action == "resolve":
-                    if pv == "freeform":
+                    if pv in ("freeform", "v3_freeform"):
                         cmd = _action_command(
                             wager_address=c["wager_address"],
                             action=action,

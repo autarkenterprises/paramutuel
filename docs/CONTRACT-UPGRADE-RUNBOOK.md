@@ -18,13 +18,13 @@ This runbook is the canonical checklist for factory/wager contract upgrades and 
 - `python3 -m unittest discover -s service/resolution/tests`
 - `python3 -m unittest discover -s mcp_server/tests`
 - `PYTHONPATH=. python3 -m unittest discover -s agents/paramutuel_bettor/tests`
-- `node --test dapp/tests/logic.test.js`
+- `(cd dapp && npm ci)` then `node --test dapp/tests/logic.test.js` (installs ethers for `freeformV3AnswerId` tests)
 
 If any fail, do not deploy.
 
 ## 3) ABI sync + compatibility
 
-- `bash script/sync-abi.sh` (syncs **v1, v2, and freeform (ADR-0009)** artifacts: `ParamutuelFactory`, `ParamutuelWager`, `ParamutuelFactoryV2`, `ParamutuelWagerV2`, `ParamutuelFactoryFreeform`, `ParamutuelWagerFreeform` into `dapp/abi/` and `mcp_server/abi/`).
+- `bash script/sync-abi.sh` (syncs **v1, v2, freeform (ADR-0009), and v3** artifacts into `dapp/abi/` and `mcp_server/abi/`).
 - If ABI changed, update all callers (`dapp`, `service`, `mcp_server`, bet scout, static site copies, testnet suites).
 - Re-run full gates after updates.
 

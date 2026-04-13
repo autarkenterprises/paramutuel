@@ -62,6 +62,11 @@ FACTORY_FREEFORM_ADDRESS = os.environ.get(
     _network_cfg.get("factoryFreeformAddress", ""),
 ).strip()
 
+FACTORY_V3_ADDRESS = os.environ.get(
+    "FACTORY_V3_ADDRESS",
+    _network_cfg.get("factoryV3Address", ""),
+).strip()
+
 CHAIN_ID = int(os.environ.get("CHAIN_ID", _network_cfg.get("chainId", 84532)))
 
 # ── ABI loading ────────────────────────────────────────────────────
@@ -96,6 +101,8 @@ FACTORY_V2_ABI = _load_abi_optional("ParamutuelFactoryV2")
 WAGER_V2_ABI = _load_abi_optional("ParamutuelWagerV2")
 FACTORY_FREEFORM_ABI = _load_abi_optional("ParamutuelFactoryFreeform")
 WAGER_FREEFORM_ABI = _load_abi_optional("ParamutuelWagerFreeform")
+FACTORY_V3_ABI = _load_abi_optional("ParamutuelFactoryV3")
+WAGER_V3_ABI = _load_abi_optional("ParamutuelWagerV3")
 
 # ── ABI encoding helpers ───────────────────────────────────────────
 
@@ -103,6 +110,14 @@ from eth_abi import encode as abi_encode  # noqa: E402
 from eth_hash.auto import keccak as _keccak256  # noqa: E402
 
 _ZERO_ADDRESS = "0x" + "00" * 20
+
+_FREEFORM_V3_DOMAIN = bytes([0x03])
+
+
+def _freeform_v3_answer_id_hex(answer: str) -> str:
+    """Match `ParamutuelWagerV3._answerId`: keccak256(abi.encodePacked(domain byte, bytes(answer)))."""
+    digest = _keccak256(_FREEFORM_V3_DOMAIN + answer.encode("utf-8"))
+    return "0x" + digest.hex()
 
 
 def _selector(sig: str) -> bytes:
@@ -360,11 +375,22 @@ async def get_protocol_info() -> str:
         if WAGER_FREEFORM_ABI
         else []
     )
+    factory_v3_functions = (
+        sorted({e["name"] for e in FACTORY_V3_ABI if e.get("type") == "function"})
+        if FACTORY_V3_ABI
+        else []
+    )
+    wager_v3_functions = (
+        sorted({e["name"] for e in WAGER_V3_ABI if e.get("type") == "function"})
+        if WAGER_V3_ABI
+        else []
+    )
     return json.dumps(
         {
-            "factory_address": FACTORY_ADDRESS,
+            "factory_address": FACTORY_ADDRESS or None,
             "factory_v2_address": FACTORY_V2_ADDRESS or None,
             "factory_freeform_address": FACTORY_FREEFORM_ADDRESS or None,
+            "factory_v3_address": FACTORY_V3_ADDRESS or None,
             "chain_id": CHAIN_ID,
             "indexer_url": INDEXER_URL,
             "factory_functions": sorted(set(factory_functions)),
@@ -373,12 +399,15 @@ async def get_protocol_info() -> str:
             "wager_v2_functions": wager_v2_functions,
             "factory_freeform_functions": factory_freeform_functions,
             "wager_freeform_functions": wager_freeform_functions,
+            "factory_v3_functions": factory_v3_functions,
+            "wager_v3_functions": wager_v3_functions,
             "constants": {
                 "BPS_DENOMINATOR": 10_000,
                 "MAX_TOTAL_FEE_BPS": 10_000,
                 "MAX_OUTCOMES": 255,
                 "FREEFORM_MAX_ANSWER_BYTES": 1024,
                 "FREEFORM_MAX_DISTINCT_ANSWERS_CAP": 1024,
+                "FREEFORM_V3_ANSWER_DOMAIN_BYTE": 3,
             },
             "notes": {
                 "v2_wagers": (
@@ -389,6 +418,12 @@ async def get_protocol_info() -> str:
                     "ADR-0009: no enumerated outcomes. placeBet(string,uint256) and resolve(string) "
                     "use identical UTF-8 bytes for ticket id keccak256(bytes(answer)). "
                     "Indexer protocol_version=freeform."
+                ),
+                "v3_wagers": (
+                    "Single factory ParamutuelFactoryV3. Enumerated mode: same ticketMask/resolve(uint256) "
+                    "semantics as v2; indexer protocol_version v3_enum. Freeform mode: placeBet(string)/"
+                    "resolve(string) with answerId = keccak256(abi.encodePacked(bytes1(0x03), bytes(answer))); "
+                    "indexer protocol_version v3_freeform. Breaking vs legacy freeform ticket ids."
                 ),
             },
         },
@@ -428,10 +463,12 @@ async def quote_place_bet(
     outcome_index: int,
     amount: int,
     require_open: bool = False,
+    answer: str = "",
 ) -> str:
     """Quote odds + return placeBet calldata + approval instructions.
 
-    All amounts are in raw token units.
+    All amounts are in raw token units. For `protocol_version` v3_freeform, pass the exact UTF-8
+    `answer` string (must match on-chain bytes); ticket pool is keyed by domain-separated answerId.
     """
     import time
 
@@ -457,10 +494,11 @@ async def quote_place_bet(
 
     protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
     ticket_mask: int | None = None
-    first_arg: int
+    first_arg: int | None = None
     outcome_total: int | None = None
+    calldata: str
 
-    if protocol_version == "v2":
+    if protocol_version in ("v2", "v3_enum"):
         ticket_mask = int(1) << int(outcome_index)
         first_arg = ticket_mask
         ticket_pools = data.get("ticket_pools") or []
@@ -471,6 +509,26 @@ async def quote_place_bet(
                 break
         if outcome_total is None:
             outcome_total = 0
+        calldata = _encode_call(
+            "placeBet(uint256,uint256)",
+            ["uint256", "uint256"],
+            [first_arg, amount],
+        )
+    elif protocol_version == "v3_freeform":
+        ans = answer.strip()
+        if not ans:
+            raise ValueError(
+                "v3_freeform wagers require non-empty `answer` (same UTF-8 as on-chain placeBet/resolve)."
+            )
+        aid = _freeform_v3_answer_id_hex(ans)
+        ticket_pools = data.get("ticket_pools") or []
+        key = aid.lower()
+        outcome_total = 0
+        for tp in ticket_pools:
+            if str(tp.get("ticket_mask")).lower() == key:
+                outcome_total = int(tp.get("pool_total", 0) or 0)
+                break
+        calldata = _encode_call("placeBet(string,uint256)", ["string", "uint256"], [ans, amount])
     else:
         first_arg = int(outcome_index)
         for o in outcomes:
@@ -479,18 +537,17 @@ async def quote_place_bet(
                 break
         if outcome_total is None:
             raise ValueError(f"Outcome index {outcome_index} not found in this wager.")
+        calldata = _encode_call(
+            "placeBet(uint256,uint256)",
+            ["uint256", "uint256"],
+            [first_arg, amount],
+        )
 
     odds = _compute_odds(
         total_pot=total_pot,
-        outcome_total=outcome_total,
+        outcome_total=outcome_total or 0,
         total_fee_bps=total_fee_bps,
         bet_amount=amount,
-    )
-
-    calldata = _encode_call(
-        "placeBet(uint256,uint256)",
-        ["uint256", "uint256"],
-        [first_arg, amount],
     )
 
     body: dict[str, Any] = {
@@ -516,6 +573,9 @@ async def quote_place_bet(
     }
     if ticket_mask is not None:
         body["ticket_mask"] = ticket_mask
+    if protocol_version == "v3_freeform":
+        body["answer"] = answer.strip()
+        body["answer_id"] = _freeform_v3_answer_id_hex(answer.strip())
     return json.dumps(body, indent=2)
 
 
@@ -559,7 +619,12 @@ async def quote_place_bets(
 
     protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
 
-    if protocol_version == "v2":
+    if protocol_version == "v3_freeform":
+        raise ValueError(
+            "v3_freeform has no placeBets batch helper; use quote_place_bet once per answer string."
+        )
+
+    if protocol_version in ("v2", "v3_enum"):
         ticket_pools = data.get("ticket_pools") or []
 
         def _pool_for_mask(m: int) -> int:
@@ -698,6 +763,11 @@ async def encode_create_wager(
         seed_outcome_indices: Outcome indices for initial seed bets.
         seed_amounts: Raw token amounts for each seed bet.
     """
+    if not FACTORY_ADDRESS:
+        raise ValueError(
+            "FACTORY_ADDRESS is not configured (env or config/deployments.json factoryAddress)"
+        )
+
     fee_recipients = extra_fee_recipients or []
     fee_bps = extra_fee_bps or []
     seeds_idx = seed_outcome_indices or []
@@ -870,6 +940,125 @@ async def encode_create_wager_v2(
 
 
 @mcp_server.tool()
+async def encode_create_enumerated_wager_v3(
+    collateral_token: str,
+    proposition: str,
+    outcomes: list[str],
+    payoff_policy: int,
+    policy_param: int,
+    betting_close_time: int = 0,
+    resolution_window: int = 0,
+    resolver: str = _ZERO_ADDRESS,
+    betting_closer: str = _ZERO_ADDRESS,
+    resolution_closer: str = _ZERO_ADDRESS,
+    extra_fee_recipients: list[str] | None = None,
+    extra_fee_bps: list[int] | None = None,
+    seed_ticket_masks: list[int] | None = None,
+    seed_amounts: list[int] | None = None,
+) -> str:
+    """Encode `ParamutuelFactoryV3.createEnumeratedWager` (v3 enumerated / bitmask + policies).
+
+    Same payoff policy semantics as v2 (`ParamutuelWagerV3.PayoffPolicy` uint8). Seeds use ticket masks.
+    """
+    if not FACTORY_V3_ADDRESS:
+        raise ValueError(
+            "FACTORY_V3_ADDRESS is not configured (env or config/deployments.json factoryV3Address)"
+        )
+
+    fee_recipients = extra_fee_recipients or []
+    fee_bps = extra_fee_bps or []
+    masks = seed_ticket_masks or []
+    samt = seed_amounts or []
+
+    if masks or samt:
+        sig = (
+            "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
+            "address,address[],uint16[],uint256[],uint256[])"
+        )
+        types = [
+            "address",
+            "string",
+            "string[]",
+            "uint8",
+            "uint256",
+            "uint64",
+            "uint64",
+            "address",
+            "address",
+            "address",
+            "address[]",
+            "uint16[]",
+            "uint256[]",
+            "uint256[]",
+        ]
+        values = [
+            collateral_token,
+            proposition,
+            outcomes,
+            payoff_policy,
+            policy_param,
+            betting_close_time,
+            resolution_window,
+            resolver,
+            betting_closer,
+            resolution_closer,
+            fee_recipients,
+            fee_bps,
+            masks,
+            samt,
+        ]
+    else:
+        sig = (
+            "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
+            "address,address[],uint16[])"
+        )
+        types = [
+            "address",
+            "string",
+            "string[]",
+            "uint8",
+            "uint256",
+            "uint64",
+            "uint64",
+            "address",
+            "address",
+            "address",
+            "address[]",
+            "uint16[]",
+        ]
+        values = [
+            collateral_token,
+            proposition,
+            outcomes,
+            payoff_policy,
+            policy_param,
+            betting_close_time,
+            resolution_window,
+            resolver,
+            betting_closer,
+            resolution_closer,
+            fee_recipients,
+            fee_bps,
+        ]
+
+    calldata = _encode_call(sig, types, values)
+    total_seed = sum(samt)
+    result: dict[str, Any] = {
+        "to": FACTORY_V3_ADDRESS,
+        "calldata": calldata,
+        "description": f"Create v3 enumerated wager: '{proposition}' ({len(outcomes)} outcomes, policy={payoff_policy})",
+    }
+    if total_seed > 0:
+        result["approval_required"] = {
+            "token": collateral_token,
+            "spender": FACTORY_V3_ADDRESS,
+            "amount": total_seed,
+            "approve_calldata": _encode_erc20_approve(FACTORY_V3_ADDRESS, total_seed),
+        }
+    return json.dumps(result, indent=2)
+
+
+@mcp_server.tool()
 async def encode_create_freeform_wager(
     collateral_token: str,
     proposition: str,
@@ -920,6 +1109,59 @@ async def encode_create_freeform_wager(
             "to": FACTORY_FREEFORM_ADDRESS,
             "calldata": calldata,
             "description": f"Create freeform wager: '{proposition}'",
+        },
+        indent=2,
+    )
+
+
+@mcp_server.tool()
+async def encode_create_freeform_wager_v3(
+    collateral_token: str,
+    proposition: str,
+    betting_close_time: int = 0,
+    resolution_window: int = 0,
+    resolver: str = _ZERO_ADDRESS,
+    betting_closer: str = _ZERO_ADDRESS,
+    resolution_closer: str = _ZERO_ADDRESS,
+    extra_fee_recipients: list[str] | None = None,
+    extra_fee_bps: list[int] | None = None,
+) -> str:
+    """Encode `ParamutuelFactoryV3.createFreeformWager` (v3 freeform; domain-separated answer ids on the wager)."""
+    if not FACTORY_V3_ADDRESS:
+        raise ValueError(
+            "FACTORY_V3_ADDRESS is not configured (env or config/deployments.json factoryV3Address)"
+        )
+    fee_recipients = extra_fee_recipients or []
+    fee_bps = extra_fee_bps or []
+    sig = "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
+    types = [
+        "address",
+        "string",
+        "uint64",
+        "uint64",
+        "address",
+        "address",
+        "address",
+        "address[]",
+        "uint16[]",
+    ]
+    values = [
+        collateral_token,
+        proposition,
+        betting_close_time,
+        resolution_window,
+        resolver,
+        betting_closer,
+        resolution_closer,
+        fee_recipients,
+        fee_bps,
+    ]
+    calldata = _encode_call(sig, types, values)
+    return json.dumps(
+        {
+            "to": FACTORY_V3_ADDRESS,
+            "calldata": calldata,
+            "description": f"Create v3 freeform wager: '{proposition}'",
         },
         indent=2,
     )
@@ -1067,9 +1309,10 @@ async def encode_resolve(wager_address: str, winning_outcome_index: int) -> str:
 
 @mcp_server.tool()
 async def encode_resolve_freeform(wager_address: str, winning_answer: str) -> str:
-    """Encode `ParamutuelWagerFreeform.resolve(string)`.
+    """Encode `resolve(string)` on legacy freeform or v3 freeform wagers.
 
-    Reverts on-chain if no stake on `keccak256(bytes(winning_answer))`.
+    Legacy ADR-0009: ticket id is `keccak256(bytes(answer))`. V3 freeform: ticket id is
+    domain-separated (`bytes1(0x03)` || UTF-8 bytes) before keccak; same calldata shape.
     """
     calldata = _encode_call("resolve(string)", ["string"], [winning_answer])
     return json.dumps(

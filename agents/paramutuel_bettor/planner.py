@@ -104,7 +104,7 @@ def quote_wager(
 
     otot: int | None = None
     answer_id_hex: str | None = None
-    if protocol_version == "v2":
+    if protocol_version in ("v2", "v3_enum"):
         mask = int(1) << int(outcome_index)
         key = str(mask)
         for tp in detail.get("ticket_pools") or []:
@@ -113,13 +113,13 @@ def quote_wager(
                 break
         if otot is None:
             otot = 0
-    elif protocol_version == "freeform":
+    elif protocol_version in ("freeform", "v3_freeform"):
         pools = [p for p in (detail.get("ticket_pools") or []) if isinstance(p, dict)]
         pools.sort(key=lambda p: str(p.get("ticket_mask") or "").lower())
         oi = int(outcome_index)
         if oi < 0 or oi >= len(pools):
             raise ValueError(
-                "freeform: outcome_index must be the row index into ticket_pools "
+                "freeform/v3_freeform: outcome_index must be the row index into ticket_pools "
                 "(sorted by answer id), as returned by recommend/pick_outcome"
             )
         row = pools[oi]

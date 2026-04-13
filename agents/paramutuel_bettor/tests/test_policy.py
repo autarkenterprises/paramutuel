@@ -36,6 +36,29 @@ class TestPolicy(unittest.TestCase):
         r = policy.pick_outcome(strategy="min_liquidity", wager_detail=detail, bet_amount=50)
         self.assertEqual(r["outcome_index"], 1)
 
+    def test_pick_v3_enum_uses_ticket_pools_like_v2(self) -> None:
+        r = policy.pick_outcome(
+            strategy="best_post_multiple",
+            wager_detail={
+                "wager": {
+                    "protocol_version": "v3_enum",
+                    "state": "OPEN",
+                    "betting_close_time": 9_999_999_999,
+                    "outcomes_json": '["A","B","C"]',
+                },
+                "totals": {"total_pot": "1000", "total_fee_bps": "0"},
+                "outcomes": [],
+                "ticket_pools": [
+                    {"ticket_mask": "1", "pool_total": "900"},
+                    {"ticket_mask": "2", "pool_total": "800"},
+                    {"ticket_mask": "4", "pool_total": "100"},
+                ],
+            },
+            bet_amount=100,
+        )
+        self.assertEqual(r["outcome_index"], 2)
+        self.assertEqual(r["per_outcome"][2]["ticket_mask"], 4)
+
     def test_pick_v2_uses_ticket_pools(self) -> None:
         detail = {
             "wager": {

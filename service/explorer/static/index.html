@@ -10,13 +10,13 @@
   <main class="container">
     <section class="card">
       <h1>Paramutuel Explorer</h1>
-      <p class="muted">Reads wager state from the indexer API.</p>
+      <p class="muted">Reads wager state from the indexer API. Lists Paramutuel protocol wagers only (current factory).</p>
       <div class="meta">
         <div><strong>Configured factory:</strong> <code id="factoryAddressDisplay">from deployments.json (if available)</code></div>
         <div><strong>API base:</strong> <code id="apiBaseDisplay">default</code></div>
       </div>
       <div class="controls">
-        <input id="wagerSearch" placeholder="Search proposition, outcomes, protocol (v1 / v2 / freeform), or address" />
+        <input id="wagerSearch" placeholder="Search proposition, outcomes, protocol_version, or address" />
         <select id="wagerOrder">
           <option value="desc">Newest first</option>
           <option value="asc">Oldest first</option>

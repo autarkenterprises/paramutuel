@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="About Paramutuel: parimutuel on Base — v1, v2 payoff rules, freeform answers — open source, testnet and mainnet." />
+  <meta name="description" content="About the Paramutuel protocol: parimutuel on Base — enumerated, bitmask, and freeform wagers — open source, testnet and mainnet." />
   <title>About — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -27,19 +27,18 @@
     <header class="about-hero">
       <h1>About Paramutuel</h1>
       <p class="muted about-lead">
-        Parimutuel pools for propositions and events on Base: stake with a wallet, settle on-chain, claim from the pot — using classic enumerated outcomes, v2 ticket rules, or freeform text answers.
+        Parimutuel pools for propositions and events on Base: stake with a wallet, settle on-chain, claim from the pot — all through the Paramutuel protocol.
       </p>
     </header>
 
     <section class="card" id="protocol-versions">
-      <h2>Protocol versions on-chain</h2>
+      <h2>The Paramutuel protocol</h2>
       <p>
-        Paramutuel ships multiple <strong>factory + wager</strong> pairs so creators can pick the right expressiveness. All versions share the same high-level lifecycle (betting window, resolution window, resolver authority, claim/refund rules) but differ in how positions are encoded.
+        One on-chain system: factory-deployed wagers, shared pool per market, resolver-driven settlement, and pro-rata claims. Markets are either <strong>enumerated</strong> (fixed outcome labels with bitmask tickets and payoff policies, including batch <code>placeBets</code>) or <strong>freeform</strong> (open text answers at stake time; resolver publishes the exact winning string).
       </p>
       <ul>
-        <li><strong>v1</strong> &mdash; Wagers with a fixed list of outcome labels; stakes reference a single winning index. Familiar single-winner parimutuel.</li>
-        <li><strong>v2</strong> &mdash; Same enumerated outcomes (up to 255), but tickets are <strong>bitmasks</strong> with configurable <strong>payoff policies</strong> (for example single-winner, any-of, exact-set, at-least-<em>k</em>, weighted overlap). Supports batch <code>placeBets</code> across multiple masks.</li>
-        <li><strong>Freeform</strong> &mdash; No outcome list at create time. Bettors submit a UTF-8 <strong>answer string</strong>; the contract keys stakes by hash. The resolver must publish the exact winning string. Suited to open-ended predictions where enumerating every possibility up front is impractical.</li>
+        <li><strong>Enumerated</strong> &mdash; Up to 255 labeled outcomes; tickets are <strong>bitmasks</strong> with configurable payoff rules (single-winner, any-of, exact-set, at-least-<em>k</em>, weighted overlap).</li>
+        <li><strong>Freeform</strong> &mdash; No fixed list at create time; stakes are keyed by a deterministic id derived from the bettor&rsquo;s UTF-8 answer.</li>
       </ul>
       <p class="muted">
         Technical reference: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/MACHINE.md" class="external">docs/MACHINE.md</a> and ADRs in <code>research/adr/</code>.
@@ -49,7 +48,7 @@
     <section class="card" id="what">
       <h2>What you can do here</h2>
       <p>
-        Use <a href="propose-a-wager.html">Propose a Wager</a> for guided creation (templates and assisted flows in development), or <a href="place-a-bet.html">Place a Bet</a> to find wagers and stake with a wallet. The stake page routes to the right contract ABI: enumerated markets use <code>placeBet</code> / <code>placeBets</code>; freeform markets use <code>placeBet(string,uint256)</code> with your exact answer text. Direct links like <code>bet.html?wager=0x…</code> open the same flow.
+        Use <a href="propose-a-wager.html">Propose a Wager</a> for guided creation (templates and assisted flows in development), or <a href="place-a-bet.html">Place a Bet</a> to find wagers and stake with a wallet. The stake page uses the Paramutuel wager ABI: enumerated markets use <code>placeBet</code> / <code>placeBets</code>; freeform markets use <code>placeBet(string,uint256)</code> with your exact answer text. Direct links like <code>bet.html?wager=0x…</code> open the same flow.
         The <a href="explorer.html">Explorer</a> lists wagers from the indexer; the full <a href="app.html">App</a> bundles create, resolve, claim, and odds preview.
       </p>
     </section>
