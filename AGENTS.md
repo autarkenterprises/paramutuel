@@ -2,6 +2,8 @@
 
 This repository is built for **bots, indexers, and LLM-driven workflows**. If you are an autonomous agent (or an engineer wiring one), start here.
 
+Paramutuel is **agent-native by design**: permissionless on-chain markets, no platform approval for wagers or payouts, and a fully configurable per-wager lifecycle (collateral token, resolver, windows, fees). Human traders and automated systems use the same contracts and APIs.
+
 ## Canonical surfaces
 
 | Surface | Purpose | Where |
@@ -13,7 +15,7 @@ This repository is built for **bots, indexers, and LLM-driven workflows**. If yo
 ## Recommended execution loop (betting)
 
 1. Use the **bet scout** to shortlist `OPEN` wagers and rank outcomes (hypothetical size in **raw token units**).
-2. Obtain **final** calldata with MCP **`quote_place_bet`** (v1/v2) or **`encode_place_bet_freeform`** (ADR-0009 freeform) immediately before signing (chain state can change).
+2. Obtain **final** calldata with MCP **`quote_place_bet`** (per indexer `protocol_version`) or **`encode_place_bet_freeform`** / related encoders immediately before signing (chain state can change).
 3. A separate **wallet / signer** submits `approve` and `placeBet`. Do not embed private keys in the scout or MCP server.
 
 Details: [`docs/AGENT-LOOP.md`](docs/AGENT-LOOP.md).

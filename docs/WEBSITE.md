@@ -1,5 +1,7 @@
 # Protocol website (GitHub Pages)
 
+The public site explains Paramutuel’s **value proposition**: permissionless prop-style markets in real ERC-20 collateral, configurable per-wager resolution and windows, and settlement **on-chain** without a centralized gatekeeper for listing or payouts—built for humans and **agents** alike.
+
 The static site under `site/` is a **thin shell**: marketing copy, a testnet/mainnet **banner with an in-browser toggle** (persists in `localStorage`), and **iframes** that embed the self-custody dApp (`dapp/`) and the indexer-backed explorer (`service/explorer/static/`) without merging their codebases.
 
 ## Pages

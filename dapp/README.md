@@ -1,10 +1,12 @@
 ## Minimal dApp (MVP)
 
+**Paramutuel** is permissionless, on-chain prop betting in any ERC-20, with configurable resolution and roles per wager—no centralized approval of markets or payouts. This dApp is the **self-custody** UI for that protocol: you connect a wallet and interact with contracts directly.
+
 This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from committed files in `dapp/abi/`, with a fallback to Foundry build artifacts in `out/`.
 
 It supports:
-- **Protocol choice:** **v1**, **v2** (`ParamutuelFactoryV2` / `ParamutuelWagerV2`, ADR-0008 bitmask tickets and payoff policies), or **freeform** (`ParamutuelFactoryFreeform` / `ParamutuelWagerFreeform`, ADR-0009 text answers).
-- Creating wagers via the selected factory (v2 adds payoff policy, `policyParam` for `AT_LEAST_K`, and parses `WagerCreatedV2`; freeform uses `createFreeformWager` and `WagerCreatedFreeform`, no outcome list).
+- **Market type:** **enumerated** (`ParamutuelFactoryV3` / `ParamutuelWagerV3` — bitmask tickets, payoff policies, `createEnumeratedWager`) or **freeform** (same factory pair — `createFreeformWager`, text answers).
+- Creating wagers via the current factory (enumerated: payoff policy, `policyParam` for `AT_LEAST_K`, `WagerCreatedV3Enumerated`; freeform: `WagerCreatedV3Freeform`, no outcome list).
 - Optional seeded liquidity at create-time (multi-outcome in one tx)
 - Configuring delegated lifecycle roles (`resolver`, `bettingCloser`, `resolutionCloser`)
 - Finite windows or closer-managed no-max windows (`bettingCloseTime = 0`, `resolutionWindow = 0`)
@@ -18,10 +20,9 @@ It supports:
 ### Prerequisites
 
 - A node wallet with gas funds on your target network
-- Deployed contract addresses:
-  - `ParamutuelFactory` (v1) and/or `ParamutuelFactoryV2` (v2) and/or `ParamutuelFactoryFreeform` (freeform)
-  - Optional: set `factoryV2Address` / `factoryFreeformAddress` in `config/deployments.json` for auto-fill when **Protocol → v2** or **freeform** is selected (v1 uses `factoryAddress`).
-  - Wagers are created dynamically; the dApp reads the wager address from `WagerCreated`, `WagerCreatedV2`, or `WagerCreatedFreeform`.
+- Deployed **ParamutuelFactoryV3** on your network; set **`factoryV3Address`** in `config/deployments.json` for auto-fill.
+- Wagers are created dynamically; the dApp reads the wager address from **`WagerCreatedV3Enumerated`** or **`WagerCreatedV3Freeform`**.
+- **Loading an existing wager** requires a contract that exposes **`MODE()`** (current Paramutuel wager); older deployments without it are not supported in this UI.
 - Serve the directory with an HTTP server (do not open via `file://...`).
 
 ### Run locally
@@ -45,8 +46,8 @@ python3 -m http.server 8080
 ### How to configure
 
 In the dApp UI, paste:
-- **Protocol** (v1 vs v2) — loading an existing wager **auto-detects** v2 via `payoffPolicy()`.
-- `Factory address` (auto-filled from `config/deployments.json`: `factoryAddress` / `factoryV2Address` by protocol)
+- **Market type** (enumerated vs freeform) — loading an existing wager uses **`MODE()`** on the wager contract.
+- `Factory address` (auto-filled from `config/deployments.json`: **`factoryV3Address`**)
 - `Collateral token preset` (network-aware dropdown; includes Base mainnet and Base Sepolia presets)
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)
@@ -59,9 +60,9 @@ In the dApp UI, paste:
 - Optional no-max checkboxes for both windows (closer-managed mode)
 - Wager template selection (sports, election, long-horizon, closer-managed)
 - Optional extra fee recipients + bps (comma-separated)
-- Optional seed outcome indices + seed amounts (comma-separated aligned lists). **v2:** each seed index is a **single-outcome** ticket mask (`1 << index`).
-- **v2 only:** payoff policy dropdown + policy param (`k` for `AT_LEAST_K`, otherwise `0`). Up to **255** outcomes on the v2 factory.
-- **Betting / resolution (v2):** enter **comma-separated outcome indices** to build the ticket or winning set bitmask (e.g. `0,2`). **v1** remains a **single integer** per field (no commas).
+- Optional seed outcome indices + seed amounts (comma-separated aligned lists). **Enumerated:** each seed index is a **single-outcome** ticket mask (`1 << index`).
+- **Enumerated only:** payoff policy dropdown + policy param (`k` for `AT_LEAST_K`, otherwise `0`). Up to **255** outcomes.
+- **Betting / resolution (enumerated):** enter **comma-separated outcome indices** to build the ticket or winning set bitmask (e.g. `0,2`). **Freeform:** enter the exact UTF-8 answer string.
 
 ### Notes
 

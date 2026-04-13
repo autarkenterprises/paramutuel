@@ -1,6 +1,6 @@
 # Paramutuel bet scout agent (`agents/paramutuel_bettor`)
 
-Small, **stdlib-only** helper for **adoption-oriented agent workflows**: discover open wagers from the indexer, score outcomes with the same parimutuel math as the MCP server, and emit a **JSON plan** a parent model (or wallet UI) can review before signing.
+Paramutuel treats **agents** (human or artificial) as first-class participants: the same permissionless markets and on-chain rules apply, with no separate “bot API” gate. This agent is a small, **stdlib-only** helper for **adoption-oriented workflows**: discover open wagers from the indexer, score outcomes with the same parimutuel math as the MCP server, and emit a **JSON plan** a parent model (or wallet UI) can review before signing.
 
 This complements the MCP server (`mcp_server/`): MCP remains the canonical **tooling surface** for calldata and rich protocol coverage; the bet agent focuses on a **tight loop** suitable for subagents and scripted delegation.
 

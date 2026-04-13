@@ -1,6 +1,14 @@
+# Paramutuel
+
+Paramutuel provides permissionless, real crypto, blockchain-powered prop betting. Anyone can propose any wager, in any ERC-20 token, with configurable resolution criteria. Proposers, bettors, and resolvers interact on-chain, through a fully distributed protocol, without relying on centralized platforms to approve wagers, or authorize payouts. Paramutuel is designed for agents, whether human or artificial: all aspects of the wager lifecycle are fully configurable, enabling a wide variety of uses—friendly bets, forecasting current events, sports betting, and more.
+
+This repository is the reference implementation: smart contracts, dApp, indexer, MCP server, bet-scout agent, and operator services. The **value proposition** is permissionless creation and settlement in the bettors’ chosen collateral, with no gatekeeper for markets or payouts—while each wager’s resolver, windows, and fee split remain **explicitly configurable** at deploy time.
+
+---
+
 ## Paramutuel (MVP)
 
-Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is intentionally structured to later support more decentralized resolution mechanisms.
+Tagline: **“Augur for prop bets”** — the MVP ships a concrete on-chain lifecycle (create → bet → resolve / retract / expire → claim) so that thesis is usable today, with room to plug in more decentralized resolution later.
 
 **Wager research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
 **Chain/fee decision memo:** see [`research/chain-and-fee-review.md`](research/chain-and-fee-review.md) (Base primary, Arbitrum secondary).
@@ -12,7 +20,7 @@ Tagline: **“Augur for prop bets”** — starting with a minimal MVP that is i
 **Resolution Service (delegated resolver ops):** see [`docs/RESOLUTION-SERVICE.md`](docs/RESOLUTION-SERVICE.md).
 **Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
 **Payout math (v1 + v2):** see [`docs/PAYOUT-CALCULATION.md`](docs/PAYOUT-CALCULATION.md).
-**Protocol shapes:** **v1** enumerated outcomes, **v2** bitmask tickets and payoff policies (ADR-0008 — [`docs/ADR-0008-IMPLEMENTATION.md`](docs/ADR-0008-IMPLEMENTATION.md)), **freeform** UTF-8 answers (ADR-0009 — [`docs/ADR-0009-IMPLEMENTATION.md`](docs/ADR-0009-IMPLEMENTATION.md)). The dApp, indexer, MCP, bet scout, and operator tooling understand `protocol_version` from the indexer.
+**Protocol shapes (contracts):** **v1** enumerated outcomes, **v2** bitmask tickets and payoff policies (ADR-0008 — [`docs/ADR-0008-IMPLEMENTATION.md`](docs/ADR-0008-IMPLEMENTATION.md)), **freeform** UTF-8 answers (ADR-0009 — [`docs/ADR-0009-IMPLEMENTATION.md`](docs/ADR-0009-IMPLEMENTATION.md)), and **V3** enumerated + freeform under one factory (current default in `config/deployments.json` and the hosted dApp). The indexer, MCP, bet scout, and operator tooling understand `protocol_version` from the indexer.
 **Service layer modules:** see [`service/README.md`](service/README.md).
 **Hosted dApp & website:** see [GitHub Pages deployment](#hosted-dapp--protocol-website).
 

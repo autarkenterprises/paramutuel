@@ -1,6 +1,6 @@
 # Machine / agent integration
 
-Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can interact without bespoke scraping.
+Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can interact without bespoke scraping—aligned with the protocol thesis: **permissionless** markets in **real on-chain collateral (ERC-20)**, **configurable** resolution and timing per wager, and **no centralized approval** of wagers or payouts. Machines read the same indexer and MCP surfaces as humans.
 
 Contract upgrade/redeploy procedure: [`CONTRACT-UPGRADE-RUNBOOK.md`](CONTRACT-UPGRADE-RUNBOOK.md).
 

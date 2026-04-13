@@ -1,5 +1,7 @@
 # Service Layer
 
+Operator-facing services support Paramutuel’s **distributed** model: anyone can run an indexer, explorer, or automation against the same on-chain protocol—no single vendor controls discovery or payout authorization.
+
 The public **operator hub** on GitHub Pages (`site/operator.html`) links to indexer endpoints from `config/deployments.json` and optional hosted URLs in `config/operator-hub.json` — see [`docs/WEBSITE.md`](../docs/WEBSITE.md).
 
 Service layer components:

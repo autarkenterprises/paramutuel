@@ -1,5 +1,7 @@
 # Live indexer hosting
 
+The indexer exists so **any client**—wallet UI, explorer, or **agent**—can discover open wagers and pool state without trusting a proprietary API. That matches Paramutuel’s model: permissionless on-chain betting with transparent, machine-readable market data.
+
 GitHub Pages is static-only, so the indexer HTTP API (`/health`, `/wagers`, `/wagers/:address`, …) must run on a container host.
 
 **Canonical setup:** Google Cloud Run — see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md) (Dockerfile at repo root, env defaults, redeploy notes).

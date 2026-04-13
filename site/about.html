@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="About the Paramutuel protocol: parimutuel on Base — enumerated, bitmask, and freeform wagers — open source, testnet and mainnet." />
+  <meta name="description" content="About Paramutuel: permissionless on-chain prop betting in any ERC-20, configurable resolution, no centralized approval—open source on Base." />
   <title>About — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -27,14 +27,14 @@
     <header class="about-hero">
       <h1>About Paramutuel</h1>
       <p class="muted about-lead">
-        Parimutuel pools for propositions and events on Base: stake with a wallet, settle on-chain, claim from the pot — all through the Paramutuel protocol.
+        Paramutuel provides permissionless, real crypto, blockchain-powered prop betting. Anyone can propose any wager, in any ERC-20 token, with configurable resolution criteria. Proposers, bettors, and resolvers interact on-chain, through a fully distributed protocol, without relying on centralized platforms to approve wagers, or authorize payouts. Paramutuel is designed for agents, whether human or artificial: all aspects of the wager lifecycle are fully configurable, enabling a wide variety of uses &mdash; friendly bets, forecasting current events, sports betting, and more.
       </p>
     </header>
 
     <section class="card" id="protocol-versions">
       <h2>The Paramutuel protocol</h2>
       <p>
-        One on-chain system: factory-deployed wagers, shared pool per market, resolver-driven settlement, and pro-rata claims. Markets are either <strong>enumerated</strong> (fixed outcome labels with bitmask tickets and payoff policies, including batch <code>placeBets</code>) or <strong>freeform</strong> (open text answers at stake time; resolver publishes the exact winning string).
+        These principles are implemented as one on-chain system: factory-deployed wagers, shared pool per market, resolver-driven settlement, and pro-rata claims in the collateral token the market chose. Markets are either <strong>enumerated</strong> (fixed outcome labels with bitmask tickets and payoff policies, including batch <code>placeBets</code>) or <strong>freeform</strong> (open text answers at stake time; resolver publishes the exact winning string).
       </p>
       <ul>
         <li><strong>Enumerated</strong> &mdash; Up to 255 labeled outcomes; tickets are <strong>bitmasks</strong> with configurable payoff rules (single-winner, any-of, exact-set, at-least-<em>k</em>, weighted overlap).</li>
