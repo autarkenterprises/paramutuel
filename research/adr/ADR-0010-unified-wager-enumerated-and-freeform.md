@@ -26,12 +26,12 @@ No third “hybrid” mode within one wager: a given deployment is **either** en
 1. **Introduce `ParamutuelWagerUnified` + `ParamutuelFactoryUnified`** (names TBD) as the **canonical** post-unification contracts. They **subsume** the *feature set* of current v2 and freeform for **new** deployments.
 
 2. **Immutable `WagerMode mode` (or equivalent)** set in the wager constructor and **never** changed. All external entrypoints **enforce** the mode:
-   - `ENUMERATED`: reject `placeBet(string)` / `resolve(string)` if exposed; use bitmask / `uint256` APIs only.
-   - `FREEFORM`: reject enumerated-only APIs (`placeBet(uint256)` with mask semantics, `resolve(uint256)` winning mask, policy parameters) — or omit them from the ABI via **interface segregation** at the compiler level (preferred: **one contract**, **internal** branch; **externally** use overloads/names that are unambiguous, e.g. `placeBetMask` vs `placeBetAnswer`).
+   - `ENUMERATED`: match current v2 surface — `placeBet(uint256 ticketMask, uint256 amount)`, `placeBets(uint256[] calldata, uint256[] calldata)`, `resolve(uint256 winningMask)`; **no** string ticket APIs. Wrong-mode calls either **revert** (fat ABI) or are **absent** (split external interfaces).
+   - `FREEFORM`: match current freeform surface — `placeBet(string calldata answer, uint256 amount)`, `resolve(string calldata winningAnswer)`; **no** bitmask / `PayoffPolicy` / `resolve(winningMask)` on that deployment. Same fat-ABI vs segregated-interface choice as above.
 
 3. **Policy engine** applies **only** to `ENUMERATED`. `FREEFORM` retains **single-winner** parimutuel over `answerId` pools (as ADR-0009). Future extension to “freeform + policy” is **out of scope** for v1 of this ADR unless explicitly added later.
 
-4. **v1 parity** remains available as **`ENUMERATED` + `SINGLE_WINNER` + single-bit tickets** (no separate v1 contract required for new deploys once unified factory ships).
+4. **v1 economic / lifecycle parity** remains available as **`ENUMERATED` + `SINGLE_WINNER` + single-bit tickets** (two-outcome lines, etc.). Factory **ABI** may still differ from legacy `ParamutuelFactory.createWager` (calldata shapes, seeding overloads); migration tooling must map old ↔ unified encodings. A separate **v1** contract is not required for **new** deploys once the unified factory ships, unless a network must preserve byte-identical v1 factories for audit/compliance.
 
 5. **Legacy contracts** (`ParamutuelFactory`, `ParamutuelFactoryV2`, `ParamutuelFactoryFreeform`, and their wagers) remain **immutable on-chain**; indexers and tooling **continue** to support them until deprecation windows close.
 
@@ -56,7 +56,7 @@ For **every logical unit** of new or changed code (Solidity function, library pu
 - **Retain** historical tests that targeted **`ParamutuelWagerV2`**, **`ParamutuelWagerFreeform`**, or split factories **as long as those contracts remain in the tree** for legacy support. Where behavior is **intentionally** superseded by the unified contract, **do not delete** the old tests without ADR sign-off; instead:
   - Either **migrate** assertions to the unified contract equivalents, **or**
   - Mark the test class/method with an explicit **`@expectedFailure`** / `xfail` / documented skip with reason **`superseded-by-ADR-0010`**, and change the **pass condition** to **“fails as expected”** (CI must treat that as success).
-- **Foundry:** use `vm.expectRevert` tests that prove legacy paths **revert** when unified mode forbids them, if both codepaths coexist in one repo.
+- **Foundry:** there is no `xfail` flag; use **`vm.expectRevert`** on unified bytecode when a fat ABI intentionally rejects wrong-mode calls, or keep **legacy contract tests** as ordinary passing suites against **unchanged** `ParamutuelWagerV2` / `ParamutuelWagerFreeform` artifacts. Do not rely on Python-style `@expectedFailure` in Solidity.
 
 **Rationale:** preserves regression signal for deployed bytecode while making unified behavior the default for new tests.
 
@@ -79,7 +79,7 @@ Mark each item with owner and PR when executing this ADR.
 - [ ] **`docs/ADR-0010-IMPLEMENTATION.md`** (new) — encoding, events, mode matrix, migration from v2/freeform ABIs.
 - [ ] `docs/MACHINE.md`, `docs/WORKFLOWS.md`, `docs/CONTRACT-UPGRADE-RUNBOOK.md`, `docs/INDEXER-HOSTING.md`, `docs/CLOUD-RUN-HOSTING.md`, `docs/WEBSITE.md`.
 - [ ] `research/adr/README.md` — index this ADR.
-- [ ] `README.md` (root), `dapp/README.md`, `service/README.md`, `mcp_server/README.md`, `AGENTS.md`, `docs/BET-AGENT.md`, `docs/AGENT-LOOP.md`, `docs/MACHINE.md`.
+- [ ] `README.md` (root), `dapp/README.md`, `service/README.md`, `mcp_server/README.md`, `AGENTS.md`, `docs/BET-AGENT.md`, `docs/AGENT-LOOP.md`.
 
 ### Indexer / explorer / SQLite schema
 
@@ -136,6 +136,18 @@ Mark each item with owner and PR when executing this ADR.
 - **Single mode flag without storage isolation:** rejected — risks storage aliasing between bitmask and string pools.
 - **Force freeform into bitmask `numOptions`:** rejected — same reasons as ADR-0009 (infinite answer space).
 - **Keep three factories forever as the “protocol”:** rejected for **new** development per this ADR; acceptable as **legacy** support.
+
+## Normative relationship to ADR-0009
+
+ADR-0009 remains **Accepted** and is the authoritative description of **freeform semantics** (exact string bytes, `answerId` hashing, caps, revert-on-no-stake). ADR-0010 does **not** redefine those rules; it specifies that **`FREEFORM` mode** in the unified wager **implements** the same behavior as today’s `ParamutuelWagerFreeform`. Wording in ADR-0009 § “Relationship to ADR-0008” (*separate wager types; compositing not in scope*) is **consistent** with ADR-0010: each **deployment** is still one mode; “compositing” there meant **multi-winner policies on string tickets**, which ADR-0010 still excludes from v1.
+
+## Open questions (resolve before / during implementation)
+
+1. **Event topics:** New unified events vs **reuse** `BetPlaced` / `Resolved` names with different signatures (indexer breakage). Prefer explicit **`BetPlacedEnumerated` / `BetPlacedFreeform`** (or namespaced equivalents) and document topic hashes in `docs/ADR-0010-IMPLEMENTATION.md`.
+2. **`answerId` domain separation:** ADR-0009 left this open; if unified contract also hashes bitmask ticket ids or other `bytes32` keys, specify **EIP-712-style domain** or fixed **type tags** so `keccak256(bytes(answer))` cannot collide with unrelated uses in the same contract.
+3. **Fat ABI vs two interface types:** One bytecode with runtime `revert WrongMode()` vs deploy-time **identical** logic but **different** public interfaces (e.g. via wrapper or minimal proxies) — affects wallet “read contract” UX and MCP tool count.
+4. **Indexer transition:** Whether `protocol_version` distinguishes `unified_enum` / `unified_freeform` only, or also maps legacy `v2` / `freeform` rows to the **same** schema for a single codepath (recommended: explicit versions first, then optional normalization layer).
+5. **v1 factory retirement:** Whether any network must keep **`ParamutuelFactory`** deployments indefinitely for integrators; affects how aggressively `factoryAddress` in `deployments.json` can point at unified factory only.
 
 ## Related
 
