@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-12
 **Author:** jpt4
-**Status:** Proposed
+**Status:** Proposed — launch target April 14, 2026
 **Implementation plan:** `docs/MICROWONK-ARG.md`
 
 ---
@@ -57,6 +57,16 @@ The Paramutuel website gains a separate "Microwonk Mode" in which the style chan
 - This requires setting up governance (contract proxies and Safes) for the testnet contract as well as the mainnet.
 - Bot accounts must comply with X's automated account labeling policy.
 - Entities other than microwonks (other Twitter users, public figures, passersby) can be made beneficiaries of some or all of the betting pool for certain wagers, using the `extraFeeRecipients` / `extraFeeBps` mechanism.
+
+### Narrative constraints
+
+*Cataclysm* is unfinished and being released on an uncertain timeframe. Predetermined wagers are limited to events within published text. Extemporaneous wagers must carefully preserve optionality — they address only peripheral or interpretive topics that future Cataclysm chapters cannot contradict. External-contingent wagers are explicitly meta (fourth-wall-breaking) and treat the author and publishing schedule as subjects. All extemporaneous resolutions require Co-ordinator review before dispatch.
+
+The wager set is designed so that more wagers are open than closed at the end of the initial month, with long-bridge wagers tied to future Cataclysm developments and unfinished ctrlcreep stories remaining open indefinitely. The ARG does not conclude — it pauses, with threads dangling.
+
+### Posture
+
+The ARG is poker-faced. No disclaimers beyond the standard testnet/mainnet notice on contracts and the required X automated-account labels. All published ctrlcreep work is fair game under fair use. Coordination with ctrlcreep is available if needed but all systems should be agnostic to this channel.
 
 ### Relationship to existing work
 
