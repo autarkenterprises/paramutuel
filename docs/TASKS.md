@@ -95,4 +95,9 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 - [x] Update dApp UX for v2 (`dapp/`): protocol toggle, `ParamutuelFactoryV2` create + `WagerCreatedV2`, bitmask tickets / winning set via comma-separated outcome indices, payoff policy + `policyParam`, odds preview (full for `SINGLE_WINNER`; pool note for other policies). Set `factoryV2Address` in `config/deployments.json` when a network has a v2 factory deployed.
 - [x] Update explorer / site surfaces for v2 metadata (indexer-backed): `service/explorer/static/`, `site/*` (ticker, search, bet page, operator copy).
 - [x] Extend service/control/MCP for v2 create/resolve encodings (`encode_create_wager_v2`, calldata helpers; control panel + resolution paths; freeform parity where applicable).
-- [ ] Gas/safety audit pass and formal limits sign-off before mainnet v2 factory.
+
+---
+
+## Mainnet
+
+- [ ] Gas/safety audit pass and formal limits sign-off before deploying Paramutuel factories to mainnet (applies to whatever protocol version is live—v1, v2, freeform, V3, or successor).
