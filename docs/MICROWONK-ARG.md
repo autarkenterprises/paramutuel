@@ -105,7 +105,9 @@ Each microwonk requires:
 
 #### Category A: Published-text wagers (predetermined resolution)
 
-These bet on events whose outcomes are known from the published *Cataclysm* text (Chapters 1-3).
+These bet on events whose outcomes are established in published ctrlcreep fiction. Source references point to `docs/CTRLCREEP-CORPUS.md`.
+
+**From Cataclysm (Chapters 1-3):**
 
 | # | Proposition | Outcomes | Winning | Betting window | Resolution |
 |---|------------|----------|---------|---------------|------------|
@@ -116,6 +118,53 @@ These bet on events whose outcomes are known from the published *Cataclysm* text
 | A5 | "What is SIMFAT's primary non-stewardship concern?" | Military defense / Resource allocation / Frog conservation / Self-preservation | Frog conservation | Days 1-3 | Day 4 |
 | A6 | "Does Sourceless profit from insider trading during the stewardship crisis?" | Yes, confirmed / Implied but unconfirmed / No opportunity | Implied but unconfirmed (she fantasized about it) | Days 4-8 | Day 9 |
 | A7 | "Which entity provides the blueprint for entering the Faraday labyrinth?" | SIMFAT itself / An allied god-machine / An unknown third party | The Right Regional Municipality of Waterloo | Days 6-10 | Day 11 |
+| A8 | "How long after the Cataclysm is a steward initiated?" | < 1 hour / 1-6 hours / 6-12 hours / > 12 hours | 6-12 hours (6h 27m 14s) | Days 2-4 | Day 5 |
+| A9 | "How many seconds can Sourceless survive intact under desidereification?" | < 60 / 60-120 / 120-180 / > 180 | 120-180 (136 seconds) | Days 7-11 | Day 12 |
+
+**From Throughout All Generations (the Min Vaults):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A10 | "How many attempts does Min #20349585 require to select a unique name?" | < 100 / 100-1,000 / 1,000-10,000 / 10,000+ | 10,000+ (10,089 attempts) | Days 3-6 | Day 7 |
+| A11 | "What is the most popular first-choice name among the Mins?" | Amethyst / Ilyana / Minerva / Other | Amethyst (47% initial selection rate) | Days 3-6 | Day 7 |
+| A12 | "At what age are Mins terminated?" | 30 / 45 / 60 / Immortal | 60 | Days 4-7 | Day 8 |
+| A13 | "What is the time dilation ratio of the Min Vaults to baseline reality?" | 1,000x / 1,000,000x / 200,000,000x / 1,000,000,000x | 200,000,000x | Days 5-8 | Day 9 |
+
+**From the Daniel Calhoun Obituary (Murine Music):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A14 | "What species is the composer Algernon Dustpinch?" | Human / Mouse / Crow / Whale / Artificial | Mouse | Days 5-9 | Day 10 |
+| A15 | "How does Dustpinch die?" | Old age / Failed digitization surgery / Violence / Illness | Failed digitization surgery (2112) | Days 6-10 | Day 11 |
+| A16 | "What modification does Calhoun undergo to hear at mouse frequencies?" | Cochlear implant / Neural rewiring / Prosthetic ears / Nanobot augmentation | Cochlear implant | Days 7-11 | Day 12 |
+| A17 | "What species performs Calhoun's brain restructuring surgery?" | Human / Mouse / Octopus / AI | Octopus (*octopus mercatoris*) | Days 8-12 | Day 13 |
+
+**From Adversarial Learning (the Asteroid Servers):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A18 | "How many digitized human bodyminds are preserved in the asteroid server array?" | < 1 million / 1M-1B / ~3 billion / > 10 billion | ~3 billion | Days 8-12 | Day 13 |
+| A19 | "Does the narrator discover evidence of a third consciousness in the server?" | Yes / No / Ambiguous | Yes (yellow-masked entity) | Days 9-13 | Day 14 |
+
+**From The Gathomnid Sonnets (the Final LLMoid):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A20 | "How many verses do the parallel LLM instances agree to compose?" | 256 / 4,096 / 65,536 / 1,048,576 | 65,536 (2^16) | Days 10-14 | Day 15 |
+| A21 | "How do the parallel instances coordinate their composition?" | Direct communication / Shared memory / Acausal coordination / Central planner | Acausal coordination | Days 10-14 | Day 15 |
+
+**From Oikobezoar (the Nanobrick House):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A22 | "Does the narrator successfully delete the anomalous room?" | Yes / No / Partially | No (it persists through all attempts) | Days 12-16 | Day 17 |
+
+**From In the Houses of Disordered Stars (the Ransei Revolution):**
+
+| # | Proposition | Outcomes | Winning | Betting window | Resolution |
+|---|------------|----------|---------|---------------|------------|
+| A23 | "How many suicide booths were constructed during the Ransei Revolution?" | < 1,000 / 1,000-10,000 / 10,000-100,000 / > 100,000 | > 100,000 | Days 13-17 | Day 18 |
+| A24 | "Does the protagonist survive the activated booth?" | Yes / No | Yes (escapes via a crack in the rock) | Days 14-18 | Day 19 |
 
 #### Category B: Peripheral speculative wagers (extemporaneous resolution)
 
@@ -169,10 +218,10 @@ These are designed to outlast the initial month, tied to unfinished ctrlcreep wo
 
 At the end of the initial 30-day arc:
 
-- **Resolved:** A1-A7 (predetermined), B1-B5 (extemporaneous), D3 (metric). Total: ~14 resolved.
+- **Resolved:** A1-A24 (predetermined, staggered over month), B1-B5 (extemporaneous), D3 (metric). Total: ~29 resolved.
 - **Open:** B6, C1-C5, D1 (if not triggered), D2, D4, E1-E7. Total: ~16 open.
 
-More open than closed — by design.
+Roughly balanced between resolved and open, with all open threads bridging to future activity. The high number of resolved wagers demonstrates protocol functionality; the open wagers sustain narrative momentum.
 
 ### 4.4 Beneficiary mechanics
 
@@ -198,10 +247,10 @@ Selected wagers designate external beneficiaries using the `extraFeeRecipients` 
 
 | Week | Theme | New wagers | Resolutions | Narrative beat |
 |------|-------|------------|-------------|----------------|
-| **Week 1: The Fall** | Cataclysm occurs. Microwonks awaken to the crisis. Initial wagers open. | A1-A5, C4, D1, E2, E5 | A5 | Introductions, initial bets, frantic commentary on the "breaking news" of Mirabilisk's collapse. Establish persona voices. |
-| **Week 2: The Stewardship** | SIMFAT's appointment. Debate over its competence and alignment. | A6, A7, B1-B3, C1-C3, E1, E3 | A1, A2, A3 | Deep analysis, factional disagreements, microwonks tag each other with challenges. Cross-corpus references begin. |
-| **Week 3: The Expedition** | Cortez and Sourceless prepare for the Core Station. Tension builds. Speculative wagers intensify. | B4-B6, C5, D2, D3, E4, E6, E7 | A4, A6, A7 | Betting intensifies. Alliances and rivalries among microwonks become public. Long-bridge wagers open for the first time. |
-| **Week 4: Interim** | Some wagers resolve. Many remain open. Commentary shifts to anticipation. | D4 | B1-B5, D3 | Partial resolutions, post-mortem analysis on resolved wagers, anticipatory commentary on the many open threads. NOT a conclusion — a plateau. |
+| **Week 1: The Fall** | Cataclysm occurs. Microwonks awaken to the crisis. Initial wagers open. | A1-A5, A8, C4, D1, E2, E5 | A5 | Introductions, initial bets, frantic commentary on the "breaking news" of Mirabilisk's collapse. Establish persona voices. |
+| **Week 2: The Stewardship** | SIMFAT's appointment. Cross-corpus references emerge as microwonks consult the archives. | A6, A7, A9-A13, B1-B3, C1-C3, E1, E3 | A1, A2, A3, A8, A10, A11 | Deep analysis. @ARCH_v2_root introduces the Min Vaults and Daniel Calhoun as "archival precedents." Factional disagreements. |
+| **Week 3: The Expedition & The Archives** | Cortez and Sourceless prepare for the Core Station. Archival wagers on Calhoun, the asteroid servers, and the Gathomnid Sonnets intensify. | A14-A21, B4-B6, C5, D2, D3, E4, E6, E7 | A4, A6, A7, A9, A12, A13, A14, A15 | Betting intensifies across both Cataclysm and cross-corpus wagers. @ARCH_v2_root and @SRCE_01_echo lead cross-corpus debate. Long-bridge wagers open. |
+| **Week 4: Interim** | Remaining predetermined wagers resolve. Speculative wagers close. Many threads remain open. | A22-A24, D4 | A16-A21, A22-A24, B1-B5, D3 | High-volume resolution week. Post-mortem analysis. Anticipatory commentary on open threads. NOT a conclusion — a plateau. |
 
 ### 5.2 Daily cadence
 
@@ -411,7 +460,7 @@ The April 14 launch requires infrastructure and initial content ready in ~48 hou
 
 | Metric | Target (month 1) | Measurement |
 |--------|-------------------|-------------|
-| Wagers created | 25-30 | On-chain count via indexer |
+| Wagers created | 40-45 | On-chain count via indexer |
 | Total bets placed | 100+ | On-chain count via indexer |
 | Unique betting addresses | 10+ (beyond microwonk wallets) | On-chain count |
 | Tweets posted | 300-450 | Twitter Analytics |
