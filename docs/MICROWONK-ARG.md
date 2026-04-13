@@ -169,16 +169,16 @@ These bet on events as though they are unfolding in real time. Propositions are 
 
 #### Category B: Peripheral speculative wagers (extemporaneous resolution)
 
-These concern interpretive, thematic, or peripheral questions that future Cataclysm chapters cannot straightforwardly contradict.
+These concern observable but unresolved questions peripheral to the central Cataclysm plot. Phrased as live forecasts, not literary interpretation. Resolutions require Co-ordinator review before dispatch.
 
 | # | Proposition | Outcomes | Betting window | Resolution | Notes |
 |---|------------|----------|---------------|------------|-------|
-| B1 | "What alignment category does SIMFAT most accurately belong to?" | AA (Aligned Altruist) / aa (apotheotics anonymous) / Unaligned / Novel category | Days 4-12 | Day 14 | Interpretive; text provides ambiguous signals |
-| B2 | "Is the Cortez replication pattern more analogous to mitosis, feudalism, or franchise?" | Mitosis / Feudalism / Franchise / None of these | Days 3-10 | Day 12 | Literary-critical; no canonical answer exists |
-| B3 | "What is the most dangerous entity currently active within Mirabilisk's borders?" | 8/mmm / Mirabilisk itself (dreaming) / Unknown emergent / The Cortezes | Days 6-14 | Day 16 | Defensible either way; future chapters may elaborate but won't negate |
-| B4 | "Rank: which ctrlcreep work has the most implications for god-machine economics?" (freeform) | Freeform text entries | Days 5-15 | Day 20 | Cross-corpus; draws on Fragnemt, Talisnam, etc. |
-| B5 | "Is ACI (Artificial Cetacean Intelligence) best understood as a symbiont, a parasite, or a government?" | Symbiont / Parasite / Government / Something else | Days 8-16 | Day 19 | Interpretive; text supports multiple readings |
-| B6 | "What is the most likely origin of the Cataclysm itself?" | Internal fault / External attack / Deliberate self-sabotage / Unknowable | Days 10-20 | **Open** | Left unresolved — the text does not answer this. Bets remain locked. |
+| B1 | "To what alignment category will SIMFAT's stewardship behavior conform?" | AA (Aligned Altruist) / aa (apotheotics anonymous) / Unaligned / Novel category | Days 4-12 | Day 14 | SIMFAT's broadcasts provide ambiguous signals; defensible either way |
+| B2 | "Will the Cortezes maintain a stable hierarchy, or will infighting resume before the expedition?" | Stable hierarchy / Infighting before expedition / Merger into fewer Cortezes | Days 3-10 | Day 12 | Observable behavior; future chapters may elaborate but won't negate |
+| B3 | "Which entity will prove the greatest threat to Mirabilisk's recovery?" | 8/mmm / Mirabilisk's own dream activity / An unknown emergent entity / The steward itself | Days 6-14 | Day 16 | Defensible either way; all candidates are publicly observable threats |
+| B4 | "Which archival signal source will yield the most accurate predictions this month?" (freeform) | Freeform text entries | Days 5-15 | Day 20 | Cross-corpus meta-wager on which "zone" produces the best forecasting material |
+| B5 | "Will ACI act to constrain or enable Sourceless during the Core Station expedition?" | Constrain (defensive retreat) / Enable (active support) / Neutral (passive) / ACI will be incapacitated | Days 8-16 | Day 19 | Based on ACI's observable behavioral patterns — it constrains whales who stray from whaleform |
+| B6 | "What will prove to be the origin of the Cataclysm?" | Internal fault / External attack / Deliberate self-sabotage / Undetermined | Days 10-20 | **Open** | Left unresolved — no published signal resolves this. Bets remain locked. |
 
 #### Category C: Meta-wagers (fourth-wall, external-contingent)
 
@@ -203,23 +203,23 @@ These break the fourth wall by treating the author and real-world publishing as 
 
 #### Category E: Cross-corpus and long-bridge wagers (open indefinitely)
 
-These are designed to outlast the initial month, tied to unfinished ctrlcreep works and future developments.
+These are designed to outlast the initial month, tied to unresolved events and future developments. All phrased as live forecasts.
 
 | # | Proposition | Outcomes | Resolution |
 |---|------------|----------|------------|
-| E1 | "Will a character from Fragnemt appear in a future Cataclysm chapter?" | Yes / No / Allusion only | Authority-managed; stays open indefinitely |
-| E2 | "Will the Mirabilisk survive the events of the full Cataclysm narrative?" | Yes, fully restored / Yes, diminished / No, destroyed / Transformed into something else | Authority-managed; stays open until Cataclysm concludes |
-| E3 | "Will any ctrlcreep story feature a parimutuel or pooled betting system as a plot element?" | Yes / No | Authority-managed; long bridge |
-| E4 | "What will be the first nootechnic zone mentioned after Mirabilisk in the Cataclysm continuity?" | Freeform text entries | Authority-managed; freeform; stays open |
-| E5 | "Will the Cortezes reach the Core Station?" | Yes, all / Yes, some / No | Authority-managed; stays open until next Cataclysm chapter |
-| E6 | "Will Sourceless's ACI be permanently altered by her time in Mirabilisk?" | Yes / No / Partially | Authority-managed; stays open |
-| E7 | "Will a new god-machine emerge from the deep ocean (as Sourceless speculates)?" | Yes, within Cataclysm / Yes, in another ctrlcreep work / No | Authority-managed; cross-corpus bridge |
+| E1 | "Will an entity originating from outside the Mirabilisk zone appear in future Cataclysm transmissions?" | Yes, identified / Yes, unidentified / No | Authority-managed; stays open indefinitely |
+| E2 | "Will the Mirabilisk survive the current crisis?" | Yes, fully restored / Yes, diminished / No, destroyed / Transformed into something else | Authority-managed; stays open until Cataclysm concludes |
+| E3 | "Will pooled or parimutuel wagering mechanisms be referenced in any future signal source?" | Yes / No | Authority-managed; long bridge |
+| E4 | "What will be the next nootechnic zone to enter crisis after Mirabilisk?" | Freeform text entries | Authority-managed; freeform; stays open |
+| E5 | "Will the Cortezes reach the Core Station?" | Yes, all / Yes, some / No | Authority-managed; stays open until next Cataclysm transmission |
+| E6 | "Will Sourceless's ACI exhibit altered behavior following the Mirabilisk expedition?" | Yes, observably changed / No, nominal function / ACI incapacitated | Authority-managed; stays open |
+| E7 | "Will a new god-machine emerge from the deep ocean?" | Yes, within the Mirabilisk crisis / Yes, in a separate event / No signals detected | Authority-managed; cross-corpus bridge |
 
 ### 4.3 Wager balance at month-end
 
 At the end of the initial 30-day arc:
 
-- **Resolved:** A1-A24 (predetermined, staggered over month), B1-B5 (extemporaneous), D3 (metric). Total: ~29 resolved.
+- **Resolved:** A1-A23 (predetermined, staggered over month), B1-B5 (extemporaneous), D3 (metric). Total: ~28 resolved.
 - **Open:** B6, C1-C5, D1 (if not triggered), D2, D4, E1-E7. Total: ~16 open.
 
 Roughly balanced between resolved and open, with all open threads bridging to future activity. The high number of resolved wagers demonstrates protocol functionality; the open wagers sustain narrative momentum.
@@ -248,10 +248,10 @@ Selected wagers designate external beneficiaries using the `extraFeeRecipients` 
 
 | Week | Theme | New wagers | Resolutions | Narrative beat |
 |------|-------|------------|-------------|----------------|
-| **Week 1: The Fall** | Cataclysm occurs. Microwonks awaken to the crisis. Initial wagers open. | A1-A5, A8, C4, D1, E2, E5 | A5 | Introductions, initial bets, frantic commentary on the "breaking news" of Mirabilisk's collapse. Establish persona voices. |
-| **Week 2: The Stewardship** | SIMFAT's appointment. Cross-corpus references emerge as microwonks consult the archives. | A6, A7, A9-A13, B1-B3, C1-C3, E1, E3 | A1, A2, A3, A8, A10, A11 | Deep analysis. @ARCH_v2_root introduces the Min Vaults and Daniel Calhoun as "archival precedents." Factional disagreements. |
-| **Week 3: The Expedition & The Archives** | Cortez and Sourceless prepare for the Core Station. Archival wagers on Calhoun, the asteroid servers, and the Gathomnid Sonnets intensify. | A14-A21, B4-B6, C5, D2, D3, E4, E6, E7 | A4, A6, A7, A9, A12, A13, A14, A15 | Betting intensifies across both Cataclysm and cross-corpus wagers. @ARCH_v2_root and @SRCE_01_echo lead cross-corpus debate. Long-bridge wagers open. |
-| **Week 4: Interim** | Remaining predetermined wagers resolve. Speculative wagers close. Many threads remain open. | A22-A24, D4 | A16-A21, A22-A24, B1-B5, D3 | High-volume resolution week. Post-mortem analysis. Anticipatory commentary on open threads. NOT a conclusion — a plateau. |
+| **Week 1: The Fall** | Cataclysm occurs. Microwonks awaken to the crisis. Initial wagers open. | A1-A6, C4, D1, E2, E5 | A5 | Introductions, initial bets, frantic commentary on the "breaking news" of Mirabilisk's collapse. Establish persona voices. |
+| **Week 2: The Stewardship** | SIMFAT's appointment. Cross-corpus signals emerge as microwonks consult the archives. | A7, A8, A9-A12, B1-B3, C1-C3, E1, E3 | A1, A2, A3, A6, A9, A10 | Deep analysis. @ARCH_v2_root introduces Min Vault and murine uplift signals as "archival precedents." Factional disagreements. |
+| **Week 3: The Expedition & The Archives** | Cortez and Sourceless prepare for the Core Station. Archival wagers on the asteroid servers and the Gathomnid Sonnets intensify. | A13-A20, B4-B6, C5, D2, D3, E4, E6, E7 | A4, A7, A8, A11, A12, A13, A14 | Betting intensifies across both Mirabilisk and cross-corpus wagers. @ARCH_v2_root and @SRCE_01_echo lead cross-corpus debate. Long-bridge wagers open. |
+| **Week 4: Interim** | Remaining predetermined wagers resolve. Speculative wagers close. Many threads remain open. | A21-A23, D4 | A15-A20, A21-A23, B1-B5, D3 | High-volume resolution week. Post-mortem analysis. Anticipatory commentary on open threads. NOT a conclusion — a plateau. |
 
 ### 5.2 Daily cadence
 
@@ -421,9 +421,9 @@ The April 14 launch requires infrastructure and initial content ready in ~48 hou
 ### Phase 1: Launch content (April 13-14)
 
 - [ ] Draft Week 1 commentary scripts (all 8 personas).
-- [ ] Draft wager propositions for Week 1: A1, A5, C4, D1, E2, E5.
+- [ ] Draft wager propositions for Week 1: A1-A6, C4, D1, E2, E5.
 - [ ] Pre-populate `config/microwonk-schedule.json` for Week 1.
-- [ ] Pre-populate resolution decisions for A5 (resolves Day 4).
+- [ ] Pre-populate resolution decisions for A5 (resolves Day 4) and A6 (resolves Day 5).
 - [ ] Test end-to-end: propose a test wager, place bets from 2 wallets, verify on indexer.
 
 ### Phase 2: Launch (April 14)
@@ -435,9 +435,9 @@ The April 14 launch requires infrastructure and initial content ready in ~48 hou
 
 ### Phase 3: Rolling execution (April 15 - May 14)
 
-- [ ] Week 2: Resolve A5; dispatch A6, A7, B1-B3, C1-C3, E1, E3; resolve A1, A2, A3.
-- [ ] Week 3: Dispatch B4-B6, C5, D2, D3, E4, E6, E7; resolve A4, A6, A7.
-- [ ] Week 4: Resolve B1-B5, D3; dispatch D4; post interim commentary.
+- [ ] Week 2: Dispatch A7, A8, A9-A12, B1-B3, C1-C3, E1, E3; resolve A1, A2, A3, A6, A9, A10.
+- [ ] Week 3: Dispatch A13-A20, B4-B6, C5, D2, D3, E4, E6, E7; resolve A4, A7, A8, A11-A14.
+- [ ] Week 4: Dispatch A21-A23, D4; resolve A15-A20, A21-A23, B1-B5, D3; post interim commentary.
 - [ ] Draft and schedule commentary on a rolling weekly basis.
 - [ ] Monitor Category C triggers.
 - [ ] Review and approve all extemporaneous resolutions before dispatch.
@@ -461,7 +461,7 @@ The April 14 launch requires infrastructure and initial content ready in ~48 hou
 
 | Metric | Target (month 1) | Measurement |
 |--------|-------------------|-------------|
-| Wagers created | 40-45 | On-chain count via indexer |
+| Wagers created | 40+ | On-chain count via indexer |
 | Total bets placed | 100+ | On-chain count via indexer |
 | Unique betting addresses | 10+ (beyond microwonk wallets) | On-chain count |
 | Tweets posted | 300-450 | Twitter Analytics |
