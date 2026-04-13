@@ -18,4 +18,6 @@
   - Multi-winner resolution and policy-driven payout semantics (any-of, exact-set, `AT_LEAST_K`, weighted overlap) without mutating v1. **On `master`** (`experiment/adr-0008-multi-winner-v2` integration history). Docs: `docs/ADR-0008-IMPLEMENTATION.md`, **glossary** `docs/PAYOUT-CALCULATION.md` Part B.
 - `ADR-0009-freeform-text-wagers.md`
   - Freeform text-answer wagers: no enumerated outcomes at creation; bettors stake on arbitrary strings; resolver submits the winning string; exact byte match; single-winner parimutuel semantics; separate contract surface from bitmask v2. Implementation + outcome-cap discussion: `docs/ADR-0009-IMPLEMENTATION.md`.
+- `ADR-0010-unified-wager-enumerated-and-freeform.md`
+  - **Proposed:** single wager + factory unifying **enumerated v2** (bitmask + policies) and **freeform** (string answers) via immutable create-time mode; strict red–green TDD; full propagation checklist (contracts, indexer, MCP, agents, dApp, docs, gas). Intended **greenfield** target; legacy v1/v2/freeform deployments remain supported until deprecated.
 
