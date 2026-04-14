@@ -94,6 +94,63 @@ Function medians from `test/ParamutuelV3Gas.t.sol` only:
 4. **Freeform:** `maxDistinctAnswers` up to **1024** at factory level — each **new** answer pays a `usedAnswerIds.push` on first stake; resolve cost does not scale with that count.
 5. **Fees:** `_chargeFeesOnce` runs at resolve / retract / expire — included in the resolve numbers above.
 
+## Illustrative USD (planning)
+
+**Formula (same as [`research/chain-and-fee-review.md`](../research/chain-and-fee-review.md) §4):**
+
+\[
+\text{fee}_{\text{USD}} \approx \text{gas} \times \text{gasPrice}_{\text{gwei}} \times 10^{-9} \times \text{ETH}_{\text{USD}}
+\]
+
+**Caveats:** L2s may charge **L1 data / blob** components not captured by a simple `gas × gwei` product—especially for **large contract creations**. **ETH/USD** and **gwei** move constantly. Figures below are **order-of-magnitude** for budgeting, not quotes. **Revise** the assumption table when ETH/USD or network gwei snapshots change (see [`chain-and-fee-review.md`](../research/chain-and-fee-review.md) for methodology and explorer pointers).
+
+### Assumptions used for the tables
+
+| Input | Value | Rationale |
+|-------|--------|-----------|
+| **ETH / USD** | **$2,500** | Round planning number; replace with a live spot when presenting externally. |
+| **Base** gas price | **0.005 gwei** | Low L2 snapshot aligned with `chain-and-fee-review.md` (Base explorer, 2026-03-20); real Base fees vary and can spike. |
+| **Arbitrum One** gas price | **0.021 gwei** | Snapshot from same memo; **~4.2×** the Base gwei figure → multiply Base USD **~4.2×** for the same gas. |
+| **Ethereum L1 (stress)** | **10 gwei** | Stress illustration only—per-wager `CREATE` is a poor fit at these prices (see memo §4.4). |
+
+Effective **$ per gas unit** on Base at the above assumptions:  
+\(0.005 \times 10^{-9} \times 2500 \approx \$1.25 \times 10^{-8}\) per gas.
+
+### ~USD on Base (0.005 gwei, ETH $2,500)
+
+Gas figures match the **Snapshot — `gasleft()`** section above unless noted.
+
+| Operation | ~Gas | ~USD (Base) |
+|-----------|------|-------------|
+| `createEnumeratedWager` (3 outcomes, no seed) | ~2.61M | **~$0.033** |
+| `createFreeformWager` | ~2.51M | **~$0.031** |
+| `placeBet` enumerated (first **new** mask) | ~246k | **~$0.003** |
+| `placeBet` enumerated (same mask) | ~72k | **~$0.0009** |
+| `placeBet` freeform (first **new** answer) | ~248k | **~$0.003** |
+| `placeBet` freeform (same answer) | ~73k | **~$0.0009** |
+| `resolve` enumerated (`ANY_OF`, 2 distinct masks) | ~136k | **~$0.0017** |
+| `resolve` enumerated (16 distinct masks) | ~200k | **~$0.0025** |
+| `resolve` enumerated (`WEIGHTED_OVERLAP`, 2 masks) | ~132k | **~$0.0017** |
+| `resolve` freeform | ~123–128k | **~$0.0015–0.0016** |
+| `claim` enumerated (2 user masks) | ~90k | **~$0.0011** |
+| `claim` freeform (winner) | ~80k | **~$0.0010** |
+
+**First-time bettor** (ERC-20 `approve` to the wager, then `placeBet`): add **~46k** gas (typical mock/ERC-20; real tokens vary) → **~$0.0006** on the same Base assumptions, **in addition to** `placeBet`.
+
+**`retract` / `expire`:** not isolated in the V3 gas harness; both charge fees once like resolve. Expect **roughly the same order of magnitude as resolve** (often **~$0.001–0.003** on Base here) until measured explicitly.
+
+### Same flows, stress L1 (10 gwei, ETH $2,500)
+
+| Operation | ~Gas | ~USD (L1 stress) |
+|-----------|------|------------------|
+| `createEnumeratedWager` (~2.61M) | ~2.61M | **~$65** |
+| `placeBet` (first new mask ~246k) | ~246k | **~$0.006** |
+| `resolve` (~136k) | ~136k | **~$0.003** |
+
+### Quick read
+
+On **Base-class** L2s at **sub-cent gwei**, **creating** a V3 wager is typically **a few cents**; **bet / resolve / claim** are usually **sub-cent to a few cents** per transaction. **Dollar cost is dominated by chain and gas price**, not the difference between e.g. 130k and 200k gas on Base. For **Arbitrum** at **0.021 gwei**, scale the Base column by **~4.2×**.
+
 ## Related
 
 - Enumerated policy semantics and v2 historical tables: [`ADR-0008-GAS.md`](ADR-0008-GAS.md), [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)  
