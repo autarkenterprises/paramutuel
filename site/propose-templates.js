@@ -1,5 +1,7 @@
 /**
  * Starter templates for Propose a Wager (main site + Resonance Exchange).
+ * Profiles: `default` (main `propose-a-wager.html`) and `resonance` (`data-propose-profile`
+ * on Resonance/Microwonk pages only — alternate proposition placeholders; does not affect main site).
  * Loaded before propose-wager.js; exposes globalThis.ParamutuelProposeTemplates.
  * Node: require("./site/propose-templates.js") for tests.
  */

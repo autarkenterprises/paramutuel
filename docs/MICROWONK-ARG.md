@@ -308,7 +308,7 @@ Displayed in the Resonance Exchange style: dark background, glowing borders, sig
 
 ### 6.3 Route
 
-`/resonance` — a standalone page (`resonance.html`). **`resonance-propose.html`** is the guided “Propose a Wager” flow in Resonance styling: it loads the same V3 factory path as `propose-a-wager.html` but sets **`data-propose-profile="resonance"`** so starter templates use diegetic placeholder copy (`site/propose-templates.js`). Mode toggle also available on main site pages via URL parameter `?mode=resonance`.
+`/resonance` — a standalone page (`resonance.html`). **`resonance-propose.html`** is the guided “Propose a Wager” flow in Resonance styling: it loads the same V3 factory path as `propose-a-wager.html` but sets **`data-propose-profile="resonance"`** so `site/propose-templates.js` supplies **Resonance-profile** proposition placeholders (fiction-facing wording). **Main site** `propose-a-wager.html` uses the **`default`** profile only — Microwonk ARG aesthetics and alternate placeholder strings must not be required for the primary Paramutuel onboarding path. Mode toggle also available on main site pages via URL parameter `?mode=resonance`.
 
 ---
 
