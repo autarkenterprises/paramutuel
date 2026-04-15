@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "network": "baseSepolia",
+  "generatedAt": "2026-04-14T02:14:26Z",
+  "roles": {
+    "treasury": {
+      "key": "arg_treasury",
+      "handle": null,
+      "role": "treasury",
+      "label": "ARG Treasury \u2014 campaign float funding all microwonks + proposer + resolver",
+      "address": "0xeBa11b0dE936877ce26B25eF0C1800d3d5bD84cc"
+    },
+    "proposer": {
+      "key": "resonance_xchg",
+      "handle": "@resonance_xchg",
+      "role": "proposer",
+      "label": "Resonance Exchange \u2014 in-universe broadcast & wager proposer",
+      "address": "0x7A8B32c667Cd8C8c6066c1a365d5056548AB8676"
+    },
+    "resolver": {
+      "key": "resolution_service",
+      "handle": null,
+      "role": "resolver",
+      "label": "Resolution Service \u2014 delegated resolver for all microwonk wagers",
+      "address": "0xe203533591d3f1B4C4b33ae3047dECEc77454233"
+    }
+  },
+  "microwonks": [
+    {
+      "key": "srce_01_echo",
+      "handle": "@SRCE_01_echo",
+      "designation": "Source-Echo Unit 01",
+      "address": "0x63261D2D86BD39c233E05095944e6D6F96BDf519",
+      "avatarSeed": "srce-01-echo-cyan-deep"
+    },
+    {
+      "key": "crtx_7_prime",
+      "handle": "@CRTX_7_prime",
+      "designation": "Cortez-Watcher Prime-7",
+      "address": "0x685dfCE4Cc43Fb3D792E59f82DFc6dcD874c9701",
+      "avatarSeed": "crtx-7-prime-amber-burst"
+    },
+    {
+      "key": "trbn_44_null",
+      "handle": "@TRBN_44_null",
+      "designation": "Tribunal Null-44",
+      "address": "0xa92F793E325c67c302899F3CccA89D0f9c51F526",
+      "avatarSeed": "trbn-44-null-magenta-grid"
+    },
+    {
+      "key": "frog_sat_ix",
+      "handle": "@FROG_sat_ix",
+      "designation": "Frog-Satellite IX",
+      "address": "0x3776Aa466e0480A3D736AA00af52b3978a3991a8",
+      "avatarSeed": "frog-sat-ix-green-pulse"
+    },
+    {
+      "key": "dsmr_00_flux",
+      "handle": "@DSMR_00_flux",
+      "designation": "Desidereification Meter Flux-00",
+      "address": "0x2beeDE5c7755E6e9B0a87a23BDA175cE0712B960",
+      "avatarSeed": "dsmr-00-flux-violet-noise"
+    },
+    {
+      "key": "wkdl_k8_arb",
+      "handle": "@WKDL_k8_arb",
+      "designation": "WonkDollar Arbitrageur K8",
+      "address": "0xB350359c9F4C8d312FA4F4d1d04CF022F2D82d5A",
+      "avatarSeed": "wkdl-k8-arb-gold-lattice"
+    },
+    {
+      "key": "mmth_03_edge",
+      "handle": "@MMTH_03_edge",
+      "designation": "Mmm-Threat Monitor Edge-03",
+      "address": "0x366D19e3bd81ef2D46195224ef670E4d6639AEE1",
+      "avatarSeed": "mmth-03-edge-red-siren"
+    },
+    {
+      "key": "arch_v2_root",
+      "handle": "@ARCH_v2_root",
+      "designation": "Archive Root V2",
+      "address": "0x4EbfD7F9593aaDb7879333351ec721ef122958F7",
+      "avatarSeed": "arch-v2-root-bone-glyph"
+    }
+  ]
+}

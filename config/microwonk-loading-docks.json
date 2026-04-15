@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-04-14T23:25:28Z",
+  "docks": [
+    {
+      "key": "dock_01",
+      "label": "Loading dock #01",
+      "address": "0xb726Ec6d7D695FE5533f600574799132860874fC",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_02",
+      "label": "Loading dock #02",
+      "address": "0xA3400A03b2EA768e5BAb8977fe3E208B4130d4c6",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_03",
+      "label": "Loading dock #03",
+      "address": "0x3d42020704d108378A11E9f04af23518cBb1fFc8",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_04",
+      "label": "Loading dock #04",
+      "address": "0xF644dcAfE0275973aeb9340e060C127F10d91F8c",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_05",
+      "label": "Loading dock #05",
+      "address": "0x48BEa38D09dBF3BC283c4e1356B0a17A68d93BCC",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_06",
+      "label": "Loading dock #06",
+      "address": "0xe83c09f4DC67226D71Eb40b8D8BA947FBfd4a070",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_07",
+      "label": "Loading dock #07",
+      "address": "0x7B148f8A6039312Da4d5A373cAC43A04155fe221",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_08",
+      "label": "Loading dock #08",
+      "address": "0xe71DdDBff5d6815Ad68c183C402eBE699bA57796",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_09",
+      "label": "Loading dock #09",
+      "address": "0x4750DB0529A84FB65dd55760571c53FFfcD25CaD",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_10",
+      "label": "Loading dock #10",
+      "address": "0x2a40B364c8057a2DD571a69705deeE26D5D9EcD1",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_11",
+      "label": "Loading dock #11",
+      "address": "0xC3767ffAB9f408a0Fec0f52C0C73e8E63953Fa6b",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_12",
+      "label": "Loading dock #12",
+      "address": "0xBF359A79eE03AC43FB15005b28EE94a555e1Bfc5",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_13",
+      "label": "Loading dock #13",
+      "address": "0x2132EFa3290f990Cac0d97D7459b5Cfc5d19F545",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_14",
+      "label": "Loading dock #14",
+      "address": "0x5d2Fe1e51E64DB46C98e7D82aAE93f02BAC3237b",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_15",
+      "label": "Loading dock #15",
+      "address": "0x908ffe6CF6E473dDfAf6E8965142191fCeAD69ed",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_16",
+      "label": "Loading dock #16",
+      "address": "0xE952D4BB077b1B8f2e382bff641942525EBD7cC8",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_17",
+      "label": "Loading dock #17",
+      "address": "0x8153986Bbf3A8a0239CEb329DA8b2F07Ed56F7fF",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_18",
+      "label": "Loading dock #18",
+      "address": "0x15cB421F1fe16cCd0032E323fC56769F7240084d",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_19",
+      "label": "Loading dock #19",
+      "address": "0xFbC112697a258bA1e364E1A76797EBC2c5d96Ac1",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_20",
+      "label": "Loading dock #20",
+      "address": "0x5C8998696C22759b9fCD843eF0CCA5FAC645c39F",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_21",
+      "label": "Loading dock #21",
+      "address": "0xFBB58a9535Af9067E86b0698CBC53707e967f3EC",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_22",
+      "label": "Loading dock #22",
+      "address": "0x69490Ae0d4F8861c1480af4faaa39B3246e85206",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_23",
+      "label": "Loading dock #23",
+      "address": "0x0c852A1c06fEAdAc69BA2355a0eED14Aef54545e",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_24",
+      "label": "Loading dock #24",
+      "address": "0x2eCE620f64F23C991582d9dc9667B88BA82842cb",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_25",
+      "label": "Loading dock #25",
+      "address": "0x4e606DeFe5f5ADEA4DBF5A60cd32366a9aE9e1CF",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_26",
+      "label": "Loading dock #26",
+      "address": "0xC490581Ad1b23d66a5C83ADA631c34aEEd81728E",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_27",
+      "label": "Loading dock #27",
+      "address": "0x75f440bCDff3c5e5a71379c3C9756081E2323e79",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_28",
+      "label": "Loading dock #28",
+      "address": "0xe4BEef8477Bf1a605b834CFF52F1bbd7D3b2259c",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_29",
+      "label": "Loading dock #29",
+      "address": "0xdf80cA316fd6b58127fEe9A21222E13482be0F72",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_30",
+      "label": "Loading dock #30",
+      "address": "0x462a610709FD8Ea0Dff71649e2C2F210D77aa040",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_31",
+      "label": "Loading dock #31",
+      "address": "0x74da2cbD5e3A3b375E8110c89290a99ADDaFB713",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_32",
+      "label": "Loading dock #32",
+      "address": "0xbA6c2ccAc7498420787118bF54F966FD42BE8Ac7",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_33",
+      "label": "Loading dock #33",
+      "address": "0x38597e2d234e7bF6D24193e9bEe9db79855a99eb",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_34",
+      "label": "Loading dock #34",
+      "address": "0x32AC1c5bFfEd5c54F3AE5623618Fa261aBF9E91a",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_35",
+      "label": "Loading dock #35",
+      "address": "0xc3C88124f7e73eb3afEa39FBF08BA42a5eD34e54",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_36",
+      "label": "Loading dock #36",
+      "address": "0x87728Cd8091D9767Dfa01EEF52686B43b8F6f26d",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_37",
+      "label": "Loading dock #37",
+      "address": "0xf97B09B11a7fc8b59D756Dc01BB242C04A6700E3",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_38",
+      "label": "Loading dock #38",
+      "address": "0xE8aECbBCC9c02E41540460DECF21E1f3C6CcDcB6",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_39",
+      "label": "Loading dock #39",
+      "address": "0xa2F426cD00500b45ea68D2eb4E6532055043a4Ce",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_40",
+      "label": "Loading dock #40",
+      "address": "0x67a148e9aC1884613Bc286aD0FDE7452d236C182",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_41",
+      "label": "Loading dock #41",
+      "address": "0xffd15093B178Efa81B4123373120cE7e9a8a1863",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_42",
+      "label": "Loading dock #42",
+      "address": "0xf9e6d12E44000B64a44bd27540CDD224C13fa3c6",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_43",
+      "label": "Loading dock #43",
+      "address": "0xB4113D18a69d364435E3fcbcd335Ae36F9c4eaaB",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_44",
+      "label": "Loading dock #44",
+      "address": "0x43aB03fe0787d56Ac8aB2130dEE4D06F7d696544",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_45",
+      "label": "Loading dock #45",
+      "address": "0xabd4C5152aCe4144534e937237F17b0A97d467f5",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_46",
+      "label": "Loading dock #46",
+      "address": "0x1aEAd0eefF2aeB499242C134afC1EE266960590e",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_47",
+      "label": "Loading dock #47",
+      "address": "0xe4872eF7da399F7b57186C92C1Eadf8F08636C1E",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_48",
+      "label": "Loading dock #48",
+      "address": "0x591DF8B7fD1Bb656a9860201F04a7d6533475ba5",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_49",
+      "label": "Loading dock #49",
+      "address": "0x19606E62E1A965a61a83f83C3767ec13493Fc4dE",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_50",
+      "label": "Loading dock #50",
+      "address": "0x064F4d5360A37f1642Aa3D18E2DE9d391aa8332E",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_51",
+      "label": "Loading dock #51",
+      "address": "0x0Cf93b28265FBaA41e5B04e1E5d556D2B2e7b1c9",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_52",
+      "label": "Loading dock #52",
+      "address": "0xC1b71555F277e8DcB400D03b7378C270249775a4",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_53",
+      "label": "Loading dock #53",
+      "address": "0x5a960FFa0a7E41723a4D6827505d3BA9dDaB5EAa",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_54",
+      "label": "Loading dock #54",
+      "address": "0xF2D29Fb614ec0960C5fCdA8B94e891a576B2f33F",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_55",
+      "label": "Loading dock #55",
+      "address": "0x5aE569713367F0D6bc58f35F9c5ABaA9B15e792b",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_56",
+      "label": "Loading dock #56",
+      "address": "0xeD21DB2bDDf8e4d0Aa1C0275AF605B3B92227F5d",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_57",
+      "label": "Loading dock #57",
+      "address": "0x3F517995F6cCc27daE91f6e99B9298A6e793884E",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_58",
+      "label": "Loading dock #58",
+      "address": "0x71Cc2524F124231221412984A95ff0cB66772DFb",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_59",
+      "label": "Loading dock #59",
+      "address": "0xA1b1292188ff31b27431f68bc9C1dea06571bD58",
+      "role": "loading_dock"
+    },
+    {
+      "key": "dock_60",
+      "label": "Loading dock #60",
+      "address": "0xcBAEd556189d5f490340937b10b7C00ce86e469E",
+      "role": "loading_dock"
+    }
+  ]
+}

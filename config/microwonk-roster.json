@@ -1,0 +1,94 @@
+{
+  "_comment": "Public roster of microwonk personas for the ARG. Safe to commit. Private keys live in config/microwonk-keys.env (gitignored). Addresses are populated by script/microwonk/generate_wallets.sh.",
+  "schemaVersion": 1,
+  "network": "baseSepolia",
+  "roles": {
+    "treasury": {
+      "key": "arg_treasury",
+      "handle": null,
+      "role": "treasury",
+      "label": "ARG Treasury — campaign float funding all microwonks + proposer + resolver",
+      "notes": "On testnet: dedicated EOA, key in config/microwonk-keys.env. On mainnet: Safe; replenisher uses the key here but holds <$100 equivalent."
+    },
+    "proposer": {
+      "key": "resonance_xchg",
+      "handle": "@resonance_xchg",
+      "role": "proposer",
+      "label": "Resonance Exchange — in-universe broadcast & wager proposer",
+      "notes": "Parent account that posts new wagers via Proposition Service. Holds gas ETH plus Proposer bond budget."
+    },
+    "resolver": {
+      "key": "resolution_service",
+      "handle": null,
+      "role": "resolver",
+      "label": "Resolution Service — delegated resolver for all microwonk wagers",
+      "notes": "Not a Twitter persona. Signs resolve()/retract()/expire() transactions based on decisions JSON."
+    }
+  },
+  "microwonks": [
+    {
+      "key": "srce_01_echo",
+      "handle": "@SRCE_01_echo",
+      "designation": "Source-Echo Unit 01",
+      "specialization": "Cetacean politics, ACI dynamics, deep-ocean intelligence",
+      "bettingStyle": "Conservative; large positions on long-odds events",
+      "avatarSeed": "srce-01-echo-cyan-deep"
+    },
+    {
+      "key": "crtx_7_prime",
+      "handle": "@CRTX_7_prime",
+      "designation": "Cortez-Watcher Prime-7",
+      "specialization": "Embodied-soul dynamics, archaic-human survival odds, clone hierarchies",
+      "bettingStyle": "Aggressive; many small bets, always doubles down",
+      "avatarSeed": "crtx-7-prime-amber-burst"
+    },
+    {
+      "key": "trbn_44_null",
+      "handle": "@TRBN_44_null",
+      "designation": "Tribunal Null-44",
+      "specialization": "God-machine jurisprudence, stewardship precedent, alignment taxonomy",
+      "bettingStyle": "Hedged; bets both sides, profits on information asymmetry",
+      "avatarSeed": "trbn-44-null-magenta-grid"
+    },
+    {
+      "key": "frog_sat_ix",
+      "handle": "@FROG_sat_ix",
+      "designation": "Frog-Satellite IX",
+      "specialization": "SIMFAT analysis, amphibian conservation indices, orbital platform behavior",
+      "bettingStyle": "Contrarian; bets against consensus",
+      "avatarSeed": "frog-sat-ix-green-pulse"
+    },
+    {
+      "key": "dsmr_00_flux",
+      "handle": "@DSMR_00_flux",
+      "designation": "Desidereification Meter Flux-00",
+      "specialization": "Mirabilisk dream activity, wish-granting field intensity, material coherence",
+      "bettingStyle": "Volatility trader; bets on extreme outcomes",
+      "avatarSeed": "dsmr-00-flux-violet-noise"
+    },
+    {
+      "key": "wkdl_k8_arb",
+      "handle": "@WKDL_k8_arb",
+      "designation": "WonkDollar Arbitrageur K8",
+      "specialization": "Wonk economy, exchange rates, market microstructure",
+      "bettingStyle": "Pure arbitrageur; exploits correlated-wager discrepancies",
+      "avatarSeed": "wkdl-k8-arb-gold-lattice"
+    },
+    {
+      "key": "mmth_03_edge",
+      "handle": "@MMTH_03_edge",
+      "designation": "Mmm-Threat Monitor Edge-03",
+      "specialization": "8/mmm incursion tracking, Onanistic Terror defense, border integrity",
+      "bettingStyle": "Risk-averse on defense; aggressive on offense predictions",
+      "avatarSeed": "mmth-03-edge-red-siren"
+    },
+    {
+      "key": "arch_v2_root",
+      "handle": "@ARCH_v2_root",
+      "designation": "Archive Root V2",
+      "specialization": "Historical precedent, cross-corpus references, Fragnemt/Talisnam allusions",
+      "bettingStyle": "Long-term bets; patient accumulator",
+      "avatarSeed": "arch-v2-root-bone-glyph"
+    }
+  ]
+}

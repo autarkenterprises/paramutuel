@@ -45,3 +45,10 @@ service/proposition/data/*.db-wal
 test/testnet/stress_wallet_pool.json
 **/stress_wallet_pool.json
 
+# Microwonk ARG: private key material (public addresses in microwonk-wallets.json are safe)
+config/microwonk-keys.env
+config/microwonk-keys.*.env
+
+# Microwonk ARG: faucet rate-limit state (no secrets, but noisy + per-environment)
+config/faucet-state.json
+

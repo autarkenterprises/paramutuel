@@ -1,0 +1,88 @@
+{
+  "_comment": "Machine-readable faucet catalog used by script/microwonk/next_faucet_run.py and by Chrome automation. Human guide: docs/FAUCET-RUNBOOK.md",
+  "schemaVersion": 1,
+  "network": "baseSepolia",
+  "targets": {
+    "treasuryMinEthWei": "150000000000000000",
+    "treasuryMinUsdcRaw": "600000000"
+  },
+  "faucets": [
+    {
+      "id": "coinbase_cdp_base_sepolia",
+      "asset": "ETH",
+      "url": "https://portal.cdp.coinbase.com/products/faucet",
+      "auth": "coinbase_account",
+      "captcha": true,
+      "ratePerDayPerAddress": 1,
+      "dripWei": "50000000000000000",
+      "humanStep": "sign in to CDP, pick Base Sepolia, paste address, click Request Funds",
+      "claudeStep": "paste address into the address field, click Request, read success banner tx hash",
+      "notes": "0.05 ETH per request. Typically the most reliable source. Requires a CDP project."
+    },
+    {
+      "id": "alchemy_base_sepolia",
+      "asset": "ETH",
+      "url": "https://www.alchemy.com/faucets/base-sepolia",
+      "auth": "alchemy_account",
+      "captcha": true,
+      "ratePerDayPerAddress": 1,
+      "dripWei": "100000000000000000",
+      "humanStep": "sign in to Alchemy; confirm wallet holds >= 0.001 ETH on mainnet; paste address",
+      "claudeStep": "paste address, click Send Me ETH, read tx receipt",
+      "notes": "0.1 ETH per request but requires 0.001 ETH on Ethereum mainnet in the connected wallet."
+    },
+    {
+      "id": "quicknode_multichain",
+      "asset": "ETH",
+      "url": "https://faucet.quicknode.com/base/sepolia",
+      "auth": "quicknode_account",
+      "captcha": true,
+      "ratePerDayPerAddress": 1,
+      "dripWei": "100000000000000000",
+      "humanStep": "sign in to QuickNode; paste address; solve CAPTCHA",
+      "claudeStep": "paste address, click Continue",
+      "notes": "0.1 ETH per request when QuickNode has balance. Often dry."
+    },
+    {
+      "id": "learnweb3_base_sepolia",
+      "asset": "ETH",
+      "url": "https://learnweb3.io/faucets/base_sepolia/",
+      "auth": "learnweb3_github",
+      "captcha": true,
+      "ratePerDayPerAddress": 1,
+      "dripWei": "20000000000000000",
+      "humanStep": "sign in with GitHub; paste address; solve CAPTCHA",
+      "claudeStep": "paste address, submit",
+      "notes": "0.02 ETH per request; useful as a top-up."
+    },
+    {
+      "id": "circle_usdc_testnet",
+      "asset": "USDC",
+      "url": "https://faucet.circle.com/",
+      "auth": "circle_developer",
+      "captcha": true,
+      "ratePerHourPerAddress": 1,
+      "dripRaw": "10000000",
+      "humanStep": "sign in; pick Base Sepolia + USDC; paste address; solve CAPTCHA",
+      "claudeStep": "select Base Sepolia from network dropdown, select USDC, paste address, click Get tokens",
+      "notes": "10 USDC per address per hour. With 3 docks we can drip 30 USDC/hr => 600 USDC in 20 hours, or 10 hours if all three faucet-cycles run in parallel."
+    },
+    {
+      "id": "superchain_bridge",
+      "asset": "ETH",
+      "url": "https://superbridge.app/base-sepolia",
+      "auth": "connected_wallet",
+      "captcha": false,
+      "ratePerDayPerAddress": null,
+      "dripWei": null,
+      "humanStep": "connect wallet that already holds Sepolia ETH (L1); bridge to Base Sepolia",
+      "claudeStep": "paste recipient, set amount, click Bridge; user signs in wallet",
+      "notes": "Last resort; only useful if you already have L1 Sepolia ETH. Sepolia L1 can be mined via pk910 PoW faucet."
+    }
+  ],
+  "operations": {
+    "loadingDockStrategy": "Register each loading dock address with the accounts a faucet requires. Prefer 3 docks so the three Circle faucet cycles can run in parallel. When any dock has >= 0.005 ETH or >= 10 USDC, run load_treasury.sh to forward to the treasury.",
+    "refreshCadence": "Re-check faucet rate limits every hour. The advisor (next_faucet_run.py) reports which faucets are eligible now given the per-address-per-day/hour counters in config/faucet-state.json.",
+    "stopCondition": "Stop once config/microwonk-wallets.json treasury holds >= treasuryMinEthWei and >= treasuryMinUsdcRaw. Verify with check_balances.sh."
+  }
+}
