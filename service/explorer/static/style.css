@@ -234,3 +234,125 @@ td {
   font-size: 12px;
   color: #c7d2e3;
 }
+
+/* ── brand=resonance (Resonance Exchange embedded explorer; main site uses default) ── */
+html[data-brand="resonance"] {
+  --void: #0a0a0f;
+  --void-mid: #10101a;
+  --void-border: #1a1a2e;
+  --glow-cyan: #00ffd5;
+  --glow-magenta: #ff00aa;
+  --glow-amber: #ffaa00;
+  --glow-green: #00ff88;
+  --text-primary: #d0d8e8;
+  --text-muted: #6a7490;
+}
+
+html[data-brand="resonance"] body {
+  position: relative;
+  font-family: "Space Mono", ui-monospace, monospace;
+  background: var(--void);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+html[data-brand="resonance"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+html[data-brand="resonance"] main.container {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 16px auto;
+  padding: 0 16px 24px;
+}
+
+html[data-brand="resonance"] .meta {
+  display: none !important;
+}
+
+html[data-brand="resonance"] h1 {
+  font-family: "VT323", "Space Mono", monospace;
+  font-size: 28px;
+  letter-spacing: 3px;
+  color: var(--glow-cyan);
+  text-shadow: 0 0 10px var(--glow-cyan);
+  margin: 0 0 10px;
+}
+
+html[data-brand="resonance"] .muted {
+  color: var(--text-muted);
+}
+
+html[data-brand="resonance"] .card {
+  background: var(--void-mid);
+  border: 1px solid var(--void-border);
+  border-radius: 10px;
+}
+
+html[data-brand="resonance"] .controls input,
+html[data-brand="resonance"] .controls select {
+  background: var(--void);
+  color: var(--text-primary);
+  border-color: var(--void-border);
+}
+
+html[data-brand="resonance"] .controls input:focus,
+html[data-brand="resonance"] .controls select:focus {
+  outline: none;
+  border-color: var(--glow-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 255, 213, 0.15);
+}
+
+html[data-brand="resonance"] button {
+  background: rgba(0, 255, 213, 0.12);
+  color: var(--glow-cyan);
+  border: 1px solid var(--glow-cyan);
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-weight: 600;
+}
+
+html[data-brand="resonance"] button:hover {
+  box-shadow: 0 0 14px rgba(0, 255, 213, 0.25);
+}
+
+html[data-brand="resonance"] .field-controls {
+  border-color: var(--void-border);
+  background: var(--void);
+}
+
+html[data-brand="resonance"] th {
+  background: var(--void-mid);
+  border-color: var(--void-border);
+  color: var(--text-muted);
+}
+
+html[data-brand="resonance"] td {
+  border-color: var(--void-border);
+  color: var(--text-primary);
+}
+
+html[data-brand="resonance"] .bet-link {
+  color: var(--glow-cyan);
+}
+
+html[data-brand="resonance"] .load-spinner {
+  border-color: var(--void-border);
+  border-top-color: var(--glow-cyan);
+}
+
+html[data-brand="resonance"] .indexer-busy {
+  color: var(--glow-cyan);
+}
+
+html[data-brand="resonance"] .auto-refresh-label input {
+  accent-color: var(--glow-cyan);
+}

@@ -15,6 +15,7 @@ The static site under `site/` is a **thin shell**: marketing copy, a testnet/mai
 | `/app.html` | Full dApp embedded via iframe |
 | `/bet.html` | Wallet staking: **v1/v2** use `placeBet` / `placeBets`; **freeform** uses `placeBet(string,uint256)` with a typed answer. ABI from indexer `protocol_version`. Reached from Place a Bet, feed, Explorer, or `?wager=` |
 | `/explorer.html` | Explorer UI with optional indexer URL override |
+| `/resonance-explorer.html` | Resonance Exchange explorer — embedded `explorer/index.html?brand=resonance` only (no indexer URL row; listings skin + `resonance-bet.html` links in `service/explorer/static/app.js`) |
 | `/operator.html` | **Operator hub** — indexer links, embedded explorer, outbound URLs for other services |
 | `/dapp/` | Same dApp as embedded, for direct links and debugging |
 

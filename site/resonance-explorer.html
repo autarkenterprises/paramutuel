@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Browse wagers on the Resonance Exchange." />
-  <title>Explorer — The Resonance Exchange</title>
+  <meta name="description" content="The Resonance Exchange — browse active listings on the public signal." />
+  <title>Explore — The Resonance Exchange</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,18 +25,27 @@
     body { font-family: 'Space Mono', monospace; background: var(--void); color: var(--text-primary); }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.045; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; }
     a { color: var(--glow-cyan); }
-    nav { background: var(--void-mid); border-bottom: 1px solid var(--glow-cyan); box-shadow: 0 0 18px 0 rgba(0,255,213,0.12); }
-    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    nav { position: relative; z-index: 10; background: var(--void-mid); border-bottom: 1px solid var(--glow-cyan); box-shadow: 0 0 18px 0 rgba(0,255,213,0.12); }
+    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); text-decoration: none; white-space: nowrap; }
+    nav .logo:hover { text-decoration: none; }
     nav .links a { color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
-    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); }
-    .iframe-config { background: var(--void-mid); border-bottom-color: var(--void-border); font-family: 'Space Mono', monospace; }
-    .iframe-config label { color: var(--text-muted); }
-    .iframe-config input { background: var(--void); color: var(--text-primary); border-color: var(--void-border); font-family: 'Space Mono', monospace; }
-    .iframe-config button { background: rgba(0,255,213,0.1); border: 1px solid var(--glow-cyan); color: var(--glow-cyan); font-family: 'Space Mono', monospace; }
-    .iframe-config button:hover { box-shadow: 0 0 16px rgba(0,255,213,0.3); }
-    .muted { color: var(--text-muted) !important; }
-    footer.app-shell-footer { background: var(--void-mid); border-top-color: var(--void-border); color: var(--text-dim); }
-    footer.app-shell-footer a { color: var(--text-muted); }
+    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); text-decoration: none; }
+    body.iframe-page { min-height: 100vh; }
+    .resonance-explorer-wrap { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .resonance-explorer-wrap iframe {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: min(520px, calc(100vh - 200px));
+      background: var(--void);
+    }
+    body.site-has-banner .resonance-explorer-wrap iframe {
+      min-height: min(480px, calc(100vh - 248px));
+    }
+    .resonance-explorer-intro { padding: 16px 24px 8px; max-width: 900px; }
+    .resonance-explorer-tag { font-family: 'VT323', monospace; font-size: 26px; letter-spacing: 3px; text-transform: uppercase; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); margin: 0 0 8px; }
+    .resonance-explorer-intro .muted { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; }
+    .iframe-page iframe { border: none; border-top: 1px solid var(--void-border); }
+    footer.app-shell-footer { position: relative; z-index: 1; background: var(--void-mid); border-top: 1px solid var(--void-border); color: var(--text-dim); padding: 16px 24px; font-size: 12px; }
   </style>
 </head>
 <body class="iframe-page">
@@ -52,66 +61,53 @@
   </nav>
   <div id="networkBannerSlot"></div>
   <script src="network-banner.js" defer></script>
-  <div class="iframe-config">
-    <label for="indexerUrl">Indexer API URL:</label>
-    <input id="indexerUrl" type="text" placeholder="http://127.0.0.1:8090" />
-    <button id="loadExplorer">Connect</button>
-    <span id="indexerHint" class="muted"></span>
+
+  <div class="resonance-explorer-wrap">
+    <div class="resonance-explorer-intro">
+      <p class="resonance-explorer-tag">// EXPLORE</p>
+      <p class="muted">Listings from the relay — search, refresh, and open a row to stake from the Bet shell.</p>
+    </div>
+    <iframe id="explorerFrame" src="explorer/index.html?brand=resonance" title="Resonance Exchange listings"></iframe>
   </div>
-  <iframe id="explorerFrame" src="explorer/index.html?brand=resonance" title="Resonance Exchange Explorer"></iframe>
+
   <script>
-    const configUrl = "config/deployments.json";
-
-    function setExplorerFrameFromInput() {
-      const url = document.getElementById("indexerUrl").value.trim();
+    (function () {
+      const configUrl = "config/deployments.json";
       const frame = document.getElementById("explorerFrame");
-      frame.src = url ? "explorer/index.html?brand=resonance&api=" + encodeURIComponent(url) : "explorer/index.html?brand=resonance";
-    }
+      const PSN = window.ParamutuelSiteNetwork;
 
-    const PSN = window.ParamutuelSiteNetwork;
-    const hintEl = document.getElementById("indexerHint");
-    if (hintEl) {
-      hintEl.textContent = PSN
-        ? PSN.copy.explorerLeaveBlank
-        : "Leave blank to use the default wager indexer URL.";
-    }
+      function setExplorerFrameSrc(apiBase) {
+        const url = (apiBase || "").trim();
+        frame.src = url
+          ? "explorer/index.html?brand=resonance&api=" + encodeURIComponent(url)
+          : "explorer/index.html?brand=resonance";
+      }
 
-    async function applyDefaultIndexerFromConfig() {
-      try {
-        const response = await fetch(configUrl);
-        if (!response.ok) return;
-        const data = await response.json();
-        const netKey = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
-        const apiBase = String(data?.[netKey]?.explorerApiBase || "").trim();
-        const input = document.getElementById("indexerUrl");
-        const hint = document.getElementById("indexerHint");
-        if (!apiBase) return;
-        input.value = apiBase;
-        if (hint && PSN) hint.textContent = PSN.copy.explorerIndexerDefault;
-      } catch (_) {}
-    }
-
-    document.getElementById("loadExplorer").addEventListener("click", setExplorerFrameFromInput);
-    applyDefaultIndexerFromConfig().finally(setExplorerFrameFromInput);
-
-    if (PSN) {
-      window.addEventListener(PSN.EVENT, (ev) => {
-        const cfg = ev.detail && ev.detail.config;
-        const nk = ev.detail && ev.detail.networkKey;
-        if (!cfg || !nk) return;
-        const apiBase = String(cfg[nk]?.explorerApiBase || "").trim();
-        const input = document.getElementById("indexerUrl");
-        const hint = document.getElementById("indexerHint");
-        if (apiBase) {
-          input.value = apiBase;
-          if (hint) hint.textContent = PSN.copy.explorerIndexerAfterToggle;
-        } else {
-          input.value = "";
-          if (hint) hint.textContent = PSN.copy.explorerIndexerMissing;
+      async function applyDefaultIndexerFromConfig() {
+        try {
+          const response = await fetch(configUrl);
+          if (!response.ok) return;
+          const data = await response.json();
+          const netKey = PSN ? PSN.getActiveNetworkKey(data) : String(data?.defaultNetwork || "baseSepolia").trim();
+          const apiBase = String(data?.[netKey]?.explorerApiBase || "").trim();
+          setExplorerFrameSrc(apiBase);
+        } catch (_) {
+          setExplorerFrameSrc("");
         }
-        setExplorerFrameFromInput();
-      });
-    }
+      }
+
+      applyDefaultIndexerFromConfig();
+
+      if (PSN) {
+        window.addEventListener(PSN.EVENT, (ev) => {
+          const cfg = ev.detail && ev.detail.config;
+          const nk = ev.detail && ev.detail.networkKey;
+          if (!cfg || !nk) return;
+          const apiBase = String(cfg[nk]?.explorerApiBase || "").trim();
+          setExplorerFrameSrc(apiBase);
+        });
+      }
+    })();
   </script>
   <footer class="app-shell-footer">
     THE RESONANCE EXCHANGE

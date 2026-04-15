@@ -1,8 +1,22 @@
 const params = new URLSearchParams(window.location.search);
 const BRAND = params.get("brand") || "paramutuel";
-const API_BASE = params.get("api") || window.EXPLORER_API_BASE || "";
+document.documentElement.dataset.brand = BRAND;
 
-if (BRAND !== "paramutuel") {
+const API_BASE = params.get("api") || window.EXPLORER_API_BASE || "";
+const BET_PAGE_HREF = BRAND === "resonance" ? "../resonance-bet.html" : "../bet.html";
+
+if (BRAND === "resonance") {
+  const fontLink = document.createElement("link");
+  fontLink.rel = "stylesheet";
+  fontLink.href =
+    "https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap";
+  document.head.appendChild(fontLink);
+  const titleEl = document.getElementById("explorerTitle");
+  const subEl = document.getElementById("explorerSubtitle");
+  if (titleEl) titleEl.textContent = "// EXPLORE";
+  if (subEl) subEl.textContent = "Listings on the public signal — search and refresh as the relay updates.";
+  document.title = "Explore — Resonance Exchange";
+} else if (BRAND !== "paramutuel") {
   const titleEl = document.getElementById("explorerTitle");
   const subEl = document.getElementById("explorerSubtitle");
   if (titleEl) titleEl.textContent = "Explorer";
@@ -108,7 +122,8 @@ function updateResultMeta() {
   const orderLabel = lastOrder === "asc" ? "oldest first" : "newest first";
   const q = lastQueryText ? `, query: "${lastQueryText}"` : "";
   const tail = exhausted ? " (end reached)" : "";
-  meta.textContent = `Loaded ${currentOffset} wager(s), ${orderLabel}${q}${tail}${lastIndexerHint}`;
+  const unit = BRAND === "resonance" ? "listing" : "wager";
+  meta.textContent = `Loaded ${currentOffset} ${unit}(s), ${orderLabel}${q}${tail}${lastIndexerHint}`;
 }
 
 function escapeHtml(value) {
@@ -250,7 +265,7 @@ function renderWagerCells(m, fields) {
       if (f.key === "wager_address" && v) {
         const addr = String(v).trim();
         const enc = encodeURIComponent(addr);
-        return `<td class="wager-cell"><a class="bet-link" href="../bet.html?wager=${enc}" title="Open wallet staking">Bet</a> <code>${escapeHtml(
+        return `<td class="wager-cell"><a class="bet-link" href="${BET_PAGE_HREF}?wager=${enc}" title="Open wallet staking">Bet</a> <code>${escapeHtml(
           addr
         )}</code></td>`;
       }
@@ -285,7 +300,10 @@ function renderWagers(wagers, { append = false } = {}) {
     }
   }
   if (!append && wagers.length === 0) {
-    const emptyMsg = BRAND === "paramutuel" ? "No Paramutuel protocol wagers in this result page." : "No wagers in this result page.";
+    const emptyMsg =
+      BRAND === "paramutuel"
+        ? "No Paramutuel protocol wagers in this result page."
+        : "No wagers in this result page.";
     tbody.innerHTML = `<tr><td colspan="${colspan}">${emptyMsg}</td></tr>`;
   }
 }
@@ -322,12 +340,13 @@ async function loadWagers({ append = false } = {}) {
     lastQueryText = queryText;
     lastOrder = order;
   }
-  if (apiNode) {
+  if (apiNode && BRAND !== "resonance") {
     apiNode.textContent = API_BASE_NORMALIZED || "same origin";
   }
   setLoadMoreEnabled(false);
   if (!append) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}"><span class="load-indicator"><span class="load-spinner" aria-hidden="true"></span> Fetching from indexer…</span></td></tr>`;
+    const fetchLabel = BRAND === "resonance" ? "Fetching listings…" : "Fetching from indexer…";
+    tbody.innerHTML = `<tr><td colspan="${colspan}"><span class="load-indicator"><span class="load-spinner" aria-hidden="true"></span> ${fetchLabel}</span></td></tr>`;
     setIndexerBusy("Loading…");
   }
   let res;
@@ -342,7 +361,11 @@ async function loadWagers({ append = false } = {}) {
     if (gen !== loadGeneration) return;
     lastIndexerHint = "";
     if (!append) {
-      tbody.innerHTML = `<tr><td colspan="${colspan}">Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.</td></tr>`;
+      const offlineMsg =
+        BRAND === "resonance"
+          ? "Signal lost — the listing relay is unreachable. Try again later."
+          : "Indexer offline or unreachable. Run the indexer locally or provide <code>?api=URL</code>.";
+      tbody.innerHTML = `<tr><td colspan="${colspan}">${offlineMsg}</td></tr>`;
     }
     setIndexerBusy("");
     updateResultMeta();
@@ -372,22 +395,27 @@ async function loadWagers({ append = false } = {}) {
         const lb = hb.last_indexed_block;
         const head = hb.chain_head;
         const err = hb.last_sync_error;
-        lastIndexerHint =
-          ` — indexer: ${wc} wager(s) stored` +
-          (lb != null ? `, last indexed block ${lb}` : "") +
-          (head != null ? `, chain head ${head}` : "") +
-          ".";
-        if (err) {
-          lastIndexerHint += ` Sync error: ${err}`;
-        } else if (wc === 0 && lb != null && lb > 0) {
-          lastIndexerHint +=
-            " Chain has been scanned but no wagers were ingested; redeploy Cloud Run from the latest master (indexer event topics must match the factory).";
-        } else if (wc === 0 && lb == null && head != null) {
-          lastIndexerHint +=
-            " RPC is reachable but no blocks were indexed yet (first sync may still be running).";
-        } else if (wc === 0 && (lb == null || lb === 0) && head == null) {
-          lastIndexerHint +=
-            " RPC or sync not initialized; confirm INDEXER_FROM_BLOCK / indexerFromBlock in deployments and redeploy Cloud Run.";
+        if (BRAND === "resonance") {
+          lastIndexerHint = wc === 0 ? "" : ` — ${wc} on relay`;
+          if (err) lastIndexerHint += ` — relay fault: ${err}`;
+        } else {
+          lastIndexerHint =
+            ` — indexer: ${wc} wager(s) stored` +
+            (lb != null ? `, last indexed block ${lb}` : "") +
+            (head != null ? `, chain head ${head}` : "") +
+            ".";
+          if (err) {
+            lastIndexerHint += ` Sync error: ${err}`;
+          } else if (wc === 0 && lb != null && lb > 0) {
+            lastIndexerHint +=
+              " Chain has been scanned but no wagers were ingested; redeploy Cloud Run from the latest master (indexer event topics must match the factory).";
+          } else if (wc === 0 && lb == null && head != null) {
+            lastIndexerHint +=
+              " RPC is reachable but no blocks were indexed yet (first sync may still be running).";
+          } else if (wc === 0 && (lb == null || lb === 0) && head == null) {
+            lastIndexerHint +=
+              " RPC or sync not initialized; confirm INDEXER_FROM_BLOCK / indexerFromBlock in deployments and redeploy Cloud Run.";
+          }
         }
       }
     } catch (_) {
