@@ -181,8 +181,8 @@
     if (!wagers.length) {
       if (status) {
         status.textContent = openOnly
-          ? "No open Paramutuel protocol wagers match. Try another search or include resolved and retracted."
-          : "No matching Paramutuel protocol wagers.";
+          ? (globalThis.__noMatchOpen || "No open Paramutuel protocol wagers match. Try another search or include resolved and retracted.")
+          : (globalThis.__noMatchAll || "No matching Paramutuel protocol wagers.");
       }
       return;
     }
