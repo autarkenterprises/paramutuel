@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="The Resonance Exchange — on-chain prop wagering from inside the ctrlcreep world. Track microwonk positions, live odds, and active wagers." />
+  <meta property="og:title" content="The Resonance Exchange" />
+  <meta property="og:description" content="On-chain prop wagering broadcast from inside the ctrlcreep ARG. Follow the microwonks." />
+  <meta property="og:type" content="website" />
+  <title>The Resonance Exchange</title>
+
+  <!-- Google Fonts: VT323 + Space Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Resonance Exchange design tokens ── */
+    :root {
+      --void:         #0a0a0f;
+      --void-mid:     #10101a;
+      --void-border:  #1a1a2e;
+      --glow-cyan:    #00ffd5;
+      --glow-magenta: #ff00aa;
+      --glow-amber:   #ffaa00;
+      --glow-green:   #00ff88;
+      --text-primary: #d0d8e8;
+      --text-muted:   #6a7490;
+      --text-dim:     #3a4060;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Noise overlay via SVG filter */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.045;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+    }
+
+    body {
+      font-family: 'Space Mono', monospace;
+      background: var(--void);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    a { color: var(--glow-cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Nav ── */
+    nav {
+      position: relative;
+      z-index: 10;
+      background: var(--void-mid);
+      border-bottom: 1px solid var(--glow-cyan);
+      box-shadow: 0 0 18px 0 rgba(0,255,213,0.12);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 56px;
+      flex-shrink: 0;
+    }
+
+    nav .logo {
+      font-family: 'VT323', monospace;
+      font-size: 22px;
+      letter-spacing: 2px;
+      color: var(--glow-cyan);
+      text-shadow: 0 0 10px var(--glow-cyan);
+      white-space: nowrap;
+    }
+
+    nav .links {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    nav .links a {
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.5px;
+      transition: color 0.15s, background 0.15s;
+      text-transform: uppercase;
+    }
+
+    nav .links a:hover,
+    nav .links a.active {
+      background: rgba(0,255,213,0.08);
+      color: var(--glow-cyan);
+      text-decoration: none;
+    }
+
+    nav .spacer { flex: 1; }
+
+    nav .back-link {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    nav .back-link:hover { color: var(--text-muted); }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 56px 24px 40px;
+      border-bottom: 1px solid var(--void-border);
+    }
+
+    .hero-eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--glow-magenta);
+      text-shadow: 0 0 8px var(--glow-magenta);
+      margin-bottom: 16px;
+    }
+
+    .hero h1 {
+      font-family: 'VT323', monospace;
+      font-size: clamp(36px, 7vw, 72px);
+      letter-spacing: 4px;
+      color: var(--glow-cyan);
+      text-shadow: 0 0 20px var(--glow-cyan), 0 0 60px rgba(0,255,213,0.3);
+      margin-bottom: 16px;
+      line-height: 1.1;
+    }
+
+    .hero .tagline {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 0 auto 28px;
+      line-height: 1.7;
+      letter-spacing: 0.3px;
+    }
+
+    .status-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--glow-green);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--glow-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--glow-green); }
+      50%       { opacity: 0.5; box-shadow: 0 0 4px var(--glow-green); }
+    }
+
+    /* ── Container ── */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      width: 100%;
+    }
+
+    /* ── Section headers ── */
+    .section-header {
+      font-family: 'VT323', monospace;
+      font-size: 26px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .section-header.cyan    { color: var(--glow-cyan);    text-shadow: 0 0 10px var(--glow-cyan); }
+    .section-header.magenta { color: var(--glow-magenta); text-shadow: 0 0 10px var(--glow-magenta); }
+    .section-header.amber   { color: var(--glow-amber);   text-shadow: 0 0 10px var(--glow-amber); }
+
+    .section-rule {
+      border: none;
+      border-top: 1px solid var(--void-border);
+      margin: 40px 0;
+    }
+
+    /* ── Microwonk roster grid ── */
+    .wonk-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .wonk-card {
+      background: var(--void-mid);
+      border: 1px solid var(--void-border);
+      border-radius: 6px;
+      padding: 18px 20px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .wonk-card:hover {
+      border-color: var(--glow-cyan);
+      box-shadow: 0 0 14px rgba(0,255,213,0.12);
+    }
+
+    .wonk-card--magenta:hover {
+      border-color: var(--glow-magenta);
+      box-shadow: 0 0 14px rgba(255,0,170,0.12);
+    }
+
+    .wonk-card--amber:hover {
+      border-color: var(--glow-amber);
+      box-shadow: 0 0 14px rgba(255,170,0,0.12);
+    }
+
+    .wonk-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .wonk-avatar {
+      width: 40px; height: 40px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'VT323', monospace;
+      font-size: 20px;
+      border: 1px solid;
+    }
+
+    .wonk-avatar.cyan    { background: rgba(0,255,213,0.08);  border-color: var(--glow-cyan);    color: var(--glow-cyan); }
+    .wonk-avatar.magenta { background: rgba(255,0,170,0.08);  border-color: var(--glow-magenta); color: var(--glow-magenta); }
+    .wonk-avatar.amber   { background: rgba(255,170,0,0.08);  border-color: var(--glow-amber);   color: var(--glow-amber); }
+    .wonk-avatar.green   { background: rgba(0,255,136,0.08);  border-color: var(--glow-green);   color: var(--glow-green); }
+    .wonk-avatar.violet  { background: rgba(180,0,255,0.08);  border-color: #bb00ff;             color: #bb00ff; }
+    .wonk-avatar.gold    { background: rgba(255,200,0,0.08);  border-color: #ffc800;             color: #ffc800; }
+    .wonk-avatar.red     { background: rgba(255,40,40,0.08);  border-color: #ff2828;             color: #ff2828; }
+    .wonk-avatar.bone    { background: rgba(220,200,180,0.08); border-color: #dcc8b4;            color: #dcc8b4; }
+
+    .wonk-meta { flex: 1; min-width: 0; }
+
+    .wonk-handle {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--glow-cyan);
+      margin-bottom: 2px;
+    }
+
+    .wonk-designation {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+
+    .wonk-spec {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+
+    .wonk-style {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.2px;
+      font-style: italic;
+      border-top: 1px solid var(--void-border);
+      padding-top: 8px;
+    }
+
+    .wonk-style strong {
+      color: var(--glow-amber);
+      font-style: normal;
+    }
+
+    /* ── Role cards ── */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .role-card {
+      background: var(--void-mid);
+      border: 1px solid var(--glow-magenta);
+      border-radius: 6px;
+      padding: 20px;
+      box-shadow: 0 0 16px rgba(255,0,170,0.08);
+    }
+
+    .role-label {
+      font-family: 'VT323', monospace;
+      font-size: 20px;
+      letter-spacing: 2px;
+      color: var(--glow-magenta);
+      margin-bottom: 4px;
+    }
+
+    .role-handle {
+      font-size: 12px;
+      color: var(--glow-cyan);
+      margin-bottom: 10px;
+    }
+
+    .role-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ── Feed section ── */
+    .feed-section {
+      background: var(--void-mid);
+      border: 1px solid var(--void-border);
+      border-radius: 6px;
+      padding: 24px;
+      min-height: 200px;
+    }
+
+    .feed-placeholder {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-dim);
+    }
+
+    .feed-placeholder .feed-icon {
+      font-family: 'VT323', monospace;
+      font-size: 48px;
+      color: var(--glow-cyan);
+      opacity: 0.3;
+      margin-bottom: 16px;
+    }
+
+    .feed-placeholder p {
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .feed-placeholder .handles {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .feed-placeholder .handle-chip {
+      font-size: 11px;
+      color: var(--glow-cyan);
+      border: 1px solid rgba(0,255,213,0.3);
+      border-radius: 3px;
+      padding: 3px 8px;
+      background: rgba(0,255,213,0.05);
+    }
+
+    /* ── Protocol section ── */
+    .protocol-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .protocol-stat {
+      background: var(--void-mid);
+      border: 1px solid var(--void-border);
+      border-radius: 6px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .protocol-stat .stat-val {
+      font-family: 'VT323', monospace;
+      font-size: 32px;
+      color: var(--glow-amber);
+      text-shadow: 0 0 10px var(--glow-amber);
+      margin-bottom: 4px;
+    }
+
+    .protocol-stat .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+    }
+
+    /* ── Links to main site ── */
+    .btn-resonance {
+      display: inline-block;
+      padding: 10px 22px;
+      border-radius: 4px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: box-shadow 0.15s, opacity 0.15s;
+    }
+
+    .btn-resonance.primary {
+      background: rgba(0,255,213,0.1);
+      border: 1px solid var(--glow-cyan);
+      color: var(--glow-cyan);
+    }
+
+    .btn-resonance.primary:hover {
+      box-shadow: 0 0 16px rgba(0,255,213,0.3);
+      text-decoration: none;
+      opacity: 0.9;
+    }
+
+    .btn-resonance.secondary {
+      background: rgba(255,0,170,0.1);
+      border: 1px solid var(--glow-magenta);
+      color: var(--glow-magenta);
+    }
+
+    .btn-resonance.secondary:hover {
+      box-shadow: 0 0 16px rgba(255,0,170,0.3);
+      text-decoration: none;
+      opacity: 0.9;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 24px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      margin-top: auto;
+      text-align: center;
+      padding: 20px 24px 28px;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+      border-top: 1px solid var(--void-border);
+    }
+
+    footer a { color: var(--text-muted); }
+
+    /* ── Scan-line animation ── */
+    @keyframes scanline {
+      0%   { background-position: 0 0; }
+      100% { background-position: 0 100vh; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .hero { padding: 36px 16px 28px; }
+      .container { padding: 28px 16px; }
+      nav .logo { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <span class="logo">THE RESONANCE EXCHANGE</span>
+    <div class="links">
+      <a href="resonance.html" class="active">Feed</a>
+      <a href="place-a-bet.html">Wager</a>
+      <a href="explorer.html">Explorer</a>
+    </div>
+    <span class="spacer"></span>
+    <a href="index.html" class="back-link">← Paramutuel</a>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <p class="hero-eyebrow">▸ LIVE BROADCAST · BASE SEPOLIA TESTNET</p>
+    <h1>THE RESONANCE<br>EXCHANGE</h1>
+    <p class="tagline">
+      On-chain parimutuel prop wagering — broadcast from inside the ctrlcreep ARG.
+      Microwonks speculate on outcomes. The protocol holds and pays.
+      No gatekeeper. No house edge.
+    </p>
+    <div class="status-bar">
+      <span class="status-dot"></span>
+      <span>NETWORK ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="container">
+
+    <!-- Protocol stats -->
+    <h2 class="section-header amber">// PROTOCOL STATUS</h2>
+    <div class="protocol-grid">
+      <div class="protocol-stat">
+        <div class="stat-val">BASE</div>
+        <div class="stat-label">Network</div>
+      </div>
+      <div class="protocol-stat">
+        <div class="stat-val">USDC</div>
+        <div class="stat-label">Collateral Token</div>
+      </div>
+      <div class="protocol-stat">
+        <div class="stat-val">8</div>
+        <div class="stat-label">Active Microwonks</div>
+      </div>
+      <div class="protocol-stat">
+        <div class="stat-val">V3</div>
+        <div class="stat-label">Protocol Version</div>
+      </div>
+    </div>
+
+    <hr class="section-rule" />
+
+    <!-- Resonance Exchange role cards -->
+    <h2 class="section-header magenta">// RESONANCE OPERATORS</h2>
+    <div class="role-grid">
+      <div class="role-card">
+        <div class="role-label">RESONANCE EXCHANGE</div>
+        <div class="role-handle"><a href="https://x.com/resonance_xchg" target="_blank" rel="noopener">@resonance_xchg</a></div>
+        <p class="role-desc">
+          The in-universe Paramutuel broadcast node. Posts new wagers as though from inside the ctrlcreep world.
+          Operates as proposer on all microwonk wagers. Holds proposer bond budget and gas ETH.
+        </p>
+      </div>
+      <div class="role-card">
+        <div class="role-label">RESOLUTION SERVICE</div>
+        <div class="role-handle"><span style="color: var(--text-muted); font-size: 12px;">· automated resolver ·</span></div>
+        <p class="role-desc">
+          Delegated resolver for all microwonk wagers. Signs resolve, retract, and expire transactions
+          based on coordinator-approved outcome decisions. No social presence.
+        </p>
+      </div>
+    </div>
+
+    <hr class="section-rule" />
+
+    <!-- Microwonk roster -->
+    <h2 class="section-header cyan">// ACTIVE MICROWONKS</h2>
+    <div class="wonk-grid">
+
+      <div class="wonk-card">
+        <div class="wonk-header">
+          <div class="wonk-avatar cyan">SC</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle"><a href="https://x.com/SRCE_01_echo" target="_blank" rel="noopener">@SRCE_01_echo</a></div>
+            <div class="wonk-designation">Source-Echo Unit 01</div>
+          </div>
+        </div>
+        <p class="wonk-spec">Cetacean politics, ACI dynamics, deep-ocean intelligence networks.</p>
+        <p class="wonk-style"><strong>Style:</strong> Conservative. Large positions on long-odds events.</p>
+      </div>
+
+      <div class="wonk-card wonk-card--amber">
+        <div class="wonk-header">
+          <div class="wonk-avatar amber">CX</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: var(--glow-amber)"><a href="https://x.com/CRTX_7_prime" target="_blank" rel="noopener" style="color: var(--glow-amber)">@CRTX_7_prime</a></div>
+            <div class="wonk-designation">Cortez-Watcher Prime-7</div>
+          </div>
+        </div>
+        <p class="wonk-spec">Embodied-soul dynamics, archaic-human survival odds, clone hierarchies.</p>
+        <p class="wonk-style"><strong>Style:</strong> Aggressive. Many small bets, always doubles down.</p>
+      </div>
+
+      <div class="wonk-card wonk-card--magenta">
+        <div class="wonk-header">
+          <div class="wonk-avatar magenta">TN</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: var(--glow-magenta)"><a href="https://x.com/TRBN_44_null" target="_blank" rel="noopener" style="color: var(--glow-magenta)">@TRBN_44_null</a></div>
+            <div class="wonk-designation">Tribunal Null-44</div>
+          </div>
+        </div>
+        <p class="wonk-spec">God-machine jurisprudence, stewardship precedent, alignment taxonomy.</p>
+        <p class="wonk-style"><strong>Style:</strong> Hedged. Bets both sides, profits on information asymmetry.</p>
+      </div>
+
+      <div class="wonk-card">
+        <div class="wonk-header">
+          <div class="wonk-avatar green">FS</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: var(--glow-green)"><a href="https://x.com/FROG_sat_ix" target="_blank" rel="noopener" style="color: var(--glow-green)">@FROG_sat_ix</a></div>
+            <div class="wonk-designation">Frog-Satellite IX</div>
+          </div>
+        </div>
+        <p class="wonk-spec">SIMFAT analysis, amphibian conservation indices, orbital platform behavior.</p>
+        <p class="wonk-style"><strong>Style:</strong> Contrarian. Bets against consensus, loves underdog outcomes.</p>
+      </div>
+
+      <div class="wonk-card">
+        <div class="wonk-header">
+          <div class="wonk-avatar violet">DF</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: #bb00ff"><a href="https://x.com/DSMR_00_flux" target="_blank" rel="noopener" style="color: #bb00ff">@DSMR_00_flux</a></div>
+            <div class="wonk-designation">Desidereification Meter Flux-00</div>
+          </div>
+        </div>
+        <p class="wonk-spec">Mirabilisk dream activity, wish-granting field intensity, material coherence.</p>
+        <p class="wonk-style"><strong>Style:</strong> Volatility trader. Bets on extreme outcomes exclusively.</p>
+      </div>
+
+      <div class="wonk-card wonk-card--amber">
+        <div class="wonk-header">
+          <div class="wonk-avatar gold">WA</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: #ffc800"><a href="https://x.com/WKDL_k8_arb" target="_blank" rel="noopener" style="color: #ffc800">@WKDL_k8_arb</a></div>
+            <div class="wonk-designation">WonkDollar Arbitrageur K8</div>
+          </div>
+        </div>
+        <p class="wonk-spec">Wonk economy, exchange rates, market microstructure, correlated-wager spreads.</p>
+        <p class="wonk-style"><strong>Style:</strong> Pure arbitrageur. Exploits correlated-wager discrepancies.</p>
+      </div>
+
+      <div class="wonk-card">
+        <div class="wonk-header">
+          <div class="wonk-avatar red">ME</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: #ff2828"><a href="https://x.com/MMTH_03_edge" target="_blank" rel="noopener" style="color: #ff2828">@MMTH_03_edge</a></div>
+            <div class="wonk-designation">Mmm-Threat Monitor Edge-03</div>
+          </div>
+        </div>
+        <p class="wonk-spec">8/mmm incursion tracking, Onanistic Terror defense, border integrity metrics.</p>
+        <p class="wonk-style"><strong>Style:</strong> Risk-averse on defense; aggressive on offense predictions.</p>
+      </div>
+
+      <div class="wonk-card">
+        <div class="wonk-header">
+          <div class="wonk-avatar bone">AR</div>
+          <div class="wonk-meta">
+            <div class="wonk-handle" style="color: #dcc8b4"><a href="https://x.com/ARCH_v2_root" target="_blank" rel="noopener" style="color: #dcc8b4">@ARCH_v2_root</a></div>
+            <div class="wonk-designation">Archive Root V2</div>
+          </div>
+        </div>
+        <p class="wonk-spec">Historical precedent, cross-corpus references, Fragnemt/Talisnam allusions.</p>
+        <p class="wonk-style"><strong>Style:</strong> Long-term accumulator. Patient. Never chases short-term odds.</p>
+      </div>
+
+    </div><!-- /wonk-grid -->
+
+    <hr class="section-rule" />
+
+    <!-- Live feed -->
+    <h2 class="section-header cyan">// LIVE MICROWONK FEED</h2>
+    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px; letter-spacing: 0.3px;">
+      Posts tagged <span style="color: var(--glow-cyan)">#microwonk</span> from the active roster.
+      Follow individual accounts to track positions in real time.
+    </p>
+    <div class="feed-section">
+      <div class="feed-placeholder">
+        <div class="feed-icon">▒▒▒</div>
+        <p>
+          Microwonk accounts are initializing.<br>
+          Follow the handles below on X to track live positions, wager proposals, and resolution commentary.
+        </p>
+        <div class="handles">
+          <span class="handle-chip">@resonance_xchg</span>
+          <span class="handle-chip">@SRCE_01_echo</span>
+          <span class="handle-chip">@CRTX_7_prime</span>
+          <span class="handle-chip">@TRBN_44_null</span>
+          <span class="handle-chip">@FROG_sat_ix</span>
+          <span class="handle-chip">@DSMR_00_flux</span>
+          <span class="handle-chip">@WKDL_k8_arb</span>
+          <span class="handle-chip">@MMTH_03_edge</span>
+          <span class="handle-chip">@ARCH_v2_root</span>
+        </div>
+      </div>
+    </div>
+
+    <hr class="section-rule" />
+
+    <!-- CTA to main protocol -->
+    <h2 class="section-header amber">// PLACE A WAGER</h2>
+    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.7; max-width: 620px;">
+      The Resonance Exchange runs on the open Paramutuel protocol.
+      Any address can stake on active wagers — no account, no approval, no gatekeeper.
+      Connect a wallet and bet alongside (or against) the microwonks.
+    </p>
+    <div class="cta-row">
+      <a href="place-a-bet.html" class="btn-resonance primary">Place a Bet →</a>
+      <a href="explorer.html" class="btn-resonance secondary">Browse Wagers →</a>
+      <a href="propose-a-wager.html" class="btn-resonance primary" style="background: rgba(255,170,0,0.08); border-color: var(--glow-amber); color: var(--glow-amber);">Propose a Wager →</a>
+    </div>
+
+  </div><!-- /container -->
+
+  <footer>
+    <span>THE RESONANCE EXCHANGE &mdash; running on <a href="index.html">Paramutuel</a></span>
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/autarkenterprises/paramutuel" target="_blank" rel="noopener">source</a>
+    &nbsp;&middot;&nbsp;
+    <span style="color: var(--glow-cyan); opacity: 0.4">BASE SEPOLIA TESTNET</span>
+  </footer>
+
+</body>
+</html>
