@@ -16,25 +16,25 @@
       default:
         "Will the observable event you care about resolve to Yes before the betting window ends? Replace this with your own yes-or-no question (what counts as Yes must be clear to bettors and resolver).",
       resonance:
-        "Will the next public broadcast or archival signal reference stewardship, the Mirabilisk line, or a named steward before betting closes? (Edit to match what observers can verify on-chain or in published channels.)",
+        "Will hiveminds comprise more or less than 72% of Europa's population by SOLDATE22870507?",
     },
     pick: {
       default:
         "Which outcome will occur first among the listed options? Replace this question and rename the options below so the winning line is unambiguous.",
       resonance:
-        "Which listed faction, force, or signal crosses the documented perimeter or threshold first in the public record? Rename options to match your scenario.",
+        "When the circum-Jovian census window snaps shut, which mandate posts first on the open register: Atlantic rim consortium, ice-shelf referendum bloc, or unaffiliated uplink?",
     },
     timed: {
       default:
         "When the scheduled event concludes, which result applies? Replace with your match, launch, vote, or release — use the outcome labels for Home/Away/Draw or your own buckets.",
       resonance:
-        "When the broadcast window for the contested event settles, which tally or designation matches the published result? Adjust outcome labels to your diegetic framing.",
+        "After the Enceladan relay fires, which line clears the board — Home / Away / Draw / voided window?",
     },
     freeform: {
       default:
         "What exact short text will appear first in the relevant public announcement? Bettors will type their own answers; you must resolve with the exact winning UTF-8 string.",
       resonance:
-        "What exact phrase will appear in the next dispatch on the public channel? Bettors type their own answers; you resolve by publishing the winning string verbatim.",
+        "What exact glyph-string will the Europa census leak attach to the hivemind column at ledger seal? Bettors type answers; you resolve by matching bytes.",
     },
   };
 
