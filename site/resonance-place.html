@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Find an active wager on the Resonance Exchange and stake alongside the microwonks." />
+  <title>Wager — The Resonance Exchange</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void:         #0a0a0f;
+      --void-mid:     #10101a;
+      --void-border:  #1a1a2e;
+      --glow-cyan:    #00ffd5;
+      --glow-magenta: #ff00aa;
+      --glow-amber:   #ffaa00;
+      --glow-green:   #00ff88;
+      --text-primary: #d0d8e8;
+      --text-muted:   #6a7490;
+      --text-dim:     #3a4060;
+    }
+    body { font-family: 'Space Mono', monospace; background: var(--void); color: var(--text-primary); }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.045; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; }
+    a { color: var(--glow-cyan); }
+    nav { background: var(--void-mid); border-bottom: 1px solid var(--glow-cyan); box-shadow: 0 0 18px 0 rgba(0,255,213,0.12); }
+    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    nav .links a { color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); }
+    .container { position: relative; z-index: 1; }
+    .card { background: var(--void-mid); border-color: var(--void-border); }
+    .muted { color: var(--text-muted) !important; }
+    .btn-primary { background: rgba(0,255,213,0.1); border: 1px solid var(--glow-cyan); color: var(--glow-cyan); font-family: 'Space Mono', monospace; }
+    .btn-primary:hover { box-shadow: 0 0 16px rgba(0,255,213,0.3); }
+    .btn-secondary { background: rgba(255,0,170,0.1); border: 1px solid var(--glow-magenta); color: var(--glow-magenta); font-family: 'Space Mono', monospace; }
+    .btn-secondary:hover { box-shadow: 0 0 16px rgba(255,0,170,0.3); }
+    .home-bet-search-input { background: var(--void); color: var(--text-primary); border-color: var(--void-border); font-family: 'Space Mono', monospace; }
+    .home-bet-search-input:focus { border-color: var(--glow-cyan); box-shadow: 0 0 0 2px rgba(0,255,213,0.2); }
+    .home-bet-search-results { background: var(--void); border-color: var(--void-border); }
+    .home-bet-search-item { border-bottom-color: var(--void-border); }
+    .home-bet-search-link:hover { background: var(--void-mid); }
+    .home-bet-search-prop { color: var(--text-primary); }
+    .home-bet-search-badge { background: var(--void-mid); color: var(--text-muted); }
+    .home-bet-search-badge--open { background: rgba(0,255,136,0.12); color: var(--glow-green); }
+    .home-bet-search-badge--resolved { background: rgba(255,170,0,0.12); color: var(--glow-amber); }
+    .home-bet-search-badge--retracted { background: rgba(255,0,170,0.12); color: var(--glow-magenta); }
+    .home-bet-search-meta { color: var(--text-muted); }
+    .home-bet-search-filter { color: var(--text-muted); }
+    .home-bet-search-filter input { accent-color: var(--glow-cyan); }
+    .home-bet-search-spinner { border-color: var(--void-border); border-top-color: var(--glow-cyan); }
+    .home-bet-search-title { font-family: 'VT323', monospace; font-size: 26px; letter-spacing: 3px; text-transform: uppercase; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    .propose-assisted-callout { border-color: var(--void-border); background: var(--void-mid); }
+    .propose-section-title { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-magenta); text-shadow: 0 0 8px var(--glow-magenta); }
+    .propose-assisted-callout__text { color: var(--text-muted); }
+    footer { position: relative; z-index: 1; border-top: 1px solid var(--void-border); color: var(--text-dim); background: transparent; }
+    footer a { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <script src="network-context.js"></script>
+  <nav>
+    <span class="logo">THE RESONANCE EXCHANGE</span>
+    <div class="links">
+      <a href="resonance.html">Feed</a>
+      <a href="resonance-place.html" class="active">Wager</a>
+      <a href="resonance-explorer.html">Explorer</a>
+    </div>
+  </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
+
+  <div class="container home-bet-search-below-feed">
+    <section class="card home-bet-search" id="place-a-bet" aria-label="Place a Bet">
+      <h1 class="home-bet-search-title">// PLACE A WAGER</h1>
+      <p class="home-bet-search-betpage-line">
+        <a href="resonance-bet.html" class="btn btn-secondary btn-inline">Stake with wallet</a>
+        <span class="muted">Paste a wager address or open a shared <code>?wager=0x&hellip;</code> link.</span>
+      </p>
+      <p class="muted home-bet-search-hint">
+        Search by <strong>wager address</strong>, <strong>proposition</strong>, <strong>outcome text</strong>, or other indexed fields. Results refresh as you type; open any row to load the staking flow.
+      </p>
+      <div class="home-bet-search-field-row">
+        <input
+          type="search"
+          id="homeBetSearchInput"
+          class="home-bet-search-input"
+          placeholder="Search open wagers…"
+          autocomplete="off"
+          spellcheck="false"
+          enterkeyhint="search"
+          aria-label="Search wagers"
+        />
+        <span class="home-bet-search-spinner" id="homeBetSearchSpinner" hidden aria-hidden="true"></span>
+      </div>
+      <label class="home-bet-search-filter">
+        <input type="checkbox" id="homeBetSearchIncludeAll" />
+        Include retracted and resolved wagers
+      </label>
+      <p class="home-bet-search-status muted" id="homeBetSearchStatus" role="status" aria-live="polite"></p>
+      <ul class="home-bet-search-results" id="homeBetSearchResults"></ul>
+    </section>
+  </div>
+
+  <footer>
+    THE RESONANCE EXCHANGE
+  </footer>
+  <script>window.__betPageBase = "resonance-bet.html";</script>
+  <script src="home-bet-search.js" defer></script>
+</body>
+</html>

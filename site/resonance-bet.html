@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Stake on a wager through the Resonance Exchange." />
+  <title>Stake — The Resonance Exchange</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void:         #0a0a0f;
+      --void-mid:     #10101a;
+      --void-border:  #1a1a2e;
+      --glow-cyan:    #00ffd5;
+      --glow-magenta: #ff00aa;
+      --glow-amber:   #ffaa00;
+      --glow-green:   #00ff88;
+      --text-primary: #d0d8e8;
+      --text-muted:   #6a7490;
+      --text-dim:     #3a4060;
+    }
+    body { font-family: 'Space Mono', monospace; background: var(--void); color: var(--text-primary); }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.045; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; }
+    a { color: var(--glow-cyan); }
+    nav { background: var(--void-mid); border-bottom: 1px solid var(--glow-cyan); box-shadow: 0 0 18px 0 rgba(0,255,213,0.12); }
+    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    nav .links a { color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); }
+    .container { position: relative; z-index: 1; }
+    .card { background: var(--void-mid); border-color: var(--void-border); }
+    .muted { color: var(--text-muted) !important; }
+    h1, h2, h3 { color: var(--text-primary); }
+    .bet-page h1 { font-family: 'VT323', monospace; font-size: 26px; letter-spacing: 3px; text-transform: uppercase; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    .btn-primary { background: rgba(0,255,213,0.1); border: 1px solid var(--glow-cyan); color: var(--glow-cyan); font-family: 'Space Mono', monospace; }
+    .btn-primary:hover { box-shadow: 0 0 16px rgba(0,255,213,0.3); }
+    .btn-secondary { background: rgba(255,0,170,0.1); border: 1px solid var(--glow-magenta); color: var(--glow-magenta); font-family: 'Space Mono', monospace; }
+    .btn-secondary:hover { box-shadow: 0 0 16px rgba(255,0,170,0.3); }
+    .btn-small { font-family: 'Space Mono', monospace; }
+    .bet-paste-label { color: var(--text-muted); }
+    .bet-paste-label input { background: var(--void); color: var(--text-primary); border-color: var(--void-border); font-family: 'Space Mono', monospace; }
+    .bet-proposition { color: var(--text-primary); }
+    .network-info dt { color: var(--text-muted); }
+    .network-info dd { color: var(--text-primary); font-family: 'Space Mono', monospace; }
+    .bet-outcomes-table-wrap { border-color: var(--void-border); }
+    .bet-outcomes-table th { background: var(--void-mid); color: var(--text-muted); border-bottom-color: var(--void-border); }
+    .bet-outcomes-table td { color: var(--text-primary); border-bottom-color: var(--void-border); }
+    .bet-outcome-row { background: var(--void); border-color: var(--void-border); }
+    .bet-amount-input { background: var(--void-mid); color: var(--text-primary); border-color: var(--void-border); font-family: 'Space Mono', monospace; }
+    .bet-freeform-text-input { background: var(--void-mid); color: var(--text-primary); border-color: var(--void-border); font-family: 'Space Mono', monospace; }
+    .bet-decimals-input { background: var(--void); color: var(--text-primary); border-color: var(--void-border); font-family: 'Space Mono', monospace; }
+    .bet-check { color: var(--text-muted); }
+    .load-spinner { border-color: var(--void-border); border-top-color: var(--glow-cyan); }
+    .load-indicator-block { color: var(--text-muted); }
+    .token-human-name { color: var(--glow-amber); }
+    .bet-more a { color: var(--glow-cyan); }
+    footer { position: relative; z-index: 1; border-top: 1px solid var(--void-border); color: var(--text-dim); background: transparent; }
+    footer a { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <script src="network-context.js"></script>
+  <nav>
+    <span class="logo">THE RESONANCE EXCHANGE</span>
+    <div class="links">
+      <a href="resonance.html">Feed</a>
+      <a href="resonance-place.html" class="active">Wager</a>
+      <a href="resonance-explorer.html">Explorer</a>
+    </div>
+  </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
+
+  <div class="container bet-page">
+    <section class="card" id="betIntro">
+      <h1>// STAKE WITH WALLET</h1>
+      <p class="muted" id="betIntroText">
+        Open from search results, the live feed, Explorer, or a <code>?wager=0x&hellip;</code> link — or paste a wager address below.
+      </p>
+      <div class="bet-paste-row">
+        <label class="bet-paste-label">
+          Wager contract address
+          <input type="text" id="wagerAddressInput" placeholder="0x…" autocomplete="off" spellcheck="false" />
+        </label>
+        <button type="button" class="btn btn-primary" id="loadWagerBtn">Load wager</button>
+      </div>
+    </section>
+
+    <div id="betLoadPanel" class="card bet-load-panel" hidden>
+      <div class="load-indicator-block" id="betLoadingBlock" role="status" aria-live="polite">
+        <span class="load-spinner" aria-hidden="true"></span>
+        <span id="betLoadingText">Fetching wager from indexer…</span>
+      </div>
+    </div>
+
+    <section class="card" id="betError" hidden>
+      <h2>Could not load wager</h2>
+      <p id="betErrorText" class="muted"></p>
+    </section>
+
+    <section class="card" id="betSummary" hidden>
+      <h2>Wager</h2>
+      <p id="betProposition" class="bet-proposition"></p>
+      <dl class="network-info bet-summary-dl">
+        <div>
+          <dt>Wager contract</dt>
+          <dd class="bet-wager-id-dd">
+            <code id="betWagerAddress"></code>
+            <button type="button" class="btn btn-small btn-secondary" id="betCopyAddressBtn">Copy</button>
+          </dd>
+        </div>
+        <div><dt>State</dt><dd id="betState"></dd></div>
+        <div><dt>Protocol</dt><dd id="betProtocol">—</dd></div>
+        <div><dt>Factory</dt><dd><code id="betFactory" class="bet-mono-wrap"></code></dd></div>
+        <div><dt>Proposer</dt><dd><code id="betProposer" class="bet-mono-wrap"></code></dd></div>
+        <div><dt>Resolver</dt><dd><code id="betResolver" class="bet-mono-wrap"></code></dd></div>
+        <div>
+          <dt>Collateral (ERC-20)</dt>
+          <dd id="betCollateralDd">
+            <span id="betCollateralHuman" class="token-human-name" hidden></span>
+            <code id="betCollateral" class="bet-mono-wrap"></code>
+          </dd>
+        </div>
+        <div><dt>Total pot (raw)</dt><dd id="betPot"></dd></div>
+        <div><dt>Total fee (basis points)</dt><dd id="betFeeBps"></dd></div>
+        <div><dt>Betting closes (UTC)</dt><dd id="betBettingClose"></dd></div>
+        <div><dt>Resolution deadline (UTC)</dt><dd id="betResolutionDeadline"></dd></div>
+        <div><dt>Resolution window (seconds)</dt><dd id="betResolutionWindow"></dd></div>
+        <div id="betWinningRow" hidden><dt>Winning outcome</dt><dd id="betWinningOutcome"></dd></div>
+        <div><dt>Created</dt><dd id="betCreatedMeta"></dd></div>
+        <div><dt>Block explorer</dt><dd><a id="betBasescan" href="#" target="_blank" rel="noopener noreferrer">Basescan</a></dd></div>
+      </dl>
+
+      <h3 class="bet-outcomes-table-title" id="betOutcomesTableTitle">Outcomes &amp; implied odds</h3>
+      <p class="muted bet-odds-footnote" id="betOutcomesTableFootnote">
+        Pool share uses on-chain stake totals. <strong>Implied multiple</strong> is the approximate payout per 1 unit staked on that outcome if it wins, <em>after</em> protocol fees and assuming no further bets.
+      </p>
+      <p class="muted bet-protocol-note" id="betProtocolNote">
+        This page loads the correct ABI from indexer <code>protocol_version</code>.
+      </p>
+      <div class="bet-outcomes-table-wrap">
+        <table class="bet-outcomes-table" id="betOutcomesTable">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Outcome</th>
+              <th scope="col">Stake (raw)</th>
+              <th scope="col">Of pool</th>
+              <th scope="col">Implied multiple</th>
+            </tr>
+          </thead>
+          <tbody id="betOutcomesTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="betFormSection" hidden>
+      <h2>Your stakes</h2>
+      <p class="muted" id="betFormLead">
+        Enter a token amount next to each outcome you want to back (human units, e.g. <code>10</code> USDC). At least one positive amount is required.
+      </p>
+      <div class="bet-wallet-row">
+        <button type="button" class="btn btn-primary" id="betConnectBtn">Connect wallet</button>
+        <span id="betWalletAddr" class="muted">Not connected</span>
+      </div>
+      <p id="betNetworkStatus" class="muted"></p>
+
+      <div class="bet-decimals-row">
+        <label class="bet-check">
+          <input type="checkbox" id="betDecimalsManual" />
+          Manual token decimals
+        </label>
+        <input type="number" id="betDecimals" min="0" max="77" value="6" class="bet-decimals-input" />
+      </div>
+      <p id="betDecimalsHint" class="muted"></p>
+
+      <div id="betOutcomeRows" class="bet-outcome-rows"></div>
+
+      <div class="bet-actions">
+        <button type="button" class="btn btn-primary" id="betSubmitBtn" disabled>Approve &amp; place bets</button>
+      </div>
+      <p id="betTxStatus" class="muted" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <footer>
+    THE RESONANCE EXCHANGE
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="bet-page.js" defer></script>
+</body>
+</html>

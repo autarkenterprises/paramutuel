@@ -55,7 +55,8 @@
   function betPageHref(wagerAddress) {
     const a = String(wagerAddress || "").trim();
     if (!a) return "#";
-    return `bet.html?wager=${encodeURIComponent(a)}`;
+    const base = globalThis.__betPageBase || "bet.html";
+    return `${base}?wager=${encodeURIComponent(a)}`;
   }
 
   function buildWagersPath(

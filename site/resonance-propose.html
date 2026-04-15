@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Propose a new wager on the Resonance Exchange." />
+  <title>Propose a Wager — The Resonance Exchange</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void:         #0a0a0f;
+      --void-mid:     #10101a;
+      --void-border:  #1a1a2e;
+      --glow-cyan:    #00ffd5;
+      --glow-magenta: #ff00aa;
+      --glow-amber:   #ffaa00;
+      --glow-green:   #00ff88;
+      --text-primary: #d0d8e8;
+      --text-muted:   #6a7490;
+      --text-dim:     #3a4060;
+    }
+    body { font-family: 'Space Mono', monospace; background: var(--void); color: var(--text-primary); }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.045; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; }
+    a { color: var(--glow-cyan); }
+    nav { background: var(--void-mid); border-bottom: 1px solid var(--glow-cyan); box-shadow: 0 0 18px 0 rgba(0,255,213,0.12); }
+    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    nav .links a { color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); }
+    .container { position: relative; z-index: 1; }
+    .card { background: var(--void-mid); border-color: var(--void-border); }
+    .muted { color: var(--text-muted) !important; }
+    h1, h2, h3 { color: var(--text-primary); }
+    .propose-wager-header h1 { font-family: 'VT323', monospace; font-size: 32px; letter-spacing: 3px; text-transform: uppercase; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    .propose-wager-lead { color: var(--text-muted); }
+    .propose-section-title { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-magenta); text-shadow: 0 0 8px var(--glow-magenta); }
+    .btn-primary { background: rgba(0,255,213,0.1); border: 1px solid var(--glow-cyan); color: var(--glow-cyan); font-family: 'Space Mono', monospace; }
+    .btn-primary:hover { box-shadow: 0 0 16px rgba(0,255,213,0.3); }
+    .btn-secondary { background: rgba(255,0,170,0.1); border: 1px solid var(--glow-magenta); color: var(--glow-magenta); font-family: 'Space Mono', monospace; }
+    .btn-secondary:hover { box-shadow: 0 0 16px rgba(255,0,170,0.3); }
+    .propose-template-card { background: var(--void); border-color: var(--void-border); }
+    .propose-template-card__title { color: var(--text-primary); font-family: 'VT323', monospace; font-size: 20px; letter-spacing: 1px; }
+    .propose-template-card__desc { color: var(--text-muted); }
+    .propose-template-card__fields { color: var(--text-muted); }
+    .propose-template-card__status { color: var(--glow-amber); }
+    .propose-streamlined-steps { color: var(--text-muted); }
+    .propose-streamlined-placeholder { background: rgba(255,170,0,0.05); border-color: rgba(255,170,0,0.3); color: var(--glow-amber); }
+    .propose-assisted-callout { border-color: var(--void-border); background: var(--void-mid); }
+    .propose-assisted-callout__text { color: var(--text-muted); }
+    .onboarding-lead { color: var(--text-muted); }
+    footer { position: relative; z-index: 1; border-top: 1px solid var(--void-border); color: var(--text-dim); background: transparent; }
+    footer a { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <script src="network-context.js"></script>
+  <nav>
+    <span class="logo">THE RESONANCE EXCHANGE</span>
+    <div class="links">
+      <a href="resonance.html">Feed</a>
+      <a href="resonance-place.html">Wager</a>
+      <a href="resonance-explorer.html">Explorer</a>
+    </div>
+  </nav>
+  <div id="networkBannerSlot"></div>
+  <script src="network-banner.js" defer></script>
+
+  <div class="container propose-wager-page">
+    <header class="propose-wager-header">
+      <h1>// Propose a Wager</h1>
+      <p class="onboarding-lead propose-wager-lead">
+        Templates for <strong>enumerated</strong> and <strong>freeform</strong> pools. Streamlined subset of options with assisted signing when available.
+      </p>
+      <div class="propose-wager-actions propose-wager-actions--header">
+        <a href="resonance-explorer.html" class="btn btn-secondary">Browse existing wagers</a>
+        <a href="resonance-place.html" class="btn btn-secondary">Place a Bet</a>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="templates-heading">
+      <h2 id="templates-heading" class="propose-section-title">// TEMPLATES</h2>
+      <p class="muted" style="margin-bottom: 20px;">
+        Enumerated templates pre-structure outcome labels and timing. Freeform skips fixed outcomes: bettors supply text answers at stake time.
+      </p>
+      <div class="propose-template-grid">
+        <article class="propose-template-card">
+          <h3 class="propose-template-card__title">Yes / No</h3>
+          <p class="propose-template-card__desc">Single question with two labeled outcomes.</p>
+          <ul class="propose-template-card__fields">
+            <li>Proposition text</li>
+            <li>Yes label &middot; No label</li>
+            <li>Betting close &middot; Resolution window</li>
+            <li>Collateral (USDC-first)</li>
+          </ul>
+          <p class="propose-template-card__status">Streamlined flow &mdash; <strong>in development</strong></p>
+        </article>
+        <article class="propose-template-card">
+          <h3 class="propose-template-card__title">Pick one</h3>
+          <p class="propose-template-card__desc">Three to five named options; classic single-winner or bitmask payoff rule.</p>
+          <ul class="propose-template-card__fields">
+            <li>Proposition text</li>
+            <li>Outcome labels (3&ndash;5)</li>
+            <li>Betting close &middot; Resolution window</li>
+            <li>Collateral</li>
+          </ul>
+          <p class="propose-template-card__status">Streamlined flow &mdash; <strong>in development</strong></p>
+        </article>
+        <article class="propose-template-card">
+          <h3 class="propose-template-card__title">Timed event</h3>
+          <p class="propose-template-card__desc">Sports, launches, or votes with a clear event time.</p>
+          <ul class="propose-template-card__fields">
+            <li>Proposition &middot; Outcomes</li>
+            <li>Event time</li>
+            <li>Betting close &middot; Resolution window</li>
+            <li>Collateral</li>
+          </ul>
+          <p class="propose-template-card__status">Streamlined flow &mdash; <strong>in development</strong></p>
+        </article>
+        <article class="propose-template-card">
+          <h3 class="propose-template-card__title">Freeform answers</h3>
+          <p class="propose-template-card__desc">Open-ended predictions: no enumerated list; resolver publishes the exact winning UTF-8 string.</p>
+          <ul class="propose-template-card__fields">
+            <li>Proposition text</li>
+            <li>Betting close &middot; Resolution window</li>
+            <li>Collateral</li>
+          </ul>
+          <p class="propose-template-card__status">Use full dApp now &mdash; streamlined wizard <strong>in development</strong></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card propose-streamlined" aria-labelledby="streamlined-heading">
+      <h2 id="streamlined-heading" class="propose-section-title">// STREAMLINED CREATION</h2>
+      <p class="onboarding-lead" style="margin-bottom: 16px;">
+        A short wizard will live here: choose a template, edit text and windows, confirm resolver, then submit.
+      </p>
+      <ol class="propose-streamlined-steps">
+        <li><strong>Template</strong> &mdash; pick Yes/No, pick-one, or timed event.</li>
+        <li><strong>Details</strong> &mdash; proposition, outcomes, collateral, schedule.</li>
+        <li><strong>Review</strong> &mdash; fee recipients and advanced options only if needed.</li>
+        <li><strong>Submit</strong> &mdash; one comfortable signing path.</li>
+      </ol>
+      <p class="propose-streamlined-placeholder" role="status">
+        <strong>Form and gateway integration &mdash; under construction.</strong>
+      </p>
+    </section>
+  </div>
+
+  <footer>
+    THE RESONANCE EXCHANGE
+  </footer>
+</body>
+</html>
