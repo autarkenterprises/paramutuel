@@ -24,44 +24,76 @@
     }
     body { font-family: 'Space Mono', monospace; background: var(--void); color: var(--text-primary); }
     body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.045; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; }
-    a { color: var(--glow-cyan); }
+    a { color: var(--glow-cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
     nav { background: var(--void-mid); border-bottom: 1px solid var(--glow-cyan); box-shadow: 0 0 18px 0 rgba(0,255,213,0.12); }
-    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
+    nav .logo { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); text-decoration: none; }
+    nav .logo:hover { text-decoration: none; }
     nav .links a { color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
-    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); }
+    nav .links a:hover, nav .links a.active { background: rgba(0,255,213,0.08); color: var(--glow-cyan); text-decoration: none; }
     .container { position: relative; z-index: 1; }
     .card { background: var(--void-mid); border-color: var(--void-border); }
     .muted { color: var(--text-muted) !important; }
     h1, h2, h3 { color: var(--text-primary); }
     .propose-wager-header h1 { font-family: 'VT323', monospace; font-size: 32px; letter-spacing: 3px; text-transform: uppercase; color: var(--glow-cyan); text-shadow: 0 0 10px var(--glow-cyan); }
-    .propose-wager-lead { color: var(--text-muted); }
     .propose-section-title { font-family: 'VT323', monospace; font-size: 22px; letter-spacing: 2px; color: var(--glow-magenta); text-shadow: 0 0 8px var(--glow-magenta); }
+    .onboarding-lead, .propose-wager-lead { color: var(--text-muted); }
     .btn-primary { background: rgba(0,255,213,0.1); border: 1px solid var(--glow-cyan); color: var(--glow-cyan); font-family: 'Space Mono', monospace; }
-    .btn-primary:hover { box-shadow: 0 0 16px rgba(0,255,213,0.3); }
+    .btn-primary:hover { box-shadow: 0 0 16px rgba(0,255,213,0.3); opacity: 1; }
     .btn-secondary { background: rgba(255,0,170,0.1); border: 1px solid var(--glow-magenta); color: var(--glow-magenta); font-family: 'Space Mono', monospace; }
-    .btn-secondary:hover { box-shadow: 0 0 16px rgba(255,0,170,0.3); }
-    .propose-template-card { background: var(--void); border-color: var(--void-border); }
-    .propose-template-card__title { color: var(--text-primary); font-family: 'VT323', monospace; font-size: 20px; letter-spacing: 1px; }
-    .propose-template-card__desc { color: var(--text-muted); }
-    .propose-template-card__fields { color: var(--text-muted); }
-    .propose-template-card__status { color: var(--glow-amber); }
-    .propose-streamlined-steps { color: var(--text-muted); }
-    .propose-streamlined-placeholder { background: rgba(255,170,0,0.05); border-color: rgba(255,170,0,0.3); color: var(--glow-amber); }
-    .propose-assisted-callout { border-color: var(--void-border); background: var(--void-mid); }
-    .propose-assisted-callout__text { color: var(--text-muted); }
-    .onboarding-lead { color: var(--text-muted); }
+    .btn-secondary:hover { box-shadow: 0 0 16px rgba(255,0,170,0.3); opacity: 1; }
+
+    /* Template cards */
+    .propose-tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .propose-tpl-card { background: var(--void); border: 1px solid var(--void-border); border-radius: 6px; padding: 16px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+    .propose-tpl-card:hover { border-color: var(--glow-cyan); }
+    .propose-tpl-selected { border-color: var(--glow-cyan); box-shadow: 0 0 14px rgba(0,255,213,0.15); }
+    .propose-tpl-card h3 { font-family: 'VT323', monospace; font-size: 20px; letter-spacing: 1px; margin-bottom: 6px; color: var(--text-primary); }
+    .propose-tpl-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+
+    /* Form fields */
+    .propose-form-section { margin-top: 20px; }
+    .propose-field { margin-bottom: 16px; }
+    .propose-field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.3px; }
+    .propose-field input, .propose-field select, .propose-field textarea {
+      width: 100%; max-width: 560px; background: var(--void); color: var(--text-primary); border: 1px solid var(--void-border);
+      border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: 'Space Mono', monospace;
+    }
+    .propose-field textarea { min-height: 80px; resize: vertical; }
+    .propose-field input:focus, .propose-field select:focus, .propose-field textarea:focus {
+      outline: none; border-color: var(--glow-cyan); box-shadow: 0 0 0 2px rgba(0,255,213,0.15);
+    }
+    .propose-outcome-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .propose-outcome-input { flex: 1; background: var(--void); color: var(--text-primary); border: 1px solid var(--void-border); border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: 'Space Mono', monospace; }
+    .propose-outcome-input:focus { outline: none; border-color: var(--glow-cyan); }
+    .propose-outcome-remove { background: none; border: 1px solid rgba(255,0,170,0.3); color: var(--glow-magenta); border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+    .propose-outcome-remove:hover { background: rgba(255,0,170,0.1); }
+    .propose-add-btn { background: var(--void-mid); border: 1px solid var(--void-border); color: var(--text-muted); border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 12px; font-family: 'Space Mono', monospace; }
+    .propose-add-btn:hover { color: var(--glow-cyan); border-color: var(--glow-cyan); }
+    .propose-timing-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+    .propose-timing-field { flex: 1; min-width: 200px; }
+    .propose-timing-field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .propose-timing-field input { width: 100%; background: var(--void); color: var(--text-primary); border: 1px solid var(--void-border); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: 'Space Mono', monospace; }
+    .propose-timing-field input:focus { outline: none; border-color: var(--glow-cyan); }
+    .propose-timing-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .propose-wallet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 8px; }
+    .propose-collateral-custom { margin-top: 8px; }
+    .propose-result { background: rgba(0,255,136,0.06); border: 1px solid var(--glow-green); border-radius: 6px; padding: 16px; margin-top: 16px; }
+    .propose-result code { word-break: break-all; font-size: 12px; color: var(--glow-cyan); }
+    .propose-error { background: rgba(255,0,170,0.06); border: 1px solid var(--glow-magenta); border-radius: 6px; padding: 12px; color: var(--glow-magenta); font-size: 13px; margin-top: 12px; }
+
     footer { position: relative; z-index: 1; border-top: 1px solid var(--void-border); color: var(--text-dim); background: transparent; }
-    footer a { color: var(--text-muted); }
   </style>
 </head>
-<body>
+<body data-propose-profile="resonance">
   <script src="network-context.js"></script>
   <nav>
-    <span class="logo">THE RESONANCE EXCHANGE</span>
+    <a href="resonance.html" class="logo">THE RESONANCE EXCHANGE</a>
     <div class="links">
       <a href="resonance.html">Feed</a>
-      <a href="resonance-place.html">Wager</a>
-      <a href="resonance-explorer.html">Explorer</a>
+      <a href="resonance-propose.html" class="active">Wager</a>
+      <a href="resonance-place.html">Bet</a>
+      <a href="resonance-explorer.html">Explore</a>
     </div>
   </nav>
   <div id="networkBannerSlot"></div>
@@ -71,85 +103,101 @@
     <header class="propose-wager-header">
       <h1>// Propose a Wager</h1>
       <p class="onboarding-lead propose-wager-lead">
-        Templates for <strong>enumerated</strong> and <strong>freeform</strong> pools. Streamlined subset of options with assisted signing when available.
+        Starter templates load diegetic-friendly placeholder copy you can edit, then deploy on-chain. Your connected address is the default resolver.
       </p>
-      <div class="propose-wager-actions propose-wager-actions--header">
-        <a href="resonance-explorer.html" class="btn btn-secondary">Browse existing wagers</a>
-        <a href="resonance-place.html" class="btn btn-secondary">Place a Bet</a>
-      </div>
     </header>
 
-    <section class="card" aria-labelledby="templates-heading">
-      <h2 id="templates-heading" class="propose-section-title">// TEMPLATES</h2>
-      <p class="muted" style="margin-bottom: 20px;">
-        Enumerated templates pre-structure outcome labels and timing. Freeform skips fixed outcomes: bettors supply text answers at stake time.
-      </p>
-      <div class="propose-template-grid">
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Yes / No</h3>
-          <p class="propose-template-card__desc">Single question with two labeled outcomes.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition text</li>
-            <li>Yes label &middot; No label</li>
-            <li>Betting close &middot; Resolution window</li>
-            <li>Collateral (USDC-first)</li>
-          </ul>
-          <p class="propose-template-card__status">Streamlined flow &mdash; <strong>in development</strong></p>
-        </article>
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Pick one</h3>
-          <p class="propose-template-card__desc">Three to five named options; classic single-winner or bitmask payoff rule.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition text</li>
-            <li>Outcome labels (3&ndash;5)</li>
-            <li>Betting close &middot; Resolution window</li>
-            <li>Collateral</li>
-          </ul>
-          <p class="propose-template-card__status">Streamlined flow &mdash; <strong>in development</strong></p>
-        </article>
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Timed event</h3>
-          <p class="propose-template-card__desc">Sports, launches, or votes with a clear event time.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition &middot; Outcomes</li>
-            <li>Event time</li>
-            <li>Betting close &middot; Resolution window</li>
-            <li>Collateral</li>
-          </ul>
-          <p class="propose-template-card__status">Streamlined flow &mdash; <strong>in development</strong></p>
-        </article>
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Freeform answers</h3>
-          <p class="propose-template-card__desc">Open-ended predictions: no enumerated list; resolver publishes the exact winning UTF-8 string.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition text</li>
-            <li>Betting close &middot; Resolution window</li>
-            <li>Collateral</li>
-          </ul>
-          <p class="propose-template-card__status">Use full dApp now &mdash; streamlined wizard <strong>in development</strong></p>
-        </article>
+    <!-- Step 1: Template selection -->
+    <section class="card" aria-labelledby="tpl-heading">
+      <h2 id="tpl-heading" class="propose-section-title">1. Choose a template</h2>
+      <div class="propose-tpl-grid">
+        <div class="propose-tpl-card propose-tpl-selected" data-template="yesno">
+          <h3>Yes / No</h3>
+          <p>Binary question — two outcomes. Fastest path for simple forecasts.</p>
+        </div>
+        <div class="propose-tpl-card" data-template="pick">
+          <h3>Pick one</h3>
+          <p>Three or more labeled outcomes; exactly one winner.</p>
+        </div>
+        <div class="propose-tpl-card" data-template="timed">
+          <h3>Timed event</h3>
+          <p>Longer windows for matches, launches, or votes; includes postpone/void.</p>
+        </div>
+        <div class="propose-tpl-card" data-template="freeform">
+          <h3>Freeform</h3>
+          <p>Bettors type answers; you resolve with the exact winning string.</p>
+        </div>
       </div>
     </section>
 
-    <section class="card propose-streamlined" aria-labelledby="streamlined-heading">
-      <h2 id="streamlined-heading" class="propose-section-title">// STREAMLINED CREATION</h2>
-      <p class="onboarding-lead" style="margin-bottom: 16px;">
-        A short wizard will live here: choose a template, edit text and windows, confirm resolver, then submit.
+    <!-- Step 2: Details -->
+    <section class="card propose-form-section" aria-labelledby="details-heading">
+      <h2 id="details-heading" class="propose-section-title">2. Wager details</h2>
+
+      <div class="propose-field">
+        <label for="proposeProposition">Proposition (the question)</label>
+        <textarea id="proposeProposition" placeholder="e.g. Will the temperature in NYC exceed 90°F on July 4, 2026?"></textarea>
+      </div>
+
+      <div class="propose-field" id="proposeOutcomesSection">
+        <label>Outcomes</label>
+        <div id="proposeOutcomesList"></div>
+        <button type="button" class="propose-add-btn" id="proposeAddOutcome">+ Add outcome</button>
+      </div>
+
+      <p class="muted" id="proposeFreeformNote" hidden style="margin-bottom:16px;">
+        Freeform wager: bettors will type their own answers when placing bets. The resolver publishes the exact winning UTF-8 string at resolution.
       </p>
-      <ol class="propose-streamlined-steps">
-        <li><strong>Template</strong> &mdash; pick Yes/No, pick-one, or timed event.</li>
-        <li><strong>Details</strong> &mdash; proposition, outcomes, collateral, schedule.</li>
-        <li><strong>Review</strong> &mdash; fee recipients and advanced options only if needed.</li>
-        <li><strong>Submit</strong> &mdash; one comfortable signing path.</li>
-      </ol>
-      <p class="propose-streamlined-placeholder" role="status">
-        <strong>Form and gateway integration &mdash; under construction.</strong>
-      </p>
+
+      <div class="propose-field">
+        <label for="proposeCollateral">Collateral token</label>
+        <select id="proposeCollateral"></select>
+        <input type="text" id="proposeCollateralCustom" class="propose-collateral-custom" placeholder="0x… ERC-20 address" hidden />
+      </div>
+
+      <div class="propose-timing-row">
+        <div class="propose-timing-field">
+          <label for="proposeBettingClose">Betting window (seconds)</label>
+          <input type="number" id="proposeBettingClose" min="60" value="7200" />
+          <p class="propose-timing-hint">Betting open for <span id="proposeBettingCloseLabel">2 hours</span></p>
+        </div>
+        <div class="propose-timing-field">
+          <label for="proposeResolutionWindow">Resolution window (seconds)</label>
+          <input type="number" id="proposeResolutionWindow" min="60" value="86400" />
+          <p class="propose-timing-hint">Resolver has <span id="proposeResolutionWindowLabel">1 day</span> to settle</p>
+        </div>
+      </div>
+
+      <div class="propose-field" style="margin-top:16px;">
+        <label for="proposeResolver">Resolver address (defaults to your wallet)</label>
+        <input type="text" id="proposeResolver" placeholder="0x… (leave blank to use your address)" />
+      </div>
+    </section>
+
+    <!-- Step 3: Connect & submit -->
+    <section class="card propose-form-section" aria-labelledby="submit-heading">
+      <h2 id="submit-heading" class="propose-section-title">3. Connect wallet &amp; deploy</h2>
+      <p class="muted" style="margin-bottom:12px;" id="proposeFactoryInfo"></p>
+      <div class="propose-wallet-row">
+        <button type="button" class="btn btn-primary" id="proposeConnectBtn">Connect wallet</button>
+        <span id="proposeWalletAddr" class="muted">Not connected</span>
+      </div>
+      <p id="proposeNetworkStatus" class="muted"></p>
+      <div style="margin-top:16px;">
+        <button type="button" class="btn btn-primary" id="proposeSubmitBtn">Deploy wager</button>
+      </div>
+      <p id="proposeStatus" class="muted" role="status" aria-live="polite" style="margin-top:8px;"></p>
+      <div id="proposeError" class="propose-error" hidden></div>
+      <div id="proposeResult" class="propose-result" hidden></div>
     </section>
   </div>
 
   <footer>
     THE RESONANCE EXCHANGE
   </footer>
+  <script>window.__proposeBetPage = "resonance-bet.html";</script>
+  <script src="propose-templates.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="propose-wager.js" defer></script>
 </body>
 </html>

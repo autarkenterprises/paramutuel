@@ -9,7 +9,8 @@ The static site under `site/` is a **thin shell**: marketing copy, a testnet/mai
 | Path | Role |
 |------|------|
 | `/` | Landing: primary CTAs (propose / bet), live ticker, wager lifecycle, then protocol orientation + network |
-| `/propose-a-wager.html` | Facilitated create — templates + streamlined flow (assisted TX per ADR-0006/7; full dApp linked for power users) |
+| `/propose-a-wager.html` | Facilitated create — **starter templates** (`site/propose-templates.js`) + wallet deploy; full dApp linked for power users |
+| `/resonance-propose.html` | Resonance Exchange skin + **`data-propose-profile="resonance"`** placeholder copy (same `propose-wager.js` engine) |
 | `/place-a-bet.html` | Betting entry — indexer search + CTA into wallet staking (`bet.html`) |
 | `/app.html` | Full dApp embedded via iframe |
 | `/bet.html` | Wallet staking: **v1/v2** use `placeBet` / `placeBets`; **freeform** uses `placeBet(string,uint256)` with a typed answer. ABI from indexer `protocol_version`. Reached from Place a Bet, feed, Explorer, or `?wager=` |

@@ -3,9 +3,46 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Propose a Paramutuel protocol wager: templates for enumerated and freeform pools. Assisted wallet flows (in development)." />
+  <meta name="description" content="Propose a wager on-chain: choose a template, fill in the details, connect a wallet, and deploy." />
   <title>Propose a Wager — Paramutuel</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .propose-tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .propose-tpl-card { background: #0b0f19; border: 1px solid #2c3a5a; border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+    .propose-tpl-card:hover { border-color: #58a6ff; }
+    .propose-tpl-selected { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.25); }
+    .propose-tpl-card h3 { font-size: 15px; margin-bottom: 6px; }
+    .propose-tpl-card p { font-size: 13px; color: #97a6c4; line-height: 1.5; margin: 0; }
+    .propose-form-section { margin-top: 20px; }
+    .propose-field { margin-bottom: 16px; }
+    .propose-field label { display: block; font-size: 14px; color: #97a6c4; margin-bottom: 6px; }
+    .propose-field input, .propose-field select, .propose-field textarea {
+      width: 100%; max-width: 560px; background: #0b0f19; color: #e6edf3; border: 1px solid #2c3a5a;
+      border-radius: 8px; padding: 10px 12px; font-size: 15px; font-family: inherit;
+    }
+    .propose-field textarea { min-height: 80px; resize: vertical; }
+    .propose-field input:focus, .propose-field select:focus, .propose-field textarea:focus {
+      outline: none; border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.2);
+    }
+    .propose-outcome-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .propose-outcome-input { flex: 1; background: #0b0f19; color: #e6edf3; border: 1px solid #2c3a5a; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-family: inherit; }
+    .propose-outcome-input:focus { outline: none; border-color: #58a6ff; }
+    .propose-outcome-remove { background: none; border: 1px solid #3d1a1a; color: #ff7b72; border-radius: 6px; width: 32px; height: 32px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+    .propose-outcome-remove:hover { background: #3d1a1a; }
+    .propose-add-btn { background: #1c2640; border: 1px solid #2c3a5a; color: #97a6c4; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 13px; font-family: inherit; }
+    .propose-add-btn:hover { color: #e6edf3; border-color: #58a6ff; }
+    .propose-timing-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+    .propose-timing-field { flex: 1; min-width: 200px; }
+    .propose-timing-field label { display: block; font-size: 14px; color: #97a6c4; margin-bottom: 6px; }
+    .propose-timing-field input { width: 100%; background: #0b0f19; color: #e6edf3; border: 1px solid #2c3a5a; border-radius: 8px; padding: 10px 12px; font-size: 15px; font-family: inherit; }
+    .propose-timing-field input:focus { outline: none; border-color: #58a6ff; }
+    .propose-timing-hint { font-size: 12px; color: #6e7a94; margin-top: 4px; }
+    .propose-wallet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 8px; }
+    .propose-collateral-custom { margin-top: 8px; }
+    .propose-result { background: #1a3d2e; border: 1px solid #2ea04e; border-radius: 10px; padding: 16px; margin-top: 16px; }
+    .propose-result code { word-break: break-all; font-size: 13px; }
+    .propose-error { background: #3d1a1a; border: 1px solid #7c2d12; border-radius: 8px; padding: 12px; color: #fca5a5; font-size: 14px; margin-top: 12px; }
+  </style>
 </head>
 <body>
   <script src="network-context.js"></script>
@@ -26,106 +63,105 @@
     <header class="propose-wager-header">
       <h1>Propose a Wager</h1>
       <p class="onboarding-lead propose-wager-lead">
-        This page is for <strong>facilitated wager creation</strong>: common templates for <strong>enumerated</strong> and <strong>freeform</strong> pools, a streamlined subset of options, and (once live) assisted signing. The full <a href="app.html">self-custody app</a> already supports choosing deployment, bitmask payoff policy, and factory parameters.
+        Pick a starter template (plain-English placeholders you can edit), connect your wallet, then deploy. Your connected address is the default resolver. For payoff policies, fee splits, and authority closers, use the <a href="app.html">full dApp</a>.
       </p>
-      <div class="propose-wager-actions propose-wager-actions--header">
-        <a href="explorer.html" class="btn btn-secondary">Browse existing wagers</a>
-        <a href="place-a-bet.html" class="btn btn-secondary">Place a Bet</a>
-      </div>
     </header>
 
-    <section class="card propose-assisted-callout" aria-labelledby="assisted-heading">
-      <h2 id="assisted-heading" class="propose-section-title">Assisted wallet experience (in development)</h2>
-      <p class="propose-assisted-callout__text">
-        The protocol stays collateral-agnostic and unchanged on-chain. Per <a href="https://github.com/autarkenterprises/paramutuel/blob/master/research/adr/ADR-0006-surface-separation-self-custody-vs-assisted-ux.md" class="external">ADR-0006</a>, the public site may offer <strong>assisted transaction UX</strong> (sponsorship, permits, policy rails) while the dApp stays fully self-custodial.
-      </p>
-      <p class="propose-assisted-callout__text">
-        <a href="https://github.com/autarkenterprises/paramutuel/blob/master/research/adr/ADR-0007-assisted-transaction-gateway-and-approval-paths.md" class="external">ADR-0007</a> defines an <strong>Assisted Transaction Gateway</strong>: signed intents, pluggable approval paths (EIP-2612, Permit2, sponsored <code>approve</code>), and optional paymaster-style adapters — so users should not need to reason about separate ETH-for-gas and USDC (or other ERC-20) steps for propose or bet once the pipeline is wired.
-      </p>
-      <p class="muted propose-assisted-callout__meta">
-        Roadmap detail: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/research/assisted-ux-roadmap.md" class="external">research/assisted-ux-roadmap.md</a>.
-      </p>
-    </section>
-
-    <section class="card" aria-labelledby="templates-heading">
-      <h2 id="templates-heading" class="propose-section-title">Templates for common wagers</h2>
-      <p class="muted" style="margin-bottom: 20px;">
-        Enumerated templates pre-structure outcome labels and timing (classic or bitmask rules). A freeform template skips fixed outcomes: bettors supply text answers at stake time. The streamlined form (below) will apply defaults you can adjust before submit.
-      </p>
-      <div class="propose-template-grid">
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Yes / No</h3>
-          <p class="propose-template-card__desc">Single question with two labeled outcomes (e.g. &ldquo;Will X happen by date D?&rdquo;).</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition text</li>
-            <li>Yes label · No label</li>
-            <li>Betting close · Resolution window</li>
-            <li>Collateral (USDC-first happy path)</li>
-          </ul>
-          <p class="propose-template-card__status">Streamlined flow — <strong>in development</strong></p>
-        </article>
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Pick one</h3>
-          <p class="propose-template-card__desc">Three to five named options; classic single-winner or bitmask payoff rule (e.g. any-of) after resolution.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition text</li>
-            <li>Outcome labels (3–5) · classic or bitmask enumerated</li>
-            <li>Betting close · Resolution window</li>
-            <li>Collateral</li>
-          </ul>
-          <p class="propose-template-card__status">Streamlined flow — <strong>in development</strong></p>
-        </article>
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Timed event</h3>
-          <p class="propose-template-card__desc">Sports, launches, or votes with a clear event time; presets for betting closing before the event.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition · Outcomes</li>
-            <li>Event time (advisory copy)</li>
-            <li>Betting close · Resolution window</li>
-            <li>Collateral</li>
-          </ul>
-          <p class="propose-template-card__status">Streamlined flow — <strong>in development</strong></p>
-        </article>
-        <article class="propose-template-card">
-          <h3 class="propose-template-card__title">Freeform answers</h3>
-          <p class="propose-template-card__desc">Open-ended predictions: no enumerated list at create; resolver publishes the exact winning UTF-8 string.</p>
-          <ul class="propose-template-card__fields">
-            <li>Proposition text</li>
-            <li>Betting close · Resolution window</li>
-            <li>Collateral</li>
-            <li>Factory: freeform (use full app today)</li>
-          </ul>
-          <p class="propose-template-card__status">Use <a href="app.html">full dApp</a> now — streamlined wizard <strong>in development</strong></p>
-        </article>
+    <!-- Step 1: Template selection -->
+    <section class="card" aria-labelledby="tpl-heading">
+      <h2 id="tpl-heading" class="propose-section-title">1. Choose a template</h2>
+      <div class="propose-tpl-grid">
+        <div class="propose-tpl-card propose-tpl-selected" data-template="yesno">
+          <h3>Yes / No</h3>
+          <p>Binary question — two outcomes. Fastest path for simple forecasts.</p>
+        </div>
+        <div class="propose-tpl-card" data-template="pick">
+          <h3>Pick one</h3>
+          <p>Three or more labeled outcomes; exactly one winner.</p>
+        </div>
+        <div class="propose-tpl-card" data-template="timed">
+          <h3>Timed event</h3>
+          <p>Longer windows for matches, launches, or votes; includes postpone/void.</p>
+        </div>
+        <div class="propose-tpl-card" data-template="freeform">
+          <h3>Freeform</h3>
+          <p>Bettors type answers; you resolve with the exact winning string.</p>
+        </div>
       </div>
     </section>
 
-    <section class="card propose-streamlined" aria-labelledby="streamlined-heading">
-      <h2 id="streamlined-heading" class="propose-section-title">Streamlined creation</h2>
-      <p class="onboarding-lead" style="margin-bottom: 16px;">
-        A short wizard will live here: choose a template, edit text and windows, confirm resolver (default: you), then submit via the assisted gateway when available (or fall back to the full app).
+    <!-- Step 2: Details -->
+    <section class="card propose-form-section" aria-labelledby="details-heading">
+      <h2 id="details-heading" class="propose-section-title">2. Wager details</h2>
+
+      <div class="propose-field">
+        <label for="proposeProposition">Proposition (the question)</label>
+        <textarea id="proposeProposition" placeholder="e.g. Will the temperature in NYC exceed 90°F on July 4, 2026?"></textarea>
+      </div>
+
+      <div class="propose-field" id="proposeOutcomesSection">
+        <label>Outcomes</label>
+        <div id="proposeOutcomesList"></div>
+        <button type="button" class="propose-add-btn" id="proposeAddOutcome">+ Add outcome</button>
+      </div>
+
+      <p class="muted" id="proposeFreeformNote" hidden style="margin-bottom:16px;">
+        Freeform wager: bettors will type their own answers when placing bets. The resolver publishes the exact winning UTF-8 string at resolution.
       </p>
-      <ol class="propose-streamlined-steps">
-        <li><strong>Template</strong> — pick Yes/No, pick-one, or timed event.</li>
-        <li><strong>Details</strong> — proposition, outcomes, collateral, schedule.</li>
-        <li><strong>Review</strong> — fee recipients and advanced options only if needed.</li>
-        <li><strong>Submit</strong> — one comfortable signing path (assisted) or link out to the full dApp.</li>
-      </ol>
-      <p class="propose-streamlined-placeholder" role="status">
-        <strong>Form and gateway integration — under construction.</strong> Until then, use the full app for end-to-end factory deploys.
-      </p>
+
+      <div class="propose-field">
+        <label for="proposeCollateral">Collateral token</label>
+        <select id="proposeCollateral"></select>
+        <input type="text" id="proposeCollateralCustom" class="propose-collateral-custom" placeholder="0x… ERC-20 address" hidden />
+      </div>
+
+      <div class="propose-timing-row">
+        <div class="propose-timing-field">
+          <label for="proposeBettingClose">Betting window (seconds)</label>
+          <input type="number" id="proposeBettingClose" min="60" value="7200" />
+          <p class="propose-timing-hint">Betting open for <span id="proposeBettingCloseLabel">2 hours</span></p>
+        </div>
+        <div class="propose-timing-field">
+          <label for="proposeResolutionWindow">Resolution window (seconds)</label>
+          <input type="number" id="proposeResolutionWindow" min="60" value="86400" />
+          <p class="propose-timing-hint">Resolver has <span id="proposeResolutionWindowLabel">1 day</span> to settle</p>
+        </div>
+      </div>
+
+      <div class="propose-field" style="margin-top:16px;">
+        <label for="proposeResolver">Resolver address (defaults to your wallet)</label>
+        <input type="text" id="proposeResolver" placeholder="0x… (leave blank to use your address)" />
+      </div>
     </section>
 
+    <!-- Step 3: Connect & submit -->
+    <section class="card propose-form-section" aria-labelledby="submit-heading">
+      <h2 id="submit-heading" class="propose-section-title">3. Connect wallet &amp; deploy</h2>
+      <p class="muted" style="margin-bottom:12px;" id="proposeFactoryInfo"></p>
+      <div class="propose-wallet-row">
+        <button type="button" class="btn btn-primary" id="proposeConnectBtn">Connect wallet</button>
+        <span id="proposeWalletAddr" class="muted">Not connected</span>
+      </div>
+      <p id="proposeNetworkStatus" class="muted"></p>
+      <div style="margin-top:16px;">
+        <button type="button" class="btn btn-primary" id="proposeSubmitBtn">Deploy wager</button>
+      </div>
+      <p id="proposeStatus" class="muted" role="status" aria-live="polite" style="margin-top:8px;"></p>
+      <div id="proposeError" class="propose-error" hidden></div>
+      <div id="proposeResult" class="propose-result" hidden></div>
+    </section>
+
+    <!-- Power users -->
     <section class="card propose-power-users">
       <h2 class="propose-section-title">Power users &amp; integrators</h2>
       <p class="muted" style="line-height: 1.6;">
         Lifecycle: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/WAGER-LIFECYCLE.md" class="external">docs/WAGER-LIFECYCLE.md</a>.
         ABI and HTTP: <a href="https://github.com/autarkenterprises/paramutuel/blob/master/docs/MACHINE.md" class="external">docs/MACHINE.md</a>.
-        <a href="about.html#developers">About → Developers</a>.
+        <a href="about.html#developers">About &rarr; Developers</a>.
       </p>
       <p class="muted" style="margin-top: 12px;">
         <a href="app.html" class="btn btn-secondary btn-inline">Open full self-custody app</a>
-        <span class="muted"> — all factory parameters, no assistance.</span>
+        <span class="muted"> — all factory parameters, payoff policies, fee recipients.</span>
       </p>
     </section>
   </div>
@@ -135,5 +171,8 @@
     · <a href="about.html">About</a>
     · <a href="https://github.com/autarkenterprises/paramutuel" class="external">GitHub</a>
   </footer>
+  <script src="propose-templates.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="propose-wager.js" defer></script>
 </body>
 </html>

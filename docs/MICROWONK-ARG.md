@@ -308,7 +308,7 @@ Displayed in the Resonance Exchange style: dark background, glowing borders, sig
 
 ### 6.3 Route
 
-`/resonance` — a standalone page. Mode toggle also available on main site pages via URL parameter `?mode=resonance`.
+`/resonance` — a standalone page (`resonance.html`). **`resonance-propose.html`** is the guided “Propose a Wager” flow in Resonance styling: it loads the same V3 factory path as `propose-a-wager.html` but sets **`data-propose-profile="resonance"`** so starter templates use diegetic placeholder copy (`site/propose-templates.js`). Mode toggle also available on main site pages via URL parameter `?mode=resonance`.
 
 ---
 
