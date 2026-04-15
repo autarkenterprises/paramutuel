@@ -1,5 +1,13 @@
 const params = new URLSearchParams(window.location.search);
+const BRAND = params.get("brand") || "paramutuel";
 const API_BASE = params.get("api") || window.EXPLORER_API_BASE || "";
+
+if (BRAND !== "paramutuel") {
+  const titleEl = document.getElementById("explorerTitle");
+  const subEl = document.getElementById("explorerSubtitle");
+  if (titleEl) titleEl.textContent = "Explorer";
+  if (subEl) subEl.textContent = "Reads wager state from the indexer API.";
+}
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
 const API_BASE_NORMALIZED = API_BASE.replace(/\/$/, "");
 const PAGE_SIZE = 20;
@@ -277,7 +285,8 @@ function renderWagers(wagers, { append = false } = {}) {
     }
   }
   if (!append && wagers.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}">No Paramutuel protocol wagers in this result page.</td></tr>`;
+    const emptyMsg = BRAND === "paramutuel" ? "No Paramutuel protocol wagers in this result page." : "No wagers in this result page.";
+    tbody.innerHTML = `<tr><td colspan="${colspan}">${emptyMsg}</td></tr>`;
   }
 }
 

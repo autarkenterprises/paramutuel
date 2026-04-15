@@ -57,14 +57,14 @@
     <button id="loadExplorer">Connect</button>
     <span id="indexerHint" class="muted"></span>
   </div>
-  <iframe id="explorerFrame" src="explorer/index.html" title="Resonance Exchange Explorer"></iframe>
+  <iframe id="explorerFrame" src="explorer/index.html?brand=resonance" title="Resonance Exchange Explorer"></iframe>
   <script>
     const configUrl = "config/deployments.json";
 
     function setExplorerFrameFromInput() {
       const url = document.getElementById("indexerUrl").value.trim();
       const frame = document.getElementById("explorerFrame");
-      frame.src = url ? "explorer/index.html?api=" + encodeURIComponent(url) : "explorer/index.html";
+      frame.src = url ? "explorer/index.html?brand=resonance&api=" + encodeURIComponent(url) : "explorer/index.html?brand=resonance";
     }
 
     const PSN = window.ParamutuelSiteNetwork;
