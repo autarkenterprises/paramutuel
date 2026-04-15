@@ -112,7 +112,7 @@
           </dd>
         </div>
         <div><dt>State</dt><dd id="betState"></dd></div>
-        <div><dt>Protocol</dt><dd id="betProtocol">—</dd></div>
+        <div><dt>Market type</dt><dd id="betProtocol">—</dd></div>
         <div><dt>Factory</dt><dd><code id="betFactory" class="bet-mono-wrap"></code></dd></div>
         <div><dt>Proposer</dt><dd><code id="betProposer" class="bet-mono-wrap"></code></dd></div>
         <div><dt>Resolver</dt><dd><code id="betResolver" class="bet-mono-wrap"></code></dd></div>
@@ -135,11 +135,9 @@
 
       <h3 class="bet-outcomes-table-title" id="betOutcomesTableTitle">Outcomes &amp; implied odds</h3>
       <p class="muted bet-odds-footnote" id="betOutcomesTableFootnote">
-        Pool share uses on-chain stake totals. <strong>Implied multiple</strong> is the approximate payout per 1 unit staked on that outcome if it wins, <em>after</em> protocol fees and assuming no further bets.
+        Pool share uses on-chain stake totals. <strong>Implied multiple</strong> is the approximate payout per 1 unit staked on that outcome if it wins, <em>after</em> fees and assuming no further bets.
       </p>
-      <p class="muted bet-protocol-note" id="betProtocolNote">
-        This page loads the correct ABI from indexer <code>protocol_version</code>.
-      </p>
+      <p class="muted bet-protocol-note" id="betProtocolNote"></p>
       <div class="bet-outcomes-table-wrap">
         <table class="bet-outcomes-table" id="betOutcomesTable">
           <thead>
