@@ -13,7 +13,7 @@ GitHub Pages is static-only, so the indexer HTTP API (`/health`, `/wagers`, `/wa
 
 ## Repo defaults
 
-- Factories and indexer start block: `config/deployments.json` (`baseSepolia.factoryAddress`, optional `factoryV2Address` / `factoryFreeformAddress`, `baseSepolia.indexerFromBlock`).
+- Factory and indexer start block: `config/deployments.json` (`baseSepolia.factoryAddress`, `baseSepolia.indexerFromBlock`). V3 is one unified `ParamutuelFactoryV3` — no separate V1/V2/freeform keys.
 - Explorer / dApp API base: `baseSepolia.explorerApiBase` in the same file.
 
 ## Wire the hosted explorer

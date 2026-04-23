@@ -32,7 +32,7 @@ Shape:
 }
 ```
 
-For **v1** wagers, use `outcomeIndex` (passed to `resolve(uint256)` as the winning outcome index). For **ADR-0008 v2** wagers (`protocol_version: "v2"` in the indexer), set **`winningMask`** to the bitmask the contract expects (for a single winning outcome at index `i`, use `1 << i`). If both are present, **`winningMask` wins**. For **freeform** wagers (`protocol_version: "freeform"`), set **`winningAnswer`** to the exact string passed to `resolve(string)` (same bytes bettors used in `placeBet(string,uint256)` for that side).
+For **enumerated** wagers (`protocol_version: "enumerated"` in the indexer — V3 `MODE()==0`), set **`winningMask`** to the bitmask passed to `resolve(uint256)` (for a single winning outcome at index `i`, use `1 << i`). For **freeform** wagers (`protocol_version: "freeform"` — V3 `MODE()==1`), set **`winningAnswer`** to the exact UTF-8 string passed to `resolve(string)` (same bytes bettors used in `placeBet(string,uint256)` for that side).
 
 Only wagers that are:
 

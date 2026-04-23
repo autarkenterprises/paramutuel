@@ -45,12 +45,6 @@ jobs:
           python3 -c "
           import json
           for name in [
-              'ParamutuelFactory',
-              'ParamutuelWager',
-              'ParamutuelFactoryV2',
-              'ParamutuelWagerV2',
-              'ParamutuelFactoryFreeform',
-              'ParamutuelWagerFreeform',
               'ParamutuelFactoryV3',
               'ParamutuelWagerV3',
           ]:

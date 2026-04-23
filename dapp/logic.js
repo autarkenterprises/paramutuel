@@ -175,7 +175,7 @@
     return warnings;
   }
 
-  /** Matches `ParamutuelWagerV2.PayoffPolicy` enum ordinals. */
+  /** Matches `ParamutuelWagerV3.PayoffPolicy` enum ordinals (enumerated mode). */
   const PAYOFF_POLICY = Object.freeze({
     SINGLE_WINNER: 0,
     ANY_OF: 1,

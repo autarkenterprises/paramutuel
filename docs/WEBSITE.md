@@ -35,7 +35,7 @@ Runtime configuration is read from `config/deployments.json` (copied to `_site/c
 ### Turnkey checklist when Base mainnet is live
 
 1. Edit **`config/deployments.json`**.
-2. Under **`baseMainnet`**, set **`factoryAddress`**, optional **`factoryV2Address`** / **`factoryFreeformAddress`** when those factories are live, **`explorerApiBase`**, and **`indexerFromBlock`** (for your indexer deployment). Keep **`chainId`** `8453`.
+2. Under **`baseMainnet`**, set **`factoryAddress`** (the unified V3 factory), **`explorerApiBase`**, and **`indexerFromBlock`** (for your indexer deployment). Keep **`chainId`** `8453`.
 3. Optionally set **`defaultNetwork`** to `"baseMainnet"` if you want new visitors to land on mainnet by default.
 4. Commit and push; **Deploy to GitHub Pages** rebuilds the site.
 
@@ -61,7 +61,7 @@ From repo root (after `forge build` if you need fresh ABIs):
 mkdir -p _site/dapp/abi _site/explorer _site/config
 python3 -c "
 import json
-for name in ['ParamutuelFactory', 'ParamutuelWager', 'ParamutuelFactoryV2', 'ParamutuelWagerV2', 'ParamutuelFactoryFreeform', 'ParamutuelWagerFreeform']:
+for name in ['ParamutuelFactoryV3', 'ParamutuelWagerV3']:
     data = json.load(open(f'out/{name}.sol/{name}.json'))
     with open(f'_site/dapp/abi/{name}.json', 'w') as f:
         json.dump({'abi': data['abi']}, f, indent=2)

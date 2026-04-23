@@ -2,10 +2,10 @@
 
 This document describes how **collateral token amounts** are computed when a wager finalizes, for:
 
-1. **Protocol v1** — `ParamutuelWager` (single winning **outcome index**).
-2. **Protocol v2** — `ParamutuelWagerV2` (bitmask **tickets** and **payoff policies**; ADR-0008).
+1. **Legacy v1** (historical) — single winning **outcome index**, single-winner pool split. Retained below for the simplest case; superseded by the V3 enumerated `SINGLE_WINNER` policy.
+2. **Enumerated mode** (ADR-0008 economics, now implemented by `ParamutuelWagerV3` with `MODE()==0`) — bitmask **tickets** and **payoff policies**.
 
-**Source layout:** v1 and v2 both live on `master`: `ParamutuelWager` / `ParamutuelFactory` and `ParamutuelWagerV2` / `ParamutuelFactoryV2` under `src/`. Integration history for v2 tracked on branch **`experiment/adr-0008-multi-winner-v2`**. Part B matches `src/ParamutuelWagerV2.sol` in-tree ([`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)).
+**Source layout:** the canonical contracts are `src/ParamutuelWagerV3.sol` + `src/ParamutuelFactoryV3.sol` (ADR-0010). Part B below matches the enumerated-mode logic in `ParamutuelWagerV3` ([`docs/ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md), [`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md) for policy semantics). Freeform-mode payouts (`MODE()==1`) follow the single-winner split over `answerId` pools — see [`ADR-0009-IMPLEMENTATION.md`](ADR-0009-IMPLEMENTATION.md).
 
 All amounts are in the wager’s **ERC-20 raw units**: the token’s **smallest indivisible unit** (for **ETH** / **WETH**, “wei”; for **USDC**, \(10^{-6}\) of a dollar — i.e. **`1e6` raw units = 1 USDC**). Arithmetic uses **integer division**; each payout line is floored, so **unclaimed collateral** after every winner has claimed is **rounding dust** only.
 
@@ -87,9 +87,9 @@ After **`retract()`** or **`expire()`**, state is **Retracted**. Every bettor wi
 
 ---
 
-## Part B — v2 (`ParamutuelWagerV2`)
+## Part B — Enumerated mode (`ParamutuelWagerV3`, ADR-0010)
 
-*(Contract: `src/ParamutuelWagerV2.sol`.)*
+*(Contract: `src/ParamutuelWagerV3.sol`, `MODE()==0`. Semantics are identical to the deleted `ParamutuelWagerV2` of ADR-0008.)*
 
 ### Tickets and winning set
 
@@ -240,9 +240,9 @@ Identical formula to **v1**:
 
 ## Summary table
 
-| Final state | v1 (`ParamutuelWager`) | v2 (`ParamutuelWagerV2`) |
-|-------------|------------------------|---------------------------|
-| **Resolved** | Share **`netPot`** by stake on **one** winning outcome index. | Share **`netPot`** by **policy-specific** winning tickets and (for weighted) overlap scores. |
+| Final state | Enumerated (`ParamutuelWagerV3`, `MODE()==0`) | Freeform (`ParamutuelWagerV3`, `MODE()==1`) |
+|-------------|-----------------------------------------------|----------------------------------------------|
+| **Resolved** | Share **`netPot`** by **policy-specific** winning tickets and (for weighted) overlap scores. `SINGLE_WINNER` recovers the legacy v1 single-index split. | Share **`netPot`** among stakers of the winning `answerId` (single winning string, exact UTF-8 bytes). |
 | **Retracted / Expired** | Pro-rata **`netPot`** by **`userTotalBet / totalPot`**. | Same. |
 | **Fees** | Once at finalize; split by **bps**; last recipient gets remainder. | Same. |
 
@@ -250,7 +250,9 @@ Identical formula to **v1**:
 
 ## References
 
-- Contracts: `src/ParamutuelWager.sol`, `src/ParamutuelWagerV2.sol`
+- Contract: `src/ParamutuelWagerV3.sol` (unified, mode-dispatched)
 - Machine / API context: [`MACHINE.md`](MACHINE.md)
-- v2 policies, gas, templates: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)
-- ADR: `research/adr/ADR-0008-multi-winner-and-settlement-generalization.md`
+- Unified protocol spec: [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md)
+- Enumerated policies, gas, templates: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md)
+- Freeform semantics: [`ADR-0009-IMPLEMENTATION.md`](ADR-0009-IMPLEMENTATION.md)
+- ADRs: `research/adr/ADR-0008-multi-winner-and-settlement-generalization.md`, `research/adr/ADR-0010-unified-wager-enumerated-and-freeform.md`

@@ -6,15 +6,15 @@ Contract upgrade/redeploy procedure: [`CONTRACT-UPGRADE-RUNBOOK.md`](CONTRACT-UP
 
 ## ABIs
 
-Pre-extracted ABI-only JSON is committed under `dapp/abi/` for **v1** (`ParamutuelFactory.json`, `ParamutuelWager.json`), **v2 / ADR-0008** (`ParamutuelFactoryV2.json`, `ParamutuelWagerV2.json`), and **freeform / ADR-0009** (`ParamutuelFactoryFreeform.json`, `ParamutuelWagerFreeform.json`). Each file is `{"abi": [...]}`. Full Foundry artifacts are available under `out/` after `forge build`.
+Pre-extracted ABI-only JSON is committed under `dapp/abi/` for the unified V3 protocol (`ParamutuelFactoryV3.json`, `ParamutuelWagerV3.json`). Each file is `{"abi": [...]}`. Full Foundry artifacts are available under `out/` after `forge build`.
 
-The MCP server bundles the same contract names under `mcp_server/abi/` (see `paramutuel-mcp` wheel `force-include`), including the freeform pair when present.
+The MCP server bundles the same ABIs under `mcp_server/abi/` (see `paramutuel-mcp` wheel `force-include`).
 
 To re-sync after contract changes: `./script/sync-abi.sh`.
 
-### Indexer payload notes (v2)
+### Indexer payload notes (V3)
 
-Hosted indexer `GET /wagers/{address}` includes `ticket_pools` (v2: per ticket bitmask stake totals; **freeform:** per `answerId` hex keyed as `ticket_mask`) and wager fields `protocol_version`, `payoff_policy`, `policy_param` (v2). MCP `quote_place_bet` / `quote_place_bets` interpret `protocol_version === "v2"` and map a chosen **outcome index** to ticket mask `1 << index` for single-outcome legs. For **`protocol_version === "freeform"`**, use MCP **`encode_place_bet_freeform`** / **`encode_resolve_freeform`** (exact UTF-8 strings); `quote_place_bet` does not apply. Tooling: `encode_create_wager_v2` → `FACTORY_V2_ADDRESS` / `factoryV2Address`; **`encode_create_freeform_wager`** → `FACTORY_FREEFORM_ADDRESS` / `factoryFreeformAddress`.
+Hosted indexer `GET /wagers/{address}` includes `ticket_pools` (enumerated: per ticket-bitmask stake totals; freeform: per `answerId` hex keyed as `ticket_mask`) and wager fields `protocol_version` (`"enumerated"` or `"freeform"`), `payoff_policy`, `policy_param`. MCP `quote_place_bet` / `quote_place_bets` interpret `protocol_version === "enumerated"` and map a chosen **outcome index** to ticket mask `1 << index` for single-outcome legs. For **`protocol_version === "freeform"`**, use MCP **`encode_place_bet_freeform`** / **`encode_resolve_freeform`** (exact UTF-8 strings); `quote_place_bet` does not apply. Tooling: `encode_create_wager` and `encode_create_freeform_wager` both target the single unified `FACTORY_ADDRESS` / `factoryAddress` (V3).
 
 ## Factory (`ParamutuelFactory`)
 
@@ -247,9 +247,9 @@ event FeeAccrued(address indexed recipient, uint256 amount);
 event FeeWithdrawn(address indexed recipient, uint256 amount);
 ```
 
-### ParamutuelWagerV2 (ADR-0008, v2)
+### ParamutuelWagerV3 (ADR-0010)
 
-In `src/` on **`master`** (integrated from **`experiment/adr-0008-multi-winner-v2`**): bitmask **tickets**, `resolve(uint256 winningMask)`, and **`PayoffPolicy`** (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`). Deploy **v2 factories** separately from v1; v1 bytecode and deployments remain valid. Colloquial **“any of” / “all of”** ↔ policy mapping: [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B glossary. Spec: [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md). Gas: [`ADR-0008-GAS.md`](ADR-0008-GAS.md). Templates: [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md), `src/libraries/WagerV2Masks.sol`.
+In `src/` on **`master`**: the unified `ParamutuelWagerV3` selects its shape at construction via an immutable `WagerMode` (Enumerated / Freeform). Enumerated mode carries bitmask **tickets**, `resolve(uint256 winningMask)`, and **`PayoffPolicy`** (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`) — the same semantics the deleted `ParamutuelWagerV2` used to provide. Freeform mode carries `placeBet(string,uint256)` / `resolve(string)` (exact UTF-8 bytes; `answerId = keccak256(abi.encodePacked(0x03, bytes(answer)))` — domain-separated per ADR-0010). Colloquial **“any of” / “all of”** ↔ policy mapping: [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B glossary. Spec: [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md). Gas: [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md). Templates: [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md).
 
 ### Error reference
 
@@ -326,7 +326,7 @@ Or via the entry point after `pip install -e mcp_server/`:
 paramutuel-mcp
 ```
 
-The server reads factory address(es) and chain ID from `config/deployments.json` (overridable via `FACTORY_ADDRESS`, optional `FACTORY_V2_ADDRESS`, and `CHAIN_ID` env vars). Discovery tools query the indexer API; transaction-encoding tools return raw calldata and approval instructions for the caller's signer.
+The server reads the unified V3 factory address and chain ID from `config/deployments.json` (overridable via `FACTORY_ADDRESS` and `CHAIN_ID` env vars). Discovery tools query the indexer API; transaction-encoding tools return raw calldata and approval instructions for the caller's signer.
 
 Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittest mcp_server/tests/test_server.py`).
 

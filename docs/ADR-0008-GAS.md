@@ -1,5 +1,7 @@
 # Paramutuel v2 gas profile (ADR-0008)
 
+> **Historical — superseded by [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md).** ADR-0010 collapsed V2 and freeform into the unified `ParamutuelFactoryV3` / `ParamutuelWagerV3`; the V2 contracts, test suites, and `script/profile_v2_gas.sh` below have been **removed from the tree**. The numbers here remain as a snapshot of the pre-unification implementation. For current gas behavior, including both enumerated and freeform modes on V3, see `PARAMUTUEL-V3-GAS.md`.
+
 Measurements are **environment-dependent** (Solc 0.8.24, Foundry, optimizer settings from `foundry.toml`). Regenerate before audits.
 
 ## How to reproduce

@@ -40,11 +40,9 @@ Expected outcomes:
 ## 5) Hosting propagation
 
 - Update `config/deployments.json`:
-  - `baseSepolia.factoryAddress` is usually set by `launch_testnet.sh` for the **v1** factory.
-  - When **ParamutuelFactoryV2** is deployed, set `factoryV2Address` for that network (empty string disables v2 `WagerCreatedV2` ingestion).
-  - When **ParamutuelFactoryFreeform** is deployed, set `factoryFreeformAddress` (empty disables `WagerCreatedFreeform` ingestion).
-  - Set `indexerFromBlock` to a block **at or before** the earliest factory you need indexed (v1 and/or v2 and/or freeform); if you add a new factory after the indexer has already synced, backfill or reset the indexer DB with a lower cursor so create events are not missed.
-- **Indexer live API** resolves `--factory-v2-address` / `--factory-freeform-address` from env or `factoryV2Address` / `factoryFreeformAddress` in the deployments file (see `service/indexer/live_api.py`). `/health` echoes configured factories when using the combined live process.
+  - `baseSepolia.factoryAddress` is set by `launch_testnet.sh` for the unified **`ParamutuelFactoryV3`**. V3 is a single factory covering both enumerated and freeform modes — no separate V2/freeform keys.
+  - Set `indexerFromBlock` to a block **at or before** the V3 factory deployment; if you redeploy the factory after the indexer has already synced, backfill or reset the indexer DB with a lower cursor so create events are not missed.
+- **Indexer live API** resolves the factory from env `FACTORY_ADDRESS` or `factoryAddress` in the deployments file (see `service/indexer/live_api.py`). `/health` echoes the configured factory.
 - Update the root `Dockerfile` env `INDEXER_FROM_BLOCK` if you rely on image defaults for Cloud Run.
 - Commit and push:
   - `config/deployments.json`

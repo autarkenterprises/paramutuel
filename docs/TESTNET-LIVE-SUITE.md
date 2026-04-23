@@ -23,7 +23,7 @@ It has three modes:
 
 Optional:
 
-- `TESTNET_WAGER_ADDRESS` (to run additional read checks on a known **v1** wager — `factory()` must match the v1 factory)
+- `TESTNET_WAGER_ADDRESS` (to run additional read checks on a known V3 wager — `factory()` must match the configured V3 factory)
 - `TESTNET_MODE=minimal-tx` (for transaction checks)
 - `PRIVATE_KEY` (required for `minimal-tx`)
 - `TESTNET_MODE=funded-tx` (for funded lifecycle checks)
@@ -33,18 +33,17 @@ Optional:
 - `TESTNET_UNAUTHORIZED_PRIVATE_KEY` (optional; enables negative access-control tx checks)
 - `TESTNET_INDEXER_BASE_URL` (optional; defaults to `config/deployments.json` -> `baseSepolia.explorerApiBase` for hosted indexer visibility checks)
 
-**ParamutuelFactoryV2 / v2 wagers** (class `TestBaseSepoliaLiveV2` in `test/testnet/test_live_base_sepolia.py`):
+**V3 enumerated-mode policy matrix** (class `TestBaseSepoliaLiveV3PolicyMatrix` in `test/testnet/test_live_base_sepolia.py`):
 
-- Factory address: `FACTORY_V2_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryV2Address`. If unset, all v2 tests are skipped.
-- `TESTNET_SKIP_V2=1` — force-skip v2 tests even when a v2 factory is configured.
-- `TESTNET_WAGER_ADDRESS_V2` — optional on-chain read checks against a known v2 wager (`payoffPolicy`, `numOptions`, …).
+- Factory address: `FACTORY_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryAddress` (the single unified V3 factory).
+- `TESTNET_SKIP_V3_MATRIX=1` — force-skip the enumerated policy matrix.
 - `TESTNET_MODE=minimal-tx` — runs a **matrix over all `PayoffPolicy` values** (dummy collateral): create → authority closes → `expire()` (no ERC-20).
-- `TESTNET_MODE=funded-tx` — runs a **funded resolve matrix**: for each policy, creates a v2 wager with real collateral, places **`placeBet` or `placeBets`** (per scenario), `resolve(winningMask)`, `claim()`. Cases cover `SINGLE_WINNER`, `ANY_OF` (+ batch `placeBets`), `EXACT_SET`, `AT_LEAST_K` (3 outcomes, `policyParam=2`), and `WEIGHTED_OVERLAP`.
-- `TESTNET_V2_CASES` — comma-separated subset of case ids: `single_winner`, `any_of`, `exact_set`, `at_least_k`, `weighted_overlap` (default: all).
+- `TESTNET_MODE=funded-tx` — runs a **funded resolve matrix**: for each policy, creates a V3 enumerated wager (`MODE()==0`) with real collateral, places **`placeBet` or `placeBets`** (per scenario), `resolve(winningMask)`, `claim()`. Cases cover `SINGLE_WINNER`, `ANY_OF` (+ batch `placeBets`), `EXACT_SET`, `AT_LEAST_K` (3 outcomes, `policyParam=2`), and `WEIGHTED_OVERLAP`.
+- `TESTNET_V3_CASES` — comma-separated subset of case ids: `single_winner`, `any_of`, `exact_set`, `at_least_k`, `weighted_overlap` (default: all).
 
-**ParamutuelFactoryFreeform** (`TestBaseSepoliaLiveFreeform` in `test/testnet/test_live_base_sepolia.py`):
+**V3 freeform mode** (`TestBaseSepoliaLiveFreeform` in `test/testnet/test_live_base_sepolia.py`):
 
-- Factory: `FACTORY_FREEFORM_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryFreeformAddress`.
+- Factory: `FACTORY_ADDRESS` or `config/deployments.json` → `baseSepolia.factoryAddress` (same unified V3 factory; freeform wagers are dispatched by `MODE()==1`).
 - `TESTNET_SKIP_FREEFORM=1` — skip all freeform live tests.
 - `TESTNET_MODE=minimal-tx` — create (dummy collateral) → authority close → `expire()`.
 - `TESTNET_MODE=funded-tx` — resolve / retract / expire matrix with real collateral (default USDC if `TESTNET_COLLATERAL_TOKEN` unset) and `placeBet(string,uint256)` / `resolve(string)`.

@@ -1,6 +1,8 @@
-# Paramutuel v2 wager templates (product patterns)
+# Paramutuel enumerated-mode wager templates (product patterns)
 
-These are **recommended combinations** of `PayoffPolicy`, `policyParam`, and ticket construction for common markets. Encode tickets with `WagerV2Masks` (`src/libraries/WagerV2Masks.sol`) or equivalent off-chain logic. For **“any of” / “all of”** product wording vs **`EXACT_SET`** vs subset-of-truth **`T ⊆ W`**, see the glossary in [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B.
+> **Scope:** these templates apply to the unified **`ParamutuelWagerV3`** when constructed with `MODE = Enumerated` (see [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md)). They describe the same `PayoffPolicy` semantics ADR-0008 defined for the now-deleted `ParamutuelWagerV2`.
+
+These are **recommended combinations** of `PayoffPolicy`, `policyParam`, and ticket construction for common markets. Ticket bitmasks are plain `uint256` values (bit `i` ⇔ outcome index `i`); construct them off-chain (`1 << i`, bitwise OR for unions, `(1 << n) - 1` for full set with `n < 256`). For **“any of” / “all of”** product wording vs **`EXACT_SET`** vs subset-of-truth **`T ⊆ W`**, see the glossary in [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B.
 
 | Template | Policy | `policyParam` | Ticket shape | Resolver submits |
 |----------|--------|---------------|--------------|------------------|
@@ -29,7 +31,7 @@ These are **recommended combinations** of `PayoffPolicy`, `policyParam`, and tic
 
 ## Lifecycle presets (time windows)
 
-Mirror v1 dApp-style **windows** from `ParamutuelFactory` / `ParamutuelWager` (absolute `bettingCloseTime`, `resolutionWindow`). v2 factory uses the same min-window rules:
+The V3 factory exposes the same absolute `bettingCloseTime` / `resolutionWindow` inputs with `minBettingWindow` / `minResolutionWindow` enforcement:
 
 | Name | Suggested betting close | Resolution window |
 |------|-------------------------|-------------------|
@@ -39,20 +41,20 @@ Mirror v1 dApp-style **windows** from `ParamutuelFactory` / `ParamutuelWager` (a
 
 (Adjust to your chain’s `minBettingWindow` / `minResolutionWindow` on the deployed factory.)
 
-## Solidity snippet
+## Off-chain mask construction (Python / JS)
 
-```solidity
-import {WagerV2Masks} from "src/libraries/WagerV2Masks.sol";
+```python
+# 4-outcome "any ticker up" style ticket: user backs options 0 and 2
+ticket = (1 << 0) | (1 << 2)  # 0b0101 = 5
 
-// 4-outcome "any ticker up" style ticket: user backs options 0 and 2
-uint256 ticket = WagerV2Masks.union(
-    WagerV2Masks.singleOutcome(0),
-    WagerV2Masks.singleOutcome(2)
-);
-// Resolver later: winningMask = WagerV2Masks.fullSet(4) if all four were true, etc.
+# Resolver later: winning bitmask if all four were true
+full_set = (1 << 4) - 1       # 0b1111 = 15 (requires n < 256)
 ```
+
+The same shapes apply to `placeBet(uint256 ticketMask, uint256 amount)` and `resolve(uint256 winningMask)` calldata.
 
 ## Related
 
-- [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md) — policy math and limits  
-- [`ADR-0008-GAS.md`](ADR-0008-GAS.md) — measured gas (regenerate with Foundry)
+- [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md) — unified V3 protocol (enumerated + freeform modes)
+- [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md) — enumerated policy math and limits
+- [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md) — measured gas on the current contracts

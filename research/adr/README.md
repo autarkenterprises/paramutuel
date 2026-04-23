@@ -19,5 +19,5 @@
 - `ADR-0009-freeform-text-wagers.md`
   - Freeform text-answer wagers: no enumerated outcomes at creation; bettors stake on arbitrary strings; resolver submits the winning string; exact byte match; single-winner parimutuel semantics; separate contract surface from bitmask v2. Implementation + outcome-cap discussion: `docs/ADR-0009-IMPLEMENTATION.md`.
 - `ADR-0010-unified-wager-enumerated-and-freeform.md`
-  - **Proposed:** single wager + factory unifying **enumerated v2** (bitmask + policies) and **freeform** (string answers) via immutable create-time mode; strict red–green TDD; full propagation checklist (contracts, indexer, MCP, agents, dApp, docs, gas). Intended **greenfield** target; legacy v1/v2/freeform deployments remain supported until deprecated.
+  - **Implemented** on `master` as `ParamutuelFactoryV3` + `ParamutuelWagerV3` (immutable `WagerMode` enum: `Enumerated` / `Freeform`). Unifies ADR-0008 bitmask + payoff policies and ADR-0009 freeform text answers behind one factory and one wager implementation with mode-dispatched external surface. The legacy standalone V1 / V2 / Freeform contracts have been **deleted from the tree**; indexer / MCP / dApp / site / agents / testnet suites are V3-only. Implementation notes: `docs/ADR-0010-IMPLEMENTATION.md`.
 

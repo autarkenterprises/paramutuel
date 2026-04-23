@@ -26,14 +26,7 @@ Source: `test/ParamutuelV3Gas.t.sol` (`ParamutuelV3GasReport`).
 | `ParamutuelFactoryV3` | **21,311** | **21,701** |
 | `ParamutuelWagerV3` | **11,651** | **15,378** |
 
-For comparison on the same toolchain (not a product requirement):
-
-| Contract | Runtime size (B) |
-|----------|------------------|
-| `ParamutuelFactoryV2` | 17,275 |
-| `ParamutuelWagerV2` | 9,065 |
-
-V3’s larger factory reflects **one deployment** covering both modes; the wager runtime sits between legacy v2-only and a hypothetical “v2 + freeform” pair deployed separately.
+V3 is a single deployment covering both enumerated and freeform modes; the legacy split of separate V1/V2/freeform factories has been removed from the tree (see ADR-0010).
 
 ## Snapshot — `gasleft()` (isolate mode)
 

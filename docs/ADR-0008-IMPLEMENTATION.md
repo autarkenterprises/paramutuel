@@ -1,7 +1,10 @@
-# ADR-0008 implementation notes (v2 contracts)
+# ADR-0008 implementation notes (enumerated-mode semantics)
 
-**Branch:** `experiment/adr-0008-multi-winner-v2` was the integration line for v2; **`master` now carries** `ParamutuelWagerV2` / `ParamutuelFactoryV2` alongside v1.  
-**Status:** Solidity + Foundry tests in-repo; treat deployments as testnet-first until audited.
+> **Superseded (contract layer) by [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md).** The standalone `ParamutuelWagerV2` / `ParamutuelFactoryV2` contracts and the `WagerV2Masks` library have been **deleted from the tree**; the ADR-0008 **payoff-policy semantics** described below are now implemented by `ParamutuelWagerV3` / `ParamutuelFactoryV3` when the wager is constructed with `MODE = Enumerated`. Read this document for the math; read ADR-0010 for the current calldata shapes, events, and config.
+>
+> References to `ParamutuelWagerV2` / `ParamutuelFactoryV2` / `WagerV2Masks` / `factoryV2Address` below should be read as historical — the enumerated-mode branch of V3 carries the same invariants.
+
+**Status:** Solidity + Foundry tests in-repo on V3 (`test/ParamutuelV3*.t.sol`); treat deployments as testnet-first until audited.
 
 ## Rationale
 

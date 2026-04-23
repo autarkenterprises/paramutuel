@@ -96,7 +96,7 @@ Indexer marks these with `protocol_version === "freeform"`. There is **no** enum
    - `encode_place_bet_freeform(wager_address, collateral_token, answer, amount)` for the bet, and
    - `encode_resolve_freeform(wager_address, winning_answer)` for resolution (resolver only).
 3. The **`answer` and `winning_answer` strings must match exactly** in UTF-8 bytes; otherwise the ticket id (`keccak256(bytes(answer))`) will not match.
-4. Optional: `encode_create_freeform_wager(...)` against `FACTORY_FREEFORM_ADDRESS` / deployments `factoryFreeformAddress`.
+4. Optional: `encode_create_freeform_wager(...)` against the unified `FACTORY_ADDRESS` / deployments `factoryAddress` (V3 `ParamutuelFactoryV3.createFreeformWager`).
 
 ---
 

@@ -18,28 +18,26 @@ SQLite lives on the container filesystem. On Cloud Run that means:
 
 So “switching contracts” is not enough if the service is scaled horizontally on ephemeral storage. See [Making the hosted index durable](#making-the-hosted-index-durable-recommended) below.
 
-## Pointing the indexer at new contracts (v1 / v2 / freeform)
+## Pointing the indexer at the V3 factory
 
-The **live** process (`service.indexer.live_api`) reads factory addresses from **`config/deployments.json` inside the image** (copied at build time) unless overridden by env:
+The **live** process (`service.indexer.live_api`) reads the factory address from **`config/deployments.json` inside the image** (copied at build time) unless overridden by env:
 
 | On-chain contract | Config key (`baseSepolia.*`) | Env override (optional) |
 |-------------------|------------------------------|-------------------------|
-| ParamutuelFactory (v1) | `factoryAddress` | `FACTORY_ADDRESS` |
-| ParamutuelFactoryV2 | `factoryV2Address` | `FACTORY_V2_ADDRESS` |
-| ParamutuelFactoryFreeform | `factoryFreeformAddress` | `FACTORY_FREEFORM_ADDRESS` |
+| `ParamutuelFactoryV3` (unified) | `factoryAddress` | `FACTORY_ADDRESS` |
 
-Empty string for v2 or freeform means **do not** ingest those factories’ create events.
+V3 is a **single** factory covering both enumerated and freeform modes (ADR-0010); legacy V1/V2/freeform factories and their config keys have been removed.
 
-**Steps to switch over after you deploy new factories on-chain:**
+**Steps to switch over after you deploy a new factory on-chain:**
 
-1. **Record deployment blocks** for each factory you care about (from the deploy transaction receipt).
+1. **Record the deployment block** (from the deploy transaction receipt).
 2. **Edit `config/deployments.json`** for that network:
-   - Set `factoryAddress` / `factoryV2Address` / `factoryFreeformAddress` to the **new** addresses you want indexed.
-   - Set **`indexerFromBlock`** to the **earliest** block among those factories’ deployments that you still need in the API (or older if you want full history). If a new factory was deployed **after** the indexer already advanced its cursor, you must **reset the cursor** (see below) or you will **never** see older creates for that factory.
+   - Set `factoryAddress` to the **new** V3 address.
+   - Set **`indexerFromBlock`** to the V3 deployment block (or earlier if you want full history). If the new factory was deployed **after** the indexer already advanced its cursor, you must **reset the cursor** (see below) or you will **never** see older creates for that factory.
 3. **Align image defaults:** if you rely on Dockerfile env for cold-start `INDEXER_FROM_BLOCK`, update `INDEXER_FROM_BLOCK` in the root `Dockerfile` to match the same starting block (or remove it and depend only on `indexerFromBlock` in JSON).
 4. **Redeploy Cloud Run** so the container ships the updated `config/deployments.json` and indexer code (`./script/deploy/redeploy_cloud_run_indexer.sh` or UI “Edit & deploy new revision”).
-5. **Optional Cloud Run console overrides** for emergencies (hotfix without rebuilding): set `FACTORY_ADDRESS`, `FACTORY_V2_ADDRESS`, `FACTORY_FREEFORM_ADDRESS`, `INDEXER_FROM_BLOCK`, `RPC_URL_BASE_SEPOLIA`. Do not set `INDEXER_FROM_BLOCK` to empty unless `indexerFromBlock` is present in the image’s JSON.
-6. **Verify:** `GET /health` on a **single** long-lived instance should eventually show non-null `last_indexed_block`, growing `wager_count`, and (on current code) `factory_address` / `factory_v2_address` / `factory_freeform_address` echoing your config.
+5. **Optional Cloud Run console overrides** for emergencies (hotfix without rebuilding): set `FACTORY_ADDRESS`, `INDEXER_FROM_BLOCK`, `RPC_URL_BASE_SEPOLIA`. Do not set `INDEXER_FROM_BLOCK` to empty unless `indexerFromBlock` is present in the image’s JSON.
+6. **Verify:** `GET /health` on a **single** long-lived instance should eventually show non-null `last_indexed_block`, growing `wager_count`, and `factory_address` echoing your config.
 
 **Resetting the cursor (backfill / new factory):** the sync cursor is `last_indexed_block` in SQLite metadata. On ephemeral storage, a new container already starts “from scratch” using `indexerFromBlock`. For a **persistent** DB, delete the DB file or run a one-off maintenance procedure to delete meta rows and re-sync from the desired block (operationally: simplest is replace the volume or delete `indexer.db` and restart with a correct `indexerFromBlock`).
 
@@ -61,7 +59,7 @@ The root `Dockerfile` sets everything needed for a no-console deploy:
 - `INDEXER_FROM_BLOCK` = `39608044` (factory deploy block for the current testnet factory)
 - `INDEXER_NETWORK`, `INDEXER_DB_PATH`, `INDEXER_POLL_INTERVAL_SECONDS`, `PORT` = as in the Dockerfile
 
-Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `FACTORY_V2_ADDRESS`, `FACTORY_FREEFORM_ADDRESS`, `RPC_URL_BASE_SEPOLIA`, `INDEXER_FROM_BLOCK`, `INDEXER_DB_PATH`, etc.
+Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC_URL_BASE_SEPOLIA`, `INDEXER_FROM_BLOCK`, `INDEXER_DB_PATH`, etc.
 
 **Do not** set `INDEXER_FROM_BLOCK` to an empty value in the console: that overrides the Dockerfile default with “unset”, and the live indexer then relies on `indexerFromBlock` in `config/deployments.json` inside the image (added in-repo next to the factory). If both are missing, the container fails fast at startup.
 

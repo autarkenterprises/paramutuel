@@ -2,6 +2,8 @@
 
 Cross-cutting items that are not tied to a single PR. Update this file when scope or decisions change.
 
+> **Note (2026-04):** Completed items below referring to `ParamutuelFactory` (v1), `ParamutuelFactoryV2`, `ParamutuelFactoryFreeform`, `factoryV2Address`, etc. describe historical work on the legacy split protocol. Those contracts have been **removed from the tree**; the canonical protocol is now the unified **`ParamutuelFactoryV3` + `ParamutuelWagerV3`** (see [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md)). Historical checkboxes are left intact as a record of shipped work.
+
 ---
 
 ## Protocol: fee totals (treasury + beneficiaries)
