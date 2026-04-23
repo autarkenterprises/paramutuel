@@ -23,12 +23,11 @@
     </label>
     <label>Protocol
       <select id="protocolVersion">
-        <option value="v1">v1</option>
-        <option value="v2">v2</option>
+        <option value="enumerated">enumerated</option>
         <option value="freeform">freeform</option>
       </select>
     </label>
-    <label>Outcome index or winning mask (v1/v2 resolve) <input id="outcomeIndex" type="number" /></label>
+    <label>Winning ticket bitmask (enumerated resolve) <input id="outcomeIndex" type="number" /></label>
     <label>Winning answer UTF-8 (freeform resolve only) <input id="winningAnswer" placeholder="exact string" /></label>
     <button id="preview">Preview</button>
     <pre id="out"></pre>

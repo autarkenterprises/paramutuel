@@ -14,7 +14,7 @@
 
   function wagerIsCurrentProtocol(w) {
     const pv = String(w.protocol_version || "").trim().toLowerCase();
-    return pv === "v3_enum" || pv === "v3_freeform";
+    return pv === "enumerated" || pv === "freeform";
   }
 
   function $(id) {
@@ -134,10 +134,10 @@
     if (state === "RESOLVED") {
       const wi = w.winning_outcome;
       let winLabel = "—";
-      if (pv === "v3_freeform") {
+      if (pv === "freeform") {
         const hx = wi === null || wi === undefined ? "" : String(wi).trim();
         winLabel = hx ? (hx.length > 20 ? `${hx.slice(0, 12)}…${hx.slice(-6)}` : hx) : "—";
-      } else if (pv === "v3_enum") {
+      } else if (pv === "enumerated") {
         try {
           const wm = BigInt(String(wi ?? "0"));
           winLabel = `mask ${wm.toString()}`;
@@ -206,7 +206,7 @@
       const key = addr.toLowerCase();
       let metaLine;
       if (state === "OPEN" && detailByAddr[key]) {
-        if (pv === "v3_freeform") {
+        if (pv === "freeform") {
           const pools = detailByAddr[key].ticket_pools || [];
           const n = pools.filter((p) => BigInt(String(p.pool_total || "0")) > 0n).length;
           metaLine = n > 0 ? `${n} staked answer id(s)` : "No stakes in detail";

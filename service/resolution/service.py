@@ -77,18 +77,19 @@ def _action_command(
     action: str,
     rpc_url: str,
     private_key: str,
-    protocol_version: str = "v1",
+    protocol_version: str = "enumerated",
     resolve_uint256: int | None = None,
     winning_answer: str | None = None,
 ) -> list[str]:
+    # ADR-0010 collapses `protocol_version` to two values: "enumerated" (bitmask
+    # tickets) and "freeform" (UTF-8 answers). Any other value is treated as
+    # enumerated and requires a numeric winning mask.
     if action == "resolve":
-        pv = (protocol_version or "v1").strip().lower()
-        if pv in ("freeform", "v3_freeform"):
+        pv = (protocol_version or "enumerated").strip().lower()
+        if pv == "freeform":
             ans = (winning_answer or "").strip()
             if not ans:
-                raise ValueError(
-                    "freeform/v3_freeform resolve requires decision.winningAnswer (exact UTF-8 string)"
-                )
+                raise ValueError("freeform resolve requires decision.winningAnswer (exact UTF-8 string)")
             return [
                 "cast",
                 "send",
@@ -101,7 +102,7 @@ def _action_command(
                 private_key,
             ]
         if resolve_uint256 is None:
-            raise ValueError("resolve decision requires outcomeIndex or winningMask (v1/v2/v3_enum)")
+            raise ValueError("enumerated resolve requires outcomeIndex or winningMask")
         return [
             "cast",
             "send",
@@ -143,7 +144,7 @@ def evaluate_candidates(
             "wager_address": wager,
             "resolver": row.get("resolver"),
             "state": row.get("state"),
-            "protocol_version": str(row.get("protocol_version") or "v1").strip().lower(),
+            "protocol_version": str(row.get("protocol_version") or "enumerated").strip().lower(),
             "betting_close_time": row.get("betting_close_time"),
             "resolution_window": row.get("resolution_window"),
             "resolution_window_closed": row.get("resolution_window_closed"),
@@ -248,14 +249,14 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             decision = c.get("decision") or {}
             action = str(decision.get("action") or "").strip().lower()
-            pv = str(c.get("protocol_version") or "v1").strip().lower()
+            pv = str(c.get("protocol_version") or "enumerated").strip().lower()
             try:
                 win = None
                 win_ans = decision.get("winningAnswer")
                 if win_ans is not None and not isinstance(win_ans, str):
                     win_ans = str(win_ans)
                 if action == "resolve":
-                    if pv in ("freeform", "v3_freeform"):
+                    if pv == "freeform":
                         cmd = _action_command(
                             wager_address=c["wager_address"],
                             action=action,

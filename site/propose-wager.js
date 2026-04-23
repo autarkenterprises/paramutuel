@@ -66,7 +66,7 @@
       ? PSN.getActiveNetworkKey(data)
       : String(data?.defaultNetwork || "baseSepolia").trim();
     const net = PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey] || {};
-    factoryAddress = String(net.factoryV3Address || "").trim() || null;
+    factoryAddress = String(net.factoryAddress || "").trim() || null;
     const cid = net.chainId;
     expectedChainId = typeof cid === "number" ? cid : Number(cid);
   }

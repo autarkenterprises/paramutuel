@@ -3,10 +3,13 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 
-import {ParamutuelFactoryFreeform} from "../src/ParamutuelFactoryFreeform.sol";
-import {ParamutuelWagerFreeform} from "../src/ParamutuelWagerFreeform.sol";
+import {ParamutuelFactoryV3} from "../src/ParamutuelFactoryV3.sol";
+import {ParamutuelWagerV3} from "../src/ParamutuelWagerV3.sol";
 
-contract MockERC20Freeform {
+/// @dev Minimal ERC20 mock — fixed-unit, no rebasing, no fee-on-transfer. The
+///      V3 protocol only guarantees correctness against tokens with these
+///      properties (see ADR-0010 §Assumptions).
+contract MockERC20V3Free {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
@@ -35,24 +38,33 @@ contract MockERC20Freeform {
     }
 }
 
-/// @notice ADR-0009 freeform wager + factory tests (TDD target suite).
-contract ParamutuelFreeformTest is Test {
-    ParamutuelFactoryFreeform public factory;
-    MockERC20Freeform public token;
+/// @notice Behavioural parity suite for ADR-0010 V3 freeform wagers. Ports the
+///         pre-migration `ParamutuelFreeform.t.sol` coverage onto the unified
+///         V3 factory (`createFreeformWager`). Cryptographic properties of
+///         `answerId` live in `ParamutuelV3AnswerId.t.sol`.
+///
+///         Freeform mode accepts arbitrary UTF-8 strings bounded by
+///         `MAX_ANSWER_BYTES` (1024). The factory hard-codes the pot's
+///         `maxDistinctAnswers` to `WAGER_MAX_DISTINCT_ANSWERS` (1024); direct
+///         construction is used in one test to validate the distinct-cap path
+///         at a smaller bound.
+contract ParamutuelV3FreeformTest is Test {
+    ParamutuelFactoryV3 factory;
+    MockERC20V3Free token;
 
     address treasury = address(0x1000);
     address proposer = address(0x2000);
     address bettor1 = address(0x3000);
     address bettor2 = address(0x4000);
 
-    uint16 protocolFeeBps = 100;
+    uint16 protocolFeeBps = 100; // 1%
     uint64 minBettingWindow = 1 hours;
     uint64 minResolutionWindow = 1 hours;
 
     function setUp() public {
         vm.warp(1000);
-        factory = new ParamutuelFactoryFreeform(treasury, protocolFeeBps, minBettingWindow, minResolutionWindow);
-        token = new MockERC20Freeform();
+        factory = new ParamutuelFactoryV3(treasury, protocolFeeBps, minBettingWindow, minResolutionWindow);
+        token = new MockERC20V3Free();
         token.mint(proposer, 1_000_000 ether);
         token.mint(bettor1, 1_000_000 ether);
         token.mint(bettor2, 1_000_000 ether);
@@ -63,10 +75,8 @@ contract ParamutuelFreeformTest is Test {
         resWin = 2 hours;
     }
 
-    function _createViaFactory() internal returns (ParamutuelWagerFreeform w) {
+    function _createViaFactory() internal returns (ParamutuelWagerV3 w) {
         (uint64 close, uint64 resWin) = _futureWindows();
-        address[] memory extra = new address[](0);
-        uint16[] memory extraBps = new uint16[](0);
         vm.prank(proposer);
         address wa = factory.createFreeformWager(
             address(token),
@@ -76,54 +86,64 @@ contract ParamutuelFreeformTest is Test {
             address(0),
             proposer,
             proposer,
-            extra,
-            extraBps
+            new address[](0),
+            new uint16[](0)
         );
-        w = ParamutuelWagerFreeform(wa);
+        w = ParamutuelWagerV3(wa);
     }
 
-    /// @dev Direct deploy for tests that need a custom `maxDistinctAnswers` cap.
-    function _deployWager(uint256 maxDistinct) internal returns (ParamutuelWagerFreeform w) {
+    /// @dev Direct construction lets us dial `maxDistinctAnswers` below the
+    ///      factory's 1024 ceiling so we can cover `TooManyDistinctAnswers`
+    ///      without generating a thousand bets.
+    function _deployWagerDirect(uint256 maxDistinct) internal returns (ParamutuelWagerV3 w) {
         (uint64 close, uint64 resWin) = _futureWindows();
         uint64 deadline = close + resWin;
-        address[] memory fr = new address[](0);
-        uint16[] memory fb = new uint16[](0);
-        w = new ParamutuelWagerFreeform(
+        string[] memory emptyOutcomes;
+        w = new ParamutuelWagerV3(
+            ParamutuelWagerV3.WagerMode.Freeform,
             address(this),
             proposer,
-            proposer,
-            proposer,
-            proposer,
+            proposer, // resolver
+            proposer, // bettingCloser
+            proposer, // resolutionCloser
             address(token),
             "direct",
+            emptyOutcomes,
+            ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER,
+            0,
             close,
             resWin,
             deadline,
-            fr,
-            fb,
+            new address[](0),
+            new uint16[](0),
             maxDistinct
         );
     }
 
+    // ---- Protocol constants ----------------------------------------------
+
     function test_factory_wager_exposes_protocol_constants() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         assertEq(w.MAX_ANSWER_BYTES(), 1024);
         assertEq(w.maxDistinctAnswers(), 1024);
-        assertEq(w.outcomesCount(), 0);
+        assertEq(w.outcomesCount(), 0, "freeform wagers publish zero outcomes");
         assertEq(factory.WAGER_MAX_DISTINCT_ANSWERS(), 1024);
+        assertEq(uint256(w.MODE()), uint256(ParamutuelWagerV3.WagerMode.Freeform));
     }
 
+    // ---- Answer validation on placeBet -----------------------------------
+
     function test_placeBet_empty_answer_reverts() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.startPrank(bettor1);
         token.approve(address(w), type(uint256).max);
-        vm.expectRevert(ParamutuelWagerFreeform.EmptyAnswer.selector);
+        vm.expectRevert(ParamutuelWagerV3.EmptyAnswer.selector);
         w.placeBet("", 1 ether);
         vm.stopPrank();
     }
 
     function test_placeBet_answer_too_long_reverts() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         bytes memory buf = new bytes(1025);
         for (uint256 i; i < 1025; i++) {
             buf[i] = bytes1(uint8(97 + (i % 26)));
@@ -131,13 +151,13 @@ contract ParamutuelFreeformTest is Test {
         string memory longAnswer = string(buf);
         vm.startPrank(bettor1);
         token.approve(address(w), type(uint256).max);
-        vm.expectRevert(ParamutuelWagerFreeform.AnswerTooLong.selector);
+        vm.expectRevert(ParamutuelWagerV3.AnswerTooLong.selector);
         w.placeBet(longAnswer, 1 ether);
         vm.stopPrank();
     }
 
     function test_placeBet_at_max_length_succeeds() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         bytes memory buf = new bytes(1024);
         for (uint256 i; i < 1024; i++) {
             buf[i] = bytes1(uint8(97 + (i % 26)));
@@ -150,8 +170,21 @@ contract ParamutuelFreeformTest is Test {
         assertEq(w.totalPot(), 1 ether);
     }
 
+    function test_wrong_mode_placeBet_uint_reverts() public {
+        ParamutuelWagerV3 w = _createViaFactory();
+        vm.prank(bettor1);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bettor1);
+        vm.expectRevert(ParamutuelWagerV3.WrongMode.selector);
+        w.placeBet(uint256(1), 1 ether);
+    }
+
+    // ---- Payoff / claim semantics -----------------------------------------
+
+    /// @notice Two bettors on the same answer split the winner pool pro-rata
+    ///         to their stakes (after protocol fee).
     function test_two_bettors_same_answer_share_winner_pool() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor2);
@@ -181,8 +214,11 @@ contract ParamutuelFreeformTest is Test {
         assertEq(token.balanceOf(bettor2) - b2Before, (net * 1 ether) / 4 ether);
     }
 
+    /// @notice Freeform answer IDs are case-sensitive: "YES" and "yes" hash to
+    ///         distinct ids. The near-miss bettor cannot claim against the
+    ///         winning id.
     function test_near_miss_loser_cannot_claim() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor2);
@@ -201,12 +237,12 @@ contract ParamutuelFreeformTest is Test {
         w.claim();
 
         vm.prank(bettor2);
-        vm.expectRevert(ParamutuelWagerFreeform.NothingToClaim.selector);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
         w.claim();
     }
 
     function test_resolve_unbacked_answer_reverts_NoWinningStake() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor1);
@@ -216,24 +252,24 @@ contract ParamutuelFreeformTest is Test {
         w.closeBetting();
 
         vm.prank(proposer);
-        vm.expectRevert(ParamutuelWagerFreeform.NoWinningStake.selector);
+        vm.expectRevert(ParamutuelWagerV3.NoWinningStake.selector);
         w.resolve("B");
     }
 
     function test_TooManyDistinctAnswers_reverts() public {
-        ParamutuelWagerFreeform w = _deployWager(3);
+        ParamutuelWagerV3 w = _deployWagerDirect(3);
         vm.startPrank(bettor1);
         token.approve(address(w), type(uint256).max);
         w.placeBet("a", 1);
         w.placeBet("b", 1);
         w.placeBet("c", 1);
-        vm.expectRevert(ParamutuelWagerFreeform.TooManyDistinctAnswers.selector);
+        vm.expectRevert(ParamutuelWagerV3.TooManyDistinctAnswers.selector);
         w.placeBet("d", 1);
         vm.stopPrank();
     }
 
     function test_retract_pro_rata_refund() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor1);
@@ -249,11 +285,11 @@ contract ParamutuelFreeformTest is Test {
         uint256 before = token.balanceOf(bettor1);
         vm.prank(bettor1);
         w.claim();
-        assertEq(token.balanceOf(bettor1) - before, net);
+        assertEq(token.balanceOf(bettor1) - before, net, "retract refunds net pot pro-rata");
     }
 
     function test_expire_after_resolution_window() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor1);
@@ -275,7 +311,7 @@ contract ParamutuelFreeformTest is Test {
     }
 
     function test_double_claim_reverts() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor1);
@@ -287,12 +323,12 @@ contract ParamutuelFreeformTest is Test {
         vm.prank(bettor1);
         w.claim();
         vm.prank(bettor1);
-        vm.expectRevert(ParamutuelWagerFreeform.NothingToClaim.selector);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
         w.claim();
     }
 
     function test_non_resolver_cannot_resolve() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor1);
@@ -300,12 +336,12 @@ contract ParamutuelFreeformTest is Test {
         vm.prank(proposer);
         w.closeBetting();
         vm.prank(bettor1);
-        vm.expectRevert(ParamutuelWagerFreeform.NotResolver.selector);
+        vm.expectRevert(ParamutuelWagerV3.NotResolver.selector);
         w.resolve("z");
     }
 
     function test_usedAnswerIds_tracked() public {
-        ParamutuelWagerFreeform w = _createViaFactory();
+        ParamutuelWagerV3 w = _createViaFactory();
         vm.prank(bettor1);
         token.approve(address(w), type(uint256).max);
         vm.prank(bettor1);

@@ -10,9 +10,13 @@ class ExplorerLogicTests(unittest.TestCase):
         self.assertEqual(classify_wager_state({"state": "RETRACTED"}), "retracted")
 
     def test_state_classification_ignores_protocol_version(self):
-        """Indexer rows may include protocol_version=v2; UI state chip stays lifecycle-only."""
+        """Indexer rows tag protocol_version as enumerated|freeform; UI state chip stays lifecycle-only."""
         self.assertEqual(
-            classify_wager_state({"state": "OPEN", "protocol_version": "v2"}),
+            classify_wager_state({"state": "OPEN", "protocol_version": "enumerated"}),
+            "open",
+        )
+        self.assertEqual(
+            classify_wager_state({"state": "OPEN", "protocol_version": "freeform"}),
             "open",
         )
 

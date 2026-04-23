@@ -87,7 +87,7 @@
         Pool share uses on-chain stake totals. <strong>Implied multiple</strong> is the approximate payout per 1 unit staked on that outcome if it wins, <em>after</em> protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).
       </p>
       <p class="muted bet-protocol-note" id="betProtocolNote">
-        This page loads the correct ABI from indexer <code>protocol_version</code>: classic enumerated (outcome index), bitmask enumerated (ticket mask / batch <code>placeBets</code>), or freeform (typed answer + <code>placeBet(string,uint256)</code>). Use the <a href="app.html">full dApp</a> to create wagers, preview all cases, resolve, and claim.
+        This page reads the indexer <code>protocol_version</code> to pick the flow: <strong>enumerated</strong> (ticket-mask stakes via <code>placeBet</code> / batch <code>placeBets</code>) or <strong>freeform</strong> (typed answer via <code>placeBet(string,uint256)</code>). Use the <a href="app.html">full dApp</a> to create wagers, preview payoffs, resolve, and claim.
       </p>
       <div class="bet-outcomes-table-wrap">
         <table class="bet-outcomes-table" id="betOutcomesTable">

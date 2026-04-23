@@ -62,42 +62,6 @@ def _factory_from_config(config_path: str, network: str) -> str:
     return str((data.get(key) or {}).get("factoryAddress") or "").strip()
 
 
-def _factory_freeform_from_config(config_path: str, network: str) -> str:
-    path = Path(config_path)
-    if not path.exists():
-        return ""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return ""
-    key = NETWORK_KEY_MAP.get(network, network)
-    return str((data.get(key) or {}).get("factoryFreeformAddress") or "").strip()
-
-
-def _factory_v2_from_config(config_path: str, network: str) -> str:
-    path = Path(config_path)
-    if not path.exists():
-        return ""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return ""
-    key = NETWORK_KEY_MAP.get(network, network)
-    return str((data.get(key) or {}).get("factoryV2Address") or "").strip()
-
-
-def _factory_v3_from_config(config_path: str, network: str) -> str:
-    path = Path(config_path)
-    if not path.exists():
-        return ""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return ""
-    key = NETWORK_KEY_MAP.get(network, network)
-    return str((data.get(key) or {}).get("factoryV3Address") or "").strip()
-
-
 def _resolve_factory_address(explicit: str, network: str, config_path: str) -> str:
     if explicit:
         return normalize_address(explicit)
@@ -110,42 +74,6 @@ def _resolve_factory_address(explicit: str, network: str, config_path: str) -> s
     if from_config:
         return normalize_address(from_config)
 
-    return ""
-
-
-def _resolve_factory_v3_address(explicit: str, network: str, config_path: str) -> str:
-    if explicit:
-        return normalize_address(explicit)
-    from_env = _env("FACTORY_V3_ADDRESS")
-    if from_env:
-        return normalize_address(from_env)
-    from_config = _factory_v3_from_config(config_path, network)
-    if from_config:
-        return normalize_address(from_config)
-    return ""
-
-
-def _resolve_factory_freeform_address(explicit: str, network: str, config_path: str) -> str:
-    if explicit:
-        return normalize_address(explicit)
-    from_env = _env("FACTORY_FREEFORM_ADDRESS")
-    if from_env:
-        return normalize_address(from_env)
-    from_config = _factory_freeform_from_config(config_path, network)
-    if from_config:
-        return normalize_address(from_config)
-    return ""
-
-
-def _resolve_factory_v2_address(explicit: str, network: str, config_path: str) -> str:
-    if explicit:
-        return normalize_address(explicit)
-    from_env = _env("FACTORY_V2_ADDRESS")
-    if from_env:
-        return normalize_address(from_env)
-    from_config = _factory_v2_from_config(config_path, network)
-    if from_config:
-        return normalize_address(from_config)
     return ""
 
 
@@ -163,9 +91,6 @@ def _sync_loop(
     rpc_url: str,
     conn,
     factory_address: str,
-    factory_v2_address: str,
-    factory_freeform_address: str,
-    factory_v3_address: str,
     poll_interval_seconds: int,
     chunk_size: int,
     initial_from_block: int,
@@ -181,9 +106,6 @@ def _sync_loop(
                 from_block=effective_from,
                 to_block=None,
                 chunk_size=chunk_size,
-                factory_v2_address=factory_v2_address,
-                factory_freeform_address=factory_freeform_address,
-                factory_v3_address=factory_v3_address,
             )
             if processed:
                 print(f"[indexer-sync] processed logs: {processed}")
@@ -198,9 +120,6 @@ def main() -> None:
     parser.add_argument("--db-path", default=_env("INDEXER_DB_PATH", "service/indexer/indexer.db"))
     parser.add_argument("--rpc-url", default=_env("RPC_URL_BASE_SEPOLIA") or _env("RPC_URL_SEPOLIA") or _env("RPC_URL"))
     parser.add_argument("--factory-address", default=_env("FACTORY_ADDRESS"))
-    parser.add_argument("--factory-v2-address", default=_env("FACTORY_V2_ADDRESS"))
-    parser.add_argument("--factory-freeform-address", default=_env("FACTORY_FREEFORM_ADDRESS"))
-    parser.add_argument("--factory-v3-address", default=_env("FACTORY_V3_ADDRESS"))
     parser.add_argument("--network", default=_env("INDEXER_NETWORK", "base-sepolia"))
     parser.add_argument("--deployments-config-path", default=_env("DEPLOYMENTS_CONFIG_PATH", "config/deployments.json"))
     parser.add_argument("--host", default=_env("HOST", "0.0.0.0"))
@@ -216,26 +135,10 @@ def main() -> None:
         network=args.network,
         config_path=args.deployments_config_path,
     )
-    factory_v2_address = _resolve_factory_v2_address(
-        explicit=args.factory_v2_address,
-        network=args.network,
-        config_path=args.deployments_config_path,
-    )
-    factory_freeform_address = _resolve_factory_freeform_address(
-        explicit=args.factory_freeform_address,
-        network=args.network,
-        config_path=args.deployments_config_path,
-    )
-    factory_v3_address = _resolve_factory_v3_address(
-        explicit=args.factory_v3_address,
-        network=args.network,
-        config_path=args.deployments_config_path,
-    )
-    if not (factory_address or factory_v2_address or factory_freeform_address or factory_v3_address):
+    if not factory_address:
         raise RuntimeError(
-            "At least one factory address is required: v1 (FACTORY_ADDRESS / factoryAddress), "
-            "v2 (FACTORY_V2_ADDRESS / factoryV2Address), freeform (FACTORY_FREEFORM_ADDRESS / "
-            "factoryFreeformAddress), or v3 (FACTORY_V3_ADDRESS / factoryV3Address)"
+            "Factory address is required: set --factory-address, env FACTORY_ADDRESS, "
+            f"or factoryAddress on the network entry in {args.deployments_config_path}"
         )
 
     initial_from_block = args.from_block
@@ -255,9 +158,6 @@ def main() -> None:
     init_db(sync_conn)
     Handler.conn = api_conn
     Handler.indexer_factory_address = factory_address or None
-    Handler.indexer_factory_v2_address = factory_v2_address or None
-    Handler.indexer_factory_freeform_address = factory_freeform_address or None
-    Handler.indexer_factory_v3_address = factory_v3_address or None
 
     stop_event = threading.Event()
     sync_thread = threading.Thread(
@@ -267,9 +167,6 @@ def main() -> None:
             rpc_url,
             sync_conn,
             factory_address,
-            factory_v2_address,
-            factory_freeform_address,
-            factory_v3_address,
             args.poll_interval_seconds,
             args.chunk_size,
             initial_from_block,
@@ -280,14 +177,7 @@ def main() -> None:
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Indexer live API listening on http://{args.host}:{args.port}")
-    if factory_address:
-        print(f"Factory (v1): {factory_address}")
-    if factory_v2_address:
-        print(f"Factory (v2): {factory_v2_address}")
-    if factory_freeform_address:
-        print(f"Factory (freeform): {factory_freeform_address}")
-    if factory_v3_address:
-        print(f"Factory (v3): {factory_v3_address}")
+    print(f"Factory: {factory_address}")
     print(f"Poll interval: {args.poll_interval_seconds}s")
     try:
         server.serve_forever()

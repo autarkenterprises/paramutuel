@@ -49,8 +49,20 @@ def main() -> int:
     c.add_argument("--resolution-closer", default="0x0000000000000000000000000000000000000000")
     c.add_argument("--extra-recipients", default="")
     c.add_argument("--extra-bps", default="")
-    c.add_argument("--seed-outcome-indices", default="", help="Comma-separated uint256 outcome indices")
+    c.add_argument("--seed-outcome-indices", default="", help="Comma-separated outcome indices (each promoted to mask 1<<i)")
     c.add_argument("--seed-amounts", default="", help="Comma-separated raw token amounts (uint256)")
+    c.add_argument(
+        "--payoff-policy",
+        type=int,
+        default=0,
+        help="PayoffPolicy enum: 0=SINGLE_WINNER, 1=ANY_OF, 2=EXACT_SET, 3=AT_LEAST_K, 4=WEIGHTED_OVERLAP",
+    )
+    c.add_argument(
+        "--policy-param",
+        type=int,
+        default=0,
+        help="k for AT_LEAST_K; 0 otherwise",
+    )
 
     ff = sub.add_parser("create-freeform-wager")
     ff.add_argument("--factory", required=True)
@@ -79,11 +91,12 @@ def main() -> int:
             "withdraw-fees",
         ],
     )
-    a.add_argument("--outcome-index", type=int, help="For resolve: v1 outcome index or v2 winningMask")
+    a.add_argument("--outcome-index", type=int, help="For enumerated resolve: winning ticket bitmask (uint256)")
     a.add_argument(
         "--protocol-version",
-        default="v1",
-        help="v1, v2, or freeform (freeform resolve uses --winning-answer)",
+        default="enumerated",
+        choices=["enumerated", "freeform"],
+        help="enumerated (resolve(uint256)) or freeform (resolve(string) via --winning-answer)",
     )
     a.add_argument("--winning-answer", default="", help="For freeform resolve(string): exact UTF-8 winning text")
 
@@ -106,6 +119,8 @@ def main() -> int:
                 resolution_closer=args.resolution_closer,
                 extra_recipients=_split_csv(args.extra_recipients),
                 extra_bps=_split_int_csv(args.extra_bps),
+                payoff_policy=args.payoff_policy,
+                policy_param=args.policy_param,
                 seed_outcome_indices=_split_int_csv(args.seed_outcome_indices),
                 seed_amounts=_split_int_csv(args.seed_amounts),
                 rpc_url=args.rpc_url,

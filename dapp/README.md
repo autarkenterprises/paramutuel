@@ -20,7 +20,7 @@ It supports:
 ### Prerequisites
 
 - A node wallet with gas funds on your target network
-- Deployed **ParamutuelFactoryV3** on your network; set **`factoryV3Address`** in `config/deployments.json` for auto-fill.
+- Deployed **ParamutuelFactoryV3** on your network; set **`factoryAddress`** in `config/deployments.json` for auto-fill.
 - Wagers are created dynamically; the dApp reads the wager address from **`WagerCreatedV3Enumerated`** or **`WagerCreatedV3Freeform`**.
 - **Loading an existing wager** requires a contract that exposes **`MODE()`** (current Paramutuel wager); older deployments without it are not supported in this UI.
 - Serve the directory with an HTTP server (do not open via `file://...`).
@@ -47,7 +47,7 @@ python3 -m http.server 8080
 
 In the dApp UI, paste:
 - **Market type** (enumerated vs freeform) — loading an existing wager uses **`MODE()`** on the wager contract.
-- `Factory address` (auto-filled from `config/deployments.json`: **`factoryV3Address`**)
+- `Factory address` (auto-filled from `config/deployments.json`: **`factoryAddress`**)
 - `Collateral token preset` (network-aware dropdown; includes Base mainnet and Base Sepolia presets)
 - `Collateral token (ERC20) address`
 - Outcomes (comma-separated strings)

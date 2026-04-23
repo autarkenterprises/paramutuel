@@ -115,11 +115,8 @@ def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
 
 class Handler(BaseHTTPRequestHandler):
     conn: sqlite3.Connection = None  # type: ignore
-    # Optional: live_api sets these so /health can echo configured factories without env injection.
+    # Optional: live_api sets this so /health can echo the configured factory without env injection.
     indexer_factory_address: str | None = None
-    indexer_factory_v2_address: str | None = None
-    indexer_factory_freeform_address: str | None = None
-    indexer_factory_v3_address: str | None = None
 
     def _send_json(self, code: int, body: dict) -> None:
         payload = json.dumps(body).encode()
@@ -169,10 +166,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.conn.execute("SELECT COUNT(*) AS c FROM wagers").fetchone()["c"]
             )
             err = get_meta_str(self.conn, "last_sync_error")
-            fac1 = getattr(self.__class__, "indexer_factory_address", None)
-            fac2 = getattr(self.__class__, "indexer_factory_v2_address", None)
-            fac_ff = getattr(self.__class__, "indexer_factory_freeform_address", None)
-            fac_v3 = getattr(self.__class__, "indexer_factory_v3_address", None)
+            fac = getattr(self.__class__, "indexer_factory_address", None)
             self._send_json(
                 200,
                 {
@@ -182,10 +176,7 @@ class Handler(BaseHTTPRequestHandler):
                     "last_indexed_block": get_meta_int(self.conn, "last_indexed_block"),
                     "chain_head": get_meta_int(self.conn, "chain_head"),
                     "last_sync_error": err if err else None,
-                    "factory_address": fac1,
-                    "factory_v2_address": fac2,
-                    "factory_freeform_address": fac_ff,
-                    "factory_v3_address": fac_v3,
+                    "factory_address": fac,
                 },
             )
             return

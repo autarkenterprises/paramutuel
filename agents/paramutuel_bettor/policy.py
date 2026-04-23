@@ -44,31 +44,11 @@ def pick_outcome(
     betting_open, revert_hint = odds_mod.betting_open_status(wager, now_ts=now_ts)
 
     per_outcome: list[dict[str, Any]] = []
-    protocol_version = str(wager.get("protocol_version") or "v1").strip().lower()
+    # ADR-0010 V3 wagers tag `protocol_version` as either `enumerated`
+    # (bitmask tickets) or `freeform` (UTF-8 answers hashed to answerId).
+    protocol_version = str(wager.get("protocol_version") or "enumerated").strip().lower()
 
-    if protocol_version in ("v2", "v3_enum"):
-        labels = _outcome_labels(wager)
-        ticket_pools = wager_detail.get("ticket_pools") or []
-        for idx in range(len(labels)):
-            mask = 1 << idx
-            otot = _ticket_pool_total(ticket_pools, mask)
-            od = odds_mod.compute_odds(
-                total_pot=total_pot,
-                outcome_total=otot,
-                total_fee_bps=total_fee_bps,
-                bet_amount=bet_amount,
-            )
-            post = od.get("post_bet_payout_multiple")
-            per_outcome.append(
-                {
-                    "outcome_index": idx,
-                    "outcome_total_raw": otot,
-                    "ticket_mask": mask,
-                    "odds": od,
-                    "score": post if isinstance(post, (int, float)) else -1.0,
-                }
-            )
-    elif protocol_version in ("freeform", "v3_freeform"):
+    if protocol_version == "freeform":
         raw_pools = wager_detail.get("ticket_pools") or []
         ticket_pools = [p for p in raw_pools if isinstance(p, dict)]
         ticket_pools.sort(key=lambda p: str(p.get("ticket_mask") or "").lower())
@@ -92,11 +72,11 @@ def pick_outcome(
                 }
             )
     else:
-        for row in outcome_rows:
-            idx = int(row.get("outcome_index", -1))
-            if idx < 0:
-                continue
-            otot = int(row.get("outcome_total", 0) or 0)
+        labels = _outcome_labels(wager)
+        ticket_pools = wager_detail.get("ticket_pools") or []
+        for idx in range(len(labels)):
+            mask = 1 << idx
+            otot = _ticket_pool_total(ticket_pools, mask)
             od = odds_mod.compute_odds(
                 total_pot=total_pot,
                 outcome_total=otot,
@@ -108,6 +88,7 @@ def pick_outcome(
                 {
                     "outcome_index": idx,
                     "outcome_total_raw": otot,
+                    "ticket_mask": mask,
                     "odds": od,
                     "score": post if isinstance(post, (int, float)) else -1.0,
                 }
@@ -134,31 +115,25 @@ def pick_outcome(
     if protocol_version == "freeform":
         out["answer_id_hex"] = str(best.get("answer_id_hex") or "")
         out["freeform_note"] = (
-            "Indexer stores answer ids (bytes32), not plaintext. To sign `placeBet`, you need the exact "
-            "UTF-8 string that hashes to this id, or use MCP `encode_place_bet_freeform` with that string."
-        )
-    elif protocol_version == "v3_freeform":
-        out["answer_id_hex"] = str(best.get("answer_id_hex") or "")
-        out["freeform_note"] = (
-            "v3_freeform: ticket id = keccak256(abi.encodePacked(bytes1(0x03), bytes(answer))) — not legacy "
-            "freeform. Indexer stores ids only; pass the exact UTF-8 answer in `quote.freeform_answer` or use MCP."
+            "V3 freeform: answerId = keccak256(abi.encodePacked(bytes1(0x03), bytes(answer))). "
+            "Indexer stores ids only; pass the exact UTF-8 answer in `quote.freeform_answer` or use "
+            "MCP `encode_place_bet_freeform` with that string."
         )
     return out
 
 
 def summarize_list_row(row: dict[str, Any]) -> dict[str, Any]:
     labels = _outcome_labels(row)
-    pv = str(row.get("protocol_version") or "v1").strip().lower()
+    pv = str(row.get("protocol_version") or "enumerated").strip().lower()
     return {
         "wager_address": row.get("wager_address"),
         "state": row.get("state"),
-        "protocol_version": row.get("protocol_version") or "v1",
+        "protocol_version": row.get("protocol_version") or "enumerated",
         "proposition": (row.get("proposition") or "")[:500],
         "collateral_token": row.get("collateral_token"),
         "total_pot_raw": str(row.get("total_pot") or "0"),
         "total_fee_bps": str(row.get("total_fee_bps") or "0"),
         "outcome_count": len(labels),
         "outcome_labels_preview": labels[:8],
-        "freeform": pv in ("freeform", "v3_freeform"),
-        "v3": pv.startswith("v3_"),
+        "freeform": pv == "freeform",
     }

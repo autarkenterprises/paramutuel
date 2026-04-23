@@ -4,13 +4,13 @@ from service.resolution.service import _action_command, evaluate_candidates
 
 
 class TestResolutionActions(unittest.TestCase):
-    def test_resolve_command_prefers_winning_mask_over_outcome_index(self) -> None:
+    def test_resolve_command_enumerated_uses_winning_mask(self) -> None:
         cmd = _action_command(
             wager_address="0x" + "ab" * 20,
             action="resolve",
             rpc_url="http://localhost:8545",
             private_key="0x" + "cd" * 32,
-            protocol_version="v2",
+            protocol_version="enumerated",
             resolve_uint256=1 << 4,
         )
         self.assertIn("resolve(uint256)", cmd)
@@ -28,14 +28,15 @@ class TestResolutionActions(unittest.TestCase):
         self.assertIn("resolve(string)", cmd)
         self.assertIn("yes", cmd)
 
-    def test_resolve_command_requires_value(self) -> None:
+    def test_resolve_command_enumerated_requires_value(self) -> None:
+        # Default protocol is enumerated; omitting the numeric arg must error.
         with self.assertRaises(ValueError):
             _action_command(
                 wager_address="0x" + "ab" * 20,
                 action="resolve",
                 rpc_url="http://localhost:8545",
                 private_key="0x" + "cd" * 32,
-                protocol_version="v1",
+                protocol_version="enumerated",
                 resolve_uint256=None,
             )
 
@@ -56,7 +57,7 @@ class TestResolutionActions(unittest.TestCase):
             {
                 "wager_address": "0xabc1000000000000000000000000000000000001",
                 "state": "OPEN",
-                "protocol_version": "v2",
+                "protocol_version": "enumerated",
                 "resolver": resolver,
                 "betting_closed_by_authority": 1,
                 "betting_close_time": 0,

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS wagers (
   collateral_token TEXT NOT NULL,
   proposition TEXT NOT NULL DEFAULT '',
   outcomes_json TEXT NOT NULL DEFAULT '[]',
-  protocol_version TEXT NOT NULL DEFAULT 'v1',
+  protocol_version TEXT NOT NULL DEFAULT 'enumerated',
   payoff_policy INTEGER,
   policy_param TEXT,
   betting_close_time INTEGER NOT NULL,

@@ -10,6 +10,8 @@ from service.control_panel.commands import (
 
 class ControlPanelCommandTests(unittest.TestCase):
     def test_create_wager_command_shape(self):
+        # ADR-0010: control panel targets `createEnumeratedWager` with seeds
+        # overload (empty seed arrays = no seed tickets).
         cmd = build_create_wager_command(
             factory="0x1111111111111111111111111111111111111111",
             collateral="0x2222222222222222222222222222222222222222",
@@ -27,10 +29,72 @@ class ControlPanelCommandTests(unittest.TestCase):
         )
         joined = " ".join(cmd.command)
         self.assertIn(
-            "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
+            "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])",
             joined,
         )
         self.assertIn("[\"YES\",\"NO\"]", joined)
+
+    def test_create_wager_command_defaults_to_single_winner_policy(self):
+        cmd = build_create_wager_command(
+            factory="0x1111111111111111111111111111111111111111",
+            collateral="0x2222222222222222222222222222222222222222",
+            proposition="Q?",
+            outcomes=["YES", "NO"],
+            betting_close_time=1234567890,
+            resolution_window=7200,
+            resolver="0x0000000000000000000000000000000000000000",
+            betting_closer="0x0000000000000000000000000000000000000000",
+            resolution_closer="0x0000000000000000000000000000000000000000",
+            extra_recipients=[],
+            extra_bps=[],
+            rpc_url="http://localhost:8545",
+            private_key="0xabc",
+        )
+        # The `uint8 payoffPolicy` and `uint256 policyParam` args sit right
+        # after the outcomes JSON; both default to 0 (SINGLE_WINNER, no param).
+        idx = cmd.command.index("[\"YES\",\"NO\"]")
+        self.assertEqual(cmd.command[idx + 1], "0")
+        self.assertEqual(cmd.command[idx + 2], "0")
+
+    def test_create_wager_command_forwards_payoff_policy_and_param(self):
+        cmd = build_create_wager_command(
+            factory="0x1111111111111111111111111111111111111111",
+            collateral="0x2222222222222222222222222222222222222222",
+            proposition="K of 4",
+            outcomes=["A", "B", "C", "D"],
+            betting_close_time=1,
+            resolution_window=1,
+            resolver="0x0000000000000000000000000000000000000000",
+            betting_closer="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            resolution_closer="0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            extra_recipients=[],
+            extra_bps=[],
+            payoff_policy=3,  # AT_LEAST_K
+            policy_param=2,
+            rpc_url="http://localhost:8545",
+            private_key="0xabc",
+        )
+        joined = " ".join(cmd.command)
+        self.assertIn("[\"A\",\"B\",\"C\",\"D\"] 3 2", joined)
+
+    def test_create_wager_command_rejects_invalid_payoff_policy(self):
+        with self.assertRaises(ValueError):
+            build_create_wager_command(
+                factory="0x1111111111111111111111111111111111111111",
+                collateral="0x2222222222222222222222222222222222222222",
+                proposition="Q?",
+                outcomes=["A", "B"],
+                betting_close_time=1,
+                resolution_window=1,
+                resolver="0x0000000000000000000000000000000000000000",
+                betting_closer="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                resolution_closer="0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                extra_recipients=[],
+                extra_bps=[],
+                payoff_policy=99,
+                rpc_url="http://localhost:8545",
+                private_key="0xabc",
+            )
 
     def test_create_wager_rejects_uncloseable_no_max(self):
         with self.assertRaises(ValueError):
@@ -51,6 +115,10 @@ class ControlPanelCommandTests(unittest.TestCase):
             )
 
     def test_create_wager_accepts_seed_arrays(self):
+        # V3 factory expects `uint256[] seedTicketMasks`, not raw outcome
+        # indices.  The control panel promotes each outcome index `i` to
+        # the single-outcome ticket bitmask `1 << i` — parity with the old
+        # "seed outcome 0 + seed outcome 1" semantics.
         cmd = build_create_wager_command(
             factory="0x1111111111111111111111111111111111111111",
             collateral="0x2222222222222222222222222222222222222222",
@@ -69,8 +137,28 @@ class ControlPanelCommandTests(unittest.TestCase):
             private_key="0xabc",
         )
         joined = " ".join(cmd.command)
-        self.assertIn("[0,1]", joined)
+        self.assertIn("[1,2]", joined)
         self.assertIn("[100,200]", joined)
+
+    def test_create_wager_rejects_seed_index_out_of_range(self):
+        with self.assertRaises(ValueError):
+            build_create_wager_command(
+                factory="0x1111111111111111111111111111111111111111",
+                collateral="0x2222222222222222222222222222222222222222",
+                proposition="Q?",
+                outcomes=["YES", "NO"],
+                betting_close_time=1,
+                resolution_window=1,
+                resolver="0x0000000000000000000000000000000000000000",
+                betting_closer="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                resolution_closer="0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                extra_recipients=[],
+                extra_bps=[],
+                seed_outcome_indices=[2],  # only outcomes 0..1 exist
+                seed_amounts=[100],
+                rpc_url="http://localhost:8545",
+                private_key="0xabc",
+            )
 
     def test_create_wager_rejects_more_than_255_outcomes(self):
         with self.assertRaises(ValueError) as ctx:

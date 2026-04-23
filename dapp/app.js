@@ -18,10 +18,10 @@ function resolveEip1193Provider() {
   return eth;
 }
 
-const FACTORY_ABI_V3_URL = "abi/ParamutuelFactoryV3.json";
-const FACTORY_ABI_V3_FALLBACK = "../out/ParamutuelFactoryV3.sol/ParamutuelFactoryV3.json";
-const WAGER_ABI_V3_URL = "abi/ParamutuelWagerV3.json";
-const WAGER_ABI_V3_FALLBACK = "../out/ParamutuelWagerV3.sol/ParamutuelWagerV3.json";
+const FACTORY_ABI_URL = "abi/ParamutuelFactoryV3.json";
+const FACTORY_ABI_FALLBACK = "../out/ParamutuelFactoryV3.sol/ParamutuelFactoryV3.json";
+const WAGER_ABI_URL = "abi/ParamutuelWagerV3.json";
+const WAGER_ABI_FALLBACK = "../out/ParamutuelWagerV3.sol/ParamutuelWagerV3.json";
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
 const Logic = globalThis.ParamutuelLogic;
 
@@ -29,8 +29,8 @@ let provider;
 let signer;
 let userAddress;
 
-let factoryAbiV3;
-let wagerAbiV3;
+let factoryAbi;
+let wagerAbi;
 /** @type {"v3_enum"|"v3_freeform"} */
 let activeWagerProtocol = "v3_enum";
 
@@ -176,16 +176,16 @@ function applySiteDeploymentNetworkFromUrl() {
   } catch (_) {}
 }
 
-function deploymentFactoryV3AddressForChain(chainId) {
+function deploymentFactoryAddressForChain(chainId) {
   if (!deploymentsConfig) return "";
   const key = deploymentConfigKeyForChain(chainId);
-  return String((deploymentsConfig[key] || {}).factoryV3Address || "").trim();
+  return String((deploymentsConfig[key] || {}).factoryAddress || "").trim();
 }
 
 function applyDefaultFactoryAddress() {
   const current = $("factoryAddress").value.trim();
   if (current) return;
-  const configured = deploymentFactoryV3AddressForChain(currentChainId);
+  const configured = deploymentFactoryAddressForChain(currentChainId);
   if (!configured || !ethers.isAddress(configured)) return;
   $("factoryAddress").value = configured;
 }
@@ -722,9 +722,9 @@ async function loadDeploymentsConfig() {
 }
 
 async function loadAbi() {
-  [factoryAbiV3, wagerAbiV3] = await Promise.all([
-    fetchAbiWithFallback(FACTORY_ABI_V3_URL, FACTORY_ABI_V3_FALLBACK),
-    fetchAbiWithFallback(WAGER_ABI_V3_URL, WAGER_ABI_V3_FALLBACK),
+  [factoryAbi, wagerAbi] = await Promise.all([
+    fetchAbiWithFallback(FACTORY_ABI_URL, FACTORY_ABI_FALLBACK),
+    fetchAbiWithFallback(WAGER_ABI_URL, WAGER_ABI_FALLBACK),
   ]);
 }
 
@@ -776,7 +776,7 @@ async function connectWallet() {
 
 async function getFactoryConstraints(factoryAddress) {
   await ensureContractExistsOnCurrentNetwork(factoryAddress, "Factory address");
-  const factory = new ethers.Contract(factoryAddress, factoryAbiV3, provider);
+  const factory = new ethers.Contract(factoryAddress, factoryAbi, provider);
   const minBettingWindow = await factory.minBettingWindow();
   const minResolutionWindow = await factory.minResolutionWindow();
   return { minBettingWindow, minResolutionWindow };
@@ -807,7 +807,7 @@ async function setActiveWager(wagerAddress) {
     );
   }
   activeWagerProtocol = protocol;
-  wagerContract = new ethers.Contract(wagerAddress, wagerAbiV3, getRunner());
+  wagerContract = new ethers.Contract(wagerAddress, wagerAbi, getRunner());
 
   $("wagerAddress").textContent = wagerAddress;
   $("activeWagerAddress").value = wagerAddress;
@@ -1032,7 +1032,7 @@ async function createWager() {
     " (window values of 0 enable no-max mode)" +
     (warnings.length ? `; Warning: ${warnings.join("; ")}` : "");
 
-  const factory = new ethers.Contract(factoryAddress, factoryAbiV3, signer);
+  const factory = new ethers.Contract(factoryAddress, factoryAbi, signer);
 
   let resolverArg = ethers.ZeroAddress;
   if (resolverInput && resolverInput.length > 0) {

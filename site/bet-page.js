@@ -31,8 +31,8 @@
   let deployments = null;
   let expectedChainId = null;
   let wagerAbi = null;
-  /** @type {"v3_enum"|"v3_freeform"} */
-  let currentProtocolVersion = "v3_enum";
+  /** @type {"enumerated"|"freeform"} */
+  let currentProtocolVersion = "enumerated";
   let indexerBase = "";
   let provider = null;
   let signer = null;
@@ -101,10 +101,10 @@
   }
 
   async function loadWagerAbiForProtocol(pv) {
-    const p = String(pv || "v3_enum").trim().toLowerCase();
+    const p = String(pv || "enumerated").trim().toLowerCase();
     const j = await loadJson(WAGER_ABI_V3_URL);
     wagerAbi = j.abi;
-    currentProtocolVersion = p === "v3_freeform" ? "v3_freeform" : "v3_enum";
+    currentProtocolVersion = p === "freeform" ? "freeform" : "enumerated";
   }
 
   function basescanUrl(addr) {
@@ -194,14 +194,6 @@
     return `${whole}.${frac}`;
   }
 
-  function outcomeTotalsByIndex(outcomesArr) {
-    const map = {};
-    for (const o of outcomesArr || []) {
-      map[Number(o.outcome_index)] = BigInt(String(o.outcome_total || "0"));
-    }
-    return map;
-  }
-
   function ticketPoolStakeRaw(ticketPoolsArr, outcomeIdx) {
     const mask = (1n << BigInt(outcomeIdx)).toString();
     for (const row of ticketPoolsArr || []) {
@@ -249,25 +241,23 @@
     }
   }
 
-  function renderOutcomesOddsTable(labels, outcomesArr, totalPotRaw, feeBpsRaw, ticketPoolsArr, useV2Pools) {
+  function renderOutcomesOddsTable(labels, totalPotRaw, feeBpsRaw, ticketPoolsArr) {
     const tbody = $("betOutcomesTableBody");
     if (!tbody) return;
 
     const totalPot = BigInt(String(totalPotRaw || "0"));
     const feeBps = BigInt(String(feeBpsRaw || "0"));
     const net = netPotAfterFees(totalPot, feeBps);
-    const byIdx = outcomeTotalsByIndex(outcomesArr);
 
     let sumStakes = 0n;
     for (let i = 0; i < labels.length; i++) {
-      const stake = useV2Pools ? ticketPoolStakeRaw(ticketPoolsArr, i) : byIdx[i] ?? 0n;
-      sumStakes += stake;
+      sumStakes += ticketPoolStakeRaw(ticketPoolsArr, i);
     }
 
     tbody.innerHTML = "";
     for (let i = 0; i < labels.length; i++) {
       const label = labels[i] || `#${i}`;
-      const stake = useV2Pools ? ticketPoolStakeRaw(ticketPoolsArr, i) : byIdx[i] ?? 0n;
+      const stake = ticketPoolStakeRaw(ticketPoolsArr, i);
       const poolPct =
         sumStakes > 0n ? Number((stake * 10000n) / sumStakes) / 100 : 0;
       const mult =
@@ -397,9 +387,9 @@
     loadedWagerAddress = address;
 
     const pvRaw = String(w.protocol_version || "").trim().toLowerCase();
-    let pv = "v3_enum";
-    if (pvRaw === "v3_freeform") pv = "v3_freeform";
-    else if (pvRaw === "v3_enum") pv = "v3_enum";
+    let pv = "enumerated";
+    if (pvRaw === "freeform") pv = "freeform";
+    else if (pvRaw === "enumerated") pv = "enumerated";
     else {
       clearLoading();
       showEl("betError", true);
@@ -425,7 +415,7 @@
     } catch {
       labels = [];
     }
-    if (pv !== "v3_freeform" && labels.length < 2) {
+    if (pv !== "freeform" && labels.length < 2) {
       throw new Error("Wager has fewer than two outcomes in the index.");
     }
 
@@ -443,7 +433,7 @@
     $("betState").textContent = state;
     const protEl = $("betProtocol");
     if (protEl) {
-      if (pv === "v3_enum") {
+      if (pv === "enumerated") {
         protEl.textContent = `Paramutuel · enumerated · payoffPolicy ${w.payoff_policy != null ? w.payoff_policy : "—"} · policyParam ${
           w.policy_param != null && w.policy_param !== "" ? w.policy_param : "—"
         }`;
@@ -455,19 +445,19 @@
     const titleEl = $("betOutcomesTableTitle");
     if (titleEl) {
       titleEl.textContent =
-        pv === "v3_freeform" ? "Answer IDs (hashed stakes) & implied odds" : "Outcomes & implied odds";
+        pv === "freeform" ? "Answer IDs (hashed stakes) & implied odds" : "Outcomes & implied odds";
     }
     const footEl = $("betOutcomesTableFootnote");
     if (footEl) {
       footEl.textContent =
-        pv === "v3_freeform"
+        pv === "freeform"
           ? "Freeform: each row is a domain-separated answer id (0x03 ‖ UTF-8 bytes, then keccak). Implied multiple assumes that answer wins and no further bets."
           : "Pool share uses on-chain stake totals. Implied multiple is the approximate payout per 1 unit staked on that outcome if it wins, after protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).";
     }
     const formLead = $("betFormLead");
     if (formLead) {
       formLead.textContent =
-        pv === "v3_freeform"
+        pv === "freeform"
           ? "Enter the exact UTF-8 answer you want to back and a human token amount. One stake per submit (call placeBet(string,uint256))."
           : "Enter a token amount next to each outcome you want to back (human units, e.g. 10 USDC). At least one positive amount is required. Batch stakes use placeBets with single-outcome ticket masks, matching the Paramutuel dApp.";
     }
@@ -492,9 +482,9 @@
       totals.winning_outcome !== ""
     ) {
       let winLabel;
-      if (pv === "v3_freeform") {
+      if (pv === "freeform") {
         winLabel = `answerId ${String(totals.winning_outcome).trim()}`;
-      } else if (pv === "v3_enum") {
+      } else {
         const wm = BigInt(String(totals.winning_outcome || "0"));
         winLabel = `mask ${wm.toString()}`;
         for (let i = 0; i < labels.length; i++) {
@@ -503,10 +493,6 @@
             break;
           }
         }
-      } else {
-        const wi = Number(totals.winning_outcome);
-        winLabel =
-          !Number.isNaN(wi) && labels[wi] != null ? `${labels[wi]} (#${wi})` : `#${totals.winning_outcome}`;
       }
       const winStake = formatPot(totals.total_winning_stake ?? "0");
       winOut.textContent = `${winLabel} · winning stake ${winStake} (raw)`;
@@ -530,22 +516,15 @@
     scan.textContent = "View on Basescan";
 
     const tPools = detail.ticket_pools || [];
-    if (pv === "v3_freeform") {
+    if (pv === "freeform") {
       renderFreeformPoolsTable(tPools, totalPotVal, feeBpsVal);
     } else {
-      renderOutcomesOddsTable(
-        labels,
-        detail.outcomes,
-        totalPotVal,
-        feeBpsVal,
-        tPools,
-        pv === "v3_enum"
-      );
+      renderOutcomesOddsTable(labels, totalPotVal, feeBpsVal, tPools);
     }
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
-    if (pv === "v3_freeform") {
+    if (pv === "freeform") {
       renderFreeformStakeInputs();
     } else {
       renderOutcomeInputs(labels);
@@ -671,7 +650,7 @@
     if (!Number.isFinite(decimals) || decimals < 0 || decimals > 77) {
       throw new Error("Invalid decimals (0–77).");
     }
-    if (currentProtocolVersion === "v3_freeform") {
+    if (currentProtocolVersion === "freeform") {
       const ansInp = $("betFreeformAnswerInput");
       const answer = ansInp ? String(ansInp.value || "").trim() : "";
       if (!answer) throw new Error("Enter a non-empty answer string.");

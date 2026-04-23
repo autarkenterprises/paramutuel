@@ -19,8 +19,6 @@ class ApiRouteTests(unittest.TestCase):
         init_db(self.conn)
         Handler.conn = self.conn
         Handler.indexer_factory_address = None
-        Handler.indexer_factory_v2_address = None
-        Handler.indexer_factory_freeform_address = None
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         host, port = self.server.server_address
@@ -35,8 +33,6 @@ class ApiRouteTests(unittest.TestCase):
         self.thread.join(timeout=2)
         self.conn.close()
         Handler.indexer_factory_address = None
-        Handler.indexer_factory_v2_address = None
-        Handler.indexer_factory_freeform_address = None
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
@@ -56,9 +52,9 @@ class ApiRouteTests(unittest.TestCase):
         collateral_token: str,
         total_pot: str = "0",
         *,
-        protocol_version: str = "v1",
-        payoff_policy: int | None = None,
-        policy_param: str | None = None,
+        protocol_version: str = "enumerated",
+        payoff_policy: int | None = 0,
+        policy_param: str | None = "0",
     ) -> None:
         self.conn.execute(
             """
@@ -72,7 +68,7 @@ class ApiRouteTests(unittest.TestCase):
             """,
             (
                 wager,
-                "0xfac7000000000000000000000000000000000001",
+                "0xfac7000000000000000000000000000000000004",
                 proposer,
                 "0xabc3000000000000000000000000000000000003",
                 "0xabc4000000000000000000000000000000000004",
@@ -136,19 +132,16 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("ticket_pools", body)
         self.assertEqual(body["ticket_pools"], [])
 
-    def test_get_wager_v2_exposes_ticket_pools_rows(self) -> None:
+    def test_get_wager_exposes_ticket_pools_rows(self) -> None:
         waddr = "0xabc10000000000000000000000000000000000aa"
         self._insert_wager(
             wager=waddr,
-            proposition="V2 bitmask pool test",
+            proposition="Bitmask pool test",
             outcomes=["A", "B"],
             created_block=9,
             created_tx_hash="0xaaf",
             proposer="0xabc2000000000000000000000000000000000002",
             collateral_token="0xabc6000000000000000000000000000000000006",
-            protocol_version="v2",
-            payoff_policy=0,
-            policy_param="0",
         )
         self.conn.execute(
             "INSERT INTO wager_ticket_pools(wager_address, ticket_mask, pool_total) VALUES (?, ?, ?)",
@@ -157,41 +150,38 @@ class ApiRouteTests(unittest.TestCase):
         self.conn.commit()
         status, body = self._get_json(f"/wagers/{waddr}")
         self.assertEqual(status, 200)
-        self.assertEqual(body["wager"]["protocol_version"], "v2")
+        self.assertEqual(body["wager"]["protocol_version"], "enumerated")
         pools = {p["ticket_mask"]: p["pool_total"] for p in body["ticket_pools"]}
         self.assertEqual(pools.get("2"), "777")
 
     def test_wagers_search_includes_protocol_version_field(self) -> None:
         self._insert_wager(
             wager="0xabc10000000000000000000000000000000000bb",
-            proposition="Alpha only",
-            outcomes=["X", "Y"],
+            proposition="Freeform entry",
+            outcomes=[],
             created_block=8,
             created_tx_hash="0xaae",
             proposer="0xabc20000000000000000000000000000000000bb",
             collateral_token="0xabc6000000000000000000000000000000000006",
-            protocol_version="v2",
+            protocol_version="freeform",
+            payoff_policy=None,
+            policy_param=None,
         )
         self.conn.commit()
-        status, body = self._get_json("/wagers?q=v2")
+        status, body = self._get_json("/wagers?q=freeform")
         self.assertEqual(status, 200)
         addrs = {m["wager_address"] for m in body["wagers"]}
         self.assertIn("0xabc10000000000000000000000000000000000bb", addrs)
 
-    def test_health_echoes_configured_factories(self) -> None:
-        Handler.indexer_factory_address = "0xfac7000000000000000000000000000000000001"
-        Handler.indexer_factory_v2_address = "0xfac7000000000000000000000000000000000002"
+    def test_health_echoes_configured_factory(self) -> None:
+        Handler.indexer_factory_address = "0xfac7000000000000000000000000000000000004"
         status, body = self._get_json("/health")
         self.assertEqual(status, 200)
         self.assertEqual(body.get("factory_address"), Handler.indexer_factory_address)
-        self.assertEqual(body.get("factory_v2_address"), Handler.indexer_factory_v2_address)
-        self.assertIsNone(body.get("factory_freeform_address"))
-
-    def test_health_echoes_freeform_factory_when_set(self) -> None:
-        Handler.indexer_factory_freeform_address = "0xfac7000000000000000000000000000000000003"
-        status, body = self._get_json("/health")
-        self.assertEqual(status, 200)
-        self.assertEqual(body.get("factory_freeform_address"), Handler.indexer_factory_freeform_address)
+        # Legacy fields must not be present.
+        self.assertNotIn("factory_v2_address", body)
+        self.assertNotIn("factory_freeform_address", body)
+        self.assertNotIn("factory_v3_address", body)
 
     def test_root_returns_service_metadata(self) -> None:
         status, body = self._get_json("/")
@@ -209,11 +199,6 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("wagers", body1)
 
     def test_legacy_market_routes_are_rejected(self) -> None:
-        """Regression: pre-wager "/markets" paths must stay gone (404).
-
-        If these ever return 200 again, a deprecated API surface has been reintroduced
-        and this test should fail until the routes are removed or intentionally versioned.
-        """
         with self.assertRaises(HTTPError):
             self._get_json("/markets?limit=1")
         with self.assertRaises(HTTPError):
@@ -289,8 +274,6 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("chain_head", body)
         self.assertIn("last_sync_error", body)
         self.assertIn("factory_address", body)
-        self.assertIn("factory_v2_address", body)
-        self.assertIn("factory_freeform_address", body)
 
 
 if __name__ == "__main__":

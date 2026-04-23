@@ -12,7 +12,7 @@
 
   function wagerIsCurrentProtocol(w) {
     const pv = String(w.protocol_version || "").trim().toLowerCase();
-    return pv === "v3_enum" || pv === "v3_freeform";
+    return pv === "enumerated" || pv === "freeform";
   }
 
   function betPageHref(wagerAddress) {
@@ -78,11 +78,11 @@
     const state = String(w.state || "").toUpperCase();
     const pot = formatPot(w.total_pot);
     const addr = String(w.wager_address || "").toLowerCase();
-    const pv = String(w.protocol_version || "v1").trim().toLowerCase();
+    const pv = String(w.protocol_version || "enumerated").trim().toLowerCase();
 
     if (state === "OPEN") {
       const d = detailByAddr[addr];
-      if (pv === "v3_freeform") {
+      if (pv === "freeform") {
         const n = (d && d.ticket_pools && d.ticket_pools.length) || 0;
         const sub =
           n > 0 ? `${n} pooled answer id(s)` : "no stakes in indexer detail";
@@ -97,10 +97,10 @@
     if (state === "RESOLVED") {
       const wo = w.winning_outcome;
       let winLabel = "—";
-      if (pv === "v3_freeform") {
+      if (pv === "freeform") {
         const hx = wo === null || wo === undefined ? "" : String(wo).trim();
         winLabel = hx ? (hx.length > 18 ? `${hx.slice(0, 10)}…${hx.slice(-6)}` : hx) : "—";
-      } else if (pv === "v3_enum") {
+      } else {
         try {
           const wm = BigInt(String(wo ?? "0"));
           winLabel = `mask ${wm.toString()}`;
@@ -113,14 +113,6 @@
         } catch {
           winLabel = String(wo ?? "—");
         }
-      } else {
-        const wi = wo === null || wo === undefined || wo === "" ? null : Number(wo);
-        winLabel =
-          wi != null && !Number.isNaN(wi) && labels[wi] != null
-            ? String(labels[wi])
-            : wi != null && !Number.isNaN(wi)
-              ? `#${wi}`
-              : "—";
       }
       const winStake = formatPot(w.total_winning_stake);
       return `Winner: ${winLabel} · Winning stake ${winStake} (raw) · Pot ${pot} (raw)`;

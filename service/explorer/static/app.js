@@ -28,7 +28,7 @@ const PAGE_SIZE = 20;
 
 function wagerIsCurrentProtocol(w) {
   const pv = String(w.protocol_version || "").trim().toLowerCase();
-  return pv === "v3_enum" || pv === "v3_freeform";
+  return pv === "enumerated" || pv === "freeform";
 }
 
 let currentOffset = 0;
@@ -251,7 +251,7 @@ async function loadConfiguredFactoryAddress() {
     const cid = net.chainId;
     const parsed = typeof cid === "number" ? cid : Number(cid);
     if (!Number.isNaN(parsed)) explorerChainId = parsed;
-    const addr = String((net.factoryV3Address || net.factoryAddress || "")).trim();
+    const addr = String((net.factoryAddress || "")).trim();
     if (node && addr) node.textContent = addr;
   } catch (_) {
     // Optional when explorer is served standalone without deployments config.

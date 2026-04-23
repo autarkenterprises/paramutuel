@@ -6,7 +6,6 @@ import {console2} from "forge-std/console2.sol";
 
 import {ParamutuelFactoryV3} from "../src/ParamutuelFactoryV3.sol";
 import {ParamutuelWagerV3} from "../src/ParamutuelWagerV3.sol";
-import {WagerV2Masks} from "../src/libraries/WagerV2Masks.sol";
 
 /// @notice Logs representative V3 gas costs (`forge test --match-contract ParamutuelV3GasReport -vv`).
 ///         Full table: `forge test --match-path 'test/ParamutuelV3*.t.sol' --gas-report` or `script/profile_v3_gas.sh`.
@@ -191,7 +190,7 @@ contract ParamutuelV3GasReport is Test {
         vm.warp(block.timestamp + 2 days);
         uint256 g0 = gasleft();
         vm.prank(proposer);
-        w.resolve(WagerV2Masks.fullSet(n));
+        w.resolve((uint256(1) << n) - 1);
         console2.log("V3 enum resolve ANY_OF (16 distinct masks)", g0 - gasleft());
     }
 
