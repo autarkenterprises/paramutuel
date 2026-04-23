@@ -19,9 +19,8 @@ set -euo pipefail
 #   STRESS_COLLATERAL_TOKEN=0x... STRESS_BET_AMOUNT=1 \
 #   ./script/testnet/run_stress_suite.sh
 #
-# Factory v2 matrices (see docs/TESTNET-STRESS-SUITE.md): set FACTORY_V2_ADDRESS or
-# factoryV2Address in deployments; optional STRESS_V2_WAGER_COUNT, STRESS_V2_CASES, STRESS_SKIP_V2.
-# Freeform: FACTORY_FREEFORM_ADDRESS or factoryFreeformAddress when adding freeform coverage.
+# V3 payoff-policy matrix (see docs/TESTNET-STRESS-SUITE.md): optional STRESS_V3_CASES filter,
+# STRESS_SKIP_V3_MATRIX to skip.
 #
 # Generate pool (do not commit):
 #   python3 script/testnet/gen_stress_wallet_pool.py 40 test/testnet/stress_wallet_pool.json

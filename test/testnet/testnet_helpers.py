@@ -1,4 +1,4 @@
-"""Shared helpers for Base Sepolia live/stress integration tests (v1 + v2 factories)."""
+"""Shared helpers for Base Sepolia live/stress integration tests (ADR-0010 V3 factory)."""
 
 from __future__ import annotations
 
@@ -15,35 +15,39 @@ DEFAULT_COLLATERAL_TOKEN_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dC
 # Non-zero sentinel used in stress/minimal tests (not a real ERC-20; no funded transfers).
 DUMMY_COLLATERAL = "0x0000000000000000000000000000000000000001"
 
-# keccak256("WagerCreated(address,address,address,address,uint64,uint64,uint64,address,address)")
-WAGER_CREATED_TOPIC_V1 = "0x1b9545daed972e7de65f9c8b3445fdfd1af0c41cdc5774595c37bc7e35f28def"
-
-# keccak256("WagerCreatedV2(address,address,address,address,uint8,uint256,uint64,uint64,uint64,address,address)")
-WAGER_CREATED_TOPIC_V2 = "0x7245d6cca974fb4447fd236c460f3aa281da5ffa682c9b5392e99c37bb3ca89a"
-
-# keccak256("WagerCreatedFreeform(address,address,address,address,uint64,uint64,uint64,address,address)")
-WAGER_CREATED_TOPIC_FREEFORM = (
-    "0x60df4ecdea5ae023d85c252f83dc6af864416587f18faf8390628be794f4591f"
+# keccak256 of ParamutuelFactoryV3 event signatures (see src/ParamutuelFactoryV3.sol).
+WAGER_CREATED_TOPIC_V3_ENUMERATED = (
+    "0xff766b6fc8dd2e2b1c7be675a874f160c4cada5bf32dac8b1b2e0d6ae7bdb0da"
+)
+WAGER_CREATED_TOPIC_V3_FREEFORM = (
+    "0xf59da875d5b5de3b09728f042bebc2a20357ee08ca31bbaf584efd9cb0ec4c53"
 )
 
-FREEFORM_CREATE_WAGER_SIG = (
-    "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
-)
-
-# ParamutuelWagerV2.PayoffPolicy enum order (must match Solidity)
+# ParamutuelWagerV3.PayoffPolicy enum order (must match Solidity)
 PAYOFF_SINGLE_WINNER = 0
 PAYOFF_ANY_OF = 1
 PAYOFF_EXACT_SET = 2
 PAYOFF_AT_LEAST_K = 3
 PAYOFF_WEIGHTED_OVERLAP = 4
 
-V2_CREATE_WAGER_SIG = (
-    "createWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[])"
+# ADR-0010 V3 factory: unified `createEnumeratedWager` with appended seed arrays
+# (uint256[] seedTicketMasks, uint256[] seedAmounts). Callers always send the
+# long form; pass `[]` `[]` for no seeds.
+V3_ENUMERATED_CREATE_WAGER_SIG = (
+    "createEnumeratedWager("
+    "address,string,string[],uint8,uint256,uint64,uint64,"
+    "address,address,address,address[],uint16[],uint256[],uint256[]"
+    ")"
+)
+
+V3_FREEFORM_CREATE_WAGER_SIG = (
+    "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
 )
 
 
-def default_factory_v2_address() -> str:
-    env = os.environ.get("FACTORY_V2_ADDRESS", "").strip()
+def default_factory_address() -> str:
+    """Return the V3 factory address from env `FACTORY_ADDRESS` or config/deployments.json baseSepolia.factoryAddress."""
+    env = os.environ.get("FACTORY_ADDRESS", "").strip()
     if env:
         return env
     config_path = Path(__file__).resolve().parents[2] / "config" / "deployments.json"
@@ -53,21 +57,7 @@ def default_factory_v2_address() -> str:
         data = json.loads(config_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return ""
-    return str((data.get("baseSepolia") or {}).get("factoryV2Address") or "").strip()
-
-
-def default_factory_freeform_address() -> str:
-    env = os.environ.get("FACTORY_FREEFORM_ADDRESS", "").strip()
-    if env:
-        return env
-    config_path = Path(__file__).resolve().parents[2] / "config" / "deployments.json"
-    if not config_path.exists():
-        return ""
-    try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return ""
-    return str((data.get("baseSepolia") or {}).get("factoryFreeformAddress") or "").strip()
+    return str((data.get("baseSepolia") or {}).get("factoryAddress") or "").strip()
 
 
 def topic_to_address(topic_word: str) -> str:
@@ -80,7 +70,7 @@ def extract_wager_address_from_receipt(
     factory_address: str,
     created_topic0: str,
 ) -> str:
-    """Return new wager address from factory log matching topic0 (v1 or v2 WagerCreated)."""
+    """Return new wager address from factory log matching topic0 (V3 enumerated or freeform WagerCreated)."""
     fac = factory_address.lower()
     t0 = created_topic0.lower()
     for log in receipt_payload.get("logs", []):
@@ -98,8 +88,8 @@ def extract_wager_address_from_receipt(
 
 
 @dataclass(frozen=True)
-class V2FundedResolveCase:
-    """One funded v2 scenario: create → bet on ticket_masks → resolve(winning_mask) → claim."""
+class V3FundedResolveCase:
+    """One funded V3 enumerated scenario: create → bet on ticket_masks → resolve(winning_mask) → claim."""
 
     case_id: str
     payoff_policy: int
@@ -110,9 +100,9 @@ class V2FundedResolveCase:
     use_place_bets: bool = False
 
 
-# Full matrix of payoff policies with concrete tickets / winning sets (ADR-0008 semantics).
-V2_FUNDED_RESOLVE_CASES: tuple[V2FundedResolveCase, ...] = (
-    V2FundedResolveCase(
+# Full matrix of payoff policies with concrete tickets / winning sets (ADR-0008 semantics, V3 shapes).
+V3_FUNDED_RESOLVE_CASES: tuple[V3FundedResolveCase, ...] = (
+    V3FundedResolveCase(
         case_id="single_winner",
         payoff_policy=PAYOFF_SINGLE_WINNER,
         policy_param=0,
@@ -120,7 +110,7 @@ V2_FUNDED_RESOLVE_CASES: tuple[V2FundedResolveCase, ...] = (
         ticket_masks=(1,),  # outcome 0 only
         winning_mask=1,
     ),
-    V2FundedResolveCase(
+    V3FundedResolveCase(
         case_id="any_of",
         payoff_policy=PAYOFF_ANY_OF,
         policy_param=0,
@@ -129,7 +119,7 @@ V2_FUNDED_RESOLVE_CASES: tuple[V2FundedResolveCase, ...] = (
         winning_mask=3,  # both outcomes in winning set → both tickets overlap
         use_place_bets=True,
     ),
-    V2FundedResolveCase(
+    V3FundedResolveCase(
         case_id="exact_set",
         payoff_policy=PAYOFF_EXACT_SET,
         policy_param=0,
@@ -137,7 +127,7 @@ V2_FUNDED_RESOLVE_CASES: tuple[V2FundedResolveCase, ...] = (
         ticket_masks=(3,),  # ticket must match full set {0,1}
         winning_mask=3,
     ),
-    V2FundedResolveCase(
+    V3FundedResolveCase(
         case_id="at_least_k",
         payoff_policy=PAYOFF_AT_LEAST_K,
         policy_param=2,
@@ -145,7 +135,7 @@ V2_FUNDED_RESOLVE_CASES: tuple[V2FundedResolveCase, ...] = (
         ticket_masks=(3,),  # mask 0b011 — two bits set
         winning_mask=3,  # overlap has popcount 2 >= k=2
     ),
-    V2FundedResolveCase(
+    V3FundedResolveCase(
         case_id="weighted_overlap",
         payoff_policy=PAYOFF_WEIGHTED_OVERLAP,
         policy_param=0,
@@ -156,8 +146,8 @@ V2_FUNDED_RESOLVE_CASES: tuple[V2FundedResolveCase, ...] = (
     ),
 )
 
-# Minimal-tx (no ERC-20) v2: authority-close then expire — one row per policy (dummy collateral).
-V2_MINIMAL_EXPIRE_POLICIES: tuple[tuple[int, int, str], ...] = (
+# Minimal-tx (no ERC-20) V3: authority-close then expire — one row per policy (dummy collateral).
+V3_MINIMAL_EXPIRE_POLICIES: tuple[tuple[int, int, str], ...] = (
     (PAYOFF_SINGLE_WINNER, 0, '["A","B"]'),
     (PAYOFF_ANY_OF, 0, '["A","B"]'),
     (PAYOFF_EXACT_SET, 0, '["A","B"]'),

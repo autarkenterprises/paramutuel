@@ -17,9 +17,8 @@ set -euo pipefail
 #   TESTNET_MODE=funded-tx PRIVATE_KEY=0x... RPC_URL_BASE_SEPOLIA=... ./script/testnet/run_live_suite.sh
 #   Optional: TESTNET_COLLATERAL_TOKEN (defaults to Base Sepolia USDC in the Python suite).
 #
-# v2 factory matrices: FACTORY_V2_ADDRESS or deployments factoryV2Address; see docs/TESTNET-LIVE-SUITE.md
-# (TESTNET_V2_CASES, TESTNET_SKIP_V2, TESTNET_WAGER_ADDRESS_V2).
-# Freeform: FACTORY_FREEFORM_ADDRESS or deployments factoryFreeformAddress when exercising freeform paths.
+# V3 payoff-policy matrix (enumerated): TESTNET_V3_CASES filter, TESTNET_SKIP_V3_MATRIX to skip.
+# V3 freeform branch: TESTNET_SKIP_FREEFORM to skip. See docs/TESTNET-LIVE-SUITE.md.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"

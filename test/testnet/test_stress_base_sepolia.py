@@ -20,10 +20,10 @@ from pathlib import Path
 
 from testnet_helpers import (
     DUMMY_COLLATERAL,
-    V2_CREATE_WAGER_SIG,
-    V2_FUNDED_RESOLVE_CASES,
-    V2_MINIMAL_EXPIRE_POLICIES,
-    default_factory_v2_address,
+    V3_ENUMERATED_CREATE_WAGER_SIG,
+    V3_FUNDED_RESOLVE_CASES,
+    V3_MINIMAL_EXPIRE_POLICIES,
+    default_factory_address,
 )
 
 
@@ -227,12 +227,12 @@ def _wait_for_indexer_wager_address(base_url: str, wager_address: str, timeout_s
     raise AssertionError(f"Timed out waiting for wager {wager_address} to appear in indexer search")
 
 
-def _filtered_stress_v2_cases():
-    raw = _env("STRESS_V2_CASES", "").strip()
+def _filtered_stress_v3_cases():
+    raw = _env("STRESS_V3_CASES", "").strip()
     if not raw:
-        return V2_FUNDED_RESOLVE_CASES
+        return V3_FUNDED_RESOLVE_CASES
     want = {x.strip() for x in raw.split(",") if x.strip()}
-    return tuple(c for c in V2_FUNDED_RESOLVE_CASES if c.case_id in want)
+    return tuple(c for c in V3_FUNDED_RESOLVE_CASES if c.case_id in want)
 
 
 class TestBaseSepoliaStress(unittest.TestCase):
@@ -311,10 +311,12 @@ class TestBaseSepoliaStress(unittest.TestCase):
             _send_key(
                 w_prop["private_key"],
                 self.factory,
-                "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+                V3_ENUMERATED_CREATE_WAGER_SIG,
                 DUMMY_COLLATERAL,
                 proposition,
                 '["A","B"]',
+                "0",  # payoffPolicy = SINGLE_WINNER
+                "0",  # policyParam
                 "0",
                 str(res_win),
                 w_res["address"],
@@ -322,6 +324,8 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 w_res_close["address"],
                 "[]",
                 "[]",
+                "[]",  # seedTicketMasks
+                "[]",  # seedAmounts
             )
 
             after = _wait_for_wagers_count(self.factory, before + 1)
@@ -341,7 +345,8 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 _send_key(self.funder_key, wager, "expire()")
                 self.assertEqual(_wait_for_state(wager, 2), 2)
             elif branch == 1:
-                _send_key(w_res["private_key"], wager, "resolve(uint256)", "0")
+                # V3 enumerated resolve takes the winning ticket bitmask (outcome 0 → mask 1).
+                _send_key(w_res["private_key"], wager, "resolve(uint256)", "1")
                 self.assertEqual(_wait_for_state(wager, 1), 1)
             else:
                 _send_key(w_res["private_key"], wager, "retract()")
@@ -396,10 +401,12 @@ class TestBaseSepoliaStress(unittest.TestCase):
             _send_key(
                 w_prop["private_key"],
                 self.factory,
-                "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])",
+                V3_ENUMERATED_CREATE_WAGER_SIG,
                 self.collateral_token,
                 proposition,
                 '["YES","NO"]',
+                "0",  # payoffPolicy = SINGLE_WINNER
+                "0",  # policyParam
                 "0",
                 str(res_win),
                 w_res["address"],
@@ -407,6 +414,8 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 w_res_close["address"],
                 "[]",
                 "[]",
+                "[]",  # seedTicketMasks
+                "[]",  # seedAmounts
             )
 
             created_index = before_count + i
@@ -427,11 +436,12 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 wager,
                 str(amount_raw),
             )
+            # V3 enumerated: ticket mask bit per outcome index. outcome 0 → 1<<0 = 1.
             _send_key(
                 w_bettor_yes["private_key"],
                 wager,
                 "placeBet(uint256,uint256)",
-                "0",
+                "1",
                 str(amount_raw),
             )
             _send_key(
@@ -445,14 +455,15 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 w_bettor_no["private_key"],
                 wager,
                 "placeBet(uint256,uint256)",
-                "1",
+                "2",  # outcome 1 → 1<<1 = 2
                 str(amount_raw),
             )
 
             _send_key(w_bet_close["private_key"], wager, "closeBetting()")
             branch = i % 3
             if branch == 0:
-                _send_key(w_res["private_key"], wager, "resolve(uint256)", "0")
+                # V3 enumerated resolve takes the winning ticket bitmask (outcome 0 → mask 1).
+                _send_key(w_res["private_key"], wager, "resolve(uint256)", "1")
                 self.assertEqual(_wait_for_state(wager, 1), 1)
                 _send_key(w_bettor_yes["private_key"], wager, "claim()")
             elif branch == 1:
@@ -481,13 +492,13 @@ class TestBaseSepoliaStress(unittest.TestCase):
                 self.skipTest(f"Hosted indexer has not yet indexed wager {first_wager}: {exc}")
 
 
-class TestBaseSepoliaStressV2(unittest.TestCase):
-    """Factory v2 matrices: all PayoffPolicy values, placeBet + placeBets paths, multi-outcome tickets."""
+class TestBaseSepoliaStressV3PolicyMatrix(unittest.TestCase):
+    """V3 unified factory matrices: all PayoffPolicy values, placeBet + placeBets paths, multi-outcome tickets."""
 
     @classmethod
     def setUpClass(cls) -> None:
         cls.rpc = _rpc_url()
-        cls.factory_v2 = _env("FACTORY_V2_ADDRESS") or default_factory_v2_address()
+        cls.factory = _env("FACTORY_ADDRESS") or default_factory_address()
         cls.mode = _env("STRESS_MODE", "readonly").lower()
         cls.sample_wagers = int(_env("STRESS_SAMPLE_WAGERS", "12"))
         cls.pool_path = _env("STRESS_WALLET_POOL_PATH")
@@ -495,41 +506,46 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
         cls.collateral_token = _env("STRESS_COLLATERAL_TOKEN")
         cls.bet_amount = _env("STRESS_BET_AMOUNT", "1")
         cls.indexer_base_url = _indexer_base_url()
-        cls.skip_v2 = _env("STRESS_SKIP_V2", "").lower() in ("1", "true", "yes")
-        cls.v2_funded_count = int(_env("STRESS_V2_WAGER_COUNT", str(len(V2_FUNDED_RESOLVE_CASES))))
-        cls.v2_minimal_count = int(_env("STRESS_V2_MINIMAL_COUNT", str(len(V2_MINIMAL_EXPIRE_POLICIES))))
+        cls.skip_matrix = _env("STRESS_SKIP_V3_MATRIX", "").lower() in ("1", "true", "yes")
+        cls.v3_funded_count = int(_env("STRESS_V3_WAGER_COUNT", str(len(V3_FUNDED_RESOLVE_CASES))))
+        cls.v3_minimal_count = int(_env("STRESS_V3_MINIMAL_COUNT", str(len(V3_MINIMAL_EXPIRE_POLICIES))))
 
-        if cls.skip_v2:
-            raise unittest.SkipTest("STRESS_SKIP_V2 set — skipping v2 stress tests")
+        if cls.skip_matrix:
+            raise unittest.SkipTest("STRESS_SKIP_V3_MATRIX set — skipping V3 matrix stress tests")
         if not cls.rpc:
             raise unittest.SkipTest("Set RPC_URL_BASE_SEPOLIA (or RPC_URL_SEPOLIA)")
-        if not cls.factory_v2:
+        if not cls.factory:
             raise unittest.SkipTest(
-                "Set FACTORY_V2_ADDRESS or config/deployments.json baseSepolia.factoryV2Address"
+                "Set FACTORY_ADDRESS or config/deployments.json baseSepolia.factoryAddress"
             )
 
-    def test_readonly_factory_v2_sample_wagers(self) -> None:
+    def test_readonly_v3_sample_wagers(self) -> None:
         if self.mode != "readonly":
             self.skipTest("Set STRESS_MODE=readonly (default) for this test")
 
-        total = _as_int(_call(self.factory_v2, "wagersCount()(uint256)"))
+        total = _as_int(_call(self.factory, "wagersCount()(uint256)"))
         if total == 0:
-            self.skipTest("No v2 wagers on factory yet")
+            self.skipTest("No V3 wagers on factory yet")
 
         n = min(total, self.sample_wagers)
         for k in range(n):
             idx = total - 1 - k
-            wager = _call(self.factory_v2, "wagers(uint256)(address)", str(idx))
+            wager = _call(self.factory, "wagers(uint256)(address)", str(idx))
             factory_on_wager = _call(wager, "factory()(address)")
-            self.assertEqual(factory_on_wager.lower(), self.factory_v2.lower())
-            policy = _as_int(_call(wager, "payoffPolicy()(uint8)"))
-            self.assertIn(policy, (0, 1, 2, 3, 4))
+            self.assertEqual(factory_on_wager.lower(), self.factory.lower())
+            # Enumerated V3 wagers expose payoffPolicy; freeform wagers omit it.
+            # WagerMode is immutable; read it to branch (0=Enumerated, 1=Freeform).
+            mode = _as_int(_call(wager, "MODE()(uint8)"))
+            self.assertIn(mode, (0, 1))
+            if mode == 0:
+                policy = _as_int(_call(wager, "payoffPolicy()(uint8)"))
+                self.assertIn(policy, (0, 1, 2, 3, 4))
             state = _as_int(_call(wager, "state()(uint8)"))
             self.assertIn(state, (0, 1, 2))
 
-    def test_tx_v2_minimal_policy_matrix_distinct_roles(self) -> None:
+    def test_tx_v3_minimal_policy_matrix_distinct_roles(self) -> None:
         if self.mode != "tx":
-            self.skipTest("Set STRESS_MODE=tx to run v2 on-chain matrix")
+            self.skipTest("Set STRESS_MODE=tx to run V3 on-chain matrix")
 
         if not self.pool_path:
             self.skipTest("Set STRESS_WALLET_POOL_PATH")
@@ -537,14 +553,14 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
             self.skipTest("Set STRESS_FUNDER_PRIVATE_KEY or PRIVATE_KEY")
 
         pool = _load_wallet_pool(self.pool_path)
-        need = self.v2_minimal_count * 4
+        need = self.v3_minimal_count * 4
         if len(pool) < need:
-            self.skipTest(f"Pool needs >= {need} wallets for v2 minimal matrix (4 roles × policies)")
+            self.skipTest(f"Pool needs >= {need} wallets for V3 minimal matrix (4 roles × policies)")
 
-        min_res = _as_int(_call(self.factory_v2, "minResolutionWindow()(uint64)"))
+        min_res = _as_int(_call(self.factory, "minResolutionWindow()(uint64)"))
 
-        for i in range(self.v2_minimal_count):
-            policy, param, outcomes_json = V2_MINIMAL_EXPIRE_POLICIES[i % len(V2_MINIMAL_EXPIRE_POLICIES)]
+        for i in range(self.v3_minimal_count):
+            policy, param, outcomes_json = V3_MINIMAL_EXPIRE_POLICIES[i % len(V3_MINIMAL_EXPIRE_POLICIES)]
             with self.subTest(i=i, policy=policy):
                 base = i * 4
                 w_prop = pool[base]
@@ -552,14 +568,14 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
                 w_bc = pool[base + 2]
                 w_rc = pool[base + 3]
 
-                before = _as_int(_call(self.factory_v2, "wagersCount()(uint256)"))
-                proposition = f"stress-v2-tx-{policy}-{int(time.time())}-{i}"
+                before = _as_int(_call(self.factory, "wagersCount()(uint256)"))
+                proposition = f"stress-v3-tx-{policy}-{int(time.time())}-{i}"
                 res_win = (0, min_res, min_res)[i % 3]
 
                 _send_key(
                     w_prop["private_key"],
-                    self.factory_v2,
-                    V2_CREATE_WAGER_SIG,
+                    self.factory,
+                    V3_ENUMERATED_CREATE_WAGER_SIG,
                     DUMMY_COLLATERAL,
                     proposition,
                     outcomes_json,
@@ -572,9 +588,11 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
                     w_rc["address"],
                     "[]",
                     "[]",
+                    "[]",  # seedTicketMasks
+                    "[]",  # seedAmounts
                 )
-                _wait_for_wagers_count(self.factory_v2, before + 1)
-                wager = _call(self.factory_v2, "wagers(uint256)(address)", str(before))
+                _wait_for_wagers_count(self.factory, before + 1)
+                wager = _call(self.factory, "wagers(uint256)(address)", str(before))
 
                 _send_key(w_bc["private_key"], wager, "closeBetting()")
                 branch = i % 3
@@ -583,42 +601,46 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
                     _send_key(self.funder_key, wager, "expire()")
                     self.assertEqual(_wait_for_state(wager, 2), 2)
                 elif branch == 1:
-                    _send_key(w_res["private_key"], wager, "resolve(uint256)", "1")
+                    # resolve(uint256) winning mask; for "A","B" with SINGLE_WINNER/ANY_OF,
+                    # mask=1 selects outcome A. For AT_LEAST_K k=2 with ["A","B","C"], need
+                    # a 2-bit mask: use 3 (bits 0 and 1) which matches policy param k=2.
+                    winning_mask = "3" if policy == 3 else "1"
+                    _send_key(w_res["private_key"], wager, "resolve(uint256)", winning_mask)
                     self.assertEqual(_wait_for_state(wager, 1), 1)
                 else:
                     _send_key(w_res["private_key"], wager, "retract()")
                     self.assertEqual(_wait_for_state(wager, 2), 2)
 
-    def test_funded_v2_payoff_policy_matrix(self) -> None:
+    def test_funded_v3_payoff_policy_matrix(self) -> None:
         if self.mode != "funded-tx":
-            self.skipTest("Set STRESS_MODE=funded-tx for v2 funded matrix")
+            self.skipTest("Set STRESS_MODE=funded-tx for V3 funded matrix")
         if not self.pool_path:
             self.skipTest("Set STRESS_WALLET_POOL_PATH")
         if not self.collateral_token:
             self.skipTest("Set STRESS_COLLATERAL_TOKEN")
 
         pool = _load_wallet_pool(self.pool_path)
-        need = self.v2_funded_count * 5
+        need = self.v3_funded_count * 5
         if len(pool) < need:
-            self.skipTest(f"Pool needs >= {need} wallets (5 per v2 funded row: roles + bettor)")
+            self.skipTest(f"Pool needs >= {need} wallets (5 per V3 funded row: roles + bettor)")
 
         if not self.funder_key:
             self.skipTest("Set STRESS_FUNDER_PRIVATE_KEY or PRIVATE_KEY for expire() branch")
 
-        cases = _filtered_stress_v2_cases()
+        cases = _filtered_stress_v3_cases()
         if not cases:
-            self.skipTest("STRESS_V2_CASES filter removed all scenarios")
+            self.skipTest("STRESS_V3_CASES filter removed all scenarios")
 
         decimals = _as_int(_call(self.collateral_token, "decimals()(uint8)"))
         amount_raw = _parse_units(self.bet_amount, decimals)
         if amount_raw <= 0:
             self.skipTest("STRESS_BET_AMOUNT must be positive")
 
-        min_res = _as_int(_call(self.factory_v2, "minResolutionWindow()(uint64)"))
-        before_all = _as_int(_call(self.factory_v2, "wagersCount()(uint256)"))
+        min_res = _as_int(_call(self.factory, "minResolutionWindow()(uint64)"))
+        before_all = _as_int(_call(self.factory, "wagersCount()(uint256)"))
         first_wager = ""
 
-        for i in range(self.v2_funded_count):
+        for i in range(self.v3_funded_count):
             case = cases[i % len(cases)]
             base = i * 5
             w_prop = pool[base]
@@ -638,14 +660,14 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
                 )
 
             with self.subTest(i=i, case_id=case.case_id):
-                before = _as_int(_call(self.factory_v2, "wagersCount()(uint256)"))
-                proposition = f"stress-v2-funded-{case.case_id}-{int(time.time())}-{i}"
+                before = _as_int(_call(self.factory, "wagersCount()(uint256)"))
+                proposition = f"stress-v3-funded-{case.case_id}-{int(time.time())}-{i}"
                 res_win = (0, min_res, min_res)[i % 3]
 
                 _send_key(
                     w_prop["private_key"],
-                    self.factory_v2,
-                    V2_CREATE_WAGER_SIG,
+                    self.factory,
+                    V3_ENUMERATED_CREATE_WAGER_SIG,
                     self.collateral_token,
                     proposition,
                     case.outcomes_json,
@@ -658,9 +680,11 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
                     w_rc["address"],
                     "[]",
                     "[]",
+                    "[]",  # seedTicketMasks
+                    "[]",  # seedAmounts
                 )
-                _wait_for_wagers_count(self.factory_v2, before + 1)
-                wager = _call(self.factory_v2, "wagers(uint256)(address)", str(before))
+                _wait_for_wagers_count(self.factory, before + 1)
+                wager = _call(self.factory, "wagers(uint256)(address)", str(before))
                 if not first_wager:
                     first_wager = wager
 
@@ -708,8 +732,8 @@ class TestBaseSepoliaStressV2(unittest.TestCase):
                     _send_key(w_bet["private_key"], wager, "claim()")
 
         self.assertGreaterEqual(
-            _wait_for_wagers_count(self.factory_v2, before_all + self.v2_funded_count),
-            before_all + self.v2_funded_count,
+            _wait_for_wagers_count(self.factory, before_all + self.v3_funded_count),
+            before_all + self.v3_funded_count,
         )
 
         if self.indexer_base_url and first_wager:
