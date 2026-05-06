@@ -56,6 +56,11 @@ contract ParamutuelV3FreeformTest is Test {
     address proposer = address(0x2000);
     address bettor1 = address(0x3000);
     address bettor2 = address(0x4000);
+    // Extra bettors for the four-actor Rosebud worked example. Distinct
+    // addresses so each `claim()` resolves cleanly without one bettor's
+    // ticket leaking into another's pool view.
+    address bettor3 = address(0x5000);
+    address bettor4 = address(0x6000);
 
     uint16 protocolFeeBps = 100; // 1%
     uint64 minBettingWindow = 1 hours;
@@ -68,6 +73,8 @@ contract ParamutuelV3FreeformTest is Test {
         token.mint(proposer, 1_000_000 ether);
         token.mint(bettor1, 1_000_000 ether);
         token.mint(bettor2, 1_000_000 ether);
+        token.mint(bettor3, 1_000_000 ether);
+        token.mint(bettor4, 1_000_000 ether);
     }
 
     function _futureWindows() internal view returns (uint64 close, uint64 resWin) {
@@ -349,5 +356,84 @@ contract ParamutuelV3FreeformTest is Test {
         vm.prank(bettor1);
         w.placeBet("q", 1);
         assertEq(w.usedAnswerIdsCount(), 2);
+    }
+
+    /// @notice Mirrors the freeform worked example in
+    ///         `docs/PAYOUT-CALCULATION.md` Part C. The point of the example
+    ///         is that `answerId = keccak256(0x03 || bytes(answer))` is
+    ///         compared **byte-for-byte** — "rosebud" and "Rosebud" hash to
+    ///         distinct ids, so the case-mismatched bettor loses despite
+    ///         being semantically correct. Fees are zero so the documented
+    ///         numbers (333 / 166 / 1 wei dust) round-trip exactly; the
+    ///         setUp() factory bakes in a 1% fee so we deploy a fresh
+    ///         fee-free factory here.
+    function testFreeform_documentationWorkedExample_rosebud() public {
+        ParamutuelFactoryV3 feeFreeFactory =
+            new ParamutuelFactoryV3(treasury, 0, minBettingWindow, minResolutionWindow);
+        (uint64 close, uint64 resWin) = _futureWindows();
+        vm.prank(proposer);
+        address wa = feeFreeFactory.createFreeformWager(
+            address(token),
+            "What was Rosebud?",
+            close,
+            resWin,
+            address(0),
+            proposer,
+            proposer,
+            new address[](0),
+            new uint16[](0)
+        );
+        ParamutuelWagerV3 w = ParamutuelWagerV3(wa);
+
+        vm.prank(bettor1);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bettor2);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bettor3);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bettor4);
+        token.approve(address(w), type(uint256).max);
+
+        // bettor1 = Alice, bettor2 = Bob, bettor3 = Carol, bettor4 = Dave
+        // (same role assignment as the Markdown example; the on-chain
+        // behaviour does not depend on the names, only the bytes).
+        vm.prank(bettor1);
+        w.placeBet("rosebud", 200); // matches winner
+        vm.prank(bettor2);
+        w.placeBet("rosebud", 100); // matches winner
+        vm.prank(bettor3);
+        w.placeBet("Rosebud", 150); // capital R — distinct id, loses
+        vm.prank(bettor4);
+        w.placeBet("a sled", 50);   // unrelated — loses
+
+        assertEq(w.totalPot(), 500);
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        w.resolve("rosebud");
+
+        // floor(stake * netPot / winningPool) per bettor.
+        uint256 b1Before = token.balanceOf(bettor1);
+        uint256 b2Before = token.balanceOf(bettor2);
+        vm.prank(bettor1);
+        w.claim();
+        vm.prank(bettor2);
+        w.claim();
+
+        assertEq(token.balanceOf(bettor1) - b1Before, 333, "alice: floor(200*500/300)");
+        assertEq(token.balanceOf(bettor2) - b2Before, 166, "bob: floor(100*500/300)");
+
+        // Both losers revert with NothingToClaim — Carol because her
+        // case-mismatched bytes hash to a non-winning id, Dave because his
+        // answer never matched.
+        vm.prank(bettor3);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
+        w.claim();
+        vm.prank(bettor4);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
+        w.claim();
+
+        // 333 + 166 = 499; netPot was 500; 1 wei dust as documented.
+        assertEq(token.balanceOf(address(w)), 1, "documented integer-division dust");
     }
 }

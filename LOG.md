@@ -96,3 +96,16 @@ Coverage baseline captured at `docs/COVERAGE-BASELINE.md`:
 - **Solidity: blocked.** `forge coverage --ir-minimum` fails with stack-too-deep on `src/ParamutuelWagerV3.sol`. Functional 65/65 pass under the production compile. Path forward (constructor refactor / library extraction / alternative tool) tracked in `docs/COVERAGE-BASELINE.md` and ADR-0013 follow-ups.
 
 Known follow-up before ADR-0014: land the regression test stubs that `docs/PAYOUT-CALCULATION.md` worked examples reference (`testSingleWinner_documentationWorkedExample_threeOutcomes`, etc.). This is L-003 work and should ship as its own commit before any further ADR.
+
+## 2026-05-06 — L-003 follow-through: pin worked examples to regression tests
+
+Closing the gap left by the 2026-05-06 PAYOUT-CALCULATION.md expansion. Four new worked-example regression tests landed:
+
+- `testSingleWinner_documentationWorkedExample_threeOutcomes` — Alice with split-stake (one losing, one winning ticket); single `claim()` aggregates and pays only the winning portion.
+- `testAtLeastK_documentationWorkedExample_fourOutcomes_k2` — four outcomes, `W = {A,B,C}`, `k = 2`. Bob (2-bit ticket but only 1-bit overlap) loses; Dave (3-bit ticket including `D ∉ W` but 2-bit overlap with `W`) wins. Documents that `AT_LEAST_K` keys on overlap, not subset or ticket size.
+- `testWeightedOverlap_documentationWorkedExample_fourOutcomes` — same `W`, equal stakes; payouts scale exactly with `popcount(T & W)`. Dave's zero-overlap ticket funds the pot and never claims.
+- `testFreeform_documentationWorkedExample_rosebud` — `"rosebud"` vs `"Rosebud"` hash to distinct `answerId`s; case-mismatched bettor loses despite being semantically correct. Fee-free factory deployed locally to bypass the suite's default 1% fee.
+
+Total fast-suite count: 65 → 69 forge tests (4 new). All previously-existing tests untouched. `script/test-fast.sh` exits 0.
+
+L-003 commitment closed. ADR-0013 follow-up entry updated.

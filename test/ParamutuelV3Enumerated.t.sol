@@ -90,6 +90,17 @@ contract ParamutuelV3EnumeratedTest is Test {
         o[4] = "E";
     }
 
+    /// @dev Used by the AT_LEAST_K and WEIGHTED_OVERLAP worked-example tests:
+    ///      four base options are the smallest count that lets us demonstrate
+    ///      `popcount(T & W)` ranging across {0, 1, 2, 3} simultaneously.
+    function _fourOutcomes() internal pure returns (string[] memory o) {
+        o = new string[](4);
+        o[0] = "A";
+        o[1] = "B";
+        o[2] = "C";
+        o[3] = "D";
+    }
+
     /// @dev Convenience: create an enumerated wager with three outcomes and no
     ///      protocol fees. Defaults used by the majority of lifecycle tests.
     function _create(ParamutuelWagerV3.PayoffPolicy policy, uint256 policyParam)
@@ -154,6 +165,33 @@ contract ParamutuelV3EnumeratedTest is Test {
             _threeOutcomes(),
             ParamutuelWagerV3.PayoffPolicy.EXACT_SET,
             0,
+            uint64(block.timestamp + 2 hours),
+            2 hours,
+            address(0),
+            proposer,
+            proposer,
+            new address[](0),
+            new uint16[](0)
+        );
+        w = ParamutuelWagerV3(wa);
+    }
+
+    /// @dev Helper for the AT_LEAST_K and WEIGHTED_OVERLAP worked-example tests.
+    ///      `policyParam` is `k` for AT_LEAST_K and unused (must be zero) for
+    ///      WEIGHTED_OVERLAP. The factory is rebuilt fee-free so the
+    ///      documentation figures (which assume zero fees) hold byte-for-byte.
+    function _createFourOutcomesNoFees(ParamutuelWagerV3.PayoffPolicy policy, uint256 policyParam)
+        internal
+        returns (ParamutuelWagerV3 w)
+    {
+        factory = new ParamutuelFactoryV3(treasury, 0, minBettingWindow, minResolutionWindow);
+        vm.prank(proposer);
+        address wa = factory.createEnumeratedWager(
+            address(token),
+            "doc example 4-outcome",
+            _fourOutcomes(),
+            policy,
+            policyParam,
             uint64(block.timestamp + 2 hours),
             2 hours,
             address(0),
@@ -632,6 +670,194 @@ contract ParamutuelV3EnumeratedTest is Test {
         w.claim();
 
         assertEq(token.balanceOf(address(w)), 0, "payouts exhaust netPot in this example");
+    }
+
+    /// @notice Mirrors the SINGLE_WINNER worked example in
+    ///         `docs/PAYOUT-CALCULATION.md`. Three outcomes, alice holds two
+    ///         tickets (one losing, one winning) so a single `claim()` pays
+    ///         out only the winning portion.
+    function testSingleWinner_documentationWorkedExample_threeOutcomes() public {
+        ParamutuelWagerV3 w = _create(ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0);
+
+        vm.prank(alice);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bob);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(carol);
+        token.approve(address(w), type(uint256).max);
+
+        // Alice splits her stake across two single-bit tickets — one will win,
+        // one will lose. The doc's value is showing that `claim()` aggregates
+        // tickets and pays the winning portion only.
+        vm.prank(alice);
+        w.placeBet(M0, 100); // {A} — losing
+        vm.prank(alice);
+        w.placeBet(M1, 50);  // {B} — winning
+        vm.prank(bob);
+        w.placeBet(M1, 200); // {B} — winning
+        vm.prank(carol);
+        w.placeBet(M2, 150); // {C} — losing
+
+        assertEq(w.totalPot(), 500);
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        w.resolve(M1);
+
+        // SINGLE_WINNER denominator is the total stake on the winning mask.
+        assertEq(w.payoutDenominator(), 250, "denominator = pool[B] = 50 + 200");
+
+        uint256 balAlice = token.balanceOf(alice);
+        uint256 balBob = token.balanceOf(bob);
+        vm.prank(alice);
+        w.claim();
+        vm.prank(bob);
+        w.claim();
+
+        // floor(50 * 500 / 250) = 100; alice's losing {A} stake is gone.
+        assertEq(token.balanceOf(alice) - balAlice, 100, "alice's winning portion only");
+        // floor(200 * 500 / 250) = 400.
+        assertEq(token.balanceOf(bob) - balBob, 400);
+
+        vm.prank(carol);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
+        w.claim();
+
+        // 100 + 400 == 500 == netPot — no rounding dust in this example.
+        assertEq(token.balanceOf(address(w)), 0, "payouts exhaust netPot");
+    }
+
+    /// @notice Mirrors the AT_LEAST_K worked example (`k = 2`) in
+    ///         `docs/PAYOUT-CALCULATION.md`. Four outcomes; `winningMask =
+    ///         {A,B,C}`. Bob loses despite holding a 2-bit ticket because his
+    ///         overlap with `W` is only 1; Dave wins despite picking
+    ///         `D ∉ W` because `popcount(T & W) = 2`. Documents that
+    ///         `AT_LEAST_K` keys on overlap, not subset or ticket size.
+    function testAtLeastK_documentationWorkedExample_fourOutcomes_k2() public {
+        uint256 mA = 1;
+        uint256 mB = 2;
+        uint256 mC = 4;
+        uint256 mD = 8;
+        uint256 winningABC = mA | mB | mC; // = 7
+
+        ParamutuelWagerV3 w = _createFourOutcomesNoFees(ParamutuelWagerV3.PayoffPolicy.AT_LEAST_K, 2);
+
+        vm.prank(alice);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bob);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(carol);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(dave);
+        token.approve(address(w), type(uint256).max);
+
+        vm.prank(alice);
+        w.placeBet(mA | mB, 100); // overlap 2 — wins
+        vm.prank(bob);
+        w.placeBet(mA | mD, 60);  // overlap 1 — loses
+        vm.prank(carol);
+        w.placeBet(mA | mB | mC, 80); // overlap 3 — wins
+        vm.prank(dave);
+        w.placeBet(mB | mC | mD, 50); // overlap 2 — wins (extra D bit doesn't disqualify)
+
+        assertEq(w.totalPot(), 290);
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        w.resolve(winningABC);
+
+        // Three distinct winning masks contribute: {A,B}=3, {A,B,C}=7, {B,C,D}=14.
+        // Their pools sum to the AT_LEAST_K denominator.
+        assertEq(w.payoutDenominator(), 230);
+
+        uint256 balAlice = token.balanceOf(alice);
+        uint256 balCarol = token.balanceOf(carol);
+        uint256 balDave = token.balanceOf(dave);
+        vm.prank(alice);
+        w.claim();
+        vm.prank(carol);
+        w.claim();
+        vm.prank(dave);
+        w.claim();
+
+        // floor(stake * netPot / denom) — each on its own ticket pool.
+        assertEq(token.balanceOf(alice) - balAlice, 126, "alice: floor(100*290/230)");
+        assertEq(token.balanceOf(carol) - balCarol, 100, "carol: floor(80*290/230)");
+        assertEq(token.balanceOf(dave) - balDave, 63, "dave: floor(50*290/230)");
+
+        vm.prank(bob);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
+        w.claim();
+
+        // 126 + 100 + 63 = 289; netPot was 290; 1 wei of dust as documented.
+        assertEq(token.balanceOf(address(w)), 1, "documented integer-division dust");
+    }
+
+    /// @notice Mirrors the WEIGHTED_OVERLAP worked example in
+    ///         `docs/PAYOUT-CALCULATION.md`. Every bettor stakes the same
+    ///         amount; payouts scale with `popcount(T & W)`. Dave's
+    ///         zero-overlap ticket contributes to the pot but never to the
+    ///         denominator and never receives a payout — this is the
+    ///         distinguishing property vs `ANY_OF`.
+    function testWeightedOverlap_documentationWorkedExample_fourOutcomes() public {
+        uint256 mA = 1;
+        uint256 mB = 2;
+        uint256 mC = 4;
+        uint256 mD = 8;
+        uint256 winningABC = mA | mB | mC;
+
+        ParamutuelWagerV3 w =
+            _createFourOutcomesNoFees(ParamutuelWagerV3.PayoffPolicy.WEIGHTED_OVERLAP, 0);
+
+        vm.prank(alice);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(bob);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(carol);
+        token.approve(address(w), type(uint256).max);
+        vm.prank(dave);
+        token.approve(address(w), type(uint256).max);
+
+        vm.prank(alice);
+        w.placeBet(mA, 100); // overlap 1, weight 100
+        vm.prank(bob);
+        w.placeBet(mA | mB, 100); // overlap 2, weight 200
+        vm.prank(carol);
+        w.placeBet(mA | mB | mC, 100); // overlap 3, weight 300
+        vm.prank(dave);
+        w.placeBet(mD, 100); // overlap 0 — funds the pot, never claims
+
+        assertEq(w.totalPot(), 400);
+
+        vm.warp(block.timestamp + 3 hours);
+        vm.prank(proposer);
+        w.resolve(winningABC);
+
+        // WEIGHTED_OVERLAP denominator is the sum of (stake * overlap) across
+        // winning tickets only. 100 + 200 + 300 == 600.
+        assertEq(w.payoutDenominator(), 600);
+
+        uint256 balAlice = token.balanceOf(alice);
+        uint256 balBob = token.balanceOf(bob);
+        uint256 balCarol = token.balanceOf(carol);
+        vm.prank(alice);
+        w.claim();
+        vm.prank(bob);
+        w.claim();
+        vm.prank(carol);
+        w.claim();
+
+        // Numerator per ticket is `stake * overlap`, not raw stake.
+        assertEq(token.balanceOf(alice) - balAlice, 66, "alice: floor(100*400/600)");
+        assertEq(token.balanceOf(bob) - balBob, 133, "bob: floor(200*400/600)");
+        assertEq(token.balanceOf(carol) - balCarol, 200, "carol: floor(300*400/600)");
+
+        vm.prank(dave);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
+        w.claim();
+
+        // 66 + 133 + 200 = 399; netPot was 400; 1 wei dust as documented.
+        assertEq(token.balanceOf(address(w)), 1, "documented integer-division dust");
     }
 
     // ---- Additional claim / multi-ticket semantics ------------------------
