@@ -109,3 +109,9 @@ Closing the gap left by the 2026-05-06 PAYOUT-CALCULATION.md expansion. Four new
 Total fast-suite count: 65 → 69 forge tests (4 new). All previously-existing tests untouched. `script/test-fast.sh` exits 0.
 
 L-003 commitment closed. ADR-0013 follow-up entry updated.
+
+## 2026-05-06 — ADR-0014: codebase-wide comment audit (kicked off)
+
+Per `AGENTS.md` practice #3 every non-test source file should carry comments sufficient for transfer to a competent stranger. The current tree's commenting is uneven (NatSpec on V3 contracts is good for external functions but light on module rationale; Python services are mixed; `dapp/app.js` is dense pure-helper code with minimal explanation). ADR-0014 codifies the audit standard and decomposes the work into four disjoint module groups so sub-agents can run in parallel per practice #6 without merge conflicts.
+
+Groups: A (Solidity contracts), B (indexer + proposition), C (resolution / explorer / control_panel / mcp_server), D (bet scout agent + dApp). Each group's sub-agent receives the ADR's success/failure criteria as part of its bounded scope; comment-only diffs; `script/test-fast.sh` is the merge gate. Per-group merge log lives in `docs/ADR-0014-IMPLEMENTATION.md`.
