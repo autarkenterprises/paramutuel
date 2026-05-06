@@ -68,3 +68,29 @@ Must demonstrate:
 - longer pre-launch cycle
 - requires testnet ops discipline across protocol + app + service
 
+## After Action Report
+
+**AAR date:** 2026-05-06
+**AAR status:** Backfilled 2026-05-06 per ADR-0012
+
+**Outcome vs success criteria** (criteria taken from original "Certification Matrix"):
+
+- *Protocol section — ≥ 5 concurrently deployed wagers across lifecycle states.* **Met** — `test/testnet/test_stress_base_sepolia.py` (multi-market stress suite, 2026-03-29) deploys multiple wagers and exercises bet / resolve / retract / expire concurrently. `test/testnet/test_live_base_sepolia.py` covers the live happy path.
+- *dApp section — listing, creation, betting, claiming, lifecycle refresh.* **Met** — `dapp/` covers all of these against Base Sepolia; manual rehearsal documented in `docs/TESTNET-REHEARSAL.md`.
+- *Service section — proposal cadence, resolver service ops, **expiry sweeper**, idempotent sweeps.* **Met** — `service/proposition/`, `service/resolution/` (with `--allow-execute` flag), and Cloud Run jobs cover this. Idempotency is asserted by sweep tests.
+- *Two independent rehearsal runs with 100% pass + post-mortem captured.* **Partially met** — multiple rehearsal cycles have been run (commit cadence shows iterative tightening of the suites), but no explicit "rehearsal-1 / rehearsal-2 / post-mortem" artifact lives in `docs/`. This is now the dominant gap blocking mainnet readiness.
+
+**Outcome vs failure criteria:**
+
+- *False confidence from single-flow demos.* **Avoided** — the suites explicitly cover concurrency and lifecycle mixes.
+- *Testnet ops discipline lapse.* **Avoided so far** — the V3-only sweep (2026-04 → 2026-05) rewrote both suites for V3 in `c00d286` (`test(testnet): rewrite Base Sepolia live+stress suites for V3-only`), so the certification posture was preserved through a major refactor.
+
+**Lessons:** none new — this ADR's discipline is internalized.
+
+**Follow-ups:**
+
+- Capture two formal rehearsal runs with explicit pass / fail tally and a written post-mortem (or rehearsal log under `docs/log/`) before mainnet cutover. Track under `docs/TESTNET-REHEARSAL.md`.
+- Add an extended-suite gating step in `script/test-extended.sh` once ADR-0013 lands, so the certification matrix is run in CI rather than ad hoc.
+
+**Revision schedule:** before mainnet factory deploy (same gate as ADR-0002).
+

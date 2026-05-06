@@ -154,3 +154,34 @@ ADR-0009 remains **Accepted** and is the authoritative description of **freeform
 - [`ADR-0008-multi-winner-and-settlement-generalization.md`](ADR-0008-multi-winner-and-settlement-generalization.md)
 - [`ADR-0009-freeform-text-wagers.md`](ADR-0009-freeform-text-wagers.md)
 - [`docs/PAYOUT-CALCULATION.md`](../../docs/PAYOUT-CALCULATION.md)
+
+## After Action Report
+
+**AAR date:** 2026-05-06
+**AAR status:** Backfilled 2026-05-06 per ADR-0012; cycle effectively **complete** (V3 is the canonical surface)
+
+**Summary:** ADR-0010 shipped fully. `ParamutuelFactoryV3` + `ParamutuelWagerV3` are deployed on Base Sepolia (`config/deployments.json`), the indexer / MCP / dApp / site / agents / testnet suites are V3-only, and the legacy V1 / V2 / Freeform standalone contracts plus `WagerV2Masks` were **deleted from the tree** (`b2a2f28`, `c00d286`, `ad0b868`). This is the most consequential ADR in the project's history to date — it eliminated three parallel ABI surfaces and unified them under one mode-discriminated wager.
+
+**Outcome vs success criteria** (criteria from "Acceptance criteria" §):
+
+- *One wager implementation deployed to testnet with both modes exercised.* **Met** — Base Sepolia factory `0x11F036ab9C2621a21892E37E9d372d1b2Fe1dCD6`. Live + stress suites in `test/testnet/` exercise both modes.
+- *Full propagation checklist completed or N/A with justification.* **Met** — propagation tracked in `docs/ADR-0010-IMPLEMENTATION.md`; the V3-only sweep across dApp / services / agents / site / testnet is captured by commits `b2a2f28`, `c00d286`, `ad0b868`.
+- *Gas document updated; no unbounded loop regression.* **Met** — `docs/PARAMUTUEL-V3-GAS.md` covers V3 gas; ADR-0008 caps preserved.
+- *Security review scheduled before mainnet unified factory.* **Open** — no audit yet; gated by mainnet readiness.
+
+**Outcome vs failure criteria** (criteria implicit in Decision § "Mode-specific storage sections must not alias"):
+
+- *Storage aliasing between bitmask and string pools.* **Avoided** — V3 uses separate storage slots per mode with the unused branch zeroed; `WrongMode()` revert at the entrypoint level.
+- *Indexer / dApp / service breakage during the V3-only sweep.* **Triggered, mitigated** — the sweep happened in three commits over ~2 weeks (April → May 2026); indexer / MCP / agents migrated in lockstep with contract deletes. No prolonged broken-window state on `master`.
+- *Legacy on-chain contracts orphaned by tooling.* **Avoided by design** — ADR-0010 explicitly notes "Legacy contracts remain immutable on-chain"; immutable bytecode is preserved by Ethereum, historical tooling is preserved by `git log`.
+- *Three-factory drift returning under product pressure.* **Avoided so far** — no proposal has emerged to add a *fourth* surface; future ADRs would face L-001's lesson explicitly.
+
+**Lessons:** ADR-0010 is the primary source of `LESSONS.md` L-001 (unify parallel surfaces) and L-002 (delete superseded code from the tree).
+
+**Follow-ups:**
+
+- Audit V3 before mainnet (shared with ADR-0008 follow-up).
+- Resolve the open questions §144–150: event topic naming (now in `docs/ADR-0010-IMPLEMENTATION.md`), `answerId` domain separation (`0x03` byte resolved), fat ABI vs two-interface choice (resolved — fat ABI with `WrongMode()` revert), indexer `protocol_version` posture (V3-only means the legacy normalization layer is unnecessary), V1 factory retirement (already done, V1 deleted from tree).
+- Revisit this AAR after first audit completes.
+
+**Revision schedule:** at first V3 audit completion, or before mainnet deploy.

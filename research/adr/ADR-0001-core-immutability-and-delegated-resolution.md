@@ -88,3 +88,26 @@ If future resolver modules need richer deterministic matching, add this outside 
 
 without changing the settlement logic of deployed wagers.
 
+## After Action Report
+
+**AAR date:** 2026-05-06
+**AAR status:** Backfilled 2026-05-06 per ADR-0012
+
+**Outcome vs success criteria** (criteria implicit in original Decision; explicit articulation here):
+
+- *Wager contracts treated as immutable settlement primitives with immutable `proposer` / `resolver`.* **Met** — `ParamutuelWagerV3` constructor sets `resolver` once and never mutates it (`src/ParamutuelWagerV3.sol`).
+- *Resolver systems evolve externally to the core contract.* **Met** — delegated resolution shipped as an external Cloud Run service in `service/resolution/` (see `docs/RESOLUTION-SERVICE.md`), with no contract coupling.
+- *Pairing performed by proposer at creation time, dApp-mediated path optional.* **Met** — `createEnumeratedWager` / `createFreeformWager` accept `resolver` directly; dApp, MCP, and direct `cast` call paths all work.
+- *Anyone can `expire()` after deadline to prevent stuck funds.* **Met** — `ParamutuelWagerV3.expire` is permissionless; covered by Foundry tests.
+
+**Outcome vs failure criteria:**
+
+- *Misconfiguration risk (wrong resolver address).* **Mitigated** — dApp validation, indexer prominently displays resolver, `WagerCreated` event includes resolver address. Risk is not zero (proposer can still pick a wrong address) but observable.
+- *Resolver-specific metadata leaks back into core.* **Avoided** — no resolver registry on-chain; metadata stays in indexer / off-chain runbooks.
+
+**Lessons:** none new — this ADR is foundational and absorbed without surprise.
+
+**Follow-ups:** none. Future oracle-style resolver work would be a new ADR, not an extension of this one.
+
+**Revision schedule:** none required.
+

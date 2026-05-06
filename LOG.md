@@ -71,3 +71,17 @@ ADR-0010 proposed unifying the three surfaces (V1 enumerated, V2 bitmask, Freefo
 ## 2026-05-06 — ADR-0011: documentation layer scaffolding
 
 This file (and `LESSONS.md`, `MEMORY.md`, `docs/log/`) created on branch `adr-0011-doc-layers` to satisfy `AGENTS.md` practice #11. See `research/adr/ADR-0011-documentation-layer-scaffolding.md` and `docs/ADR-0011-IMPLEMENTATION.md` for the rationale and conventions. The lengthy backfill above is the one-time retrospective spine; from this point forward entries are written contemporaneously with the events they describe.
+
+## 2026-05-06 — ADR-0012: ADR template + retroactive AAR sweep
+
+`AGENTS.md` practice #4 mandates ADRs document success / failure criteria and receive AARs once complete. ADR-0012 adopts a uniform ADR section structure (template at `research/adr/ADR-TEMPLATE.md`) and **appends** After Action Reports to ADR-0001 through ADR-0010, without rewriting any pre-existing ADR body (per practice #8).
+
+Findings worth surfacing from the AAR sweep:
+
+- **ADR-0002 (governance + Safe):** treasury is currently an EOA on Base Sepolia; no on-chain fee setters in `ParamutuelFactoryV3`. Acceptable for testnet, must resolve before mainnet.
+- **ADR-0003 (testnet certification):** no formal "rehearsal-1 / rehearsal-2 / post-mortem" artifact exists despite multiple iterative testnet runs. Capture as a doc gap.
+- **ADR-0007 (assisted transaction gateway):** marked Accepted in 2026-03-30; **not implemented**. Decide deferral vs rejection at next product roadmap review.
+- **ADR-0008 experiment branch:** `experiment/adr-0008-multi-winner-v2` is fully merged into `master` (merge-base = branch tip `bbef4367`). Per practice #5 the branch is **preserved** locally and on `origin`; **no deletion**.
+- **ADR-0009 / ADR-0010 supersession:** V2 and standalone Freeform contracts are deleted from the tree; immutable on-chain bytecode preserved by Ethereum, historical tooling preserved by `git log`.
+
+No new entries added to `LESSONS.md` from this sweep — the durable lessons (L-001, L-002, L-003, L-004, L-005) all predate the AAR write-up.

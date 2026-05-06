@@ -66,3 +66,31 @@ The system needs a generalized flow that works across many ERC-20 assets, plus s
 - Requires backend ops, monitoring, and anti-abuse systems.
 - Permit2/relayer integrations add third-party operational dependencies.
 - Website UX must communicate sponsorship limits and fallback behavior clearly.
+
+## After Action Report
+
+**AAR date:** 2026-05-06
+**AAR status:** Backfilled 2026-05-06 per ADR-0012
+
+**Outcome vs success criteria** (criteria implicit in Decision):
+
+- *Assisted Transaction Gateway service.* **Not met (not started)** — no `service/atg/` or equivalent exists. `research/assisted-ux-roadmap.md` (Phase 0 design freeze) is the only artifact, and it remains in draft.
+- *Pluggable approval paths (permit / Permit2 / approve+act).* **Not met** — no implementation.
+- *Replaceable execution adapters.* **Not met** — no implementation.
+- *Tier-1 / Tier-2 token policy.* **Not met as runtime behavior**, partially captured in `site/` copy.
+- *Safety / economics controls.* **Not met** — no sponsorship limits, replay protection, or audit logs because no gateway exists.
+
+**Outcome vs failure criteria:**
+
+- *Backend ops / monitoring overhead.* **Avoided by deferral** — the cost has not been incurred because the feature was deprioritized.
+- *Vendor lock-in via single relayer or AA stack.* **Avoided by deferral** — no integration committed yet.
+
+**Lessons:** none new; the lesson here is meta — *deferring an "Accepted" ADR's implementation is acceptable, but the AAR must record that explicitly so the deferral is visible*. ADR-0012's discipline catches this.
+
+**Follow-ups:**
+
+- Decide whether ADR-0007 is **deferred** (current de-facto state) or **rejected**. Update `Status:` accordingly. If kept as `Accepted`, schedule resourcing.
+- If implementation starts, refresh the assisted-ux roadmap document (currently dated 2026-03-30 and unfinished).
+- The unimplemented status is a known gap in `docs/PROJECT-REVIEW.md` ("Assisted UX") — keep that pointer accurate.
+
+**Revision schedule:** at the next product roadmap review, or at mainnet readiness gate.

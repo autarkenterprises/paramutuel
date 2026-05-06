@@ -56,3 +56,29 @@ The project already has modular layers:
 - Two UX modes must be documented clearly to avoid user confusion.
 - Assisted website flows require centralized policy and monitoring.
 - Some edge-token assisted flows may be slower/costlier than curated stablecoin lanes.
+
+## After Action Report
+
+**AAR date:** 2026-05-06
+**AAR status:** Backfilled 2026-05-06 per ADR-0012
+
+**Outcome vs success criteria** (criteria implicit in Decision):
+
+- *Protocol contract boundaries preserved.* **Met** — no gas-abstraction or relayer coupling exists in `src/`; V3 contracts are collateral-agnostic ERC-20.
+- *Product surfaces split: `/dapp` advanced, `/site` assisted.* **Partially met** — `dapp/` is the self-custody power-user surface and works. `site/` is the marketing / navigation shell with the Resonance explorer skin and `bet.html` wallet staking page; **assisted UX (gas sponsorship, policy rails, convenience flows) is not yet shipped**. The surface is reserved but not occupied.
+- *dApp fully functional without platform services.* **Met** — `dapp/` only requires an EIP-1193 wallet and a network RPC; no service-layer dependency.
+- *Token policy: protocol collateral-agnostic; site curates happy paths.* **Met for protocol**, partially met for site (the Tier-1 / Tier-2 distinction exists in copy but not yet in flow code).
+
+**Outcome vs failure criteria:**
+
+- *Two UX modes confuse users.* **Currently avoided** — only one is live (self-custody dApp). Risk re-emerges when assisted flows ship.
+- *Centralized policy and monitoring overhead bites.* **Deferred** — overhead is not yet incurred because assisted flows are unbuilt.
+
+**Lessons:** none new.
+
+**Follow-ups:**
+
+- ADR-0007 (assisted transaction gateway) is the natural follow-on; its AAR (below) shows it is not yet implemented.
+- When assisted flows ship, this AAR's "currently avoided" rows must be revisited.
+
+**Revision schedule:** when ADR-0007 implementation begins, or no later than the mainnet readiness gate.
