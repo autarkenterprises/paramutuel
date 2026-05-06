@@ -85,3 +85,14 @@ Findings worth surfacing from the AAR sweep:
 - **ADR-0009 / ADR-0010 supersession:** V2 and standalone Freeform contracts are deleted from the tree; immutable on-chain bytecode preserved by Ethereum, historical tooling preserved by `git log`.
 
 No new entries added to `LESSONS.md` from this sweep — the durable lessons (L-001, L-002, L-003, L-004, L-005) all predate the AAR write-up.
+
+## 2026-05-06 — ADR-0013: test stratification + coverage baseline
+
+`script/test-fast.sh` and `script/test-extended.sh` introduced as the top-level cadence runners per `AGENTS.md` #13/#14. Fast suite is forge + the four Python unit-test groups + dApp Node tests; aborts on first failure; runs in ≈ 12 seconds on the development machine. Extended suite wraps the existing `script/testnet/run_live_suite.sh` and `script/testnet/run_stress_suite.sh`.
+
+Coverage baseline captured at `docs/COVERAGE-BASELINE.md`:
+
+- **Python: 3463 statements, 1355 missed, 61% covered.** Every 0%-covered and sub-50%-covered file has documented rationale (entrypoints / servers / CLIs exercised by the extended suite or manual ops).
+- **Solidity: blocked.** `forge coverage --ir-minimum` fails with stack-too-deep on `src/ParamutuelWagerV3.sol`. Functional 65/65 pass under the production compile. Path forward (constructor refactor / library extraction / alternative tool) tracked in `docs/COVERAGE-BASELINE.md` and ADR-0013 follow-ups.
+
+Known follow-up before ADR-0014: land the regression test stubs that `docs/PAYOUT-CALCULATION.md` worked examples reference (`testSingleWinner_documentationWorkedExample_threeOutcomes`, etc.). This is L-003 work and should ship as its own commit before any further ADR.

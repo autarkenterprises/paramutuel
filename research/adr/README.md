@@ -24,4 +24,6 @@
   - **Implemented** on branch `adr-0011-doc-layers`. Process / meta ADR satisfying `AGENTS.md` practice #11: introduces `LOG.md` (chronological spine), `LESSONS.md` (durable lessons), `MEMORY.md` (high-priority working-context facts), and `docs/log/` for long-form notes. No protocol-layer change. Implementation notes: `docs/ADR-0011-IMPLEMENTATION.md`.
 - `ADR-0012-adr-template-and-aar-discipline.md`
   - **Implemented** on branch `adr-0012-aar-template`. Process / meta ADR satisfying `AGENTS.md` practice #4: adopts a uniform ADR section structure (Context / Decision / Decision points / Success criteria / Failure criteria / AAR), provides a copy-pasteable template at `research/adr/ADR-TEMPLATE.md`, and **appends** After Action Reports to ADR-0001 through ADR-0010 (no rewrite of existing ADR bodies). Implementation notes: `docs/ADR-0012-IMPLEMENTATION.md`.
+- `ADR-0013-test-stratification-and-coverage-baseline.md`
+  - **Implemented** on branch `adr-0013-test-stratification`. Codifies the fast / extended test split per `AGENTS.md` #13/#14 (`script/test-fast.sh` and `script/test-extended.sh`), records the Python coverage baseline (61%, every 0% and sub-50% file rationalized in `docs/COVERAGE-BASELINE.md`), and documents the current `forge coverage` stack-too-deep obstacle with a path forward. Implementation notes: `docs/ADR-0013-IMPLEMENTATION.md`.
 
