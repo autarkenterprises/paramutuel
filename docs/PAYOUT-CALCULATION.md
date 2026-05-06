@@ -173,9 +173,43 @@ Summed over all of the bettor’s tickets. If the sum is **0** (e.g. only losing
 - **ANY_OF** / **EXACT_SET** / **AT_LEAST_K** / **SINGLE_WINNER**: same idea as v1 — **`netPot`** is split among **winning stakes** in proportion to each **winning ticket’s pool share**; each bettor’s share is proportional to their stake on each winning mask.
 - **WEIGHTED_OVERLAP**: larger **overlap** between **`T`** and **`W`** multiplies that ticket’s contribution to the denominator and to the bettor’s claim (partial credit).
 
-#### Worked example (`ANY_OF`)
+### Worked examples
 
-Assume **fees are 0**. The numbers **100**, **50**, … are **only** illustrative **raw integers** (they could mean **100 wei** in a test, or **100** of any token’s smallest unit). They are **not** “100 ETH” or “100 USDC” unless you scale the whole worked example consistently.
+All five examples use **fees = 0** and **raw integer** stakes (same convention as the top-of-document **ERC-20 raw units** paragraph). Each example is pinned by a Foundry regression test named `test<Policy>_documentationWorkedExample_*` in **`test/ParamutuelV3Enumerated.t.sol`** — if you change any stake or payout figure below, the test must be updated to match.
+
+#### Worked example (`SINGLE_WINNER`) — 3 outcomes, split-stake bettor
+
+- Three base options **A, B, C** (indices `0 … 2`; masks **`{A}=1`**, **`{B}=2`**, **`{C}=4`**).
+- **`payoffPolicy = SINGLE_WINNER`**, **`policyParam = 0`**.
+- Resolver sets **`W = {B}`**, i.e. **`winningMask = 2`**. Because `SINGLE_WINNER` requires `popcount(W) == 1`, a single-bit `W` is mandatory and all tickets must also be single-bit.
+
+| Bettor | Ticket (set) | Mask | Stake (raw) | vs `W = {B}` |
+|--------|----------------|------|-------------|----------------|
+| Alice | `{A}` | **1** | **100** | **Lose** (`1 ≠ 2`) |
+| Alice | `{B}` | **2** | **50** | **Win** (`2 == 2`) |
+| Bob | `{B}` | **2** | **200** | **Win** (`2 == 2`) |
+| Carol | `{C}` | **4** | **150** | **Lose** (`4 ≠ 2`) |
+
+Note Alice holds **two tickets** — one losing, one winning. Both stakes contribute to **`totalPot`** and to fees (if any), but **only** the winning stake contributes to **`totalWinningUnits`** and to Alice's claim.
+
+**`totalPot`** = 100 + 50 + 200 + 150 = **500**; **`netPot`** = **500**.
+
+Only one distinct **winning** mask appears: **`2`**. Its pool is **`ticketPoolTotal[2]`** = 50 + 200 = **250**, so **`totalWinningUnits` = 250**.
+
+**Claims** (\(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\)):
+
+- **Alice** (only her winning `{B}` stake counts): ⌊50 × 500 / 250⌋ = **100**.
+- **Bob:** ⌊200 × 500 / 250⌋ = **400**.
+
+**100 + 400 = 500 = `netPot`** — the floors close exactly, no dust. Alice recovers her winning stake plus half of Carol's forfeited stake; her losing **`{A}`** stake is gone. **Carol** and **Alice-on-losing-ticket** paths never trigger a separate revert because `claim` aggregates **all** of a bettor's tickets in one call — Alice's single `claim()` pays **100** total; Carol's single `claim()` reverts with `NothingToClaim` because none of her tickets won.
+
+**Contrast with `ANY_OF`:** Under `SINGLE_WINNER`, **multi-bit** tickets (e.g. `{A, B}`) are **rejected at `placeBet`** with `InvalidTicketMask`. Under `ANY_OF`, the same multi-bit tickets are legal and would win so long as overlap with `W` is non-empty.
+
+Regression: **`testSingleWinner_documentationWorkedExample_threeOutcomes`** in **`test/ParamutuelV3Enumerated.t.sol`**.
+
+#### Worked example (`ANY_OF`) — 5 outcomes, multi-bit tickets
+
+The numbers **100**, **50**, … are **only** illustrative **raw integers** (they could mean **100 wei** in a test, or **100** of any token's smallest unit). They are **not** "100 ETH" or "100 USDC" unless you scale the whole worked example consistently.
 
 - Five base options **A–E** (indices `0 … 4`).
 - Resolver sets **`W = {A, C, E}`**.
@@ -194,9 +228,9 @@ Per-ticket claims (integer division, then summed per bettor):
 
 **Alice + Bob** receive **498** of **`netPot`**; **2** of the **same smallest units** remain in the contract as **rounding dust** (in the toy table, that is literally **2 wei** if stakes were **100 wei**, **50 wei**, … — **not** 2 whole USDC or 2 ETH). **Carol** has no winning ticket, so **`claim()`** reverts (`NothingToClaim`) in the resolved-winner path.
 
-**On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw amounts passed to `placeBet` (as in the Foundry regression). If you use **human-scale** stakes (e.g. **`500e6`** raw for **500 USDC**), **`netPot`** is also in **raw** form; Alice’s lines are still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) — the **remainder** left on the contract stays **dust on the smallest-unit scale**, not “a few dollars” or “a few ETH.” You **cannot** derive payouts by multiplying the toy integers **213** × **`10^6`** unless you repeat the same floor math on full-precision integers. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+**On-chain identity:** The figures **142**, **71**, **213**, **285**, and **2** match `claim` when the stakes (**100**, **50**, **200**, **150**) are the **actual** raw amounts passed to `placeBet` (as in the Foundry regression). If you use **human-scale** stakes (e.g. **`500e6`** raw for **500 USDC**), **`netPot`** is also in **raw** form; Alice's lines are still \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\) — the **remainder** left on the contract stays **dust on the smallest-unit scale**, not "a few dollars" or "a few ETH." You **cannot** derive payouts by multiplying the toy integers **213** × **`10^6`** unless you repeat the same floor math on full-precision integers. Regression: **`testAnyOf_documentationWorkedExample_fiveOutcomes`** in **`test/ParamutuelV3Enumerated.t.sol`**.
 
-#### Worked example (`EXACT_SET`)
+#### Worked example (`EXACT_SET`) — 3 outcomes, strict match
 
 Same **raw integer** convention as the **ANY_OF** example above (toy amounts in **smallest token units**; see the **ERC-20 raw units** and **rounding dust** paragraphs at the top of this document).
 
@@ -226,7 +260,76 @@ Only one **distinct winning mask** appears: **`5`**. Its pool is **`ticketPoolTo
 
 **Contrast with `ANY_OF`:** If this were **`ANY_OF`** and the same **`W`**, tickets **`{A}`** and **`{A,B,C}`** would **win** (non-zero overlap); under **`EXACT_SET`** they **lose** because they did not name **exactly** **`{A,C}`**.
 
-Regression: **`testExactSet_documentationWorkedExample_threeOutcomes`** in **`test/ParamutuelV2Extensive.t.sol`**.
+Regression: **`testExactSet_documentationWorkedExample_threeOutcomes`** in **`test/ParamutuelV3Enumerated.t.sol`**.
+
+#### Worked example (`AT_LEAST_K`) — 4 outcomes, `k = 2`
+
+This example is the decisive one for understanding `AT_LEAST_K`: it shows that the test is **not** "at least `k` of the ticket's picks are in `W`" (i.e. subset-like logic), it is **not** "the ticket must lie inside `W`", and ticket size itself is irrelevant — only **`popcount(T & W)`** is compared against `k`.
+
+- Four base options **A, B, C, D** (masks **`{A}=1`**, **`{B}=2`**, **`{C}=4`**, **`{D}=8`**).
+- **`payoffPolicy = AT_LEAST_K`**, **`policyParam = 2`**.
+- Resolver sets **`W = {A, B, C}`**, i.e. **`winningMask = 7`**.
+
+| Bettor | Ticket (set) | Mask | Stake (raw) | `popcount(T & W)` | Outcome |
+|--------|----------------|------|-------------|--------------------|---------|
+| Alice | `{A, B}` | **3** | **100** | **2** (`{A,B}`) | **Win** (≥ 2) |
+| Bob | `{A, D}` | **9** | **60** | **1** (`{A}`) | **Lose** (< 2) — 2-bit ticket, but only one bit in **`W`** |
+| Carol | `{A, B, C}` | **7** | **80** | **3** (`{A,B,C}`) | **Win** |
+| Dave | `{B, C, D}` | **14** | **50** | **2** (`{B,C}`) | **Win** — extra bit **`D ∉ W`** does **not** disqualify |
+
+**`totalPot`** = 100 + 60 + 80 + 50 = **290**; **`netPot`** = **290**.
+
+Three **distinct winning masks** appear: **`3`** (pool 100), **`7`** (pool 80), **`14`** (pool 50). So **`totalWinningUnits`** = 100 + 80 + 50 = **230**. Bob's losing pool is excluded.
+
+**Claims** (\(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\)):
+
+- **Alice:** ⌊100 × 290 / 230⌋ = ⌊29000 / 230⌋ = **126**.
+- **Carol:** ⌊80 × 290 / 230⌋ = ⌊23200 / 230⌋ = **100**.
+- **Dave:** ⌊50 × 290 / 230⌋ = ⌊14500 / 230⌋ = **63**.
+
+**Sum = 126 + 100 + 63 = 289**; **dust = 1** left on the contract.
+
+**Reading the matrix:**
+
+- **Bob loses** despite holding a 2-bit ticket — **`T & W = {A}`** has only **one** bit. `AT_LEAST_K` asks about **overlap**, not ticket size or number of picks.
+- **Dave wins** despite picking **`D ∉ W`** — his overlap is 2 (`{B,C}`). Extra "wrong" bits do **not** hurt; they only grow the ticket pool and therefore shrink Dave's own relative share (vs. a 2-bit ticket of equal stake landing exactly on `{B,C}`, which would still have overlap 2 and same weight).
+- **Alice and Carol** both win but on **different** masks, so they **share** `netPot` with Dave in proportion to their **pool** on each mask.
+
+**Subset-of-truth uniform case:** If every ticket had **exactly `k = 2`** bits (a product rule enforced off-chain), `popcount(T & W) ≥ 2` ⇔ `T ⊆ W`. In this example Alice's `{A,B}` is a subset of **`W`** and Bob's `{A,D}` is not, which is exactly the subset-of-truth distinction. With mixed ticket sizes (Carol's 3-bit, Dave's 3-bit including a D), the subset interpretation breaks down — Dave is **not** a subset of **`W`** yet still wins. This is why **`PAYOUT-CALCULATION.md`** Part B glossary marks subset-of-truth as **"no dedicated enum value"** and only recommends `AT_LEAST_K` for the uniform-ticket case.
+
+Regression: **`testAtLeastK_documentationWorkedExample_fourOutcomes_k2`** in **`test/ParamutuelV3Enumerated.t.sol`**.
+
+#### Worked example (`WEIGHTED_OVERLAP`) — 4 outcomes, partial credit
+
+This example isolates the one effect that makes `WEIGHTED_OVERLAP` different from `ANY_OF`: every winning ticket's contribution to the denominator **and** to its bettor's payout is **multiplied by its overlap size**. Same stake, larger overlap ⇒ larger share.
+
+- Four base options **A, B, C, D** (masks **`{A}=1`**, **`{B}=2`**, **`{C}=4`**, **`{D}=8`**).
+- **`payoffPolicy = WEIGHTED_OVERLAP`**, **`policyParam = 0`**.
+- Resolver sets **`W = {A, B, C}`**, i.e. **`winningMask = 7`**.
+- **Every** bettor stakes **100** so overlap is the **only** variable.
+
+| Bettor | Ticket (set) | Mask | Stake | `popcount(T & W)` | Weight (`stake × overlap`) |
+|--------|----------------|------|-------|--------------------|-----------------------------|
+| Alice | `{A}` | **1** | **100** | **1** | **100** |
+| Bob | `{A, B}` | **3** | **100** | **2** | **200** |
+| Carol | `{A, B, C}` | **7** | **100** | **3** | **300** |
+| Dave | `{D}` | **8** | **100** | **0** | **0** — overlap is zero, ticket is out of the money |
+
+**`totalPot`** = 100 × 4 = **400**; **`netPot`** = **400**.
+
+**`totalWinningUnits`** = 100 + 200 + 300 + 0 = **600**. Dave contributes **nothing** to the denominator (overlap == 0 short-circuits both the "ticket wins" check and the weight accumulation) but his stake still joins the pot from which winners are paid.
+
+**Claims** under `WEIGHTED_OVERLAP` use **`weight`** (not raw stake) as the numerator:
+
+- **Alice:** ⌊100 × 400 / 600⌋ = ⌊40000 / 600⌋ = **66**.
+- **Bob:** ⌊200 × 400 / 600⌋ = ⌊80000 / 600⌋ = **133**.
+- **Carol:** ⌊300 × 400 / 600⌋ = ⌊120000 / 600⌋ = **200**.
+
+**Sum = 66 + 133 + 200 = 399**; **dust = 1**. The ratio **66 : 133 : 200** is approximately **1 : 2 : 3** — exactly the overlap ratio — because all three bettors staked the same amount. If Alice had staked **300** instead of 100 (overlap still 1), her weight would be **300** and she would earn the same payout as Carol despite covering only one winning option. That is the whole point of `WEIGHTED_OVERLAP`: stake × specificity.
+
+**Contrast with `ANY_OF`:** Same scenario under `ANY_OF` (all overlap ≥ 1 ⇒ win) would use `totalWinningUnits = 100 + 100 + 100 = 300` and pay each winner ⌊100 × 400 / 300⌋ = **133** — Alice and Carol are indistinguishable despite Carol covering the **entire** winning set. `WEIGHTED_OVERLAP` gives Carol **~3×** Alice's payout; `ANY_OF` gives them the same.
+
+Regression: **`testWeightedOverlap_documentationWorkedExample_fourOutcomes`** in **`test/ParamutuelV3Enumerated.t.sol`**.
 
 ### Retracted or expired (refund)
 
@@ -235,6 +338,86 @@ Identical formula to **v1**:
 \[
 \texttt{paid} = \left\lfloor \frac{\texttt{userTotalBet} \times \texttt{netPot}}{\texttt{totalPot}} \right\rfloor
 \]
+
+---
+
+## Part C — Freeform mode (`ParamutuelWagerV3`, `MODE()==1`)
+
+*(ADR-0009 economics, now implemented by `ParamutuelWagerV3` in freeform mode — see [`ADR-0009-IMPLEMENTATION.md`](ADR-0009-IMPLEMENTATION.md) and [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md).)*
+
+### Ticket identity
+
+Freeform wagers have **no** outcomes array. A bet is placed with a UTF-8 string `answer` and is pooled under a `bytes32` **`answerId`**:
+
+\[
+\texttt{answerId} = \texttt{keccak256}\bigl(\texttt{0x03} \,\Vert\, \texttt{bytes(answer)}\bigr)
+\]
+
+The **`0x03`** prefix is `FREEFORM_ANSWER_DOMAIN` — a domain-separation byte chosen in ADR-0010 so freeform ids cannot collide with unrelated `bytes32` uses in the same contract.
+
+**Exact-byte match:** two bets with even one byte of difference (case, whitespace, Unicode normalization, trailing newline) produce **different** `answerId`s and therefore **different** pools. The contract does **no** canonicalization; off-chain UX is responsible for any normalization policy.
+
+### When is a ticket a "winner"?
+
+The resolver calls **`resolve(winningAnswer)`** with **one** UTF-8 string. Its `answerId` is computed with the same domain byte and compared. A bet wins iff its `answerId` equals the winning id. No policy engine, no partial credit, no `popcount`. If no bet was placed on the winning string, `resolve` reverts with `NoWinningStake`.
+
+### Payout
+
+Identical to **v1** single-winner parimutuel, with `answerId` pools replacing outcome-index pools:
+
+- `totalWinningStake` = sum of all stakes whose `answerId` matches the resolver's.
+- For each winning bettor with stake `userWinStake` on the winning id:
+
+  \[
+  \texttt{paid} = \left\lfloor \frac{\texttt{userWinStake} \times \texttt{netPot}}{\texttt{totalWinningStake}} \right\rfloor
+  \]
+
+Losers (any bettor whose answer does not match) forfeit their stake to the winning pool (minus fees). Retract / expire refunds use the same formula as enumerated mode.
+
+#### Worked example (freeform mode) — case-sensitive answers
+
+The point of this example is to show that **exact UTF-8 bytes** govern the split — "rosebud" and "Rosebud" are two separate pools.
+
+- Proposition: "What was Rosebud?" (freeform wager, `MODE()==1`).
+- Fees = 0. Raw integer stakes, same convention as Part B.
+
+| Bettor | Answer (exact bytes) | Stake (raw) | `answerId` vs winner |
+|--------|------------------------|-------------|-----------------------|
+| Alice | `"rosebud"` | **200** | matches winning id |
+| Bob | `"rosebud"` | **100** | matches winning id |
+| Carol | `"Rosebud"` | **150** | **different** id (capital `R`) — **loses** |
+| Dave | `"a sled"` | **50** | different id — **loses** |
+
+Resolver calls **`resolve("rosebud")`**.
+
+**`totalPot`** = 200 + 100 + 150 + 50 = **500**; **`netPot`** = **500**.
+
+Only one winning `answerId` — the keccak of `0x03 || "rosebud"`. Its pool is **`ticketPoolTotal[that id]`** = 200 + 100 = **300**. So **`totalWinningStake`** = **300**.
+
+**Claims:**
+
+- **Alice:** ⌊200 × 500 / 300⌋ = ⌊100000 / 300⌋ = **333**.
+- **Bob:** ⌊100 × 500 / 300⌋ = ⌊50000 / 300⌋ = **166**.
+
+**Sum = 333 + 166 = 499**; **dust = 1** left on the contract. Carol's and Dave's single `claim()` calls each revert with `NothingToClaim`.
+
+**Reading the matrix:**
+
+- **Alice and Bob share** one pool because they sent the same UTF-8 bytes. The contract does not "see" their text — it only sees the two identical `answerId`s.
+- **Carol loses** despite being semantically correct (Rosebud *is* the canonical spelling in the film). One byte difference ⇒ one id difference ⇒ separate pool. Any off-chain canonicalization must happen **before** `placeBet`.
+- **Dave loses** on a completely different answer; his stake funds the winners like any other parimutuel loser.
+
+Regression: **`testFreeform_documentationWorkedExample_rosebud`** in **`test/ParamutuelV3Freeform.t.sol`**.
+
+### Retracted or expired (refund)
+
+Identical formula to enumerated mode:
+
+\[
+\texttt{paid} = \left\lfloor \frac{\texttt{userTotalBet} \times \texttt{netPot}}{\texttt{totalPot}} \right\rfloor
+\]
+
+where `userTotalBet` is the sum of **all** of a bettor's stakes across **all** of their distinct `answerId`s.
 
 ---
 
