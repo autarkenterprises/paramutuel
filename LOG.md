@@ -151,3 +151,9 @@ User flagged that the Resonance Exchange (formerly Microwonk ARG, `docs/MICROWON
 Closing the gap the original ADR-0014 scope under-weighted: `site/resonance-*.html` is the live ARG launch surface (the most user-visible code in the tree) and was treated as marketing chrome rather than production code. Each of the five Resonance pages (`resonance.html`, `resonance-bet.html`, `resonance-place.html`, `resonance-propose.html`, `resonance-explorer.html`) acquires a leading HTML comment block explaining its role, wallet binding, and iframe-skin contract with the explorer / dApp. `site/propose-templates.js` and `site/network-context.js` already carried sufficient JSDoc.
 
 The `resonance-bet.html` comment also flags the human-onlooker-without-ETH UX gap as a known issue tracked under ADR-0007 / ADR-0016, so a future reader can find the planned fix from the file.
+
+## 2026-05-07 — ADR-0015 proposed: Safe-controlled treasuries on both networks
+
+Design ADR landing the testnet-as-production implication of ADR-0002's revisited AAR: Safe multisig treasuries on **both** Base Sepolia and Base Mainnet, with no EOA in the production-exposure path. New V3 factory deployed per network with the Safe as `treasury_`; the existing Base Sepolia factory remains immutable on-chain but is deprecated for new ARG dispatch after cutover. Operational role wallets (proposer / resolver / individual microwonks) remain EOAs by design — Safe is for accumulated protocol fees, not bot-frequency signing.
+
+Cutover runbook in `docs/ADR-0015-IMPLEMENTATION.md`. Implementation gated on operator input: signer set + threshold per network, whether Sepolia and Mainnet share signers, retention or retirement of the legacy factory address in `config/deployments.json`, public disclosure of Safe addresses on the Resonance landing.
