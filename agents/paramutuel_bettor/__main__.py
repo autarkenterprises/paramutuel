@@ -1,3 +1,21 @@
+"""CLI / subagent entry point for the bet-scout package.
+
+Two surfaces are exposed:
+
+* Argparse subcommands (``health``, ``scan``, ``recommend``, ``quote``) for
+  human/operator use at the shell.
+* A ``json`` subcommand that reads exactly one JSON object from stdin and
+  writes one JSON object on stdout. This is the stable contract used by
+  higher-level agents that want to call the planner programmatically
+  without parsing argparse strings.
+
+Both surfaces share the same dispatch logic and emit the same shape of
+result (``{"ok": true, ...}`` on success, ``{"ok": false, "error": str}``
+on failure, written to stderr with a non-zero exit). The agent never
+touches a private key — every command output describes calldata that the
+caller must sign elsewhere.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -57,6 +75,13 @@ def _cmd_quote(client: IndexerClient, args: argparse.Namespace) -> dict[str, Any
 
 
 def _dispatch_json(client: IndexerClient, payload: dict[str, Any]) -> dict[str, Any]:
+    """Route one JSON request object to the matching planner call.
+
+    The wire shape mirrors the argparse subcommands so a calling agent can
+    learn the surface from the CLI ``--help`` and then use ``json`` for
+    machine-to-machine I/O. Numeric fields use the ``_raw`` suffix to make
+    it explicit that values are integer base units (no decimals applied).
+    """
     op = str(payload.get("op") or "").strip().lower()
     if op == "health":
         return _cmd_health(client)

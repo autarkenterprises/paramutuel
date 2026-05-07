@@ -1,3 +1,18 @@
+"""ABI calldata encoders used by the planner to build tx-ready hints.
+
+The encoders shell out to Foundry's ``cast calldata`` rather than depend on
+a Python ABI library. This keeps the package's runtime requirements to the
+standard library (the same posture as ``indexer_client`` using ``urllib``);
+when ``cast`` is missing we return ``None`` and surface a note so the
+caller can either install Foundry or route the encode through the MCP
+server's encoders instead.
+
+The recommend / quote pipeline ends in ``build_quote_like_payload``: that
+function is the single source of truth for the JSON shape that downstream
+tools rely on, including the ``placeBet.calldata`` hex and the
+``approval_required`` block needed to pre-allow ERC-20 spend.
+"""
+
 from __future__ import annotations
 
 import shutil
@@ -6,6 +21,13 @@ from typing import Any
 
 
 def _cast_calldata(signature: str, *args: Any) -> str | None:
+    """Run ``cast calldata <sig> <args...>`` and return ``0x...`` on success.
+
+    Returning ``None`` (rather than raising) lets the planner degrade
+    gracefully when Foundry isn't installed: the JSON payload still
+    carries odds and approval metadata, just without ready-to-broadcast
+    placeBet calldata.
+    """
     cast = shutil.which("cast")
     if not cast:
         return None
@@ -18,6 +40,12 @@ def _cast_calldata(signature: str, *args: Any) -> str | None:
 
 
 def encode_place_bet(outcome_index: int, amount: int) -> str | None:
+    """Enumerated mode: first argument is a pre-shifted ticket bitmask.
+
+    Callers pass the already-shifted ``1 << outcome_index`` value; the
+    planner does that shift in ``build_quote_like_payload`` so this helper
+    stays a thin pass-through to ``cast``.
+    """
     return _cast_calldata("placeBet(uint256,uint256)", outcome_index, amount)
 
 
@@ -47,6 +75,14 @@ def build_quote_like_payload(
     protocol_version: str = "enumerated",
     freeform_answer: str | None = None,
 ) -> dict[str, Any]:
+    """Assemble the wire-shape JSON returned by ``recommend`` and ``quote``.
+
+    The shape is intentionally stable: the MCP server, the dApp, and any
+    downstream agent rely on the same field names so a recommendation can
+    be handed to a wallet without further translation. ``execution_allowed``
+    summarises gating (open + calldata available for freeform) so callers
+    can surface a single boolean without re-deriving the rules.
+    """
     # ADR-0010 recognises exactly two V3 protocol_version values:
     # `enumerated` (bitmask tickets, `placeBet(uint256,uint256)`) and
     # `freeform` (UTF-8 answer, `placeBet(string,uint256)`).
