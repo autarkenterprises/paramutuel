@@ -115,3 +115,14 @@ L-003 commitment closed. ADR-0013 follow-up entry updated.
 Per `AGENTS.md` practice #3 every non-test source file should carry comments sufficient for transfer to a competent stranger. The current tree's commenting is uneven (NatSpec on V3 contracts is good for external functions but light on module rationale; Python services are mixed; `dapp/app.js` is dense pure-helper code with minimal explanation). ADR-0014 codifies the audit standard and decomposes the work into four disjoint module groups so sub-agents can run in parallel per practice #6 without merge conflicts.
 
 Groups: A (Solidity contracts), B (indexer + proposition), C (resolution / explorer / control_panel / mcp_server), D (bet scout agent + dApp). Each group's sub-agent receives the ADR's success/failure criteria as part of its bounded scope; comment-only diffs; `script/test-fast.sh` is the merge gate. Per-group merge log lives in `docs/ADR-0014-IMPLEMENTATION.md`.
+
+## 2026-05-07 — ADR-0014 sub-agents land + gap-fill closes the audit
+
+Four Opus-class sub-agents launched in isolated worktrees executed Groups A–D in parallel. All four made on-target diffs but each was cut off by an external usage cap before reaching its commit step; the diffs were committed manually from each worktree, then merged into `master` in order (A → B → C → D), running `script/test-fast.sh` after each merge. All four merges passed.
+
+Two findings worth surfacing:
+
+1. **One latent regression** in Group B's diff: the agent replaced the body of `service/indexer/indexer.py:_decode_abi_string` with only a docstring, deleting twelve lines of ABI-decoding logic. Caught at merge review (the fast suite missed it because only the live testnet enrichment path exercises the helper). Restored before commit. New durable lesson recorded as `LESSONS.md` L-006: treat "comment-only" sub-agent diffs as suspect, verify by tooling — a structural check that strips comments and diffs the remainder is straightforward to add and would have caught this.
+2. **Bounded scope by module list, not per-file deadline** meant the late files in each group's list were never reached. Group C only completed resolution before the cap; Group D only completed the first three of eight bet-scout files; neither reached `dapp/{logic,app}.js`. A gap-fill commit on `master` covers the missing files in: `service/proposition/{dispatch,ingest,json_sources,rss,synthesize,server}.py`; all of `service/explorer/`; all of `service/control_panel/`; `mcp_server/__init__.py`; `agents/paramutuel_bettor/{config,indexer_client,odds,planner,policy}.py`; `dapp/{logic,app}.js`. `mcp_server/{__main__,server}.py` already carried complete docstrings and were left untouched per AGENTS.md #8.
+
+Phase 4 closed. ADR-0014 AAR will be filled in shortly with the per-group results and the L-006 lesson reference.

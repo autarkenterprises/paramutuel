@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+"""Control panel — operator command-line surface.
+
+Each subcommand maps to one V3 lifecycle action: create (enumerated or
+freeform), close betting, resolve, retract, expire, withdraw fees. The CLI
+defaults to dry-run; ``--allow-execute`` is required to actually broadcast
+via ``cast send``. Calldata is constructed in :mod:`commands`; this module
+only handles argparse wiring, env-var hydration, and subprocess invocation.
+
+Refusal posture: a missing ``PRIVATE_KEY``, missing ``RPC_URL_*``, or unset
+``--allow-execute`` flag each abort the dispatch path with a non-zero exit
+and a clear stderr message. Operators expect dry-run to be the default —
+the safety contract is "nothing happens unless I explicitly say so".
+"""
 from __future__ import annotations
 
 import argparse

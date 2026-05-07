@@ -1,3 +1,14 @@
+"""Proposition Service — RSS / Atom ingestor.
+
+Parses a small subset of RSS 2.0 and Atom 1.0 sufficient for the news-style
+sources the proposition pipeline reads (title, link, summary, GUID, pubDate).
+Implemented against ``xml.etree`` rather than feedparser to avoid the heavy
+dependency in the proposition service container.
+
+The dedupe key is the feed item's GUID when present, falling back to a hash
+of the link plus title — both are stable across a feed refresh, so rerunning
+the ingest against the same feed produces no duplicate :class:`FeedItem` rows.
+"""
 from __future__ import annotations
 
 import re

@@ -1,3 +1,17 @@
+"""Bet scout — top-level recommendation planner.
+
+Composes the four lower-level modules (:mod:`indexer_client`, :mod:`odds`,
+:mod:`policy`, :mod:`calldata`) into a single ``recommend(...)`` operation:
+shortlist OPEN wagers, score outcomes against the agent's policy, build
+the calldata an external signer would broadcast. The planner produces
+JSON-only output and reads JSON-only input — that is the
+stdin → stdout subagent contract documented in ``docs/BET-AGENT.md``.
+
+Stateless by design: every invocation starts from indexer reads and ends
+with calldata in the response, with nothing held between calls. The
+caller's wallet (CLI, MCP-driven LLM, custom signer) decides whether to
+broadcast.
+"""
 from __future__ import annotations
 
 import json

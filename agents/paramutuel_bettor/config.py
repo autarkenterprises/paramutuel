@@ -1,3 +1,16 @@
+"""Bet scout — runtime configuration helpers.
+
+Two responsibilities: (a) locate the repository root so the agent can
+read ``config/deployments.json`` when installed from source, and (b)
+resolve the indexer URL the agent should query. Resolution order is
+``INDEXER_URL`` env var, then the ``baseSepolia.explorerApiBase`` /
+``baseMainnet.explorerApiBase`` field in ``config/deployments.json``,
+then a documented public fallback.
+
+The agent is intentionally network-only — it holds no private keys and
+takes no signing path — so misconfiguration here can only produce stale
+or empty quotes, never a wrong-chain transaction.
+"""
 from __future__ import annotations
 
 import json
@@ -6,6 +19,13 @@ from pathlib import Path
 
 
 def repo_root() -> Path:
+    """Return the paramutuel repo root.
+
+    Used to locate ``config/deployments.json`` when the agent is run from
+    a clone (``python3 -m agents.paramutuel_bettor``); when installed
+    from PyPI, the env var path takes precedence and this fallback is
+    not exercised.
+    """
     return Path(__file__).resolve().parents[2]
 
 

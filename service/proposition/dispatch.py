@@ -1,3 +1,16 @@
+"""Proposition Service — outbound dispatch to the on-chain factory.
+
+Bridges the operator-approved proposal records (managed in :mod:`service.proposition.db`)
+to a ``cast send`` invocation that creates the wager. Calldata building is delegated
+to :func:`service.control_panel.commands.build_create_wager_command` so the proposition
+and control-panel services agree on encoding rules; this module's job is purely the
+process-level fan-out (subprocess invocation, dry-run vs execute, JSON output capture).
+
+The dispatch path is deliberately single-shot per proposal: idempotency is enforced
+upstream by the operator UI marking each proposal as ``dispatched``. A re-dispatch
+of an already-dispatched record would create a second wager on-chain, which is why
+the gate sits in :mod:`db`, not here.
+"""
 from __future__ import annotations
 
 import json

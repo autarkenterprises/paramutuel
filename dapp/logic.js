@@ -1,4 +1,27 @@
-// Shared pure logic for the browser dApp and Node tests.
+/**
+ * Pure logic helpers shared between the browser dApp (`app.js`) and the
+ * Node-side unit tests (`tests/logic.test.js`). Everything here is
+ * deliberately framework-free and DOM-free so it can be exercised under
+ * `node --test` without a headless browser.
+ *
+ * Surface (selected — see exported names at the bottom of the IIFE):
+ *
+ *   - WAGER_TEMPLATES / getTemplate           — operator-friendly window presets
+ *   - computeWindowArgs / validateWindowMins  — bettingClose / resolutionWindow math
+ *   - parseMultiBetInputs / planWagerAction   — turn UI rows into V3 calldata args
+ *   - PAYOFF_POLICY constants                 — match the V3 enum offsets
+ *   - parseOutcomeIndicesCsvToTicketMask /
+ *     seedOutcomeIndicesToTicketMasks /
+ *     popcountMask                            — bitmask helpers for enumerated mode
+ *   - validatePolicyParamForCreate            — `policyParam != 0` only for AT_LEAST_K
+ *   - freeformV3AnswerId                      — keccak256(0x03 || bytes(answer))
+ *
+ * The freeform answer-id helper carries the canonical `0x03`
+ * `FREEFORM_ANSWER_DOMAIN` byte so the JS-side preview matches the V3
+ * contract exactly; any change here must land in lockstep with
+ * `src/ParamutuelWagerV3.sol` or freeform bets will hash to a different
+ * pool than the contract sees.
+ */
 (function initParamutuelLogic(globalScope) {
   const WAGER_TEMPLATES = {
     custom: {

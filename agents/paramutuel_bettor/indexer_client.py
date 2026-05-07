@@ -1,3 +1,11 @@
+"""Bet scout — minimal HTTP client for the indexer's read API.
+
+Stdlib-only (urllib) so the published wheel has zero runtime dependencies
+beyond Python itself, matching the bet-scout's "lightweight subagent"
+distribution shape (see ``docs/BET-AGENT.md``). Errors are normalised to
+:class:`RuntimeError` with the failing path in the message; the planner
+surfaces them in the JSON output rather than crashing.
+"""
 from __future__ import annotations
 
 import json

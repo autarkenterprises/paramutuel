@@ -1,3 +1,15 @@
+"""Proposition Service — draft proposal synthesis.
+
+Renders raw source items (RSS / JSON) into operator-reviewable proposal drafts:
+proposition prose, candidate outcomes, default windows, and a coarse cadence
+label. The cadence label informs operator filtering; it is not authoritative
+on-chain (the wager's ``bettingCloseTime`` is what matters).
+
+This module is deliberately rule-based rather than LLM-backed at the time of
+writing — every call is deterministic for a given input and clock. An
+LLM-backed branch is reserved for future expansion under a feature flag and
+would route through :mod:`service.proposition.dispatch`'s synthesis hook.
+"""
 from __future__ import annotations
 
 import re
@@ -7,6 +19,13 @@ from typing import Any
 
 
 def _truncate(s: str, max_len: int) -> str:
+    """Truncate ``s`` to ``max_len`` characters with a single-ellipsis suffix.
+
+    Used to fit synthesised propositions inside the on-chain string limits
+    that the V3 factory imposes via :class:`service.control_panel.commands`
+    validators. Non-strict — callers that need byte-exact bounds should
+    measure UTF-8 byte length separately.
+    """
     s = s.strip()
     if len(s) <= max_len:
         return s

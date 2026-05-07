@@ -1,3 +1,15 @@
+"""Proposition Service — periodic ingestion driver.
+
+Reads a ``sources.json`` configuration listing RSS feeds and JSON endpoints,
+fans out fetches via :mod:`service.proposition.rss` and :mod:`service.proposition.json_sources`,
+deduplicates raw items in :mod:`service.proposition.db`, and synthesises draft
+proposal rows via :mod:`service.proposition.synthesize`.
+
+The ingest pipeline is deliberately additive: every step ``INSERT OR IGNORE``s,
+so a re-run after partial failure produces no duplicates. Errors are accumulated
+into the returned dict rather than raised so a single bad source does not stall
+the whole sweep — the operator panel surfaces the per-source error counts.
+"""
 from __future__ import annotations
 
 import json
@@ -12,6 +24,12 @@ from . import synthesize
 
 
 def load_sources_config(path: Path) -> list[dict[str, Any]]:
+    """Load the sources file, normalising both ``{"sources": [...]}`` and bare-list shapes.
+
+    Returns an empty list (rather than raising) when the file is missing,
+    malformed, or inhabits an unexpected top-level type. The ingest driver
+    treats "no sources" as a no-op.
+    """
     if not path.exists():
         return []
     data = json.loads(path.read_text(encoding="utf-8"))

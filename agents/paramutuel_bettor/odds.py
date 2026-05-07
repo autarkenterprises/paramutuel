@@ -1,3 +1,12 @@
+"""Bet scout — odds and expected-payout helpers.
+
+Mirrors the math used by the dApp (``dapp/logic.js``) and the MCP server
+so all three surfaces produce the same number for a given wager / outcome /
+bet size. Drift between them would mislead an agent that hops between
+surfaces (e.g. an LLM reading MCP odds and calling the bet scout to plan).
+All values are raw token units; the caller is responsible for any
+human-scale formatting.
+"""
 from __future__ import annotations
 
 from typing import Any

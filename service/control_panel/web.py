@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+"""Control panel — token-gated HTTP shell.
+
+Mirrors the CLI commands behind a ``ThreadingHTTPServer``. Every mutating
+endpoint goes through :func:`service.control_panel.security.token_authorized`
+before executing; the bearer token is read from
+``CONTROL_PANEL_TOKEN`` at process start and never logged. Like the CLI,
+the dispatch path requires ``--allow-execute``; without it, every write
+endpoint returns the prepared dry-run command for operator review rather
+than broadcasting.
+
+Read paths (operator dashboard) are unauthenticated — they only proxy
+indexer queries and never expose keying material. The split between this
+service (operator-only, write-capable) and the public explorer
+(:mod:`service.explorer.server`, read-only, public) is the surface
+boundary defined in ADR-0006.
+"""
 from __future__ import annotations
 
 import argparse

@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+"""Explorer service — HTTP server.
+
+Serves the static explorer bundle and proxies a small set of read-only
+queries to the configured indexer base URL. No write paths, no signing
+material, no operator gating — the dApp / explorer split per ADR-0006
+keeps the dApp as the self-custody power-user surface and the explorer
+as a public read-only shell.
+
+The proxy layer exists to keep CORS rules simple: clients hit one origin
+(the explorer), which forwards to the indexer with stable headers. If the
+indexer is unreachable, the explorer surfaces a structured error rather
+than a hard 5xx, so the dApp's loading UX can degrade gracefully.
+"""
 from __future__ import annotations
 
 import argparse

@@ -1,3 +1,15 @@
+"""Proposition Service — JSON-source ingestor.
+
+Pulls structured items (events, races, scheduled drops) from configured JSON
+endpoints. Each source supplies a JSONPath-shaped extraction config; this
+module flattens the response into :class:`JsonItem` records that the
+:mod:`service.proposition.synthesize` step can render into proposal drafts.
+
+External IDs are computed from the source-specific identity field so the
+upstream :func:`service.proposition.db.insert_source_item` dedupe survives
+a rerun against a partly-overlapping snapshot — important for endpoints
+that reflect a rolling window rather than monotonically appended events.
+"""
 from __future__ import annotations
 
 import json

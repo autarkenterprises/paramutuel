@@ -1,3 +1,17 @@
+"""Bet scout — outcome-selection policy.
+
+Given a wager row from the indexer plus a hypothetical bet size, returns
+the per-outcome scores the planner ranks against. The default policy is
+the simplest defensible one: pick the outcome with the highest implied
+payout multiple, breaking ties by lowest current pool share so the bet
+moves the line less.
+
+The policy is **explicitly not financial advice** — it has no notion of
+truth, latent probability, or external information. It is a deterministic
+shortlist function the calling agent can override or augment. Future
+policies (Kelly, quote-mark variance, etc.) would land as additional
+``pick_*`` functions selected via the planner's ``policy=`` argument.
+"""
 from __future__ import annotations
 
 import json

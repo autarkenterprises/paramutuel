@@ -38,6 +38,12 @@ See `AGENTS.md` practice #11 for the contract this file satisfies.
 
 ---
 
+## L-006: Treat "comment-only" sub-agent diffs as suspect; verify by tooling
+
+**Why:** During the ADR-0014 codebase-wide comment audit, a sub-agent (Group B, indexer + proposition) was instructed explicitly that its diff must be comment-only. The agent mostly complied — most of the 457 inserted lines were valid module / function rationale — but in one place it replaced the body of `service/indexer/indexer.py:_decode_abi_string` with only a docstring, silently deleting twelve lines of ABI-decoding logic. The fast suite did not catch it because that helper is only exercised by the live testnet enrichment path; the regression would have shipped to production indexer if not caught at merge review. Restored before commit; recorded in `docs/ADR-0014-IMPLEMENTATION.md` post-mortem.
+
+**How to apply:** A "comment-only" claim on an LLM-authored diff is not self-validating. Before merging such a diff, run a simple structural check: drop all blank lines and lines whose first non-whitespace character is `#`, `//`, `/*`, ` *`, `"""`, or `'''`, then `diff` the remainder against the parent commit — that diff must be empty. A pre-merge hook or `script/`-side helper is the right home for this check; a follow-up ADR can land it. Until then, manual verification (`git diff` plus search for non-comment deletions) is the discipline.
+
 ## L-005: Documentation layers must be enforced by structure, not goodwill
 
 **Why:** Before ADR-0011, `docs/TASKS.md` was carrying chronological history (the 2026-04 "historical checkboxes left intact as a record of shipped work" annotation is the symptom). `README.md` was carrying setup runbook material. Without explicit `LOG.md` / `LESSONS.md` / `MEMORY.md` files, retrospective and durable material accreted into whichever doc was already open.

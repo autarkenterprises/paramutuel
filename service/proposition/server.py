@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+"""Proposition Service — HTTP server (operator panel + ingest scheduler).
+
+Stands up the operator review UI plus a small JSON API. Read endpoints (list
+items, list proposals) are unauthenticated; mutating endpoints (approve,
+reject, dispatch) gate on a bearer token via
+:func:`service.control_panel.security.token_authorized`. The optional
+``--allow-execute`` flag is required before any dispatch path will actually
+broadcast a transaction; without it the dispatch endpoints return the
+prepared command dry-run-style, mirroring the control_panel security model.
+
+The server runs the periodic :func:`service.proposition.ingest.run_ingest`
+loop on a background thread when started with ``--ingest-interval``; the
+HTTP server itself is :class:`ThreadingHTTPServer`, so each request handler
+runs concurrently and shares the SQLite connection via the cross-thread
+flag in :mod:`service.proposition.db`.
+"""
 from __future__ import annotations
 
 import argparse

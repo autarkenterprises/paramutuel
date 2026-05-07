@@ -1,3 +1,30 @@
+/**
+ * Browser entrypoint for the self-custody dApp surface (ADR-0006).
+ *
+ * Everything in this file is DOM-bound and wallet-bound. Pure helpers live
+ * in `dapp/logic.js` so they can be unit-tested under `node --test`; this
+ * file wires those helpers into form fields, EIP-1193 events, and the V3
+ * factory / wager ABIs published in `dapp/abi/`.
+ *
+ * Wallet contract: ANY EIP-1193-compliant injected provider works. When
+ * multiple wallets register under `ethereum.providers[]`, the helper
+ * `pickInjectedProvider` selects the first entry that implements
+ * `request` — see `docs/WEBSITE.md`. WalletConnect and other non-injected
+ * paths are intentionally not bundled here; this file is the advanced
+ * power-user lane and avoids extra dependencies.
+ *
+ * Network contract: `config/deployments.json` is the source of truth for
+ * factory address, indexer URL, and chain id per network. The dApp
+ * surfaces a clear network-mismatch error rather than guessing — the
+ * V3 factory will revert anyway, but the UX bound matters.
+ *
+ * Mode dispatch: V3 is mode-discriminated (`Enumerated` / `Freeform`).
+ * Form state and ABI selection branch on the wager's `MODE()` view, with
+ * the freeform branch using the `0x03`-domained `answerId` helper from
+ * `dapp/logic.js` to preview a bet before signing. Switching surfaces
+ * between modes always re-reads `MODE()` from chain to avoid stale UI.
+ */
+
 // Load ethers via UMD in index.html:
 // <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
 // The UMD bundle exposes `ethers` on `globalThis`.

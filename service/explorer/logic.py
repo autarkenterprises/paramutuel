@@ -1,3 +1,11 @@
+"""Explorer service — pure data-shape helpers.
+
+Stateless transforms over indexer-shaped wager dicts. Pulled into a separate
+module so they are unit-testable without standing up the HTTP server, and
+because the dApp's JS-side equivalents (in ``dapp/logic.js``) need to agree
+on the same classification rules — drift between the two would silently
+mislabel wagers in the explorer vs the dApp.
+"""
 from __future__ import annotations
 
 

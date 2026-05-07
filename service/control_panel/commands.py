@@ -1,3 +1,24 @@
+"""Control panel — calldata builders for V3 wager-lifecycle actions.
+
+Pure functions over operator inputs that produce ``cast send`` argument
+lists. Centralising the encoders here means the proposition service
+(which dispatches its own create commands) and the control-panel CLI /
+web shell agree byte-for-byte on calldata; encoding drift between the
+two would silently mint differently-encoded wagers.
+
+V3 protocol surface assumptions baked in:
+
+- Two factory entry points: ``createEnumeratedWager`` (12-arg or 14-arg
+  with seed bets) and ``createFreeformWager``.
+- Lifecycle actions are scoped to a wager address: ``closeBetting``,
+  ``resolve``, ``retract``, ``expire``, ``withdrawFees``. The encoders
+  produce the function selector + ABI-packed args; the CLI handles the
+  ``--rpc-url`` / ``--private-key`` / ``--allow-execute`` plumbing.
+
+Address handling uses the EIP-55 checksum form except where the protocol
+explicitly accepts ``0x0`` to mean "default to proposer" (resolver,
+betting closer, resolution closer).
+"""
 from __future__ import annotations
 
 import json
