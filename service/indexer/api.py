@@ -1,4 +1,42 @@
 #!/usr/bin/env python3
+"""Read-only HTTP API over the indexer SQLite database.
+
+Surface
+-------
+``/`` (or ``/api``)
+    Self-describing service banner with the supported endpoints.
+``/health``
+    Liveness + cursor snapshot used by the explorer footer and by
+    operator-facing status checks. Surfaces ``last_sync_error`` so a
+    stuck sync is visible without grepping logs.
+``/wagers``
+    Paginated list of wagers joined to ``wager_totals``. Supports
+    free-text search across every indexed wager column (``q=``); the
+    LIKE expansion is intentionally exhaustive because the explorer
+    needs a single-box global search.
+``/wagers/{address}``
+    Single wager detail bundle: metadata, totals, per-outcome stake,
+    per-ticket-mask pool, and the ordered event log.
+``/sweeper/expire-candidates``
+    Operator preview for the sweeper. Accepts an optional ``now``
+    override so tests can drive deterministic clocks.
+
+Threading & lifecycle
+---------------------
+The handler reads from a single connection set on the class via
+``Handler.conn = ...`` before ``serve_forever``. The connection is
+opened with ``check_same_thread=False`` (see ``db_connect``) because
+``ThreadingHTTPServer`` dispatches each request on a worker thread.
+There is no write path here; the live daemon owns its own connection
+for the sync loop.
+
+CORS
+----
+``Access-Control-Allow-Origin: *`` is set on every response so the
+static explorer dApp can call this API directly from the browser
+without a same-origin proxy. There are no mutating endpoints, so
+allowing arbitrary origins is safe.
+"""
 import argparse
 import json
 import sqlite3
@@ -21,6 +59,16 @@ def list_wagers(
     order: str,
     offset: int,
 ) -> list[dict]:
+    """Paginated wager list joined to totals; powers the explorer feed.
+
+    The free-text search expands a single ``q`` parameter into a
+    case-insensitive ``LIKE`` against every operator-meaningful column
+    on ``wagers`` and ``wager_totals``. The duplication is deliberate:
+    SQLite has no native column-spanning text index here, and the
+    explorer's single-box UX needs to find a wager by partial address,
+    proposition fragment, payoff-policy ordinal, or any other shown
+    field.
+    """
     base_query = """
         SELECT
             m.*,
@@ -82,6 +130,14 @@ def list_wagers(
 
 
 def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
+    """Return the full wager bundle the explorer detail view needs.
+
+    Combines the wager row, totals, per-outcome stake, per-ticket-mask
+    pool, and the ordered event log in one round trip. ``payload_json``
+    fields are decoded from text to JSON so callers do not have to
+    re-parse them; the wager address is lower-cased to match the
+    canonicalisation enforced by ``normalize_address``.
+    """
     m = conn.execute("SELECT * FROM wagers WHERE wager_address = ?", (wager_address.lower(),)).fetchone()
     if not m:
         return None
@@ -114,6 +170,14 @@ def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """``BaseHTTPRequestHandler`` subclass — see module docstring for the route table.
+
+    Class-level attributes are populated once by the entrypoint
+    (``api.main`` or ``live_api.main``) before the server starts; each
+    request reads them directly. There is no per-request state — the
+    handler is intentionally stateless beyond the shared connection.
+    """
+
     conn: sqlite3.Connection = None  # type: ignore
     # Optional: live_api sets this so /health can echo the configured factory without env injection.
     indexer_factory_address: str | None = None

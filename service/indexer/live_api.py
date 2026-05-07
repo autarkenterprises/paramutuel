@@ -1,4 +1,48 @@
 #!/usr/bin/env python3
+"""Live indexer daemon: background sync loop + read API in one process.
+
+This is the production entrypoint deployed to the indexer host. A
+background thread polls ``eth_getLogs`` from
+``last_indexed_block + 1`` to chain head every
+``--poll-interval-seconds``; the foreground thread serves the same
+read API as ``api.py`` so the explorer / agents have one URL to talk
+to.
+
+Configuration precedence
+------------------------
+For each setting (factory address, RPC URL, initial from-block) the
+resolution order is: explicit CLI flag > matching environment
+variable > ``config/deployments.json`` for the configured network
+(``--network``, default ``base-sepolia``). The deployments file maps
+short network names through ``NETWORK_KEY_MAP`` to the canonical keys
+written by the deploy scripts.
+
+Initial from-block
+------------------
+``sync_logs`` is invoked **without** ``allow_genesis_start`` here; if
+``last_indexed_block`` is unset, ``initial_from_block`` is required and
+must come from CLI / env / deployments. Starting at block 0 against a
+mainnet RPC would burn quota for no benefit, since wagers cannot exist
+before the factory was deployed.
+
+RPC error recovery
+------------------
+The sync thread wraps each ``sync_logs`` call in a broad ``except``
+that prints the error and waits for the next tick. ``sync_logs``
+itself bisects on RPC failure inside a chunk and writes the most
+recent failure to ``last_sync_error`` so ``/health`` can surface a
+stuck sync. The thread is daemonic and is shut down via the
+``stop_event`` set in the ``finally`` of the main HTTP loop.
+
+Connections
+-----------
+Two SQLite connections share the database: one for the read API
+(``api_conn``) and one for the sync writer (``sync_conn``). SQLite
+serialises writes at the file level; using two connections means a
+slow read cannot block the sync loop's commit, while
+``check_same_thread=False`` (in ``db_connect``) lets the API
+connection serve threaded requests safely.
+"""
 import argparse
 import json
 import os
@@ -95,6 +139,19 @@ def _sync_loop(
     chunk_size: int,
     initial_from_block: int,
 ) -> None:
+    """Background poller that drives ``sync_logs`` on a fixed interval.
+
+    On the first iteration after a fresh DB, ``last_indexed_block`` is
+    unset and ``effective_from`` falls back to ``initial_from_block``
+    (operator-supplied via CLI / env / deployments). On every later
+    iteration the cursor is taken from the meta row, so a restart
+    resumes exactly where the previous run left off.
+
+    Exceptions from ``sync_logs`` (RPC outage, malformed response, etc.)
+    are caught here so a transient failure cannot kill the daemon
+    thread; the next tick simply retries. ``stop_event.wait`` is used
+    instead of ``time.sleep`` so shutdown is responsive.
+    """
     while not stop_event.is_set():
         try:
             last = get_meta_int(conn, "last_indexed_block")
