@@ -145,3 +145,9 @@ User flagged that the Resonance Exchange (formerly Microwonk ARG, `docs/MICROWON
 - **`docs/COVERAGE-BASELINE.md`:** the 0%-covered server / dispatch entrypoints in `service/{resolution,proposition}` run **live** during the ARG; rationale updated, follow-up is "lift coverage with deterministic shims," not "exercised by manual ops."
 
 `MEMORY.md` updated with the testnet-as-production framing and the active design ADR list (ADR-0015 / ADR-0016 / ADR-0017).
+
+## 2026-05-07 — ADR-0014 site follow-up: Resonance pages commented
+
+Closing the gap the original ADR-0014 scope under-weighted: `site/resonance-*.html` is the live ARG launch surface (the most user-visible code in the tree) and was treated as marketing chrome rather than production code. Each of the five Resonance pages (`resonance.html`, `resonance-bet.html`, `resonance-place.html`, `resonance-propose.html`, `resonance-explorer.html`) acquires a leading HTML comment block explaining its role, wallet binding, and iframe-skin contract with the explorer / dApp. `site/propose-templates.js` and `site/network-context.js` already carried sufficient JSDoc.
+
+The `resonance-bet.html` comment also flags the human-onlooker-without-ETH UX gap as a known issue tracked under ADR-0007 / ADR-0016, so a future reader can find the planned fix from the file.

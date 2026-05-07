@@ -1,4 +1,13 @@
 <!doctype html>
+<!--
+  Resonance Exchange — explorer page. Embeds service/explorer/static via
+  iframe with `?brand=resonance`, which the explorer's app.js reads to
+  render the Resonance listing skin and route bet links to
+  resonance-bet.html. The indexer URL row is hidden on this page (the
+  Resonance flow uses a single canonical Cloud Run indexer per
+  config/deployments.json — operator-grade indexer-override is reserved
+  for site/explorer.html).
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8" />

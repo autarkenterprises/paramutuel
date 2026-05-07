@@ -1,4 +1,17 @@
 <!doctype html>
+<!--
+  Resonance Exchange — bet-staking page. Wallet-bound (EIP-1193 via
+  ethers BrowserProvider); reads protocol_version from the indexer and
+  picks the V3 enumerated or freeform placeBet ABI accordingly. Mirrors
+  site/bet.html's logic but with the Resonance skin and ARG copy.
+
+  Reached from resonance.html, resonance-place.html, resonance-explorer.html,
+  or any deep link with ?wager=<addr>. A human onlooker landing here without
+  ETH for gas is a known UX gap — the assisted-UX gateway (ADR-0007 +
+  ADR-0016) is the planned fix; until it ships, the page surfaces a clear
+  "needs Base Sepolia ETH" message rather than letting the wallet error
+  through unexplained.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8" />

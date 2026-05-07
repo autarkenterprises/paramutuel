@@ -1,4 +1,16 @@
 <!doctype html>
+<!--
+  Resonance Exchange — wager-creation page. Shares the propose-wager.js
+  engine with site/propose-a-wager.html; the only difference is the
+  `data-propose-profile="resonance"` attribute, which selects the
+  Resonance template set in site/propose-templates.js (alternate
+  proposition placeholders in ARG voice).
+
+  Wallet-bound (EIP-1193) for the actual createEnumeratedWager /
+  createFreeformWager call; the calldata path is identical to the main
+  site, so a wager created here is indistinguishable on-chain from one
+  created via propose-a-wager.html.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8" />
