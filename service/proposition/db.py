@@ -1,3 +1,27 @@
+"""SQLite persistence for the proposition service.
+
+The schema (``schema.sql``) defines two tables:
+
+``source_items``
+    Raw items pulled from configured sources. ``UNIQUE(source_id,
+    external_id)`` is the dedupe contract: every ingest pass calls
+    :func:`upsert_source_item` per item and lands a row only when the
+    pair has not been seen before.
+
+``proposals``
+    Operator-facing wager drafts. ``status`` advances through the
+    state machine ``pending → approved → dispatched`` (or ``rejected``
+    / ``dispatch_failed``). The CHECK constraint in the schema is the
+    source of truth for legal status values; this module's helpers
+    write only those exact strings.
+
+Connections are short-lived: the HTTP server opens a connection per
+request, runs the helper, and closes it. SQLite's default
+serialised-write semantics are sufficient because all writes here go
+through :func:`update_proposal_status` /
+:func:`update_proposal_content` and the throughput is operator-paced.
+"""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +32,13 @@ from typing import Any
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
+    """Open a per-request SQLite connection, creating the parent dir if needed.
+
+    The proposition service is run as a single-process HTTP server with
+    operator-paced traffic, so each handler opens, uses, and closes a
+    connection. ``Row`` factory makes ``dict(row)`` work cleanly when
+    serialising responses.
+    """
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
@@ -16,6 +47,12 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection, schema_path: Path) -> None:
+    """Apply ``schema.sql`` to the connection. Idempotent.
+
+    Every statement in the schema uses ``CREATE TABLE IF NOT EXISTS`` /
+    ``CREATE INDEX IF NOT EXISTS``, so this runs safely on every
+    process boot and after migrations that introduce new tables.
+    """
     sql = schema_path.read_text(encoding="utf-8")
     conn.executescript(sql)
     conn.commit()
@@ -32,7 +69,14 @@ def upsert_source_item(
     published_at: int | None,
     raw: dict[str, Any],
 ) -> int | None:
-    """Insert source item if new. Returns row id if inserted, else None."""
+    """Insert a fetched source item; return its row id, or ``None`` if duplicate.
+
+    Dedupe is enforced by the ``UNIQUE(source_id, external_id)`` index
+    on ``source_items``. Returning ``None`` on duplicate (rather than
+    raising) lets the ingest loop simply skip already-seen items
+    without try/except per row, and the caller uses the returned id to
+    decide whether to also synthesise a draft proposal.
+    """
     now = int(time.time())
     try:
         cur = conn.execute(
@@ -70,6 +114,16 @@ def insert_proposal(
     source_refs: list[dict[str, str]],
     source_item_ids: list[int],
 ) -> int:
+    """Land a new proposal row in ``status='pending'``.
+
+    Lists of strings / dicts are JSON-encoded into their respective
+    ``*_json`` columns because SQLite has no native array type and the
+    operator UI deserialises them on render. Note that this does **not**
+    dedupe on ``proposition`` text; ingest checks
+    :func:`proposition_exists` for calendar templates only — RSS-driven
+    drafts intentionally allow near-duplicates so the operator can pick
+    the best wording.
+    """
     now = int(time.time())
     cur = conn.execute(
         """

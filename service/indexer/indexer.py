@@ -9,6 +9,43 @@ Single factory, two wager modes:
 The `protocol_version` column on `wagers` stores the wager mode (`enumerated`
 or `freeform`). Earlier v1 / v2 / standalone-freeform contracts are not
 supported.
+
+Idempotency contract
+--------------------
+Every event is keyed by ``event_id = "<txHash>:<logIndex>"``. ``apply_log``
+performs an ``INSERT OR IGNORE`` into ``events_log`` and only mutates the
+derived tables (``wagers``, ``wager_totals``, ``wager_ticket_pools``) when
+that insert actually wrote a new row. Replaying the same RPC response — or
+re-syncing an overlapping block window after a restart — is therefore safe
+and produces no double counting. ``apply_log`` also drops any wager-scoped
+event whose ``WagerCreatedV3*`` parent row is not yet present, so partial /
+out-of-order log batches reconcile on the next sync pass.
+
+Event topic schema
+------------------
+``TOPICS`` is the canonical V3 keccak topic table. The two factory topics
+are scoped to the configured factory address (out-of-factory ``WagerCreated``
+events are ignored); all other events are address-scoped to the wager that
+emitted them and require the corresponding ``wagers`` row to exist.
+
+Sync loop
+---------
+``sync_logs`` walks ``[from_block, to_block]`` in ``chunk_size`` slices,
+bisecting on RPC error so a single hot range cannot stall progress. The
+``meta`` table tracks the cursor (``last_indexed_block``), the chain head
+(``chain_head``), and the most recent transient error (``last_sync_error``)
+for the ``/health`` endpoint.
+
+Reorg handling
+--------------
+The on-chain protocol does not produce in-place state edits, so the
+indexer relies on its insert-only event log and the ``INSERT OR IGNORE``
+guards rather than a separate reorg-rewinder. A finalised event id never
+changes; a non-finalised event id that is later re-emitted at a different
+log index would be ingested as a new row, and the operator is expected to
+tail ``last_sync_error`` and reconcile manually if the underlying chain
+forks past finality. This is documented as an accepted limitation in the
+upgrade runbook.
 """
 import argparse
 import json
@@ -46,13 +83,26 @@ WAGER_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
 
 
 def db_connect(path: str) -> sqlite3.Connection:
-    # API server uses ThreadingHTTPServer; allow sqlite connection across handler threads.
+    """Open the indexer SQLite DB with cross-thread access enabled.
+
+    The HTTP API server uses ``ThreadingHTTPServer`` and the live daemon
+    runs the sync loop on a separate thread; both share a single
+    connection per process, so ``check_same_thread=False`` is required.
+    Concurrent writers are avoided by giving the sync loop its own
+    connection (see ``live_api.main``).
+    """
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db(conn: sqlite3.Connection) -> None:
+    """Apply ``schema.sql`` and ensure derived indices.
+
+    Idempotent — every statement in the schema and the secondary index
+    uses ``IF NOT EXISTS``, so this is safe to call on every process
+    boot, both from the read API and from the sync loop.
+    """
     schema = Path(__file__).with_name("schema.sql").read_text()
     conn.executescript(schema)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wagers_proposition ON wagers(proposition)")
@@ -60,6 +110,13 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 
 def rpc_call(rpc_url: str, method: str, params: List[Any]) -> Any:
+    """Issue a single JSON-RPC call and return the ``result`` field.
+
+    Raises ``RuntimeError`` on a JSON-RPC error response so the caller
+    can surface it via ``last_sync_error`` rather than silently dropping
+    it. The 30-second timeout matches Base Sepolia public-RPC latency
+    expectations; longer chunk fetches should be sliced upstream.
+    """
     payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
     req = request.Request(
         rpc_url,
@@ -89,6 +146,14 @@ def _decode_u256_word(data_hex: str) -> int:
 
 
 def _decode_abi_string(data_hex: str) -> str:
+    """Decode a single ABI-encoded ``string`` returned by ``eth_call``.
+
+    The dynamic ``string`` layout is ``offset(uint256) | length(uint256) |
+    payload(bytes, padded)``; we read the offset, then the length, then
+    extract that many bytes. Any short / malformed response is treated
+    as an empty string so a partially-deployed wager cannot crash the
+    enrichment path.
+    """
     payload = data_hex[2:] if data_hex.startswith("0x") else data_hex
     if len(payload) < 128:
         return ""
@@ -113,6 +178,15 @@ def _eth_call_hex(rpc_url: str, to_addr: str, data_hex: str) -> str:
 
 
 def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
+    """Read ``proposition`` and ``outcomeText[]`` off-chain via ``eth_call``.
+
+    The proposition string and outcome labels live in storage, not in
+    events, because they are too large to emit cheaply on every
+    creation. The factory creation event tells the indexer the wager
+    address; this helper enriches the row with human-readable text the
+    explorer / agent can render. Errors are swallowed: a partial / RPC
+    failure must not block the core idempotent log application.
+    """
     proposition = ""
     outcomes: List[str] = []
     try:
@@ -136,6 +210,12 @@ def to_int(hex_value: str) -> int:
 
 
 def normalize_address(addr: str) -> str:
+    """Lower-case 20-byte hex address with a single ``0x`` prefix.
+
+    Topics carry left-padded 32-byte values; the trailing 20 bytes are
+    the address. SQLite primary keys are case-sensitive, so every write
+    and lookup must run through this helper to keep keys stable.
+    """
     return "0x" + addr.lower().replace("0x", "")[-40:]
 
 
@@ -144,6 +224,13 @@ def topic_to_address(topic_word: str) -> str:
 
 
 def data_word(data_hex: str, idx: int) -> str:
+    """Slice the ``idx``-th 32-byte word out of a packed ABI ``data`` blob.
+
+    ``data`` is the non-indexed event payload, hex-encoded with a ``0x``
+    prefix; words are 64 hex chars each. Used for static-layout events
+    only — dynamic types (``string``, ``bytes``) are not present in V3
+    event ABIs and therefore not handled.
+    """
     payload = data_hex[2:]
     start = idx * 64
     end = start + 64
@@ -151,6 +238,13 @@ def data_word(data_hex: str, idx: int) -> str:
 
 
 def event_id(tx_hash: str, log_index_hex: str) -> str:
+    """Build the canonical idempotency key for an on-chain log.
+
+    ``tx_hash`` is lowercased so casing variation between RPC providers
+    cannot create duplicate rows; ``log_index_hex`` is converted to a
+    decimal integer so the key sorts naturally and matches the
+    ``events_log.event_id`` column.
+    """
     return f"{tx_hash.lower()}:{to_int(log_index_hex)}"
 
 
@@ -192,6 +286,14 @@ def insert_event_log(
     log_index: int,
     payload: Dict[str, Any],
 ) -> bool:
+    """Append to ``events_log`` and report whether the write was new.
+
+    Returns ``True`` only when this exact ``event_id`` had not been seen
+    before. Callers gate their derived-table mutations on that boolean,
+    which is the foundation of the indexer's idempotency contract: a
+    replayed log can never double-count pots, totals, or state
+    transitions.
+    """
     cur = conn.execute(
         """
         INSERT OR IGNORE INTO events_log(event_id, wager_address, event_name, block_number, tx_hash, log_index, payload_json)
@@ -208,6 +310,30 @@ def apply_log(
     log: Dict[str, Any],
     rpc_url: Optional[str] = None,
 ) -> None:
+    """Decode one ``eth_getLogs`` entry and update derived state.
+
+    The function is the indexer's event-application state machine. Each
+    branch:
+
+    1. Identifies the event by its ``topic0`` against ``TOPIC_TO_EVENT``;
+       unknown topics are silently dropped (forward-compatibility with
+       upstream contract additions).
+    2. For factory events (``WagerCreatedV3*``), confirms the emitting
+       address matches the configured factory; off-factory creations are
+       ignored.
+    3. For wager-scoped events, requires the parent ``wagers`` row to
+       exist and otherwise drops the log as orphan (the parent
+       ``WagerCreated`` will arrive in a subsequent pass and the event
+       will be replayed because its row was never written).
+    4. Calls :func:`insert_event_log` first; only mutates derived tables
+       when that returned ``True``. This is what keeps replays safe.
+
+    ``rpc_url`` is optional so unit tests can drive the function with
+    synthetic logs and no network. When provided, the wager-creation
+    branches enrich the row with off-chain ``proposition`` /
+    ``outcomeText[]`` via :func:`fetch_wager_metadata`; failures there
+    are swallowed and the row still lands.
+    """
     factory = normalize_address(factory_address) if factory_address else ""
     address = normalize_address(log["address"])
     topics = log.get("topics", [])
@@ -521,6 +647,22 @@ def apply_log(
 
 
 def get_expire_candidates(conn: sqlite3.Connection, now_ts: Optional[int] = None) -> List[sqlite3.Row]:
+    """Return ``OPEN`` wagers whose resolution window has elapsed.
+
+    Two paths qualify a wager as a candidate:
+
+    * The resolver explicitly closed the window
+      (``resolution_window_closed = 1``); the on-chain expire check then
+      only verifies the marker, regardless of clock.
+    * The wall-clock has passed ``betting_close_at + resolution_window``
+      (or ``betting_close_time + resolution_window`` if the authority
+      never explicitly closed betting). The fallback to the configured
+      ``betting_close_time`` matches the contract's expire path for
+      wagers where betting has not been authority-closed.
+
+    Used by the sweeper (``--execute`` calls ``expire()``) and by the
+    ``/sweeper/expire-candidates`` endpoint for operator preview.
+    """
     if now_ts is None:
         now_ts = int(time.time())
     return conn.execute(
@@ -550,7 +692,16 @@ def _eth_get_logs_bisect(
     topic_filter: List[List[str]],
     min_span: int = 1,
 ) -> List[Dict[str, Any]]:
-    """Return logs for [start, end], recursively halving the block span on RPC failure."""
+    """Return logs for ``[start, end]``, halving on RPC failure.
+
+    Public RPCs (notably Base Sepolia's free tier) reject ``eth_getLogs``
+    requests whose response would exceed an internal byte limit, with
+    no precise hint about the threshold. Bisecting on failure keeps the
+    sync loop progressing without forcing the operator to lower
+    ``--chunk-size`` for the entire run. ``min_span=1`` means a single
+    block that still fails will surface its exception to the caller,
+    where it lands in ``last_sync_error`` and aborts the chunk.
+    """
     if start > end:
         return []
     span = end - start + 1
@@ -576,6 +727,26 @@ def sync_logs(
     *,
     allow_genesis_start: bool = False,
 ) -> int:
+    """Pull and apply factory + wager logs for the requested block range.
+
+    Cursor resolution:
+
+    * ``from_block`` is taken explicitly when given, else from the
+      ``last_indexed_block`` meta row, else (only when
+      ``allow_genesis_start`` is true, i.e. the CLI entrypoint) from
+      block 0. The ``live_api`` daemon never sets ``allow_genesis_start``
+      because starting a long-running sync at block 0 against Base
+      mainnet would burn RPC quota; it requires an explicit
+      ``INDEXER_FROM_BLOCK`` / ``indexerFromBlock`` instead.
+    * ``to_block`` defaults to the current chain head, capped to it.
+
+    Each chunk uses the bisecting fetch, applies logs in
+    ``(blockNumber, logIndex)`` order, and commits the cursor / clears
+    ``last_sync_error`` after the chunk lands. A per-log exception is
+    logged and skipped — one malformed log must not stop the sync.
+    Returns the number of logs successfully applied (useful for the
+    live daemon's heartbeat output).
+    """
     factory_address = normalize_address(factory_address) if factory_address else ""
 
     latest = to_int(rpc_call(rpc_url, "eth_blockNumber", []))

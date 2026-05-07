@@ -1,4 +1,32 @@
 #!/usr/bin/env python3
+"""Best-effort daemon that calls ``expire()`` on stale wagers.
+
+The sweeper reads ``expire_candidates`` from the indexer's SQLite DB
+(see :func:`service.indexer.indexer.get_expire_candidates`) and, when
+``--execute`` is passed, sends an ``expire()`` transaction to each via
+``cast send``. By default the daemon runs in dry-run, printing the
+command it *would* execute so an operator can inspect a window before
+turning execution on.
+
+Idempotency
+-----------
+The on-chain ``expire()`` reverts after the first successful call (the
+wager state moves to ``RETRACTED``). The next sweep round re-reads the
+candidate list, the now-retracted wager is no longer ``OPEN``, and it
+drops out — so calling sweep on the same window repeatedly is safe and
+self-converges. ``cast send`` returns non-zero on the contract revert
+in the rare race where another caller expired the wager first; that
+shows up as a ``FAILED`` line and is normal background noise.
+
+Operational shape
+-----------------
+The daemon does not own a chain key; the caller passes
+``--private-key`` explicitly. The intended deployment is a low-priv
+hot wallet that can pay gas for ``expire()`` but holds no other
+authority. Running with ``--loop --interval-seconds N`` gives a simple
+forever-loop poller; absent ``--loop`` the script does a single sweep
+and exits, suitable for cron.
+"""
 from __future__ import annotations
 
 import argparse
@@ -39,6 +67,20 @@ def sweep_once(
     execute: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> SweepResult:
+    """Run one sweep pass over the indexer's candidate list.
+
+    The ``runner`` indirection lets unit tests stub
+    :func:`subprocess.run` and assert on the constructed ``cast send``
+    invocation without spawning real processes. ``now_ts`` is forwarded
+    to :func:`get_expire_candidates` so tests can pin a deterministic
+    clock.
+
+    Dry-run (``execute=False``) counts every candidate as "succeeded"
+    because the only failure mode for a dry-run is an exception, which
+    we surface by letting it propagate. Live runs treat any non-zero
+    return code from ``cast send`` as a failure and capture stderr for
+    the operator log.
+    """
     conn = db_connect(db_path)
     init_db(conn)
     candidates = get_expire_candidates(conn, now_ts=now_ts)
