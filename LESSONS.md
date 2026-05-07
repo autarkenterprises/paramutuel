@@ -44,6 +44,12 @@ See `AGENTS.md` practice #11 for the contract this file satisfies.
 
 **How to apply:** A "comment-only" claim on an LLM-authored diff is not self-validating. Before merging such a diff, run a simple structural check: drop all blank lines and lines whose first non-whitespace character is `#`, `//`, `/*`, ` *`, `"""`, or `'''`, then `diff` the remainder against the parent commit — that diff must be empty. A pre-merge hook or `script/`-side helper is the right home for this check; a follow-up ADR can land it. Until then, manual verification (`git diff` plus search for non-comment deletions) is the discipline.
 
+## L-007: Re-read the practices charter on a calendar, not on demand
+
+**Why:** AGENTS.md practice #12 mandates "review these practices regularly, to keep them in context." Without a fixed cadence the review never happens — practice charters drift out of working context within weeks of being adopted, especially as new ADRs add their own conventions. The 2026-05-06 adoption of AGENTS.md as the project-wide charter is the natural starting point for a cadence; the first scheduled review on 2026-06-06 establishes the rhythm.
+
+**How to apply:** A `## YYYY-MM-DD — practices review` entry is appended to `LOG.md` on the first business day of each month. The entry records: which practices were re-read (default: all 15), any drift observed (a practice that has slipped vs the live tree), and any update to the charter itself. If a review uncovers no drift, the entry is one line saying so. Skipping a month is also recorded — silence is the failure mode this lesson exists to prevent.
+
 ## L-005: Documentation layers must be enforced by structure, not goodwill
 
 **Why:** Before ADR-0011, `docs/TASKS.md` was carrying chronological history (the 2026-04 "historical checkboxes left intact as a record of shipped work" annotation is the symptom). `README.md` was carrying setup runbook material. Without explicit `LOG.md` / `LESSONS.md` / `MEMORY.md` files, retrospective and durable material accreted into whichever doc was already open.

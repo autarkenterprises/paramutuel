@@ -126,3 +126,11 @@ Two findings worth surfacing:
 2. **Bounded scope by module list, not per-file deadline** meant the late files in each group's list were never reached. Group C only completed resolution before the cap; Group D only completed the first three of eight bet-scout files; neither reached `dapp/{logic,app}.js`. A gap-fill commit on `master` covers the missing files in: `service/proposition/{dispatch,ingest,json_sources,rss,synthesize,server}.py`; all of `service/explorer/`; all of `service/control_panel/`; `mcp_server/__init__.py`; `agents/paramutuel_bettor/{config,indexer_client,odds,planner,policy}.py`; `dapp/{logic,app}.js`. `mcp_server/{__main__,server}.py` already carried complete docstrings and were left untouched per AGENTS.md #8.
 
 Phase 4 closed. ADR-0014 AAR will be filled in shortly with the per-group results and the L-006 lesson reference.
+
+## 2026-05-07 — practices-review cadence established (AGENTS.md #12)
+
+`AGENTS.md` practice #12 ("review these practices regularly, to keep them in context") is operationalised as a calendar cadence: a one-line `## YYYY-MM-DD — practices review` entry appended to `LOG.md` on the first business day of each month. The entry records which practices were re-read (default: all 15), any observed drift between charter and live tree, and any updates to the charter itself.
+
+The cadence is anchored at this entry. **Next scheduled review: 2026-06-01.** Skipping a month is itself a logged event — silence is the failure mode the cadence exists to prevent.
+
+This closes Phase 5 of the bring-the-codebase-up-to-AGENTS.md plan. All five phases shipped: Phase 0 (commit pending tree), Phase 1 (ADR-0011 documentation layer scaffolding), Phase 2 (ADR-0012 ADR/AAR template + retroactive AARs), Phase 3 (ADR-0013 test stratification + coverage baseline), Phase 4 (ADR-0014 codebase-wide comment audit), Phase 5 (this entry). Plus one L-003 follow-through commit (worked-example regression tests). New durable lessons since the bring-up began: L-006 (verify "comment-only" sub-agent diffs by tooling) and L-007 (calendar-driven practices review).
