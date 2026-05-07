@@ -165,3 +165,17 @@ Design ADR addressing ADR-0007's revisited AAR. Specifies two runtime modes: **s
 Service shape: `service/atg/` as a peer to the existing services (indexer / proposition / resolution / control_panel / explorer). Same Cloud Run / Python pattern.
 
 Implementation runbook in `docs/ADR-0016-IMPLEMENTATION.md`, ordered TDD: intent encoding → tier policy → caps → oracle → relay → replenishment → server → site integration. Gated on operator input on caps, tier list per network, markup, DEX choice, and AA-vs-traditional-relayer.
+
+## 2026-05-07 — ADR-0017 proposed: Paramutuel Service Provider concept
+
+Design ADR pinning down the project's operating role. Until now, "service entity" was a load-bearing phrase in `research/go-to-market-strategy.md` without a single ADR specifying which services are *offered* (a creator can rely on them) vs *operator-only* (project-internal tooling). ADR-0017 establishes the catalog: indexer + JSON API and explorer are public; resolver address is a public **resolver-by-reference** product; MCP server and bet scout are public packages; assisted-tx gateway (ADR-0016) is public when live; proposition service and control panel are operator-only.
+
+Hosting is uniform Cloud Run for hosted services per `docs/CLOUD-RUN-HOSTING.md`; Render is no longer used (per `LESSONS.md` L-004). PyPI for distributed packages. GitHub Pages for the static marketing site.
+
+Discoverability primitive: a single JSON manifest at `agents/service-provider-manifest.json` (mirroring the existing `agents/subagent-manifest.json` posture), served at a stable raw URL on the project's GitHub. The manifest enumerates per-network factory address, indexer URL, explorer homepage, resolver address + policy URL, ATG URL when live, plus PyPI package names.
+
+The resolver address being a *product* requires a separate doc: `docs/SERVICE-PROVIDER-RESOLVER-POLICY.md` (not yet written) — names policy scope, fee, rotation rules, dispute escalation. Without that doc, naming the resolver address is just trust; with it, the resolver address is a product with a stated contract.
+
+Implementation runbook in `docs/ADR-0017-IMPLEMENTATION.md`. Gated on operator input on resolver fee, policy scope, manifest URL, rotation policy, SLA disclaimer.
+
+This concludes the testnet-as-production recalibration round. Three design ADRs (0015 / 0016 / 0017) propose, with implementation gated on operator input. AAR revisions on 0002 / 0003 / 0007 / 0014 already landed; site Resonance comment audit closed; `MEMORY.md` carries the active design ADR list. All five branches preserved on origin per practice #5.
