@@ -30,4 +30,6 @@
   - **Implemented** (audit complete; AAR final). Codebase-wide comment audit per `AGENTS.md` practice #3, executed by parallel sub-agents per practice #6 across four disjoint module groups: A (`src/*.sol`), B (indexer + proposition services), C (resolution / explorer / control_panel / mcp_server), D (bet scout agent + dApp). Comment-only diffs; `script/test-fast.sh` was the merge gate. Generated `LESSONS.md` L-006. Implementation notes: `docs/ADR-0014-IMPLEMENTATION.md`.
 - `ADR-0015-safe-controlled-treasuries.md`
   - **Proposed** (design ADR). Specifies Safe multisig treasuries on both Base Sepolia and Base Mainnet under the testnet-as-production posture (Resonance Exchange ARG). Implementation requires operator input on signer set / threshold per network; cutover runbook in `docs/ADR-0015-IMPLEMENTATION.md`.
+- `ADR-0016-assisted-ux-funds-management.md`
+  - **Proposed** (design ADR). Builds on ADR-0006 / ADR-0007 / ADR-0015. Specifies the assisted-tx gateway with two runtime modes (sponsored / reimbursed), a Safe-budgeted spend-from key, a Tier-1 / Tier-2 collateral split (Tier-2 explicitly unassisted), per-day and per-address caps, and a threshold-driven DEX-swap replenishment loop. Service shape `service/atg/`. Open questions for operator input on caps, tier list, DEX, and AA-vs-traditional-relayer; runbook in `docs/ADR-0016-IMPLEMENTATION.md`.
 

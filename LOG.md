@@ -157,3 +157,11 @@ The `resonance-bet.html` comment also flags the human-onlooker-without-ETH UX ga
 Design ADR landing the testnet-as-production implication of ADR-0002's revisited AAR: Safe multisig treasuries on **both** Base Sepolia and Base Mainnet, with no EOA in the production-exposure path. New V3 factory deployed per network with the Safe as `treasury_`; the existing Base Sepolia factory remains immutable on-chain but is deprecated for new ARG dispatch after cutover. Operational role wallets (proposer / resolver / individual microwonks) remain EOAs by design — Safe is for accumulated protocol fees, not bot-frequency signing.
 
 Cutover runbook in `docs/ADR-0015-IMPLEMENTATION.md`. Implementation gated on operator input: signer set + threshold per network, whether Sepolia and Mainnet share signers, retention or retirement of the legacy factory address in `config/deployments.json`, public disclosure of Safe addresses on the Resonance landing.
+
+## 2026-05-07 — ADR-0016 proposed: assisted-UX gateway with funds management
+
+Design ADR addressing ADR-0007's revisited AAR. Specifies two runtime modes: **sponsored** (ARG / testnet, project absorbs gas costs from a Safe-budgeted float, daily and per-address caps) and **reimbursed** (mainnet retail, bettor pays a small surcharge in collateral, scheduled DEX swaps replenish the ETH float). The "how not to run out of funds when facilitating arbitrary ERC-20" question gets an explicit answer: **Tier-1 collateral is assisted; Tier-2 is explicitly unassisted** — the gateway refuses sponsorship for collateral with no deep DEX liquidity rather than holding it indefinitely.
+
+Service shape: `service/atg/` as a peer to the existing services (indexer / proposition / resolution / control_panel / explorer). Same Cloud Run / Python pattern.
+
+Implementation runbook in `docs/ADR-0016-IMPLEMENTATION.md`, ordered TDD: intent encoding → tier policy → caps → oracle → relay → replenishment → server → site integration. Gated on operator input on caps, tier list per network, markup, DEX choice, and AA-vs-traditional-relayer.
