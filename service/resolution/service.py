@@ -1,4 +1,41 @@
 #!/usr/bin/env python3
+"""Operator-facing resolution daemon.
+
+This is a small HTTP service (stdlib `http.server`, threaded) the
+operator runs alongside the indexer. It periodically — or on demand
+via `POST /run-once` — pulls open V3 wagers from the indexer, joins
+each row against an operator-curated decisions JSON file keyed by
+wager address, and either prints the `cast send` command (`execute=
+False`, the default) or actually submits the transaction.
+
+Neighbours:
+
+  * `service/indexer/` — read-only HTTP source for `state=OPEN` wagers
+    and the wager fields needed by `logic.actionability_reason`.
+  * `service/control_panel/` — separate operator surface for
+    create/close/withdraw transactions; this daemon only handles the
+    resolve/retract phase.
+  * `mcp_server/` — alternate path for an LLM agent to encode the same
+    `resolve(uint256)` / `resolve(string)` / `retract()` calldata.
+
+Decision JSON shape (one entry per wager address):
+
+    {
+      "0xabc...": {
+        "action": "resolve" | "retract",
+        # enumerated wagers:
+        "outcomeIndex": 0,             # promoted to 1<<i if winningMask absent
+        "winningMask": 5,              # raw bitmask, takes precedence
+        # freeform wagers:
+        "winningAnswer": "exact UTF-8 string"
+      }
+    }
+
+`execute=False` is the safety default — the dry run prints the full
+`cast send` invocation including the `--private-key` value, so the
+service must only be run on operator-controlled hosts. The fast suite
+exercises only the dry-run pipeline.
+"""
 from __future__ import annotations
 
 import argparse
@@ -50,6 +87,14 @@ def _read_decisions(path: str) -> dict:
 
 
 def _extract_resolver_address(explicit: str, private_key: str) -> str:
+    """Resolve the address the daemon will compare against `wager.resolver`.
+
+    Operators usually set `RESOLUTION_SERVICE_ADDRESS` explicitly so a
+    typo in the private key cannot silently flip the daemon to a
+    different address; if it is unset we derive it from the supplied
+    private key via `cast wallet address` rather than reimplement
+    secp256k1 here.
+    """
     if explicit:
         return normalize_address(explicit)
     if not private_key:
@@ -81,6 +126,17 @@ def _action_command(
     resolve_uint256: int | None = None,
     winning_answer: str | None = None,
 ) -> list[str]:
+    """Translate a (wager, decision) pair into the `cast send` argv list.
+
+    This is the decision JSON → calldata pipeline: the caller has
+    already verified the wager is actionable (see
+    `logic.actionability_reason`) and looked up its decision row;
+    here we map `action` plus the wager's `protocol_version` to the
+    correct V3 function selector (`resolve(uint256)`,
+    `resolve(string)`, or `retract()`) and emit the full argv. The
+    return value is a list, not a string, so it can be passed
+    directly to `subprocess.run` without shell quoting.
+    """
     # ADR-0010 collapses `protocol_version` to two values: "enumerated" (bitmask
     # tickets) and "freeform" (UTF-8 answers). Any other value is treated as
     # enumerated and requires a numeric winning mask.
