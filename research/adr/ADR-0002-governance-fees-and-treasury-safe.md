@@ -102,3 +102,16 @@ If immutable v1 lacks these setters, launch planning must include:
 
 **Revision schedule:** before mainnet factory deploy.
 
+### AAR revision — 2026-05-07 (testnet-as-production posture)
+
+**AAR status:** Revisited 2026-05-07
+
+The original AAR's "acceptable for testnet, must resolve before mainnet" framing is **wrong** under the Resonance Exchange ARG posture: testnet is *production* for the live ARG launch (`docs/MICROWONK-ARG.md`), not a rehearsal. The Base Sepolia treasury is currently an EOA (`config/microwonk-wallets.json`) holding real ARG operating funds; a leaked key takes down the live campaign, not just a rehearsal.
+
+**Revised follow-ups:**
+
+- **Implement Safe-controlled treasuries on BOTH Base Sepolia AND Base Mainnet** — testnet is no longer a downgraded posture vs mainnet for safety. Base Sepolia first because it has live exposure now; mainnet before its first wager. Tracked under **ADR-0015** (`research/adr/ADR-0015-safe-controlled-treasuries.md`).
+- The "deploy a new factory to change fees" pattern remains acceptable on both nets; runtime fee setters are out of scope of ADR-0015.
+
+**Revised revision schedule:** at next ARG funding cycle (Safe testnet must be live before the treasury is topped up again).
+

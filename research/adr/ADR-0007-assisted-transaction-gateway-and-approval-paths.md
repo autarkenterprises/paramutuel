@@ -94,3 +94,20 @@ The system needs a generalized flow that works across many ERC-20 assets, plus s
 - The unimplemented status is a known gap in `docs/PROJECT-REVIEW.md` ("Assisted UX") — keep that pointer accurate.
 
 **Revision schedule:** at the next product roadmap review, or at mainnet readiness gate.
+
+### AAR revision — 2026-05-07 (testnet-as-production posture)
+
+**AAR status:** Revisited 2026-05-07; effectively superseded by ADR-0016 for the unfunded-funds question
+
+The original AAR called the assisted-UX gateway "deferred / not implemented." Under the Resonance Exchange ARG posture, deferral is *more* costly than the original AAR implied, not less:
+
+- Microwonks bet via the bet-scout subagent and their own wallets; the gateway is **not** on their critical path.
+- However, **human onlookers** observing the ARG who click through to `site/resonance-bet.html` and lack ETH for gas drop out of the user-visible flow. For a campaign optimised for retail observation, that is a UX failure on the live launch surface.
+- The original ADR-0007 left the *funds-management* question (how the relayer sponsors gas without exhausting its ETH float, especially when settling arbitrary ERC-20 collateral) as one of several open items. That question is the load-bearing one for an actual deployment and warrants its own ADR.
+
+**Revised follow-ups:**
+
+- ADR-0007 remains **Accepted** as the architectural shape (split surfaces; assisted UX as upper-layer) but its *implementation* is moved into **ADR-0016** (`research/adr/ADR-0016-assisted-ux-funds-management.md`), which addresses the funds-management question explicitly.
+- ADR-0007's "Status" header is unchanged (Accepted) — ADR-0016 builds on it rather than superseding it.
+
+**Revised revision schedule:** at ADR-0016's first implementation cycle.

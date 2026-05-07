@@ -134,3 +134,14 @@ Phase 4 closed. ADR-0014 AAR will be filled in shortly with the per-group result
 The cadence is anchored at this entry. **Next scheduled review: 2026-06-01.** Skipping a month is itself a logged event — silence is the failure mode the cadence exists to prevent.
 
 This closes Phase 5 of the bring-the-codebase-up-to-AGENTS.md plan. All five phases shipped: Phase 0 (commit pending tree), Phase 1 (ADR-0011 documentation layer scaffolding), Phase 2 (ADR-0012 ADR/AAR template + retroactive AARs), Phase 3 (ADR-0013 test stratification + coverage baseline), Phase 4 (ADR-0014 codebase-wide comment audit), Phase 5 (this entry). Plus one L-003 follow-through commit (worked-example regression tests). New durable lessons since the bring-up began: L-006 (verify "comment-only" sub-agent diffs by tooling) and L-007 (calendar-driven practices review).
+
+## 2026-05-07 — testnet-as-production recalibration triggered by Resonance Exchange ARG framing
+
+User flagged that the Resonance Exchange (formerly Microwonk ARG, `docs/MICROWONK-ARG.md`) is a **live testnet launch indistinguishable from production modulo mainnet**, not a closed rehearsal. Several AARs landed in earlier phases under-weighted this and treated Base Sepolia as a downgraded posture vs mainnet for safety / observability / coverage purposes. Revisions appended (per ADR-0012's `Revisited YYYY-MM-DD` discipline, append-only, no rewrite):
+
+- **ADR-0002 AAR (governance + Safe):** Safe-controlled treasury required on **both** Base Sepolia and Base Mainnet, not just mainnet. Tracked under ADR-0015.
+- **ADR-0003 AAR (testnet certification):** dual-rehearsal artifact reframed as live ARG post-mortem in `docs/log/`, dated entries appended throughout the campaign — the ARG is public-facing, not a closed rehearsal.
+- **ADR-0007 AAR (assisted UX):** deferral is more costly than the original AAR implied — human onlookers without ETH drop out at `site/resonance-bet.html`. Architectural shape unchanged; *implementation* lifted into ADR-0016 with a focus on the funds-management question (how the relayer sponsors gas without exhausting its float when settling arbitrary ERC-20 collateral).
+- **`docs/COVERAGE-BASELINE.md`:** the 0%-covered server / dispatch entrypoints in `service/{resolution,proposition}` run **live** during the ARG; rationale updated, follow-up is "lift coverage with deterministic shims," not "exercised by manual ops."
+
+`MEMORY.md` updated with the testnet-as-production framing and the active design ADR list (ADR-0015 / ADR-0016 / ADR-0017).

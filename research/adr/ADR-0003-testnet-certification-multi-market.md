@@ -94,3 +94,16 @@ Must demonstrate:
 
 **Revision schedule:** before mainnet factory deploy (same gate as ADR-0002).
 
+### AAR revision — 2026-05-07 (testnet-as-production posture)
+
+**AAR status:** Revisited 2026-05-07
+
+The original AAR called for "two formal rehearsal runs with explicit pass / fail tally and a written post-mortem." Under the Resonance Exchange ARG posture (`docs/MICROWONK-ARG.md`), the ARG itself is the live rehearsal — but it is a **public campaign with onlookers**, not a closed run. A pre-launch dual-rehearsal artifact is the wrong shape for that.
+
+**Revised follow-ups:**
+
+- **Run a live ARG post-mortem in `docs/log/`**, dated entries appended throughout the campaign (per ADR-0011's `docs/log/` convention) capturing per-day pass / fail / incident summary. The first entry should land before the next Co-ordinator dispatch cycle.
+- The CI / extended-suite gate from ADR-0013 still applies before any commit that changes functionality measured by `script/test-extended.sh` — this AAR revision does not weaken that gate.
+
+**Revised revision schedule:** monthly during the active ARG run; revisit fully when the ARG concludes (or a defined pause point is reached).
+

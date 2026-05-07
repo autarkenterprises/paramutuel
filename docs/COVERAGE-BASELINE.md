@@ -46,9 +46,9 @@ Full per-file numbers in `git show` of this commit; the salient pattern is that 
 | File | % | Rationale |
 |------|---|-----------|
 | `service/indexer/live_api.py` | 23% | Live RPC + WebSocket adapter — the *uncovered* paths are the RPC error handlers (HTTP 400 bisect, deep-reorg recovery, chunk-size adjustment). They are exercised by the **extended suite** (`script/test-extended.sh` → live Base Sepolia run) but not by unit tests, by design — mocking out the failure modes well enough to be useful is harder than running the real failure on testnet. **Follow-up:** add deterministic unit tests for the bisect heuristic. |
-| `service/resolution/service.py` | 27% | Cloud Run service entrypoint + decision dispatch. Pure decision logic is in `logic.py` (76% covered). The uncovered paths are the HTTP server lifecycle and `--allow-execute` gating; both are exercised by manual operator runs. |
-| `service/proposition/ingest.py` | 40% | Periodic-ingest scheduling logic; partial coverage today. **Follow-up:** the bulk of the uncovered code is timing / async glue that warrants targeted unit tests; tracked in `docs/TASKS.md`. |
-| `service/proposition/synthesize.py` | 50% | LLM-prompt synthesis paths; some branches require live model calls and are tested manually. |
+| `service/resolution/service.py` | 27% | Cloud Run service entrypoint + decision dispatch. Pure decision logic is in `logic.py` (76% covered). The uncovered paths are the HTTP server lifecycle and `--allow-execute` gating; **both run live in production** during the Resonance Exchange ARG (`docs/MICROWONK-ARG.md`) — the prior "exercised by manual operator runs" rationale was understated. **Revised follow-up:** lift coverage of the lifecycle / dispatch paths with deterministic unit tests against a fake `subprocess` shim, since the live ARG path now depends on them. |
+| `service/proposition/ingest.py` | 40% | Periodic-ingest scheduling logic; partial coverage today. The Co-ordinator's wager dispatch cadence (`docs/MICROWONK-ARG.md`) runs through this module live during the ARG. **Follow-up:** targeted unit tests for the timing / async glue, tracked in `docs/TASKS.md`. |
+| `service/proposition/synthesize.py` | 50% | Rule-based draft synthesis paths; some branches reserved for an LLM-backed expansion under feature flag (see module docstring). |
 
 ### 50–80%-covered modules (acceptable; unit tests cover happy paths)
 
