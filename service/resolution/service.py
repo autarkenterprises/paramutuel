@@ -31,10 +31,13 @@ Decision JSON shape (one entry per wager address):
       }
     }
 
-`execute=False` is the safety default — the dry run prints the full
-`cast send` invocation including the `--private-key` value, so the
-service must only be run on operator-controlled hosts. The fast suite
-exercises only the dry-run pipeline.
+`execute=False` is the safety default. `POST /run-once` is gated by a
+bearer token (`RESOLUTION_SERVICE_TOKEN` / `--auth-token`, sent as
+`Authorization: Bearer <t>` or `X-Token: <t>`) and fails closed when no
+token is configured; the dry-run response redacts `--private-key`
+(ADR-0019 — previously the endpoint was unauthenticated, CORS-open, and
+echoed the resolver key). `GET` endpoints stay open and never carry key
+material. The fast suite exercises the dry-run pipeline end to end.
 """
 from __future__ import annotations
 
@@ -48,7 +51,13 @@ from pathlib import Path
 from urllib import request
 from urllib.parse import parse_qs, urlparse
 
+from service.control_panel.security import token_authorized
+
 from .logic import actionability_reason, normalize_address
+
+# `numOptions <= 255` (factory `MAX_OUTCOMES`), so a valid outcome index is
+# in [0, 254] and its single-bit mask `1 << i` always fits in uint256.
+MAX_OUTCOME_INDEX = 254
 
 
 def _env(name: str, default: str = "") -> str:
@@ -110,6 +119,43 @@ def _extract_resolver_address(explicit: str, private_key: str) -> str:
     return normalize_address(proc.stdout.strip())
 
 
+def _redact_command(cmd: list[str]) -> list[str]:
+    """Return a copy of a `cast` argv with the `--private-key` value masked.
+
+    Mirrors `control_panel.web.Handler._redact_command`; used for every
+    command echoed back over HTTP so key material never leaves the process.
+    """
+    out = list(cmd)
+    for i, token in enumerate(out[:-1]):
+        if token == "--private-key":
+            out[i + 1] = "<redacted>"
+    return out
+
+
+def resolve_uint256_from_decision(decision: dict) -> int | None:
+    """Map an enumerated decision row to the `resolve(uint256)` argument.
+
+    `winningMask` (raw bitmask, must be > 0) takes precedence; otherwise
+    `outcomeIndex` i is promoted to the single-bit mask `1 << i`, as the
+    decision-file contract documents. Returns None when neither is set so
+    the caller can surface "missing value". Rejects bools, non-integers,
+    negative values and out-of-range indices with ValueError rather than
+    letting a malformed decision reach the chain — before ADR-0019 the
+    index was sent raw, so `outcomeIndex: 1` resolved outcome 0.
+    """
+    mask = decision.get("winningMask")
+    if mask is not None:
+        if isinstance(mask, bool) or not isinstance(mask, int) or mask <= 0:
+            raise ValueError(f"winningMask must be a positive integer, got {mask!r}")
+        return mask
+    idx = decision.get("outcomeIndex")
+    if idx is None:
+        return None
+    if isinstance(idx, bool) or not isinstance(idx, int) or not 0 <= idx <= MAX_OUTCOME_INDEX:
+        raise ValueError(f"outcomeIndex must be an integer in [0, {MAX_OUTCOME_INDEX}], got {idx!r}")
+    return 1 << idx
+
+
 def _load_open_wagers(indexer_base_url: str, limit: int = 300) -> list[dict]:
     base = indexer_base_url.rstrip("/")
     body = _http_get_json(f"{base}/wagers?state=OPEN&limit={limit}&order=desc")
@@ -143,7 +189,9 @@ def _action_command(
     if action == "resolve":
         pv = (protocol_version or "enumerated").strip().lower()
         if pv == "freeform":
-            ans = (winning_answer or "").strip()
+            # Byte-exact: never trim. V3 hashes the answer bytes verbatim
+            # (ADR-0009 §5), so " Paris " and "Paris" are different pools.
+            ans = winning_answer or ""
             if not ans:
                 raise ValueError("freeform resolve requires decision.winningAnswer (exact UTF-8 string)")
             return [
@@ -225,6 +273,8 @@ class Handler(BaseHTTPRequestHandler):
     resolver_address: str = ""
     rpc_url: str = ""
     private_key: str = ""
+    # Bearer token for POST /run-once; None/empty fails closed.
+    auth_token: str | None = None
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         self.send_response(204)
@@ -283,6 +333,13 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path != "/run-once":
             _json_response(self, 404, {"error": "not found"})
             return
+        if not token_authorized(
+            expected_token=self.auth_token,
+            auth_header=self.headers.get("Authorization"),
+            x_token=self.headers.get("X-Token"),
+        ):
+            _json_response(self, 401, {"error": "unauthorized"})
+            return
         raw = self.rfile.read(int(self.headers.get("Content-Length", "0")) or 0)
         payload = json.loads(raw.decode() or "{}")
         execute = bool(payload.get("execute", False))
@@ -323,16 +380,14 @@ class Handler(BaseHTTPRequestHandler):
                             winning_answer=win_ans,
                         )
                     else:
-                        win = decision.get("winningMask")
-                        if win is None:
-                            win = decision.get("outcomeIndex")
+                        win = resolve_uint256_from_decision(decision)
                         cmd = _action_command(
                             wager_address=c["wager_address"],
                             action=action,
                             rpc_url=self.rpc_url,
                             private_key=self.private_key,
                             protocol_version=pv,
-                            resolve_uint256=int(win) if win is not None else None,
+                            resolve_uint256=win,
                             winning_answer=None,
                         )
                 else:
@@ -352,7 +407,9 @@ class Handler(BaseHTTPRequestHandler):
             attempted += 1
             if not execute:
                 succeeded += 1
-                results.append({"wager": c["wager_address"], "ok": True, "dry_run": True, "command": cmd})
+                results.append(
+                    {"wager": c["wager_address"], "ok": True, "dry_run": True, "command": _redact_command(cmd)}
+                )
                 continue
             proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
             if proc.returncode == 0:
@@ -382,6 +439,11 @@ def main() -> None:
     parser.add_argument("--indexer-base-url", default=_env("INDEXER_BASE_URL"))
     parser.add_argument("--rpc-url", default=_env("RPC_URL_BASE_SEPOLIA") or _env("RPC_URL"))
     parser.add_argument("--private-key", default=_env("PRIVATE_KEY"))
+    parser.add_argument(
+        "--auth-token",
+        default=_env("RESOLUTION_SERVICE_TOKEN"),
+        help="Bearer token required by POST /run-once (unset = endpoint disabled).",
+    )
     parser.add_argument("--resolver-address", default=_env("RESOLUTION_SERVICE_ADDRESS"))
     parser.add_argument(
         "--decisions-path",
@@ -402,6 +464,9 @@ def main() -> None:
     Handler.resolver_address = resolver
     Handler.rpc_url = args.rpc_url
     Handler.private_key = args.private_key
+    Handler.auth_token = args.auth_token or None
+    if not Handler.auth_token:
+        print("WARNING: RESOLUTION_SERVICE_TOKEN unset — POST /run-once will reject every request")
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Resolution service listening on http://{args.host}:{args.port}")

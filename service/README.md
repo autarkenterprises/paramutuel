@@ -135,7 +135,7 @@ PYTHONPATH=. python3 -m service.resolution.service \
 Then:
 
 - `GET /candidates` to inspect actionable wagers for this resolver.
-- `POST /run-once` with `{"execute":false}` for dry-run previews.
+- `POST /run-once` with `{"execute":false}` for dry-run previews (requires `Authorization: Bearer $RESOLUTION_SERVICE_TOKEN`; key redacted in output).
 - `POST /run-once` with `{"execute":true}` to broadcast.
 
 ## Launch shortcut
