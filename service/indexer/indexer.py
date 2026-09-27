@@ -80,6 +80,10 @@ TOPIC_TO_EVENT = {v: k for k, v in TOPICS.items()}
 WAGER_PROPOSITION_SELECTOR = "0xba002c61"  # proposition()
 WAGER_OUTCOMES_COUNT_SELECTOR = "0x7deb9776"  # outcomesCount()
 WAGER_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
+# totalFeeBps() — immutable per wager (protocol slot + proposer extras), but
+# absent from the V3 creation events, so it must be read via eth_call
+# (ADR-0019). Stored in `wager_totals.total_fee_bps` for fee-aware previews.
+WAGER_TOTAL_FEE_BPS_SELECTOR = "0xc56f84cf"
 
 
 def db_connect(path: str) -> sqlite3.Connection:
@@ -178,7 +182,7 @@ def _eth_call_hex(rpc_url: str, to_addr: str, data_hex: str) -> str:
 
 
 def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
-    """Read ``proposition`` and ``outcomeText[]`` off-chain via ``eth_call``.
+    """Read ``proposition``, ``outcomeText[]`` and ``totalFeeBps`` via ``eth_call``.
 
     The proposition string and outcome labels live in storage, not in
     events, because they are too large to emit cheaply on every
@@ -186,9 +190,22 @@ def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
     address; this helper enriches the row with human-readable text the
     explorer / agent can render. Errors are swallowed: a partial / RPC
     failure must not block the core idempotent log application.
+
+    ``total_fee_bps`` is fetched in its own ``try`` so a failure in the
+    (longer) outcome-label loop cannot lose the fee, and vice versa. On
+    failure it is ``None`` and the caller keeps the schema default ``'0'``
+    — a known under-statement of fees until the next replay (the hosted DB
+    is rebuilt from chain on every cold start, see INDEXER-HOSTING.md).
     """
     proposition = ""
     outcomes: List[str] = []
+    total_fee_bps: Optional[int] = None
+    try:
+        total_fee_bps = _decode_u256_word(
+            _eth_call_hex(rpc_url, wager_address, WAGER_TOTAL_FEE_BPS_SELECTOR)
+        )
+    except Exception:
+        total_fee_bps = None
     try:
         proposition_hex = _eth_call_hex(rpc_url, wager_address, WAGER_PROPOSITION_SELECTOR)
         proposition = _decode_abi_string(proposition_hex)
@@ -202,7 +219,7 @@ def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
     except Exception:
         # Metadata enrichment is best-effort and must not block core indexing.
         pass
-    return {"proposition": proposition, "outcomes": outcomes}
+    return {"proposition": proposition, "outcomes": outcomes, "total_fee_bps": total_fee_bps}
 
 
 def to_int(hex_value: str) -> int:
@@ -363,7 +380,7 @@ def apply_log(
         resolution_deadline = to_int(data_word(log["data"], 5))
         betting_closer = topic_to_address(data_word(log["data"], 6))
         resolution_closer = topic_to_address(data_word(log["data"], 7))
-        metadata = {"proposition": "", "outcomes": []}
+        metadata: Dict[str, Any] = {"proposition": "", "outcomes": [], "total_fee_bps": None}
         if rpc_url:
             metadata = fetch_wager_metadata(rpc_url, wager)
 
@@ -421,8 +438,8 @@ def apply_log(
             ),
         )
         conn.execute(
-            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
-            (wager,),
+            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', ?)",
+            (wager, str(metadata["total_fee_bps"] or 0)),
         )
         return
 
@@ -438,7 +455,7 @@ def apply_log(
         resolution_deadline = to_int(data_word(log["data"], 3))
         betting_closer = topic_to_address(data_word(log["data"], 4))
         resolution_closer = topic_to_address(data_word(log["data"], 5))
-        metadata = {"proposition": "", "outcomes": []}
+        metadata: Dict[str, Any] = {"proposition": "", "outcomes": [], "total_fee_bps": None}
         if rpc_url:
             metadata = fetch_wager_metadata(rpc_url, wager)
 
@@ -492,8 +509,8 @@ def apply_log(
             ),
         )
         conn.execute(
-            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', '0')",
-            (wager,),
+            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', ?)",
+            (wager, str(metadata["total_fee_bps"] or 0)),
         )
         return
 

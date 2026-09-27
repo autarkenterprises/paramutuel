@@ -291,5 +291,68 @@ class IndexerStateTests(unittest.TestCase):
         self.assertEqual(int(row["betting_closed_at"]), 1500)
 
 
+class FeeBpsEnrichmentTests(IndexerStateTests):
+    """ADR-0019: ``wager_totals.total_fee_bps`` must mirror the wager's
+    on-chain ``totalFeeBps()``.
+
+    V3 creation events carry no fee data, so the indexer must read the
+    immutable fee total via ``eth_call`` at creation time. Before ADR-0019
+    the column was hard-coded to ``'0'`` and never updated, so every
+    fee-aware consumer (bet scout EV, site odds preview, explorer) silently
+    assumed a fee-free pot and overstated payouts by the fee share.
+    Inherits the log builders from ``IndexerStateTests`` (its tests re-run
+    here harmlessly).
+    """
+
+    FEE_BPS = 350
+
+    def _fake_eth_call(self, calls):
+        from service.indexer import indexer as ix
+
+        def fake(rpc_url, to_addr, data_hex):
+            calls.append((to_addr, data_hex))
+            if data_hex == ix.WAGER_TOTAL_FEE_BPS_SELECTOR:
+                return "0x" + word_u256(self.FEE_BPS)
+            if data_hex == ix.WAGER_OUTCOMES_COUNT_SELECTOR:
+                return "0x" + word_u256(0)
+            # proposition(): ABI-encoded string "q"
+            return "0x" + word_u256(32) + word_u256(1) + "71".ljust(64, "0")
+
+        return fake
+
+    def _fee_after_create(self, log, eth_call):
+        from unittest import mock
+
+        from service.indexer import indexer as ix
+
+        with mock.patch.object(ix, "_eth_call_hex", eth_call):
+            apply_log(self.conn, self.FACTORY, log, rpc_url="http://rpc.invalid")
+        self.conn.commit()
+        row = self.conn.execute(
+            "SELECT total_fee_bps FROM wager_totals WHERE wager_address = ?", (self.WAGER.lower(),)
+        ).fetchone()
+        self.assertIsNotNone(row)
+        return row["total_fee_bps"]
+
+    def test_enumerated_create_records_onchain_total_fee_bps(self):
+        calls = []
+        fee = self._fee_after_create(self._wager_created_enum_log(), self._fake_eth_call(calls))
+        self.assertEqual(fee, str(self.FEE_BPS))
+        # Every enrichment call targets the new wager, never the factory.
+        self.assertTrue(calls)
+        self.assertTrue(all(to.lower() == self.WAGER.lower() for to, _ in calls))
+
+    def test_freeform_create_records_onchain_total_fee_bps(self):
+        fee = self._fee_after_create(self._wager_created_freeform_log(), self._fake_eth_call([]))
+        self.assertEqual(fee, str(self.FEE_BPS))
+
+    def test_fee_lookup_failure_does_not_block_indexing(self):
+        def boom(*_a, **_k):
+            raise RuntimeError("rpc down")
+
+        fee = self._fee_after_create(self._wager_created_enum_log(), boom)
+        self.assertEqual(fee, "0")
+
+
 if __name__ == "__main__":
     unittest.main()
