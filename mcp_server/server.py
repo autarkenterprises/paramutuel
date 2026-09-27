@@ -186,6 +186,29 @@ def _compute_batch_odds(
     }
 
 
+_ODDS_MODEL_NOTE = (
+    "Odds use the single-winning-pool formula, which is the contract's claim() math only for "
+    "SINGLE_WINNER and freeform wagers. This wager's payoff policy divides the net pot by the "
+    "resolver-dependent winning-units total (docs/PAYOUT-CALCULATION.md Part B), so the multiple "
+    "is not a payout estimate."
+)
+
+
+def _odds_model_exact(wager_row: dict[str, Any]) -> bool:
+    """True iff `_compute_odds` matches on-chain claim() math for this wager (ADR-0019).
+
+    Freeform and SINGLE_WINNER (payoff_policy 0) pay `stake * netPot / winningPool`;
+    every other policy — or a row with no policy recorded — is flagged inexact.
+    """
+    pv = str(wager_row.get("protocol_version") or "enumerated").strip().lower()
+    if pv == "freeform":
+        return True
+    policy = wager_row.get("payoff_policy")
+    if policy is None or policy == "":
+        return False
+    return int(policy) == 0
+
+
 def _betting_open_status(wager_row: dict[str, Any], now_ts: int) -> tuple[bool, str]:
     state = str(wager_row.get("state", "")).upper()
     if state != "OPEN":
@@ -424,6 +447,9 @@ async def quote_place_bet(
         bet_amount=amount,
     )
     body["odds"] = odds
+    body["odds_model_exact"] = _odds_model_exact(wager)
+    if not body["odds_model_exact"]:
+        body["odds_note"] = _ODDS_MODEL_NOTE
     body["placeBet"] = {
         "to": wager_address,
         "calldata": calldata,
@@ -511,6 +537,8 @@ async def quote_place_bets(
             "outcome_indices": outcome_indices,
             "ticket_masks": ticket_masks,
             "amounts": amounts,
+            "odds_model_exact": _odds_model_exact(wager),
+            **({} if _odds_model_exact(wager) else {"odds_note": _ODDS_MODEL_NOTE}),
             "betting_open": betting_open,
             "execution_allowed": betting_open,
             "revert_hint": revert_hint,

@@ -513,6 +513,52 @@ class TestQuoteToolsMockedIndexer(unittest.TestCase):
                 )
 
 
+class TestQuoteOddsModelFlag(unittest.TestCase):
+    """ADR-0019: quotes must say whether their odds are the real payout.
+
+    ``_compute_odds`` is the SINGLE_WINNER / freeform claim formula. For
+    multi-winner policies the contract divides by a resolver-dependent
+    winning-units total, so the quoted multiple is not a payout; the quote
+    must flag that instead of presenting it as one.
+    """
+
+    def _detail(self, policy):
+        d = json.loads(json.dumps(TestQuoteToolsMockedIndexer._enumerated_detail))
+        d["wager"]["payoff_policy"] = policy
+        return d
+
+    def _quote(self, detail, **kw):
+        with _mock_httpx_indexer_payload(detail):
+            return json.loads(_run(quote_place_bet("0x" + "ab" * 20, amount=10, require_open=False, **kw)))
+
+    def test_single_winner_quote_is_exact(self):
+        body = self._quote(self._detail(0), outcome_index=2)
+        self.assertTrue(body["odds_model_exact"])
+        self.assertNotIn("odds_note", body)
+
+    def test_multi_winner_policy_quote_is_flagged(self):
+        for policy in (1, 2, 3, 4):
+            with self.subTest(policy=policy):
+                body = self._quote(self._detail(policy), outcome_index=2)
+                self.assertFalse(body["odds_model_exact"])
+                self.assertIn("PAYOUT-CALCULATION", body["odds_note"])
+
+    def test_unknown_policy_is_not_claimed_exact(self):
+        body = self._quote(TestQuoteToolsMockedIndexer._enumerated_detail, outcome_index=2)
+        self.assertFalse(body["odds_model_exact"])
+
+    def test_freeform_quote_is_exact(self):
+        body = self._quote(TestQuoteToolsMockedIndexer._freeform_detail, answer="Paris")
+        self.assertTrue(body["odds_model_exact"])
+
+    def test_batch_quote_is_flagged_for_multi_winner(self):
+        with _mock_httpx_indexer_payload(self._detail(1)):
+            body = json.loads(
+                _run(quote_place_bets("0x" + "ab" * 20, outcome_indices=[2], amounts=[5], require_open=False))
+            )
+        self.assertFalse(body["odds_model_exact"])
+
+
 class TestABILoading(unittest.TestCase):
     def test_factory_abi_loaded(self):
         self.assertGreater(len(FACTORY_ABI), 5)
