@@ -48,6 +48,10 @@ def recommend(
 
     recs: list[dict[str, Any]] = []
     errors: list[str] = []
+    # Wagers deliberately left out of the ranking, with the reason (ADR-0019):
+    # the indexer's OPEN state survives the betting close, and the scout's
+    # odds model only matches claim() math for SINGLE_WINNER / freeform.
+    skipped: list[dict[str, str]] = []
     for row in filtered:
         addr = str(row.get("wager_address") or "").strip()
         if not addr:
@@ -55,6 +59,18 @@ def recommend(
         try:
             detail = client.get_wager(addr)
             pick = pick_outcome(strategy=strategy, wager_detail=detail, bet_amount=bet_amount_raw)
+            if not pick["betting_open"]:
+                skipped.append({"wager_address": addr, "reason": f"betting closed: {pick['revert_hint']}"})
+                continue
+            if not pick["odds_model_exact"]:
+                policy = (detail.get("wager") or {}).get("payoff_policy")
+                skipped.append(
+                    {
+                        "wager_address": addr,
+                        "reason": f"payoff policy {policy}: single-pool odds model does not match claim() math",
+                    }
+                )
+                continue
             oi = int(pick["outcome_index"])
             od = pick["odds"]
             post = od.get("post_bet_payout_multiple")
@@ -92,6 +108,7 @@ def recommend(
         "indexer_url": client.base_url,
         "candidates_scanned": len(filtered),
         "recommendations": recs[: max(1, top)],
+        "skipped": skipped,
         "errors_sample": errors[:10],
     }
 

@@ -20,6 +20,29 @@ from typing import Any
 
 from . import odds as odds_mod
 
+# `ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER`. The scout's odds model
+# (`bet * netAfter / (pool + bet)`) is the contract's claim formula only for
+# this policy and for freeform wagers (single winning answer pool).
+PAYOFF_POLICY_SINGLE_WINNER = 0
+
+
+def odds_model_exact(wager_row: dict[str, Any]) -> bool:
+    """True iff the single-pool odds model matches on-chain `claim()` math.
+
+    Freeform wagers and SINGLE_WINNER enumerated wagers pay
+    `stake * netPot / winningPool`. Every other policy divides by a
+    resolver-dependent winning-units total (docs/PAYOUT-CALCULATION.md
+    Part B) and multi-bit tickets live in other masks, so the model's
+    multiples are not payouts there (ADR-0019). Unknown policy -> False.
+    """
+    pv = str(wager_row.get("protocol_version") or "enumerated").strip().lower()
+    if pv == "freeform":
+        return True
+    policy = wager_row.get("payoff_policy")
+    if policy is None or policy == "":
+        return False
+    return int(policy) == PAYOFF_POLICY_SINGLE_WINNER
+
 
 def _outcome_labels(wager_row: dict[str, Any]) -> list[str]:
     raw = wager_row.get("outcomes_json") or "[]"
@@ -125,6 +148,7 @@ def pick_outcome(
         "per_outcome": per_outcome,
         "betting_open": betting_open,
         "revert_hint": revert_hint,
+        "odds_model_exact": odds_model_exact(wager),
     }
     if protocol_version == "freeform":
         out["answer_id_hex"] = str(best.get("answer_id_hex") or "")
