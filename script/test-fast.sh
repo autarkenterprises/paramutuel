@@ -68,6 +68,10 @@ if [[ "${FAST_SKIP_FORGE:-0}" != "1" ]]; then
   # --no-match-path keeps the option open if a slow Solidity-side regression
   # ever needs to move to the extended suite. Currently empty (no exclusions).
   run_layer "forge test" forge test
+  # Structural backstop for the blocked `forge coverage` (ADR-0019 / L-009):
+  # every custom error / require string in src/ must be asserted by a test.
+  section "revert-path coverage"
+  run_layer "revert-path coverage" python3 script/check-revert-coverage.py
 else
   echo "(skipped Foundry suite per FAST_SKIP_FORGE=1)"
 fi
