@@ -1,7 +1,7 @@
 # ADR-0019: V3 verification audit — correctness vs intent, test-parity restoration
 
 Date: 2026-09-26
-Status: **Accepted** (audit + test backfill); contract-level mitigations **Proposed** (require a new factory / wager bytecode)
+Status: **Implemented** (audit + test backfill + off-chain fixes); contract-level mitigations **Proposed** (require a new factory / wager bytecode)
 Builds on: ADR-0001, ADR-0005, ADR-0009, ADR-0010, ADR-0013, `AGENTS.md` #1 / #2 / #4 / #8
 
 ## Context
@@ -130,5 +130,22 @@ already scoped by ADR-0018 and are not re-decided here.
 
 ## After Action Report
 
-**AAR date:** Pending
-**AAR status:** Pending
+**AAR date:** 2026-09-26
+**AAR status:** Initial (revisit after the operator redeploys in `docs/ADR-0019-IMPLEMENTATION.md` §Operator follow-ups and the extended suite has run against them)
+
+**Outcome vs success criteria:**
+
+- *Every custom error and string `require` in `src/` asserted by a test.* **Met** — `script/check-revert-coverage.py` (fast suite): 30 errors + 8 strings; fails with 23 missing against master's `test/`.
+- *Every listed mutation killed.* **Met** — 28 / 28 (one initial survivor fixed in `d25577a`); table in the implementation notes.
+- *`script/test-fast.sh` passes.* **Met** — 109 Foundry tests + Python + node layers.
+- *ADR-0005 AAR matches code.* **Met** — revision appended.
+- *Every peripheral finding fixed with a regression test or recorded with rationale.* **Met** — 12 fixed under red → green; 2 intent/contract items recorded as follow-ups (answer-space mitigation, freeform answer-text recovery); 2 leads rejected with rationale.
+
+**Outcome vs failure criteria:**
+
+- *A new test passes against a mutated guard.* **Triggered once, mitigated** — fee-remainder test strengthened and re-verified.
+- *Genuine V3 regression vs V1.* **Avoided** — no contract behaviour change was needed; all V1-era behaviours ported hold on V3.
+
+**Lessons:** L-008 (AAR claims need a named test), L-009 (port tests by behaviour when deleting superseded code). Also reconfirmed L-006: the sub-agent leads were valuable but one (answer trimming on bet surfaces) was a convention, not a bug — verify before acting.
+
+**Revision schedule:** after the resolution-service and indexer redeploys; again when the contract-mitigation ADR lands.
