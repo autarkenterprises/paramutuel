@@ -999,7 +999,7 @@ contract ParamutuelV3LifecycleTest is Test {
         r[0] = alice;
         r[1] = bob;
         b[0] = 33;
-        b[1] = 67;
+        b[1] = 34;
         vm.prank(proposer);
         ParamutuelWagerV3 w = ParamutuelWagerV3(
             factory.createEnumeratedWager(
@@ -1007,7 +1007,11 @@ contract ParamutuelV3LifecycleTest is Test {
                 resolverAddr, address(0), address(0), r, b
             )
         );
-        _bet(w, alice, M0, 10_007);
+        // Amounts chosen so the floored slices leave dust: fees = floor(59881 *
+        // 167 / 10000) = 1000; floor(1000*100/167) = 598, floor(1000*33/167) =
+        // 197, so the last recipient must get the remainder 205 — not
+        // floor(1000*34/167) = 203 (which would strand 2 wei in the wager).
+        _bet(w, alice, M0, 59_878);
         _bet(w, bob, M1, 3);
         vm.warp(closeAt);
 
@@ -1018,22 +1022,21 @@ contract ParamutuelV3LifecycleTest is Test {
         vm.prank(resolverAddr);
         w.resolve(M0);
         uint256 pot = w.totalPot();
-        assertEq(pot, 10_010);
-        uint256 fees = (pot * 200) / 10_000; // floor(200.2) = 200
-        uint256 s0 = (fees * 100) / 200; // treasury 100
-        uint256 s1 = (fees * 33) / 200; // alice 33
-        assertEq(w.feeBalances(treasury), s0);
-        assertEq(w.feeBalances(alice), s1);
-        assertEq(w.feeBalances(bob), fees - s0 - s1);
+        assertEq(pot, 59_881);
+        uint256 fees = (pot * 167) / 10_000;
+        assertEq(fees, 1000);
+        assertEq(w.feeBalances(treasury), 598);
+        assertEq(w.feeBalances(alice), 197);
+        assertEq(w.feeBalances(bob), 205);
 
         vm.prank(treasury);
-        assertEq(w.withdrawFees(), s0);
+        assertEq(w.withdrawFees(), 598);
         vm.prank(treasury);
         vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
         w.withdrawFees();
 
         vm.prank(alice);
-        assertEq(w.claim(), 10_010 - fees);
+        assertEq(w.claim(), 59_881 - fees);
         vm.prank(alice);
         w.withdrawFees();
         vm.prank(bob);
