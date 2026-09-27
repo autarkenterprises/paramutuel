@@ -16,8 +16,9 @@ V3 protocol surface assumptions baked in:
   ``--rpc-url`` / ``--private-key`` / ``--allow-execute`` plumbing.
 
 Address handling uses the EIP-55 checksum form except where the protocol
-explicitly accepts ``0x0`` to mean "default to proposer" (resolver,
-betting closer, resolution closer).
+explicitly accepts ``0x0``: for ``resolver`` it means "default to
+proposer"; for ``betting closer`` / ``resolution closer`` it means "role
+disabled" (time-based close only) — see ADR-0005's 2026-09-26 AAR revision.
 """
 from __future__ import annotations
 
@@ -80,8 +81,9 @@ def build_create_wager_command(
     `seed_outcome_indices` is an ergonomic shorthand: each index `i` is
     promoted to the single-outcome ticket bitmask `1 << i` before it is
     passed to the factory's `uint256[] seedTicketMasks` argument. Multi-bit
-    seeds (for `ANY_OF` / `EXACT_SET` policies) still go through this path
-    by passing the precomputed mask as the index value.
+    seeds (for `ANY_OF` / `EXACT_SET` policies) are NOT expressible here —
+    a mask passed as an "index" would itself be shifted — so call the
+    factory directly with explicit masks for those.
 
     `payoff_policy` is the `ParamutuelWagerV3.PayoffPolicy` enum:
     `0=SINGLE_WINNER, 1=ANY_OF, 2=EXACT_SET, 3=AT_LEAST_K, 4=WEIGHTED_OVERLAP`.
@@ -217,7 +219,9 @@ def build_wager_action_command(
     pv = (protocol_version or "enumerated").strip().lower()
     if action == "resolve":
         if pv == "freeform":
-            ans = (winning_answer or "").strip()
+            # Byte-exact: never trim (ADR-0009 §5 / ADR-0019) — the wager
+            # hashes these bytes verbatim to find the winning pool.
+            ans = winning_answer or ""
             if not ans:
                 raise ValueError("winning_answer required for freeform resolve(string)")
             sig = "resolve(string)"

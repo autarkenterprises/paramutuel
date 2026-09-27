@@ -223,6 +223,20 @@ class ControlPanelCommandTests(unittest.TestCase):
         self.assertIn("resolve(string)", joined)
         self.assertIn("Team A", joined)
 
+    def test_action_command_freeform_resolve_is_byte_exact(self):
+        # ADR-0019: V3 hashes the answer bytes verbatim (ADR-0009 §5), so the
+        # encoder must not trim — " Team A " and "Team A" are different pools.
+        cmd = build_wager_action_command(
+            wager="0x3333333333333333333333333333333333333333",
+            action="resolve",
+            outcome_index=None,
+            protocol_version="freeform",
+            winning_answer=" Team A ",
+            rpc_url="http://localhost:8545",
+            private_key="0xabc",
+        )
+        self.assertEqual(cmd.command[cmd.command.index("resolve(string)") + 1], " Team A ")
+
     def test_create_freeform_wager_command_shape(self):
         cmd = build_create_freeform_wager_command(
             factory="0x1111111111111111111111111111111111111111",
