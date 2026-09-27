@@ -466,7 +466,7 @@ async function updateOddsPreviewV2() {
   const [totalPot, totalFeeBps, pool] = await Promise.all([
     wagerContract.totalPot(),
     wagerContract.totalFeeBps(),
-    wagerContract.ticketPoolTotal(mask),
+    wagerContract.ticketPoolByMask(mask),
   ]);
 
   if (policy === Logic.PAYOFF_POLICY.SINGLE_WINNER) {
