@@ -50,3 +50,20 @@ On-chain contracts cannot observe off-chain “event start” or “grading done
 **Follow-ups:** none. The roles ship in V3 and are exercised by every wager.
 
 **Revision schedule:** none required.
+
+### AAR revision — 2026-09-26 (ADR-0019 verification audit)
+
+**AAR status:** Revisited 2026-09-26 — **correction**.
+
+The original AAR's first two bullets are **wrong**. Neither closer defaults to the proposer: since commit `bc8e4a8` ("support time-only windows and forbid uncloseable no-max markets") `address(0)` **disables** the role. `ParamutuelFactoryV3` passes `bettingCloser` / `resolutionCloser` through unchanged, and instead rejects `bettingCloseTime == 0 && bettingCloser == 0` and `resolutionWindow == 0 && resolutionCloser == 0` with `InvalidLifecycleConfig`. Only the *resolver* defaults to the proposer (ADR-0001). `docs/WAGER-LIFECYCLE.md` already described the real behaviour; this ADR did not. There was no test for either the default or its absence.
+
+Decision §1 / §2 are therefore superseded in part: read "default **proposer** when `address(0)`" as "**optional**; `address(0)` means no authority close for that transition (time-based only)".
+
+Additional facts the original AAR omitted, now pinned by `test/ParamutuelV3Lifecycle.t.sol`:
+
+- An early `closeBetting()` re-anchors the resolution window at the close time, so the effective deadline can be **earlier** than the immutable `resolutionDeadline` (which is informational only). The indexer / sweeper / resolution service already anchor on `betting_closed_at`.
+- With a zero-time window the closer is the only way forward; if its key is lost, stake is locked (neither `retract` nor `expire` can run while betting is open). ADR-0001's "anyone can `expire()`" guarantee holds for time-bounded wagers only.
+
+**Evidence:** `test_zeroAddressCloser_disablesRole`, `test_create_roleDefaultsAndDeadline`, `test_earlyAuthorityClose_shortensEffectiveResolutionDeadline`, `test_noMaxBetting_resolutionWindowAnchoredAtAuthorityClose`, `test_noMaxResolution_expireRequiresResolutionCloser`.
+
+**Lessons:** `LESSONS.md` L-008 (AAR claims need a named test).

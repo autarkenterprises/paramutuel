@@ -60,7 +60,9 @@ The 50-80% band covers the production-critical pure-logic modules. Each has work
 
 **Status: blocked.** `forge coverage` (and `forge coverage --ir-minimum`) currently fails to compile `src/ParamutuelWagerV3.sol` with **stack-too-deep** errors when the optimizer / via-IR are disabled (which `forge coverage` does to keep source mappings accurate). This is a known Foundry limitation against complex contracts.
 
-**Status of the contract logic itself:** all 65 Foundry tests pass under the production compile (`forge test`). Functional coverage is high — `test/ParamutuelV3Enumerated.t.sol` alone has 26 tests covering all five payoff policies plus seed / lifecycle / fee paths, with two fuzz tests. Worked-example tests pin the documentation (`docs/PAYOUT-CALCULATION.md`) to specific named regression tests per `LESSONS.md` L-003.
+**Re-verified 2026-09-26 (ADR-0019):** still blocked with forge 1.5.1 — `forge coverage --ir-minimum` fails with "Cannot swap Slot RET with Variable ret_param: too deep in the stack by 1 slots", i.e. in the ABI decoder of the 17-argument `ParamutuelWagerV3` constructor. Substitute evidence now in place: (a) `script/check-revert-coverage.py` (fast suite) requires every custom error and `require` string in `src/` to be asserted by a `vm.expectRevert` — currently 30 errors + 8 strings, all asserted; (b) `test/ParamutuelV3Lifecycle.t.sol` restores the lifecycle / access-control coverage lost in `b2a2f28`, with a mutation run recorded in `docs/ADR-0019-IMPLEMENTATION.md`. Total: 109 Foundry tests.
+
+**Status of the contract logic itself (2026-05-06 text, kept for history):** all 65 Foundry tests pass under the production compile (`forge test`). Functional coverage is high — `test/ParamutuelV3Enumerated.t.sol` alone has 26 tests covering all five payoff policies plus seed / lifecycle / fee paths, with two fuzz tests. Worked-example tests pin the documentation (`docs/PAYOUT-CALCULATION.md`) to specific named regression tests per `LESSONS.md` L-003.
 
 **Path forward** (follow-up, not blocking ADR-0013):
 

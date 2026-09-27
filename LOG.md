@@ -179,3 +179,13 @@ The resolver address being a *product* requires a separate doc: `docs/SERVICE-PR
 Implementation runbook in `docs/ADR-0017-IMPLEMENTATION.md`. Gated on operator input on resolver fee, policy scope, manifest URL, rotation policy, SLA disclaimer.
 
 This concludes the testnet-as-production recalibration round. Three design ADRs (0015 / 0016 / 0017) propose, with implementation gated on operator input. AAR revisions on 0002 / 0003 / 0007 / 0014 already landed; site Resonance comment audit closed; `MEMORY.md` carries the active design ADR list. All five branches preserved on origin per practice #5.
+
+## 2026-09-26 — ADR-0019: V3 verification audit (correctness vs intent)
+
+Operator asked for an independent verification of a codebase largely written by earlier, weaker agents. Lead agent reviewed `src/` line by line and verified cross-language invariants itself; two read-only Cursor sub-agents (`composer-2.5` — Opus/GPT Cursor quota exhausted mid-run) swept `service/` and the clients, and every lead they raised was re-verified against the code before acting.
+
+Headline: the contract economics are sound, but the *surroundings* had drifted. The V1 test suite was deleted with V1 (`b2a2f28`) and never ported, leaving the whole V3 lifecycle / access-control surface untested (invisible because `forge coverage` is still stack-too-deep — re-checked with forge 1.5.1 `--ir-minimum`). The live resolution service resolved the wrong outcome for `outcomeIndex` decisions and served an unauthenticated, key-echoing `/run-once`. The indexer never recorded fees, so every EV / odds preview assumed fee-free pots. ADR-0005's AAR claimed a closer default the code had dropped months earlier. A freeform griefing vector (1024 one-wei answers lock out new answers) was confirmed by PoC and pinned; its fix needs new bytecode.
+
+Dead end: `forge coverage --ir-minimum` still fails ("Cannot swap Slot RET … too deep by 1 slot") on the 17-argument wager constructor decoder. Substituted a structural check (`script/check-revert-coverage.py`) plus a 28-mutation run in a scratch copy.
+
+Details, finding table, mutation results and operator follow-ups (resolution-service redeploy with a token + possible key rotation; indexer redeploy; decision-file audit): [`docs/ADR-0019-IMPLEMENTATION.md`](docs/ADR-0019-IMPLEMENTATION.md). New lessons L-008 (AAR claims need a named test), L-009 (port tests by behaviour when deleting superseded code).

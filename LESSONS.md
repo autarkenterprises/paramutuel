@@ -55,3 +55,15 @@ See `AGENTS.md` practice #11 for the contract this file satisfies.
 **Why:** Before ADR-0011, `docs/TASKS.md` was carrying chronological history (the 2026-04 "historical checkboxes left intact as a record of shipped work" annotation is the symptom). `README.md` was carrying setup runbook material. Without explicit `LOG.md` / `LESSONS.md` / `MEMORY.md` files, retrospective and durable material accreted into whichever doc was already open.
 
 **How to apply:** Every project of nontrivial duration needs the four-layer split (chronological / durable / working-context / navigational) named explicitly *before* material starts to accrete. AGENTS.md practice #11 codifies this; ADR-0011 is the implementation. New material's home is decided by **purpose**, not by which file is already open.
+
+## L-008: An AAR "Met" claim is only as good as the test it names
+
+**Why:** ADR-0005's backfilled AAR asserted "default-to-proposer behavior implemented and tested" for both closers. It was neither: `bc8e4a8` had deliberately changed `address(0)` to mean "role disabled" weeks earlier, and no test covered either behavior. The claim was written from the ADR text, not from the code, and survived until the ADR-0019 audit. Downstream readers (and agents) trusting the ADR would have mis-configured wagers.
+
+**How to apply:** Every "Met" line in an AAR cites the test (or file:line) that proves it. If no such test exists, the line says "Unverified" and a test is added in the same unit of work. Extends L-003 from worked examples to AAR claims.
+
+## L-009: When a migration deletes a superseded implementation, port its tests by behavior, not by file
+
+**Why:** ADR-0010 correctly deleted the V1 / V2 contracts (L-002), and commit `b2a2f28` deleted `test/Paramutuel.t.sol` with them. The V2 suites were ported; the V1 suite was not — yet V1 was the only suite pinning the lifecycle / access-control / fee-cap / token-failure behavior that V3 inherited verbatim. For months 15 V3 custom errors and every string `require` had no test, invisible because `forge coverage` is blocked (ADR-0013). ADR-0019 restored 40 tests and proved them by mutation.
+
+**How to apply:** Before deleting a test file during a migration, list the behaviors it pins (one line per test) and map each to a surviving test or a new port; commit the map in the migration's implementation notes. A cheap backstop that needs no coverage tooling: every custom error / `require` string in `src/` must appear in at least one `expectRevert` in `test/`.
