@@ -570,10 +570,7 @@ def apply_log(
             "UPDATE wager_ticket_pools SET pool_total = ? WHERE wager_address = ? AND ticket_mask = ?",
             (str(prev + amount), wager, mask_key),
         )
-        conn.execute(
-            "UPDATE wager_totals SET total_pot = CAST(total_pot AS INTEGER) + ? WHERE wager_address = ?",
-            (amount, wager),
-        )
+        _add_to_total_pot(conn, wager, amount)
         return
 
     if event_name == "BetPlacedV3Freeform":
@@ -599,10 +596,7 @@ def apply_log(
             "UPDATE wager_ticket_pools SET pool_total = ? WHERE wager_address = ? AND ticket_mask = ?",
             (str(prev + amount), wager, answer_id_key),
         )
-        conn.execute(
-            "UPDATE wager_totals SET total_pot = CAST(total_pot AS INTEGER) + ? WHERE wager_address = ?",
-            (amount, wager),
-        )
+        _add_to_total_pot(conn, wager, amount)
         return
 
     if event_name == "ResolvedV3Enumerated":
@@ -661,6 +655,26 @@ def apply_log(
             {"recipient": recipient, "amount": amount},
         )
         return
+
+
+def _add_to_total_pot(conn: sqlite3.Connection, wager: str, amount: int) -> None:
+    """Add ``amount`` to ``wager_totals.total_pot`` with exact big-int math.
+
+    Amounts are uint256 and stored as decimal TEXT. The arithmetic must
+    happen in Python: SQLite integers are signed 64-bit (~9.22 tokens at
+    18 decimals), and the former ``CAST(total_pot AS INTEGER) + ?`` both
+    degraded the pot to a REAL (``'1.0e+19'``) past 2**63 and raised
+    ``OverflowError`` binding a single amount >= 2**63 (ADR-0019).
+    """
+    row = conn.execute(
+        "SELECT total_pot FROM wager_totals WHERE wager_address = ?", (wager,)
+    ).fetchone()
+    if row is None:
+        return
+    conn.execute(
+        "UPDATE wager_totals SET total_pot = ? WHERE wager_address = ?",
+        (str(int(row["total_pot"] or 0) + amount), wager),
+    )
 
 
 def get_expire_candidates(conn: sqlite3.Connection, now_ts: Optional[int] = None) -> List[sqlite3.Row]:
@@ -814,10 +828,18 @@ def sync_logs(
             raise
         logs.sort(key=lambda l: (to_int(l["blockNumber"]), to_int(l["logIndex"])))
         for log in logs:
+            # Each log is applied inside its own SAVEPOINT so a failure part
+            # way through `apply_log` (after e.g. the event row was inserted)
+            # rolls back *all* of that log's writes instead of committing a
+            # torn state with the chunk (ADR-0019).
+            conn.execute("SAVEPOINT apply_one_log")
             try:
                 apply_log(conn, factory_address, log, rpc_url=rpc_url)
+                conn.execute("RELEASE SAVEPOINT apply_one_log")
                 processed += 1
             except Exception as exc:
+                conn.execute("ROLLBACK TO SAVEPOINT apply_one_log")
+                conn.execute("RELEASE SAVEPOINT apply_one_log")
                 tx = log.get("transactionHash", "?")
                 li = log.get("logIndex", "?")
                 print(f"[indexer-sync] skip log {tx}:{li}: {exc}")

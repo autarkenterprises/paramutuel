@@ -354,5 +354,86 @@ class FeeBpsEnrichmentTests(IndexerStateTests):
         self.assertEqual(fee, "0")
 
 
+class LargeAmountTests(IndexerStateTests):
+    """ADR-0019: pot arithmetic must be exact for any uint256 stake.
+
+    ``total_pot`` was accumulated in SQL (``CAST(total_pot AS INTEGER) + ?``).
+    SQLite integers are signed 64-bit, i.e. ~9.22 tokens of an 18-decimal
+    collateral (WETH / DAI are site presets; collateral is permissionless):
+    crossing 2**63 silently turned the pot into the REAL text ``'1.0e+19'``
+    (breaking every ``int()`` / ``BigInt()`` consumer), and a single bet
+    >= 2**63 raised ``OverflowError`` mid-``apply_log`` after the event row and
+    ticket pool had already been written — a torn, committed state.
+    """
+
+    def _bet(self, amount, *, tx, log_index=0, freeform=False):
+        if freeform:
+            topics = [TOPICS["BetPlacedV3Freeform"], topic_addr(self.BETTOR), "0x" + "ab" * 32]
+            data = "0x" + word_u256(amount)
+        else:
+            topics = [TOPICS["BetPlacedV3Enumerated"], topic_addr(self.BETTOR)]
+            data = "0x" + word_u256(1) + word_u256(amount)
+        return {
+            "address": self.WAGER,
+            "topics": topics,
+            "data": data,
+            "blockNumber": hex(11),
+            "transactionHash": tx,
+            "logIndex": hex(log_index),
+        }
+
+    def _pot(self):
+        row = self.conn.execute(
+            "SELECT total_pot FROM wager_totals WHERE wager_address = ?", (self.WAGER.lower(),)
+        ).fetchone()
+        return row["total_pot"]
+
+    def test_enumerated_pot_is_exact_past_int64(self):
+        apply_log(self.conn, self.FACTORY, self._wager_created_enum_log())
+        for i in range(2):
+            apply_log(self.conn, self.FACTORY, self._bet(5 * 10**18, tx=f"0xb{i}"))
+        self.conn.commit()
+        self.assertEqual(self._pot(), str(10 * 10**18))
+
+    def test_single_huge_bet_is_exact_for_both_modes(self):
+        huge = 10**30 + 7
+        apply_log(self.conn, self.FACTORY, self._wager_created_freeform_log())
+        apply_log(self.conn, self.FACTORY, self._bet(huge, tx="0xc1", freeform=True))
+        apply_log(self.conn, self.FACTORY, self._bet(huge, tx="0xc2", freeform=True))
+        self.conn.commit()
+        self.assertEqual(self._pot(), str(2 * huge))
+        pool = self.conn.execute(
+            "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ?", (self.WAGER.lower(),)
+        ).fetchone()
+        self.assertEqual(pool["pool_total"], str(2 * huge))
+
+    def test_failed_log_leaves_no_partial_state(self):
+        """sync_logs applies each log atomically: a log that fails half-way
+        must not leave its event row (or any other write) behind."""
+        from unittest import mock
+
+        from service.indexer import indexer as ix
+
+        apply_log(self.conn, self.FACTORY, self._wager_created_enum_log())
+        self.conn.commit()
+        bad = self._bet(3, tx="0xdead")
+        real_apply = ix.apply_log
+
+        def half_apply(conn, factory, log, rpc_url=None):
+            real_apply(conn, factory, log, rpc_url=rpc_url)
+            raise RuntimeError("simulated failure after writes")
+
+        with mock.patch.object(ix, "rpc_call", return_value="0x20"), \
+             mock.patch.object(ix, "_eth_get_logs_bisect", return_value=[bad]), \
+             mock.patch.object(ix, "apply_log", half_apply):
+            ix.sync_logs(rpc_url="http://rpc.invalid", conn=self.conn, factory_address=self.FACTORY,
+                         from_block=11, to_block=11, chunk_size=10)
+        n = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM events_log WHERE tx_hash = ?", ("0xdead",)
+        ).fetchone()["n"]
+        self.assertEqual(n, 0)
+        self.assertEqual(self._pot(), "0")
+
+
 if __name__ == "__main__":
     unittest.main()
