@@ -99,7 +99,7 @@ done
 #    directory because logic.test.js uses relative requires; the current
 #    shell of this subprocess is restored on exit by `(...)`.
 section "dapp pure-helper tests"
-( cd dapp && run_layer "dapp" node --test tests/logic.test.js )
+( cd dapp && run_layer "dapp" node --test tests/logic.test.js tests/abi-drift.test.js tests/site-bet-logic.test.js )
 
 echo
 echo "=== fast suite OK ==="

@@ -2,6 +2,8 @@
   "use strict";
 
   const ethers = globalThis.ethers;
+  // Pure open-for-stakes / odds-accuracy decisions (site/bet-logic.js, unit-tested; ADR-0019).
+  const BetLogic = globalThis.ParamutuelBetLogic;
   const CONFIG_URL = "config/deployments.json";
   const WAGER_ABI_V3_URL = "dapp/abi/ParamutuelWagerV3.json";
 
@@ -241,13 +243,16 @@
     }
   }
 
-  function renderOutcomesOddsTable(labels, totalPotRaw, feeBpsRaw, ticketPoolsArr) {
+  function renderOutcomesOddsTable(labels, totalPotRaw, feeBpsRaw, ticketPoolsArr, payoffPolicy) {
     const tbody = $("betOutcomesTableBody");
     if (!tbody) return;
 
     const totalPot = BigInt(String(totalPotRaw || "0"));
     const feeBps = BigInt(String(feeBpsRaw || "0"));
     const net = netPotAfterFees(totalPot, feeBps);
+    // Only SINGLE_WINNER pays `net / stake(1<<i)`; other policies divide by a
+    // resolver-dependent winning-units total, so no honest per-outcome multiple exists.
+    const multipleOk = BetLogic.perOutcomeMultipleSupported(payoffPolicy);
 
     let sumStakes = 0n;
     for (let i = 0; i < labels.length; i++) {
@@ -260,8 +265,11 @@
       const stake = ticketPoolStakeRaw(ticketPoolsArr, i);
       const poolPct =
         sumStakes > 0n ? Number((stake * 10000n) / sumStakes) / 100 : 0;
-      const mult =
-        stake > 0n ? `${formatRatioBig(net, stake, 4)}x` : "—";
+      const mult = !multipleOk
+        ? "n/a (policy)"
+        : stake > 0n
+          ? `${formatRatioBig(net, stake, 4)}x`
+          : "—";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -452,7 +460,9 @@
       footEl.textContent =
         pv === "freeform"
           ? "Freeform: each row is a domain-separated answer id (0x03 ‖ UTF-8 bytes, then keccak). Implied multiple assumes that answer wins and no further bets."
-          : "Pool share uses on-chain stake totals. Implied multiple is the approximate payout per 1 unit staked on that outcome if it wins, after protocol fees and assuming no further bets (integer rounding on-chain may differ slightly).";
+          : BetLogic.perOutcomeMultipleSupported(w.payoff_policy)
+            ? "Pool share uses on-chain stake totals. Implied multiple is the approximate payout per 1 unit staked on that outcome if it wins, after protocol fees and assuming no further bets (integer rounding on-chain may differ slightly)."
+            : "Pool share counts single-outcome tickets only. This wager's payoff policy splits the pot by the resolver's winning set (docs/PAYOUT-CALCULATION.md Part B), so no per-outcome multiple is shown.";
     }
     const formLead = $("betFormLead");
     if (formLead) {
@@ -519,7 +529,7 @@
     if (pv === "freeform") {
       renderFreeformPoolsTable(tPools, totalPotVal, feeBpsVal);
     } else {
-      renderOutcomesOddsTable(labels, totalPotVal, feeBpsVal, tPools);
+      renderOutcomesOddsTable(labels, totalPotVal, feeBpsVal, tPools, w.payoff_policy);
     }
 
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
@@ -530,10 +540,13 @@
       renderOutcomeInputs(labels);
     }
 
-    const open = state === "OPEN";
+    // `state === "OPEN"` persists after betting closes (by time or by the
+    // betting closer), so mirror the contract's placeBet gates instead.
+    const betStatus = BetLogic.bettingOpenStatus(w, Math.floor(Date.now() / 1000));
+    const open = betStatus.open;
     $("betSubmitBtn").disabled = !open || !signer;
     if (!open) {
-      let msg = "This wager is not open for new stakes.";
+      let msg = betStatus.reason || "This wager is not open for new stakes.";
       if (state === "RESOLVED") msg = "Resolved — staking is closed. Winners can claim from the full dApp if applicable.";
       else if (state === "RETRACTED") msg = "Retracted — staking is closed.";
       $("betTxStatus").textContent = msg;
