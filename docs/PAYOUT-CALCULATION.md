@@ -2,8 +2,9 @@
 
 This document describes how **collateral token amounts** are computed when a wager finalizes, for:
 
-1. **Legacy v1** (historical) — single winning **outcome index**, single-winner pool split. Retained below for the simplest case; superseded by the V3 enumerated `SINGLE_WINNER` policy.
-2. **Enumerated mode** (ADR-0008 economics, now implemented by `ParamutuelWagerV3` with `MODE()==0`) — bitmask **tickets** and **payoff policies**.
+1. **Single winner** (the simplest case) — the `SINGLE_WINNER` policy of enumerated mode: one winning outcome, and its stakers split the net pot.
+2. **Enumerated mode generally** (ADR-0008 economics, `ParamutuelWagerV3` with `MODE()==0`) — bitmask **tickets** and **payoff policies**.
+3. **Freeform mode** (ADR-0009 economics, `ParamutuelWagerV3` with `MODE()==1`) — open text answers.
 
 **Source layout:** the canonical contracts are `src/ParamutuelWagerV3.sol` + `src/ParamutuelFactoryV3.sol` (ADR-0010). Part B below matches the enumerated-mode logic in `ParamutuelWagerV3` ([`docs/ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md), [`docs/ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md) for policy semantics). Freeform-mode payouts (`MODE()==1`) follow the single-winner split over `answerId` pools — see [`ADR-0009-IMPLEMENTATION.md`](ADR-0009-IMPLEMENTATION.md).
 
@@ -13,13 +14,13 @@ All amounts are in the wager’s **ERC-20 raw units**: the token’s **smallest 
 
 ---
 
-## Shared concepts (v1 and v2)
+## Shared concepts (all modes)
 
 ### Pot and fees
 
 - **`totalPot`** — Sum of every stake ever recorded on the wager while it was **Open** (including seeded bets from the factory, if any).
 - **`totalFeeBps`** — Sum of all fee basis points configured at creation (treasury + extra recipients). **`BPS_DENOMINATOR` = 10_000** (100% = 10_000 bps).
-- **When** the wager leaves **Open** via **`resolve`**, **`retract`**, or **`expire`**, fees are charged **once** (idempotent if called again internally):
+- **When** the wager leaves **Open** via **`resolve`**, **`retract`**, or **`expire`**, fees are charged **once**, on that single transition out of Open:
 
   \[
   \texttt{totalFees} = \left\lfloor \frac{\texttt{totalPot} \times \texttt{totalFeeBps}}{10\_000} \right\rfloor
@@ -45,35 +46,37 @@ Those slices are credited to **`feeBalances[recipient]`** and withdrawn with **`
 
 - Each address may call **`claim()` at most once** (`hasClaimed`).
 - The contract transfers **`paid`** collateral to `msg.sender` as computed below.
+- A claim that would pay **0** reverts with `NothingToClaim` and leaves `hasClaimed` false. This covers a losing ticket, a stake so small it floors to nothing, and a 100% fee.
+- All products are computed at full precision (512-bit `mulDiv`), so the floors below are exact and no intermediate value can overflow, whatever the token's supply (ADR-0020).
 
 ---
 
-## Part A — v1 (`ParamutuelWager`)
+## Part A — Single winner (`PayoffPolicy.SINGLE_WINNER`)
 
 ### Bets
 
-- Each bet is on a single **outcome index** \(i\) in `0 … outcomesCount-1`.
-- **`bets[bettor][i]`** — that bettor’s total stake on outcome \(i\).
-- **`userTotalBet[bettor]`** — sum of `bets[bettor][*]` across all outcomes.
+- Each bet is on a single outcome \(i\) in `0 … outcomesCount-1`, placed as the one-bit ticket mask `1 << i`.
+- **`betsByMask[bettor][1 << i]`** — that bettor's total stake on outcome \(i\).
+- **`userTotalBet[bettor]`** — sum of that bettor's stakes across all outcomes.
 
 ### Resolved (single winner)
 
-The resolver calls **`resolve(outcomeIndex)`** with one winning index **`w`**.
+The resolver calls **`resolve(1 << w)`** for winning outcome **`w`**. Note that the argument is a mask, not an index: outcome 0 is `1`, outcome 1 is `2`.
 
-- **`totalWinningStake`** \(=\) **`outcomeTotals[w]`** — total stake on the winning outcome (fixed at resolve time).
+- **`payoutDenominator`** \(=\) **`ticketPoolByMask[1 << w]`** — total stake on the winning outcome (fixed at resolve time).
 
 **Bettor payout** (state **Resolved**):
 
-- Let **`userWinStake = bets[bettor][w]`**.
+- Let **`userWinStake = betsByMask[bettor][1 << w]`**.
 - If **`userWinStake == 0`**, `claim` reverts (nothing to claim as a winner).
 
 \[
-\texttt{paid} = \left\lfloor \frac{\texttt{userWinStake} \times \texttt{netPot}}{\texttt{totalWinningStake}} \right\rfloor
+\texttt{paid} = \left\lfloor \frac{\texttt{userWinStake} \times \texttt{netPot}}{\texttt{payoutDenominator}} \right\rfloor
 \]
 
 **Interpretation:** all winning stakes share **`netPot`** in proportion to how much each bettor placed on the winning outcome. Losers forfeit their stake to that pool (minus fees).
 
-**Edge case:** If **`totalWinningStake == 0`** (nobody staked on `w`), `claim` for a “winner” path reverts; the economic situation is degenerate and should be avoided operationally.
+**Edge case:** `resolve` reverts with `NoWinningStake` if nobody staked on `w`. The resolver must then `retract`, or let the wager expire, which refunds everyone minus fees.
 
 ### Retracted or expired (refund)
 
@@ -122,7 +125,7 @@ Let **`overlap = T & W`** (bits in both ticket and truth). Define **`popcount(x)
 
 **Disambiguating “all of”:** Marketing phrase **“all of these outcomes”** usually means **EXACT_SET** — the bettor’s ticket must match **`W` exactly** (`T == W`). That is **stricter** than **“every option I picked is among the true ones”** (**`T ⊆ W`**): e.g. **`T = {A}`** and **`W = {A,B}`** satisfies **`T ⊆ W`** but **fails** **EXACT_SET**.
 
-**Subset-of-truth (`T ⊆ W`) without a new policy:** The baseline v2 enum does **not** include **`ALL_PICKS_TRUE`**-style semantics. Practical options:
+**Subset-of-truth (`T ⊆ W`) without a new policy:** The policy enum does **not** include **`ALL_PICKS_TRUE`**-style semantics. Practical options:
 
 1. **Uniform ticket size:** If **every** stake uses a mask with **exactly `k`** bits (enforce in UI / market rules), then **`AT_LEAST_K`** with **`policyParam = k`** matches **`T ⊆ W`** for those tickets: **`popcount(T & W) ≥ k`** with **`popcount(T) = k`** iff every bit of **`T`** appears in **`W`**.
 2. **Variable ticket sizes:** A **single** global **`k`** cannot express per-ticket subset semantics for all masks. Split markets by ticket shape, or specify a **new `PayoffPolicy`** in a follow-up ADR.
@@ -170,7 +173,7 @@ Summed over all of the bettor’s tickets. If the sum is **0** (e.g. only losing
 
 **Interpretation:**
 
-- **ANY_OF** / **EXACT_SET** / **AT_LEAST_K** / **SINGLE_WINNER**: same idea as v1 — **`netPot`** is split among **winning stakes** in proportion to each **winning ticket’s pool share**; each bettor’s share is proportional to their stake on each winning mask.
+- **ANY_OF** / **EXACT_SET** / **AT_LEAST_K** / **SINGLE_WINNER**: same idea as Part A — **`netPot`** is split among **winning stakes** in proportion to each **winning ticket’s pool share**; each bettor’s share is proportional to their stake on each winning mask.
 - **WEIGHTED_OVERLAP**: larger **overlap** between **`T`** and **`W`** multiplies that ticket’s contribution to the denominator and to the bettor’s claim (partial credit).
 
 ### Worked examples
@@ -249,7 +252,7 @@ Under **EXACT_SET**, a ticket **`T`** wins **only if** **`T == W`**. Overlap is 
 
 **`totalPot`** = 60 + 100 + 140 + 40 = **340**; with **no fees**, **`netPot` = 340**.
 
-Only one **distinct winning mask** appears: **`5`**. Its pool is **`ticketPoolTotal[5]`** = 60 + 40 = **100**, so **`totalWinningUnits` = 100**. Losers’ stakes remain in **`netPot`** but do **not** enter the denominator — they are effectively forfeit to the winning side of the pool (same parimutuel idea as v1 losers funding winners).
+Only one **distinct winning mask** appears: **`5`**. Its pool is **`ticketPoolByMask[5]`** = 60 + 40 = **100**, so **`totalWinningUnits` = 100**. Losers’ stakes remain in **`netPot`** but do **not** enter the denominator — they are effectively forfeit to the winning side of the pool (same parimutuel idea as v1 losers funding winners).
 
 **Claims** (each winning line: \(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\)):
 
@@ -333,7 +336,7 @@ Regression: **`testWeightedOverlap_documentationWorkedExample_fourOutcomes`** in
 
 ### Retracted or expired (refund)
 
-Identical formula to **v1**:
+Identical formula to Part A:
 
 \[
 \texttt{paid} = \left\lfloor \frac{\texttt{userTotalBet} \times \texttt{netPot}}{\texttt{totalPot}} \right\rfloor
@@ -363,7 +366,7 @@ The resolver calls **`resolve(winningAnswer)`** with **one** UTF-8 string. Its `
 
 ### Payout
 
-Identical to **v1** single-winner parimutuel, with `answerId` pools replacing outcome-index pools:
+Identical to Part A, with `answerId` pools replacing outcome pools:
 
 - `totalWinningStake` = sum of all stakes whose `answerId` matches the resolver's.
 - For each winning bettor with stake `userWinStake` on the winning id:
@@ -425,7 +428,7 @@ where `userTotalBet` is the sum of **all** of a bettor's stakes across **all** o
 
 | Final state | Enumerated (`ParamutuelWagerV3`, `MODE()==0`) | Freeform (`ParamutuelWagerV3`, `MODE()==1`) |
 |-------------|-----------------------------------------------|----------------------------------------------|
-| **Resolved** | Share **`netPot`** by **policy-specific** winning tickets and (for weighted) overlap scores. `SINGLE_WINNER` recovers the legacy v1 single-index split. | Share **`netPot`** among stakers of the winning `answerId` (single winning string, exact UTF-8 bytes). |
+| **Resolved** | Share **`netPot`** by **policy-specific** winning tickets and (for weighted) overlap scores. `SINGLE_WINNER` is the simple split of Part A. | Share **`netPot`** among stakers of the winning `answerId` (single winning string, exact UTF-8 bytes). |
 | **Retracted / Expired** | Pro-rata **`netPot`** by **`userTotalBet / totalPot`**. | Same. |
 | **Fees** | Once at finalize; split by **bps**; last recipient gets remainder. | Same. |
 

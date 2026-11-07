@@ -3,6 +3,7 @@
 
   const ethers = globalThis.ethers;
   const CONFIG_URL = "config/deployments.json";
+  const COLLATERAL_ALLOWLIST_URL = "config/collateral-allowlist.json";
   const FACTORY_ABI_URL = "dapp/abi/ParamutuelFactoryV3.json";
 
   const CHAIN_NAMES = {
@@ -33,6 +34,9 @@
   }
 
   let deployments = null;
+  /** Curated collateral list (ADR-0018); null if unavailable, which disables the consent check. */
+  let collateralAllowlist = null;
+  let activeNetworkKey = null;
   let expectedChainId = null;
   let factoryAddress = null;
   let factoryAbi = null;
@@ -67,6 +71,13 @@
       : String(data?.defaultNetwork || "baseSepolia").trim();
     const net = PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey] || {};
     factoryAddress = String(net.factoryAddress || "").trim() || null;
+    activeNetworkKey = netKey;
+    try {
+      collateralAllowlist = await loadJson(COLLATERAL_ALLOWLIST_URL);
+    } catch (e) {
+      console.warn("Collateral allowlist unavailable:", e);
+      collateralAllowlist = null;
+    }
     const cid = net.chainId;
     expectedChainId = typeof cid === "number" ? cid : Number(cid);
   }
@@ -281,14 +292,31 @@
       throw new Error("Valid collateral token address required.");
     }
 
+    // Empty means "I resolve this myself". A non-empty value must be valid: quietly falling back on a
+    // typo would hand resolution to the proposer when the user named someone else (ADR-0001).
     const resolverRaw = ($("proposeResolver")?.value || "").trim();
-    const resolver = resolverRaw && ethers.isAddress(resolverRaw) ? resolverRaw : ethers.ZeroAddress;
+    if (resolverRaw && !ethers.isAddress(resolverRaw)) {
+      throw new Error("Resolver is not a valid address. Fix it, or leave it empty to resolve this wager yourself.");
+    }
+    const resolver = resolverRaw || ethers.ZeroAddress;
 
     // Check chain
     const net = await provider.getNetwork();
     const cid = Number(net.chainId);
     if (cid !== expectedChainId) {
       throw new Error(`Switch wallet to ${CHAIN_NAMES[expectedChainId] || expectedChainId}. Currently on ${CHAIN_NAMES[cid] || cid}.`);
+    }
+
+    // A token address from the wrong network creates a wager nobody can ever bet on.
+    if ((await provider.getCode(collateralToken)) === "0x") {
+      throw new Error("That collateral address has no contract on this network.");
+    }
+    // ADR-0018: any token remains possible, but an unlisted one takes an explicit choice.
+    const listed = (collateralAllowlist?.[activeNetworkKey]?.tokens || []).some(
+      (t) => String(t.address).toLowerCase() === collateralToken.toLowerCase()
+    );
+    if (collateralAllowlist && !listed && !$("proposeUnlistedAck")?.checked) {
+      throw new Error("This token is not on the curated list. Tick the box under the token field to use it anyway.");
     }
 
     const nowSec = Math.floor(Date.now() / 1000);
@@ -388,6 +416,8 @@
     $("proposeCollateral")?.addEventListener("change", () => {
       const custom = $("proposeCollateralCustom");
       if (custom) custom.hidden = $("proposeCollateral").value !== "custom";
+      const ack = $("proposeUnlistedAckRow");
+      if (ack) ack.hidden = $("proposeCollateral").value !== "custom";
     });
 
     // Wallet

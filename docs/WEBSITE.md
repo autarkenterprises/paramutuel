@@ -13,7 +13,7 @@ The static site under `site/` is a **thin shell**: marketing copy, a testnet/mai
 | `/resonance-propose.html` | Resonance Exchange skin only: **`data-propose-profile="resonance"`** in `propose-templates.js` (main `propose-a-wager.html` uses **`default`**) — same `propose-wager.js` engine |
 | `/place-a-bet.html` | Betting entry — indexer search + CTA into wallet staking (`bet.html`) |
 | `/app.html` | Full dApp embedded via iframe |
-| `/bet.html` | Wallet staking: **v1/v2** use `placeBet` / `placeBets`; **freeform** uses `placeBet(string,uint256)` with a typed answer. ABI from indexer `protocol_version`. Reached from Place a Bet, feed, Explorer, or `?wager=` |
+| `/bet.html` | Wallet staking: **enumerated** uses `placeBets` with single-outcome masks; **freeform** uses `placeBet(string,uint256)` with a typed answer or one picked from the staked answers, which is sent byte-exact. ABI from indexer `protocol_version`. Reached from Place a Bet, feed, Explorer, or `?wager=` |
 | `/explorer.html` | Explorer UI with optional indexer URL override |
 | `/resonance-explorer.html` | Resonance Exchange explorer — embedded `explorer/index.html?brand=resonance` only (no indexer URL row; listings skin + `resonance-bet.html` links in `service/explorer/static/app.js`) |
 | `/operator.html` | **Operator hub** — indexer links, embedded explorer, outbound URLs for other services |

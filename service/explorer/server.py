@@ -18,7 +18,7 @@ import argparse
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib import request
+from urllib import error, request
 from urllib.parse import urlparse
 
 
@@ -73,6 +73,16 @@ class Handler(BaseHTTPRequestHandler):
                 with request.urlopen(target, timeout=10) as resp:
                     body = resp.read()
                 self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except error.HTTPError as e:
+                # The indexer answered: pass that on. A missing wager must stay a 404 rather than
+                # look like the indexer being down.
+                body = e.read()
+                self.send_response(e.code)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()

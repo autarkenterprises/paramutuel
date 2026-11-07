@@ -50,6 +50,7 @@ const FACTORY_ABI_FALLBACK = "../out/ParamutuelFactoryV3.sol/ParamutuelFactoryV3
 const WAGER_ABI_URL = "abi/ParamutuelWagerV3.json";
 const WAGER_ABI_FALLBACK = "../out/ParamutuelWagerV3.sol/ParamutuelWagerV3.json";
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
+const COLLATERAL_ALLOWLIST_URL = "../config/collateral-allowlist.json";
 const Logic = globalThis.ParamutuelLogic;
 
 let provider;
@@ -73,6 +74,8 @@ let wagerContract; // last-created wager
 let currentChainId = null;
 let walletListenersAttached = false;
 let deploymentsConfig = null;
+/** Curated collateral list (ADR-0018). Null when unavailable, which disables the opt-in check. */
+let collateralAllowlist = null;
 /** When embedded from site/app.html with ?siteNetwork=baseMainnet|baseSepolia */
 let siteDeploymentNetworkKey = null;
 
@@ -339,10 +342,9 @@ function ensureDefaultAbsoluteResolutionClose() {
   $("resolutionCloseAt").value = formatDateTimeLocal(closeDate);
 }
 
-function parseAmount(amountNumber, decimals) {
-  // amountNumber is entered in whole tokens (e.g. "10" -> 10 tokens)
-  const amountStr = String(amountNumber);
-  return ethers.parseUnits(amountStr, decimals);
+function parseAmount(amountText, decimals) {
+  // Entered in whole tokens ("10" is 10 tokens). Stays text throughout: see Logic.parseHumanAmount.
+  return ethers.parseUnits(Logic.parseHumanAmount(amountText), decimals);
 }
 
 function formatRatio(numerator, denominator, precision) {
@@ -387,8 +389,10 @@ async function updateOddsPreviewFreeform() {
     clearOddsPreview("Answer exceeds 1024 UTF-8 bytes (on-chain limit).");
     return;
   }
-  const amountNumber = Number($("betAmount").value);
-  if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+  const amountText = $("betAmount").value;
+  try {
+    Logic.parseHumanAmount(amountText);
+  } catch (_) {
     clearOddsPreview("Enter a positive bet amount to preview payout.");
     return;
   }
@@ -402,7 +406,7 @@ async function updateOddsPreviewFreeform() {
   const answerId = Logic.freeformV3AnswerId(answer);
   const collateralTokenAddress = await wagerContract.collateralToken();
   const decimals = await resolveBettingDecimals(collateralTokenAddress);
-  const betAmount = parseAmount(amountNumber, decimals);
+  const betAmount = parseAmount(amountText, decimals);
 
   const poolReader = wagerContract.ticketPoolByAnswerId(answerId);
   const [totalPot, totalFeeBps, pool] = await Promise.all([
@@ -432,8 +436,10 @@ async function updateOddsPreviewFreeform() {
 }
 
 async function updateOddsPreviewV2() {
-  const amountNumber = Number($("betAmount").value);
-  if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+  const amountText = $("betAmount").value;
+  try {
+    Logic.parseHumanAmount(amountText);
+  } catch (_) {
     clearOddsPreview("Enter a positive bet amount to preview payout.");
     return;
   }
@@ -461,7 +467,7 @@ async function updateOddsPreviewV2() {
 
   const collateralTokenAddress = await wagerContract.collateralToken();
   const decimals = await resolveBettingDecimals(collateralTokenAddress);
-  const betAmount = parseAmount(amountNumber, decimals);
+  const betAmount = parseAmount(amountText, decimals);
 
   const [totalPot, totalFeeBps, pool] = await Promise.all([
     wagerContract.totalPot(),
@@ -746,6 +752,12 @@ async function loadDeploymentsConfig() {
   } catch (_) {
     // Optional for local/dev runs; manual factory entry still works.
   }
+  try {
+    const response = await fetch(COLLATERAL_ALLOWLIST_URL);
+    if (response.ok) collateralAllowlist = await response.json();
+  } catch (_) {
+    // Optional: without the list no token is called unlisted.
+  }
 }
 
 async function loadAbi() {
@@ -788,14 +800,27 @@ async function connectWallet() {
       provider = new ethers.BrowserProvider(next);
       signer = await provider.getSigner();
       await refreshConnectedNetwork();
-      $("walletStatus").textContent = "Network changed. Review factory/token before transacting.";
+      // The loaded wager lives on one chain. Drop it, or its next transaction would be sent to the
+      // same address on a different network.
+      wagerContract = undefined;
+      $("walletStatus").textContent = "Network changed. Reload your wager and review factory/token before transacting.";
       await tryDetectDecimalsFromCollateralField();
     });
-    eip1193.on("accountsChanged", async () => {
+    eip1193.on("accountsChanged", async (accounts) => {
       if (!provider) return;
+      if (!accounts || accounts.length === 0) {
+        signer = undefined;
+        userAddress = undefined;
+        $("walletAddr").textContent = "";
+        $("walletStatus").textContent = "Wallet disconnected.";
+        return;
+      }
       signer = await provider.getSigner();
       userAddress = await signer.getAddress();
       $("walletAddr").textContent = userAddress;
+      // A contract instance keeps the signer it was made with, so without this the page would show
+      // the new account while transactions were still requested from the old one.
+      if (wagerContract) wagerContract = wagerContract.connect(signer);
     });
     walletListenersAttached = true;
   }
@@ -868,7 +893,97 @@ async function setActiveWager(wagerAddress) {
   }
 
   syncBettingAndResolutionLabels();
+  await showWagerWarnings();
   await updateOddsPreview();
+}
+
+/**
+ * Trust assumptions a bettor should see before staking: no-time-limit wagers depend on a closer's key
+ * (ADR-0020 W11), and a token outside the curated list may be misleading or unsafe (ADR-0018).
+ */
+async function showWagerWarnings() {
+  const el = $("activeWagerWarnings");
+  if (!el) return;
+  const warnings = [];
+  const [closeTime, window, closedByAuthority, windowClosed, token] = await Promise.all([
+    wagerContract.bettingCloseTime(),
+    wagerContract.resolutionWindow(),
+    wagerContract.bettingClosedByAuthority(),
+    wagerContract.resolutionWindowClosedByAuthority(),
+    wagerContract.collateralToken(),
+  ]);
+  if (closeTime === 0n && !closedByAuthority) {
+    warnings.push(
+      "No betting deadline: only the betting closer can end betting. If that key is lost, stakes are locked."
+    );
+  }
+  if (window === 0n && !windowClosed) {
+    warnings.push(
+      "No resolution deadline: only the resolver or the resolution closer can move this wager on. If both keys are lost, stakes are locked."
+    );
+  }
+  if (collateralAllowlist && !isListedCollateral(token)) {
+    warnings.push(
+      "This collateral token is not on the curated list. Its name may be misleading, and fee-on-transfer or rebasing tokens can leave the last claimants unpaid."
+    );
+  }
+  el.textContent = warnings.join(" ");
+  el.hidden = warnings.length === 0;
+}
+
+function isListedCollateral(tokenAddress) {
+  const key = deploymentConfigKeyForChain(currentChainId);
+  const tokens = (collateralAllowlist && collateralAllowlist[key] && collateralAllowlist[key].tokens) || [];
+  const wanted = String(tokenAddress).toLowerCase();
+  return tokens.some((t) => String(t.address).toLowerCase() === wanted);
+}
+
+/** Fails before the user pays for an approve that the bet would then waste. */
+async function assertBettingOpenOnChain() {
+  const [state, closedByAuthority, closeTime, block] = await Promise.all([
+    wagerContract.state(),
+    wagerContract.bettingClosedByAuthority(),
+    wagerContract.bettingCloseTime(),
+    provider.getBlock("latest"),
+  ]);
+  if (state !== 0n) throw new Error("This wager is finalized; it no longer accepts bets.");
+  if (closedByAuthority) throw new Error("Betting was closed by the betting closer.");
+  if (closeTime !== 0n && BigInt(block.timestamp) >= closeTime) {
+    throw new Error("Betting has closed for this wager.");
+  }
+}
+
+/**
+ * `minNewTicketStake()` is absent on wagers from factories deployed before ADR-0020. Reverts mean "no
+ * minimum" there; the contract enforces it where it exists, so this only saves a wasted approve.
+ */
+async function assertMeetsMinNewTicketStake(poolTotal, amount) {
+  let minStake = 0n;
+  try {
+    minStake = await wagerContract.minNewTicketStake();
+  } catch (_) {
+    return;
+  }
+  if (minStake > 0n && poolTotal === 0n && amount < minStake) {
+    throw new Error(`Opening a new ticket on this wager needs at least ${minStake} raw token units.`);
+  }
+}
+
+/** Show the exact bytes a freeform resolve would send: they must match a staked answer precisely. */
+function updateWinningAnswerBytes() {
+  const el = $("winningAnswerBytes");
+  if (!el) return;
+  if (activeWagerProtocol !== "v3_freeform" || !$("winningOutcomeIndex").value) {
+    el.textContent = "";
+    el.hidden = true;
+    return;
+  }
+  const value = $("winningOutcomeIndex").value;
+  const bytes = ethers.toUtf8Bytes(value);
+  const hex = ethers.hexlify(bytes);
+  const note = value !== value.trim() ? " Includes leading or trailing space, which counts." : "";
+  el.textContent = `Will send ${bytes.length} bytes: ${hex.length > 90 ? `${hex.slice(0, 90)}…` : hex}.${note} Answer id: ${Logic.freeformV3AnswerId(value)}`;
+  el.hidden = false;
 }
 
 function syncBettingAndResolutionLabels() {
@@ -893,6 +1008,7 @@ function syncBettingAndResolutionLabels() {
   if (winPh) {
     winPh.placeholder = ff ? "exact winning text" : "e.g. 0,2 — exact true set";
   }
+  updateWinningAnswerBytes();
 }
 
 async function ensureWagerForPlannedAction(actionName) {
@@ -996,8 +1112,16 @@ async function createWager() {
   if (extraFeeRecipients.length !== extraFeeBps.length) {
     throw new Error("extraFeeRecipients and extraFeeBps length mismatch.");
   }
+  // ADR-0018: the protocol takes any token, and this surface still allows it, but only knowingly.
+  await ensureContractExistsOnCurrentNetwork(collateralToken, "Collateral token");
+  if (collateralAllowlist && !isListedCollateral(collateralToken) && !$("allowUnlistedCollateral").checked) {
+    throw new Error(
+      "This token is not on the curated list. Tick \"Use an unlisted token\" to proceed knowingly: fee-on-transfer or rebasing tokens can leave the last claimants unpaid."
+    );
+  }
+
   const seedParsed = protocolIsFreeformLike(protocol)
-    ? { outcomeIndices: [], amountNumbers: [] }
+    ? { outcomeIndices: [], amountStrings: [] }
     : Logic.parseMultiBetInputs(seedOutcomeIndicesCsv, seedAmountsCsv, true);
   if (!protocolIsFreeformLike(protocol)) {
     for (const idx of seedParsed.outcomeIndices) {
@@ -1086,7 +1210,7 @@ async function createWager() {
   let seedTotalAmount = 0n;
   if (seedParsed.outcomeIndices.length > 0) {
     const decimals = await resolveBettingDecimals(collateralToken);
-    seedAmountsRaw = seedParsed.amountNumbers.map((n) => parseAmount(n, decimals));
+    seedAmountsRaw = seedParsed.amountStrings.map((text) => parseAmount(text, decimals));
     for (const amount of seedAmountsRaw) seedTotalAmount += amount;
   }
 
@@ -1098,10 +1222,17 @@ async function createWager() {
     await approveTx.wait();
   }
 
+  // Optional minimum to open a new ticket (ADR-0020). Older factories lack the overload that takes
+  // it, so it is only sent when set.
+  const minStakeText = $("minNewTicketStake").value.trim();
+  const minNewTicketStake = minStakeText
+    ? parseAmount(minStakeText, await resolveBettingDecimals(collateralToken))
+    : 0n;
+
   $("createStatus").textContent = "Submitting create wager transaction...";
   let receipt;
   if (protocolIsFreeformLike(protocol)) {
-    const tx = await factory.createFreeformWager(
+    const freeformArgs = [
       collateralToken,
       proposition,
       BigInt(closeTime),
@@ -1110,8 +1241,12 @@ async function createWager() {
       bettingCloserArg,
       resolutionCloserArg,
       extraFeeRecipients,
-      extraFeeBps
-    );
+      extraFeeBps,
+    ];
+    const tx =
+      minNewTicketStake > 0n
+        ? await factory.createFreeformWager(...freeformArgs, minNewTicketStake)
+        : await factory.createFreeformWager(...freeformArgs);
     receipt = await tx.wait();
   } else if (protocolIsV2Like(protocol)) {
     const payoffPolicy = Number($("payoffPolicy").value);
@@ -1147,10 +1282,14 @@ async function createWager() {
       extraFeeRecipients,
       extraFeeBps,
     ];
-    const tx =
-      seedMasks.length > 0
-        ? await factory.createEnumeratedWager(...commonArgs, seedMasks, seedAmountsRaw)
-        : await factory.createEnumeratedWager(...commonArgs);
+    let tx;
+    if (minNewTicketStake > 0n) {
+      tx = await factory.createEnumeratedWager(...commonArgs, seedMasks, seedAmountsRaw, minNewTicketStake);
+    } else if (seedMasks.length > 0) {
+      tx = await factory.createEnumeratedWager(...commonArgs, seedMasks, seedAmountsRaw);
+    } else {
+      tx = await factory.createEnumeratedWager(...commonArgs);
+    }
     receipt = await tx.wait();
   } else {
     throw new Error("Invalid market type selected.");
@@ -1182,7 +1321,7 @@ async function createWager() {
 async function placeBet() {
   if (!wagerContract) throw new Error("Create a wager first.");
 
-  const amountNumber = Number($("betAmount").value);
+  const amountText = $("betAmount").value;
   const numOptions = Number(await wagerContract.outcomesCount());
 
   let placeArg;
@@ -1212,7 +1351,14 @@ async function placeBet() {
   ];
   const token = new ethers.Contract(collateralTokenAddress, erc20Abi, signer);
 
-  const amount = parseAmount(amountNumber, decimals);
+  const amount = parseAmount(amountText, decimals);
+
+  await assertBettingOpenOnChain();
+  const poolTotal =
+    activeWagerProtocol === "v3_freeform"
+      ? await wagerContract.ticketPoolByAnswerId(Logic.freeformV3AnswerId(placeArg))
+      : await wagerContract.ticketPoolByMask(placeArg);
+  await assertMeetsMinNewTicketStake(poolTotal, amount);
 
   $("betStatus").textContent = "Approving collateral...";
   const approveTx = await token.approve(wagerContract.target, amount);
@@ -1246,9 +1392,11 @@ async function placeBets() {
   ];
   const token = new ethers.Contract(collateralTokenAddress, erc20Abi, signer);
 
-  const amounts = parsed.amountNumbers.map((n) => parseAmount(n, decimals));
+  const amounts = parsed.amountStrings.map((text) => parseAmount(text, decimals));
   let totalAmount = 0n;
   for (const amount of amounts) totalAmount += amount;
+
+  await assertBettingOpenOnChain();
 
   $("betStatus").textContent = "Approving collateral for batch bet...";
   const approveTx = await token.approve(wagerContract.target, totalAmount);
@@ -1266,7 +1414,9 @@ async function resolveWager() {
   let winningArg;
   const { targetWager } = await ensureWagerForPlannedAction("resolve");
   if (activeWagerProtocol === "v3_freeform") {
-    const ans = $("winningOutcomeIndex").value.trim();
+    // Byte-exact, never trimmed: V3 hashes these bytes to find the winning pool, so a stake on
+    // "Paris " can only be resolved by sending exactly "Paris " (ADR-0009 §5).
+    const ans = $("winningOutcomeIndex").value;
     if (!ans) throw new Error("Enter the exact winning answer string (UTF-8 bytes must match a staked answer).");
     if (ethers.toUtf8Bytes(ans).length > 1024) throw new Error("Answer exceeds 1024 UTF-8 bytes.");
     winningArg = ans;
@@ -1411,6 +1561,7 @@ async function main() {
   $("betOutcomeIndex").addEventListener("input", () => {
     updateOddsPreview();
   });
+  $("winningOutcomeIndex").addEventListener("input", updateWinningAnswerBytes);
   $("betAmount").addEventListener("input", () => {
     updateOddsPreview();
   });

@@ -1,0 +1,51 @@
+name: Fast test suite
+
+# The whole fast suite (script/test-fast.sh) plus the local-chain end-to-end test, which needs no
+# secrets. Contracts, services and clients had no CI at all before this (ADR-0020 D6).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+jobs:
+  fast-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python test dependencies
+        run: python3 -m pip install -q "mcp>=1.0.0,<2" "httpx>=0.25.0" "eth-abi>=5.0.0" "eth-hash[pycryptodome]"
+
+      # The dApp's node tests import ethers; `dapp/node_modules` is not committed.
+      - name: Install dApp test dependencies
+        run: npm ci --prefix dapp
+
+      - name: Fast suite
+        run: ./script/test-fast.sh
+
+      - name: Local-chain end-to-end
+        run: ./script/test-local-e2e.sh
+
+      # This wheel could not be built at all until ADR-0020 and nothing noticed, so build and load it.
+      - name: MCP wheel builds and loads outside the repo
+        run: |
+          python3 -m pip install -q hatchling
+          (cd mcp_server && python3 -m hatchling build -t wheel -d "$RUNNER_TEMP/mcp-dist")
+          python3 -m pip install -q --no-deps "$RUNNER_TEMP"/mcp-dist/*.whl
+          cd "$RUNNER_TEMP" && python3 -c "import mcp_server.server as s; assert s.FACTORY_ADDRESS.startswith('0x'), s.FACTORY_ADDRESS; print(s.FACTORY_ADDRESS)"

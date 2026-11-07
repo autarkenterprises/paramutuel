@@ -39,6 +39,19 @@ class RunCastSendTests(unittest.TestCase):
         self.assertFalse(r.ok)
         self.assertIn("BettingNotClosed", r.stderr)
 
+    def test_log_noise_after_the_receipt_does_not_hide_success(self):
+        """Seen against a real node: cast's RPC poller can log to stdout after printing the receipt.
+        Parsing the whole of stdout would report a mined transaction as failed."""
+        noise = "\x1b[2m2026-11-07T07:06:37Z\x1b[0m \x1b[31mERROR\x1b[0m alloy_rpc_client::poller: failed to poll\n"
+        r = self._run(FakeProc(stdout=receipt("0x1", "0xabc") + "\n" + noise))
+        self.assertTrue(r.ok)
+        self.assertEqual(r.tx_hash, "0xabc")
+
+    def test_log_noise_does_not_hide_a_revert(self):
+        noise = "ERROR alloy_rpc_client::poller: failed to poll\n"
+        self.assertFalse(self._run(FakeProc(stdout=receipt("0x0") + "\n" + noise)).ok)
+        self.assertFalse(self._run(FakeProc(stdout=noise + receipt("0x0"))).ok)
+
     def test_output_that_is_not_a_receipt_is_a_failure(self):
         """`--help` exits 0 with text output; that must never read as success."""
         self.assertFalse(self._run(FakeProc(stdout="Sign and publish a transaction")).ok)

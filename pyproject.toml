@@ -41,7 +41,7 @@ Homepage = "https://github.com/autarkenterprises/paramutuel"
 Repository = "https://github.com/autarkenterprises/paramutuel"
 Documentation = "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT.md"
 "Distribution & rollout" = "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT-DISTRIBUTION.md"
-"Agent index" = "https://github.com/autarkenterprises/paramutuel/blob/master/AGENTS.md"
+"Agent index" = "https://github.com/autarkenterprises/paramutuel/blob/master/docs/MACHINE.md"
 "Subagent manifest" = "https://raw.githubusercontent.com/autarkenterprises/paramutuel/master/agents/subagent-manifest.json"
 
 [project.scripts]

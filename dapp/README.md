@@ -1,6 +1,6 @@
 ## Minimal dApp (MVP)
 
-**Paramutuel** is permissionless, on-chain prop betting in any ERC-20, with configurable resolution and roles per wager—no centralized approval of markets or payouts. This dApp is the **self-custody** UI for that protocol: you connect a wallet and interact with contracts directly.
+**Paramutuel** is permissionless, on-chain prop betting in any standard ERC-20, with configurable resolution and roles per wager—no centralized approval of markets or payouts. This dApp is the **self-custody** UI for that protocol: you connect a wallet and interact with contracts directly.
 
 This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from committed files in `dapp/abi/`, with a fallback to Foundry build artifacts in `out/`.
 
@@ -71,9 +71,11 @@ In the dApp UI, paste:
 - Time fields in the create form support both relative and absolute UX. On submit, the dApp sends an absolute unix `bettingCloseTime` either from `now + offset` (relative mode) or from your selected local date/time (absolute mode).
 - Resolution timing supports both relative and absolute UX. In absolute mode, the dApp converts your selected resolution-close timestamp into `resolutionWindow` seconds after the effective betting close.
 - The dApp enforces that the computed resolution window (including absolute-mode conversion) is at least the factory `minResolutionWindow`.
+- A token outside `config/collateral-allowlist.json` needs an explicit opt-in, because fee-on-transfer and rebasing tokens can leave the last claimants unpaid (ADR-0018). The token address must also have code on the connected network.
+- Freeform resolve sends the winning answer byte-exact and shows those bytes first; bets on typed answers trim surrounding whitespace as a typing aid.
 - Leaving closer fields empty creates time-only finite windows (no authority pre-emption) when finite windows are configured.
 - If you enable a no-max window, the dApp requires the matching closer address to prevent creating an uncloseable wager.
-- Seeded create flow automatically performs token `approve(factory, totalSeedAmount)` before submitting `createWager`.
+- Seeded create flow automatically performs token `approve(factory, totalSeedAmount)` before submitting the create transaction.
 - The contract compares against on-chain `block.timestamp`. If transaction inclusion is delayed, the effective remaining window can be shorter than expected; very tight windows can fail factory minimum-window checks at execution time.
 - The dApp attempts to read factory `minBettingWindow()` and `minResolutionWindow()` and warns if your inputs violate them.
 - Seeding and batch bets support multi-outcome entries with one approval + one transaction path.

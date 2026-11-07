@@ -1635,3 +1635,11 @@ footer {
     padding: 24px 16px;
   }
 }
+
+/* Trust assumptions a bettor must not miss (ADR-0018, ADR-0020). */
+.bet-warning {
+  border-left: 3px solid #b45309;
+  padding: 8px 12px;
+  margin: 12px 0;
+  color: #b45309;
+}

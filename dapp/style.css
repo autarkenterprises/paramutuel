@@ -107,3 +107,11 @@ button:disabled {
   margin-bottom: 8px;
 }
 
+
+/* Trust assumptions a user must not miss (ADR-0018, ADR-0020). */
+.warn {
+  border-left: 3px solid #b45309;
+  padding: 6px 10px;
+  margin: 8px 0;
+  color: #b45309;
+}

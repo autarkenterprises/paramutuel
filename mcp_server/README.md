@@ -2,22 +2,25 @@
 
 MCP server for the [Paramutuel](https://github.com/autarkenterprises/paramutuel) on-chain parimutuel betting protocol on Base.
 
-Exposes 20+ tools that let LLM agents discover wagers, analyze odds, and prepare transactions — no private keys required on the server side.
+Exposes 21 tools that let LLM agents discover wagers, analyze odds, and prepare transactions — no private keys required on the server side.
 
 **Adoption complement:** the repo ships a **bet scout subagent** (`agents/paramutuel_bettor`, JSON stdin/stdout) with a **machine manifest** at `agents/subagent-manifest.json` and human index [`AGENTS.md`](../AGENTS.md). See [`docs/BET-AGENT.md`](../docs/BET-AGENT.md); use MCP for final `quote_place_bet` (enumerated) or `encode_place_bet_freeform` (freeform, ADR-0010) / calldata right before signing.
 
 ## Quick start
 
+The PyPI package is **not yet published** (see `docs/TASKS.md`), so run it from the repo:
+
 ```bash
-pip install paramutuel-mcp
-paramutuel-mcp
+pip install "mcp<2" httpx eth-abi "eth-hash[pycryptodome]"
+python -m mcp_server
 ```
 
-Or run from the repo:
+Or build and install the wheel:
 
 ```bash
-pip install -e mcp_server/
-python -m mcp_server
+(cd mcp_server && pip install hatchling && python -m hatchling build -t wheel -d dist)
+pip install mcp_server/dist/*.whl
+paramutuel-mcp
 ```
 
 ### Claude Desktop / Claude Code
@@ -87,11 +90,11 @@ All write tools return ABI-encoded calldata. The caller signs and submits the tr
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `INDEXER_URL` | From `config/deployments.json` or `http://127.0.0.1:8090` | Indexer API base URL |
+| `INDEXER_URL` | From the deployments config, or `http://127.0.0.1:8090` | Indexer API base URL |
 | `FACTORY_ADDRESS` | From `config/deployments.json` `factoryAddress` | ParamutuelFactoryV3 contract address (ADR-0010 unified factory for enumerated + freeform wagers) |
 | `CHAIN_ID` | From `config/deployments.json` or `84532` | Target chain ID |
 
-When installed as a pip package, the server bundles its own ABI files and works standalone. When run from the repo, it also checks `dapp/abi/` and `out/` for ABIs.
+When installed as a wheel, the server bundles its ABIs and a copy of the deployments config from build time, and works standalone. When run from the repo, it uses the live `config/deployments.json`.
 
 ## Protocol
 
@@ -101,6 +104,7 @@ Paramutuel is a permissionless, immutable parimutuel betting protocol on Base (E
 - **Bettors** deposit into outcome pools; winners split the net pot pro-rata
 - **Resolution** is modular: creator-resolved (MVP), upgradeable to oracle/DAO
 - **Fees** are configurable per wager (protocol fee + optional creator fee, capped at 100% for full-beneficiary/charity flows)
+- **Freeform answers are byte-exact.** Every tool sends exactly the string it is given, so whitespace counts; `quote_place_bet` flags edge whitespace in `answer_has_edge_whitespace`. `get_wager` lists staked answers in `ticket_pools[].answer_text`.
 
 Live dApp: https://autarkenterprises.github.io/paramutuel/
 
@@ -108,7 +112,7 @@ Live dApp: https://autarkenterprises.github.io/paramutuel/
 
 ```bash
 # Run tests
-python -m unittest mcp_server/tests/test_server.py
+python -m unittest discover -s mcp_server/tests
 
 # Run server in dev mode
 python -m mcp_server

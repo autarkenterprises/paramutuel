@@ -7,8 +7,8 @@ Concise assessment of the repository as a **modular** system: protocol contracts
 - **Clear separation of concerns:** contracts in `src/`; self-custody **dApp** in `dapp/`; **marketing + navigation shell** in `site/` (iframe embedding preserves boundaries); **indexer / explorer / control / proposition / resolution** as distinct Python services (`service/`).
 - **Testnet-first with a documented mainnet switch:** `config/deployments.json` + `defaultNetwork`; site banner and docs describe the same lever (`docs/WEBSITE.md`).
 - **Operator-facing surfaces:** CLI and token-gated web for sensitive actions; new **operator hub** page aggregates read-only and configurable links without entangling public Pages with private keys.
-- **Agent story:** MCP server, bet scout package (`paramutuel-bettor-agent`), manifest JSON, and documented loops (`AGENTS.md`, `docs/AGENT-LOOP.md`).
-- **CI:** contract build, site assembly, bettor-agent tests/publish workflows; path-filtered deploys.
+- **Agent story:** MCP server, bet scout package (`paramutuel-bettor-agent`), manifest JSON, and documented loops (`docs/MACHINE.md`, `docs/AGENT-LOOP.md`).
+- **CI:** the fast suite and a local-chain end-to-end test run on every push, Pages deploys depend on them, and bettor-agent tests/publish workflows run on their own paths.
 
 ## Gaps vs “production ready” for retail + investors
 
@@ -18,8 +18,9 @@ Concise assessment of the repository as a **modular** system: protocol contracts
 | **Legal / compliance** | No terms, privacy, or jurisdiction copy on the public site | Add lightweight footer links and “testnet / not an offer” framing where appropriate |
 | **Wallet breadth** | EIP-1193 only; no WalletConnect in static build | Optional connector module or hosted wallet modal for mobile |
 | **Assisted UX** | Self-custody only on Pages | Track in `docs/TASKS.md` (assisted gateway); keep dApp as advanced escape hatch per ADR-0006/0007 |
-| **Observability** | Services depend on operator-run logging | Dashboards for indexer lag, RPC errors, resolution job outcomes |
-| **PyPI publish** | Tag push works; PyPI **Trusted Publishing** must be completed in the PyPI UI | See `docs/TASKS.md` — release engineering checklist; verify Actions after first tag |
+| **Observability** | `/health` reports sync lag, sync errors and skipped logs, but nothing alerts on them; the hosted indexer was returning 500/503 unnoticed as of 2026-11-07 | Uptime check and alert on `/health`; dashboards for RPC errors and resolution outcomes |
+| **Hosted indexer durability** | Ephemeral SQLite rescans from the deploy block on every cold start | Persistent volume; see `docs/CLOUD-RUN-HOSTING.md` |
+| **PyPI publish** | Neither package is on PyPI yet. A tag exists, but **Trusted Publishing** must be completed in the PyPI UI | See `docs/TASKS.md` — release engineering checklist; verify Actions after first tag |
 
 ## Polish (non-blocking)
 

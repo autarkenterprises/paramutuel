@@ -1,5 +1,7 @@
 # ADR-0010 implementation notes (unified V3 wager — enumerated + freeform)
 
+> **Note (ADR-0020):** this records V3 as first built. Since then the freeform answer cap (`WAGER_MAX_DISTINCT_ANSWERS`, `maxDistinctAnswers`) and `feesCharged` were removed, single-outcome tickets became exempt from `MAX_DISTINCT_TICKETS`, the constructor became a struct, and `FreeformAnswerRevealedV3` and `minNewTicketStake` were added. See [`ADR-0020-IMPLEMENTATION.md`](ADR-0020-IMPLEMENTATION.md) and [`MACHINE.md`](MACHINE.md).
+
 **Status:** **Implemented** on `master`. `ParamutuelFactoryV3` + `ParamutuelWagerV3` are the canonical contracts; the legacy standalone `ParamutuelFactory` / `ParamutuelFactoryV2` / `ParamutuelFactoryFreeform` and their wagers (plus the `WagerV2Masks` library) have been **deleted from the tree**. Indexer, MCP, dApp, site, agents, and testnet suites are V3-only.
 **ADR:** [`research/adr/ADR-0010-unified-wager-enumerated-and-freeform.md`](../research/adr/ADR-0010-unified-wager-enumerated-and-freeform.md)
 **Supersedes (contract layer):** [`ADR-0008-IMPLEMENTATION.md`](ADR-0008-IMPLEMENTATION.md), [`ADR-0009-IMPLEMENTATION.md`](ADR-0009-IMPLEMENTATION.md) — their economic / lifecycle math is unchanged and still authoritative; only the *contract surface* moved to V3.

@@ -1,10 +1,10 @@
 # `paramutuel_bettor`
 
-Bet **scout / planner** for Paramutuel: indexer JSON in, ranked bet ideas + optional `cast calldata` out.
+Bet **scout / planner** for Paramutuel: indexer JSON in, ranked bet ideas and calldata out. Standard library only.
 
 See [`docs/BET-AGENT.md`](../../docs/BET-AGENT.md) for full usage, JSON bridge, and safety notes.
 
-Quick start (installed package):
+Once published to PyPI (**not yet**; see `docs/TASKS.md`):
 
 ```bash
 pip install paramutuel-bettor-agent

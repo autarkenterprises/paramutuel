@@ -35,7 +35,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "mcp>=1.0.0",
+    # 2.x removed mcp.server.fastmcp, which server.py imports. Unbounded, a fresh install failed at import.
+    "mcp>=1.0.0,<2",
     "httpx>=0.25.0",
     "eth-abi>=5.0.0",
     "eth-hash[pycryptodome]",
@@ -50,8 +51,15 @@ Documentation = "https://github.com/autarkenterprises/paramutuel/blob/master/doc
 [project.scripts]
 paramutuel-mcp = "mcp_server.server:mcp_server.run"
 
+# This file sits inside the package directory, so the project root is the package itself. Paths here
+# are relative to it. The factory address and indexer URL come from a bundled copy of the deployments
+# config, so an installed server does not default to localhost with no factory.
 [tool.hatch.build.targets.wheel]
-packages = ["mcp_server"]
+bypass-selection = true
 
 [tool.hatch.build.targets.wheel.force-include]
-"mcp_server/abi" = "mcp_server/abi"
+"__init__.py" = "mcp_server/__init__.py"
+"__main__.py" = "mcp_server/__main__.py"
+"server.py" = "mcp_server/server.py"
+"abi" = "mcp_server/abi"
+"../config/deployments.json" = "mcp_server/deployments.json"

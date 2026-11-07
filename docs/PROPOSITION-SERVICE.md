@@ -36,7 +36,7 @@ Open `http://127.0.0.1:8094`, paste the same token, click **Save token (local)**
 | `PROPOSITION_SOURCES_PATH` | Override path to sources JSON (default `config/proposition-sources.json`) |
 | `PROPOSITION_DB_PATH` | SQLite file (default `service/proposition/data/propositions.db`) |
 | `FACTORY_ADDRESS` / `PROPOSITION_FACTORY` | Factory contract (else `config/deployments.json` + `defaultNetwork`) |
-| `PROPOSITION_COLLATERAL_TOKEN` | Collateral `address` for `createWager` |
+| `PROPOSITION_COLLATERAL_TOKEN` | Collateral `address` for `createEnumeratedWager` |
 | `RPC_URL_BASE_SEPOLIA` / `RPC_URL` | RPC for `cast send` |
 | `PRIVATE_KEY` / `PROPOSITION_PRIVATE_KEY` | Hot key for dispatch |
 | `PROPOSITION_ALLOW_EXECUTE` | `1` / `true` to allow `POST .../dispatch`; override with `--allow-execute` or `--no-allow-execute` |
@@ -45,7 +45,7 @@ Open `http://127.0.0.1:8094`, paste the same token, click **Save token (local)**
 | `PROPOSITION_RESOLVER`, `PROPOSITION_BETTING_CLOSER`, `PROPOSITION_RESOLUTION_CLOSER` | Role addresses (optional; `0x0` if omitted) |
 | `PROPOSITION_EXTRA_FEE_RECIPIENTS`, `PROPOSITION_EXTRA_FEE_BPS` | Comma-aligned lists for extra fee slots |
 
-**Dispatch** shells out to `cast` (Foundry). The process running the server must have `cast` on `PATH` and a working RPC/key when execute is enabled.
+**Dispatch** signs and sends with `cast` (Foundry), which `Dockerfile.proposition` includes. Proposition and outcome text reach the chain exactly, as ABI-encoded calldata. A dispatch counts as successful only when mined with status 1.
 
 ## Sources configuration
 
@@ -65,11 +65,11 @@ Open `http://127.0.0.1:8094`, paste the same token, click **Save token (local)**
 - `GET /api/proposals?status=pending&limit=100`
 - `PATCH /api/proposals/{id}` — body `{ "proposition", "outcomes": ["Yes","No",...] }` (**pending** only).
 - `POST /api/ingest?calendar=0|1` — JSON body includes `new_source_rows`, `new_proposals`, `calendar_skipped_duplicates`, `errors[]`.
-- `POST /api/proposals/{id}/approve|reject|dispatch` — dispatch requires approved row + execute enabled + env.
+- `POST /api/proposals/{id}/approve|reject|dispatch|retry` — dispatch requires approved row + execute enabled + env. Concurrent dispatches of one proposal cannot both send. `retry` returns a `dispatch_failed` proposal to `approved`; check the recorded error first, because a timed-out transaction may still have been mined, and a second dispatch would create a second wager.
 
 ## Docker
 
-`Dockerfile.proposition` runs the HTTP server only (Python slim, no Foundry). For on-chain dispatch inside a container, extend the image to install Foundry or run dispatch from a host that has `cast`.
+`Dockerfile.proposition` runs the HTTP server and includes a pinned, checksummed `cast` for dispatch.
 
 ```bash
 docker build -f Dockerfile.proposition -t paramutuel-proposition .

@@ -6,7 +6,7 @@ This document compiles **distribution channels**, **awareness tactics**, and the
 
 | Artifact | Role |
 |----------|------|
-| **PyPI** `paramutuel-bettor-agent` | `pip install paramutuel-bettor-agent` → console `paramutuel-bettor` |
+| **PyPI** `paramutuel-bettor-agent` | **Not yet published** (see `TASKS.md`). Once it is: `pip install paramutuel-bettor-agent` → console `paramutuel-bettor` |
 | **Git tag** `bettor-agent-vX.Y.Z` | Triggers PyPI + GHCR workflows (see below) |
 | **GHCR image** `ghcr.io/<owner>/paramutuel-bettor-agent:<version>` | Docker / K8s / Compose fleets |
 | **Git clone** | `PYTHONPATH=.` development path |
@@ -32,9 +32,9 @@ Use any subset; combine for reach.
 - **Repository topics** on GitHub: e.g. `mcp`, `agents`, `subagent`, `parimutuel`, `prediction-markets`, `base`, `llm`, `ethereum`, `defi`.
 - **Awesome-* lists** — PRs to curated agent / MCP / prediction-market lists (follow each list’s contribution rules).
 - **MCP server directories** — wherever MCP servers are catalogued; list both **`paramutuel-mcp`** and the **bet scout** as complementary.
-- **Blog / changelog posts** — short “how to run a scout fleet + executor pattern” linking `AGENTS.md`.
+- **Blog / changelog posts** — short “how to run a scout fleet + executor pattern” linking `MACHINE.md`.
 - **Discord / Farcaster / X** — release threads with tag + PyPI link.
-- **Docs site** — single landing page linking `AGENTS.md`, `BET-AGENT.md`, and this file.
+- **Docs site** — single landing page linking `MACHINE.md`, `BET-AGENT.md`, and this file.
 
 ### Machine-readable discovery
 

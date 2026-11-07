@@ -88,6 +88,19 @@ class CastResult:
     returncode: int | None = None
 
 
+def _first_json_object(text: str) -> dict | None:
+    """The JSON object in ``cast`` output, or None. Not simply ``json.loads``: seen on a real node,
+    cast's RPC poller can log to stdout around the receipt, which must not read as a failed transaction."""
+    start = text.find("{")
+    if start < 0:
+        return None
+    try:
+        value, _ = json.JSONDecoder().raw_decode(text[start:])
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def _scrub_key(text: str, argv: list[str]) -> str:
     """Remove the private key from text that came back from ``cast``, in case an error echoed it."""
     for i, token in enumerate(argv[:-1]):
@@ -122,11 +135,8 @@ def run_cast_send(
     stderr = _scrub_key(getattr(proc, "stderr", "") or "", argv)
     if proc.returncode != 0:
         return CastResult(False, stdout, stderr or f"cast exited {proc.returncode}", returncode=proc.returncode)
-    try:
-        receipt = json.loads(stdout)
-    except json.JSONDecodeError:
-        receipt = None
-    if not isinstance(receipt, dict) or "status" not in receipt:
+    receipt = _first_json_object(stdout)
+    if receipt is None or "status" not in receipt:
         return CastResult(False, stdout, f"unexpected cast output, not a transaction receipt: {stdout[:200]}", returncode=0)
     tx_hash = receipt.get("transactionHash")
     if str(receipt["status"]).lower() not in ("0x1", "1"):

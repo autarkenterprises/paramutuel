@@ -21,7 +21,7 @@ from typing import Any
 from . import calldata as calldata_mod
 from .indexer_client import IndexerClient
 from . import odds as odds_mod
-from .policy import pick_outcome, summarize_list_row
+from .policy import _outcome_labels, odds_model_exact, pick_outcome, summarize_list_row
 
 
 def recommend(
@@ -86,7 +86,7 @@ def recommend(
                 betting_open=bool(pick["betting_open"]),
                 revert_hint=str(pick["revert_hint"] or ""),
                 protocol_version=str(wager.get("protocol_version") or "enumerated"),
-                freeform_answer=None,
+                freeform_answer=pick.get("answer_text"),
             )
             recs.append(
                 {
@@ -134,6 +134,11 @@ def quote_wager(
     now_ts = int(time.time())
     betting_open, revert_hint = odds_mod.betting_open_status(wager, now_ts=now_ts)
 
+    if protocol_version != "freeform":
+        labels = _outcome_labels(wager)
+        if int(outcome_index) < 0 or (labels and int(outcome_index) >= len(labels)):
+            raise ValueError(f"outcome_index {outcome_index} out of range: this wager has {len(labels)} outcomes")
+
     otot: int | None = None
     answer_id_hex: str | None = None
     if protocol_version == "freeform":
@@ -176,6 +181,13 @@ def quote_wager(
         protocol_version=protocol_version,
         freeform_answer=freeform_answer,
     )
+    # A new ticket below the wager's minimum reverts, so say so before anyone signs.
+    minimum = int(wager.get("min_new_ticket_stake") or 0)
+    if minimum and otot == 0 and bet_amount_raw < minimum:
+        quote["execution_allowed"] = False
+        quote["revert_hint"] = (
+            f"This would open a new ticket, which needs at least minNewTicketStake={minimum} raw units."
+        )
     out: dict[str, Any] = {
         "wager_address": wager_address,
         "outcome_index": outcome_index,
@@ -183,7 +195,14 @@ def quote_wager(
         "outcome_total_raw": otot,
         "total_pot_raw": total_pot,
         "quote": quote,
+        "odds_model_exact": odds_model_exact(wager),
     }
+    if not out["odds_model_exact"]:
+        out["odds_note"] = (
+            "Odds use the single-winning-pool formula, which is the contract's payout only for "
+            "SINGLE_WINNER and freeform wagers. This policy divides by the resolver-dependent winning "
+            "units (docs/PAYOUT-CALCULATION.md Part B), so the multiple is not a payout estimate."
+        )
     if answer_id_hex:
         out["answer_id_hex"] = answer_id_hex
     return out

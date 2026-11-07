@@ -12,10 +12,10 @@ It is intentionally simple and deterministic for MVP operations.
 ## Endpoints
 
 - `GET /health` - liveness + indexer connectivity + resolver address.
-- `GET /candidates` - open wagers with actionability diagnostics and decision match.
+- `GET /candidates` - open wagers with actionability diagnostics. Decision **contents** appear only with the token: a decision written before betting closes tells a reader the winner while they can still bet (ADR-0020). Without it, `decision_present` shows only that one exists.
 - `POST /run-once` - run one cycle over actionable decisions. **Requires** `Authorization: Bearer $RESOLUTION_SERVICE_TOKEN` (or `X-Token: $RESOLUTION_SERVICE_TOKEN`); returns `401` otherwise, and rejects every request when the token is unset (fail closed, ADR-0019).
   - body: `{"execute": false}` for dry run (default) — echoed `cast` commands have `--private-key` redacted
-  - body: `{"execute": true}` to broadcast transactions
+  - body: `{"execute": true}` to broadcast transactions. A result's `ok` means mined with status 1; a reverted transaction is reported as failed, with its `tx_hash`.
 
 ## Decision file
 
@@ -32,7 +32,7 @@ Shape:
 }
 ```
 
-For **enumerated** wagers (`protocol_version: "enumerated"` in the indexer — V3 `MODE()==0`), either set **`outcomeIndex`** `i` (0-based; the service sends the single-bit mask `1 << i`) or set **`winningMask`** to the raw bitmask passed to `resolve(uint256)` (use this for multi-winner policies). `winningMask` takes precedence when both are present. Before ADR-0019 `outcomeIndex` was sent unpromoted, so `outcomeIndex: 1` resolved outcome 0 — re-check any decision files written against the old behaviour. For **freeform** wagers (`protocol_version: "freeform"` — V3 `MODE()==1`), set **`winningAnswer`** to the exact UTF-8 string passed to `resolve(string)` (same bytes bettors used in `placeBet(string,uint256)` for that side). The service does **not** trim or normalise it. Note the convention on the bet side: the dApp, the staking site and the MCP quote tool all trim surrounding whitespace before `placeBet(string,…)`, so decision-file answers should normally be trimmed too. A mismatch reverts with `NoWinningStake` (loud, retryable within the window) rather than silently resolving a different pool.
+For **enumerated** wagers (`protocol_version: "enumerated"` in the indexer — V3 `MODE()==0`), either set **`outcomeIndex`** `i` (0-based; the service sends the single-bit mask `1 << i`) or set **`winningMask`** to the raw bitmask passed to `resolve(uint256)` (use this for multi-winner policies). `winningMask` takes precedence when both are present. Before ADR-0019 `outcomeIndex` was sent unpromoted, so `outcomeIndex: 1` resolved outcome 0 — re-check any decision files written against the old behaviour. For **freeform** wagers (`protocol_version: "freeform"` — V3 `MODE()==1`), set **`winningAnswer`** to the exact UTF-8 string passed to `resolve(string)` (same bytes bettors used in `placeBet(string,uint256)` for that side). The service sends those bytes exactly, as raw calldata: it does not trim or normalise them, and it does not pass them through `cast`'s argument parser, which would strip trailing whitespace and surrounding quotes. Note the convention on the bet side: the dApp and staking site trim surrounding whitespace before `placeBet(string,…)` as a typing aid, while machine surfaces (the MCP server, the scout, direct calls) send exactly what they are given. A staked answer can therefore carry whitespace, so copy the winning answer from the indexer's `ticket_pools[].answer_text` rather than retyping it. A mismatch normally reverts with `NoWinningStake`, but it resolves a different pool if someone staked on exactly the bytes you sent.
 
 Only wagers that are:
 
@@ -57,13 +57,13 @@ PYTHONPATH=. python3 -m service.resolution.service \
 
 ## Cloud Run
 
-Use `Dockerfile.resolution`.
+Use `Dockerfile.resolution`, which includes a pinned `cast` for signing and broadcasting. `cast` accepts a raw key only as a process argument, so run this service alone in its container, or on a host with no other local users.
 
 Required env for execution:
 
 - `PRIVATE_KEY` (resolver key)
 - `RESOLUTION_SERVICE_TOKEN` (bearer token for `POST /run-once`; without it the endpoint is disabled)
-- optional `RESOLUTION_SERVICE_ADDRESS` (derived from `PRIVATE_KEY` if omitted)
+- optional `RESOLUTION_SERVICE_ADDRESS` (derived from `PRIVATE_KEY` with `cast` if omitted)
 - optional overrides: `INDEXER_BASE_URL`, `RPC_URL_BASE_SEPOLIA`, `RESOLUTION_DECISIONS_PATH`
 
 Deploy helper:
@@ -76,7 +76,7 @@ export GCP_PROJECT_ID="your-project-id"
 Then verify:
 
 - `GET /health`
-- `GET /candidates`
+- `GET /candidates` with `Authorization: Bearer $RESOLUTION_SERVICE_TOKEN`
 - `POST /run-once` with `{"execute": false}` and `Authorization: Bearer $RESOLUTION_SERVICE_TOKEN`
 
 Before enabling execute mode in production, confirm the decisions file contains only intended wagers/outcomes.

@@ -104,6 +104,9 @@ def pick_outcome(
                     "outcome_index": idx,
                     "outcome_total_raw": otot,
                     "answer_id_hex": aid,
+                    # Exact text from the indexer; None when it is not valid UTF-8 or the wager predates
+                    # the reveal event, in which case there is nothing an agent could send.
+                    "answer_text": row.get("answer_text"),
                     "odds": od,
                     "score": post if isinstance(post, (int, float)) else -1.0,
                 }
@@ -152,10 +155,11 @@ def pick_outcome(
     }
     if protocol_version == "freeform":
         out["answer_id_hex"] = str(best.get("answer_id_hex") or "")
+        out["answer_text"] = best.get("answer_text")
         out["freeform_note"] = (
             "V3 freeform: answerId = keccak256(abi.encodePacked(bytes1(0x03), bytes(answer))). "
-            "Indexer stores ids only; pass the exact UTF-8 answer in `quote.freeform_answer` or use "
-            "MCP `encode_place_bet_freeform` with that string."
+            "`answer_text` is byte-exact. When it is null the text is unknown, so nothing can be sent "
+            "for this answer until its exact bytes are known."
         )
     return out
 
