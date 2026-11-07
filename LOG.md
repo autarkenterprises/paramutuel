@@ -215,3 +215,10 @@ CI, on its first clean runs, found what this machine hid: an unbounded `mcp` dep
 Dead end worth keeping: running Chrome with `TMPDIR` set to the session scratchpad fails with "Socket path too long". Unix sockets cap at 108 bytes, so browser tests use the system temp directory.
 
 Work paused overnight for the operator's usage window, then resumed at 07:30. Records: the ADR-0020 AAR, `docs/ADR-0020-IMPLEMENTATION.md`, the ADR-0019 AAR revision, the ADR-0018 AAR, and L-010 to L-016.
+
+Merged to `master` (fast-forward to `96b3bf7`). The Pages deploy succeeded, and the hosted propose scripts now return 200, ending the 404s of finding D1. Two `master`-only CI failures followed, both from this work:
+- The propose test read the suggested resolver a moment before the page filled it in.
+- The bet scout's own workflow, which ran only on `master`, never installed the test oracles its new tests import.
+
+Both were fixed on the branch (`ad9cd36`), and that workflow now runs on every branch.
+

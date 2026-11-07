@@ -208,7 +208,7 @@ Fixing the findings above turned up more defects, recorded with their evidence i
   - CLI: `test_execute_reports_success_and_failure_through_the_exit_code`
 - *`script/mutation-check.py` kills every listed mutation:* **Met.** 66 of 66, after the baseline run passes.
 - *`forge coverage` runs:* **Met.** Results and its false gaps are in `docs/COVERAGE-BASELINE.md`.
-- *After merge, the hosted propose scripts return 200:* recorded in the LOG entry for the merge.
+- *After merge, the hosted propose scripts return 200:* **Met.** After deploy run 42375236064, `propose-wager.js`, `propose-templates.js`, `propose-a-wager.html`, `bet-page.js` and `config/collateral-allowlist.json` all return 200 from GitHub Pages, and the served `dapp/app.js` calls `resolve` by full signature.
 
 **Outcome vs failure criteria:**
 
