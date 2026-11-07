@@ -29,7 +29,7 @@ PYTHONPATH=. python3 -m service.indexer.live_api --host 0.0.0.0 --port 8090
 ```
 
 It resolves `RPC_URL_BASE_SEPOLIA`/`RPC_URL_SEPOLIA`/`RPC_URL` and factory addresses from env or
-`config/deployments.json` (v1 `factoryAddress`, optional v2 / freeform factories).
+`config/deployments.json` (`factoryAddress`, `indexerFromBlock`).
 
 ### Can this be modularly appended to the dApp?
 
@@ -44,9 +44,8 @@ Yes. It is already modular:
 Print (dry-run) command:
 
 ```bash
+# Reads RPC_URL and PRIVATE_KEY from the environment; flags would be visible in process listings.
 python3 -m service.control_panel.cli \
-  --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY" \
   wager-action \
   --wager "$WAGER" \
   --action close-betting
@@ -56,8 +55,6 @@ Execute for real:
 
 ```bash
 python3 -m service.control_panel.cli \
-  --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY" \
   --execute \
   wager-action \
   --wager "$WAGER" \
@@ -71,7 +68,6 @@ python3 -m service.control_panel.cli \
 ```bash
 python3 -m service.control_panel.web \
   --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY" \
   --allow-execute \
   --auth-token "$CONTROL_PANEL_TOKEN" \
   --port 8092

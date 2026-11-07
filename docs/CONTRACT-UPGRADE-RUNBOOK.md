@@ -17,15 +17,14 @@ This runbook is the canonical checklist for factory/wager contract upgrades and 
 - `python3 -m unittest discover -s service/indexer/tests` (includes HTTP API routes, V3 `apply_log` branches, live_api factory config)
 - `python3 -m unittest discover -s service/control_panel/tests`
 - `python3 -m unittest discover -s service/resolution/tests`
-- `python3 -m unittest discover -s mcp_server/tests`
-- `PYTHONPATH=. python3 -m unittest discover -s agents/paramutuel_bettor/tests`
-- `(cd dapp && npm ci)` then `node --test dapp/tests/logic.test.js` (installs ethers for `freeformV3AnswerId` tests)
+- `./script/test-fast.sh` and `./script/test-local-e2e.sh`
+- `python3 script/mutation-check.py` if contract logic changed (about an hour)
 
 If any fail, do not deploy.
 
 ## 3) ABI sync + compatibility
 
-- `bash script/sync-abi.sh` (syncs **v1, v2, freeform (ADR-0009), and v3** artifacts into `dapp/abi/` and `mcp_server/abi/`).
+- `bash script/sync-abi.sh` (syncs the V3 factory and wager ABIs into `dapp/abi/` and `mcp_server/abi/`). A fast-suite test fails if these drift from the contracts.
 - If ABI changed, update all callers (`dapp`, `service`, `mcp_server`, bet scout, static site copies, testnet suites).
 - Re-run full gates after updates.
 
@@ -35,7 +34,7 @@ If any fail, do not deploy.
 
 Expected outcomes:
 - New on-chain factory deployed.
-- `config/deployments.json` auto-updated with new `baseSepolia.factoryAddress`.
+- `config/deployments.json` auto-updated with the new `baseSepolia.factoryAddress` and `indexerFromBlock`.
 
 ## 5) Hosting propagation
 
@@ -43,10 +42,8 @@ Expected outcomes:
   - `baseSepolia.factoryAddress` is set by `launch_testnet.sh` for the unified **`ParamutuelFactoryV3`**. V3 is a single factory covering both enumerated and freeform modes — no separate V2/freeform keys.
   - Set `indexerFromBlock` to a block **at or before** the V3 factory deployment; if you redeploy the factory after the indexer has already synced, backfill or reset the indexer DB with a lower cursor so create events are not missed.
 - **Indexer live API** resolves the factory from env `FACTORY_ADDRESS` or `factoryAddress` in the deployments file (see `service/indexer/live_api.py`). `/health` echoes the configured factory.
-- Update the root `Dockerfile` env `INDEXER_FROM_BLOCK` if you rely on image defaults for Cloud Run.
 - Commit and push:
   - `config/deployments.json`
-  - `Dockerfile` (if the default from-block changed)
   - any ABI/docs/test changes.
 
 ## 6) Redeploy hosted components
@@ -63,6 +60,7 @@ Expected outcomes:
   - `TESTNET_MODE=readonly ./script/testnet/run_live_suite.sh`
   - `TESTNET_MODE=minimal-tx ./script/testnet/run_live_suite.sh`
   - `TESTNET_MODE=funded-tx ./script/testnet/run_live_suite.sh`
+- Before any of these, `./script/test-local-e2e.sh` runs the same flows against a local chain and needs no funds.
 - Stress suite:
   - `STRESS_MODE=readonly ./script/testnet/run_stress_suite.sh`
   - `STRESS_MODE=tx ./script/testnet/run_stress_suite.sh`

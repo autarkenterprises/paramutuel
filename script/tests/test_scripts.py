@@ -97,6 +97,15 @@ class DocumentedCommandsTest(unittest.TestCase):
                 self.assertIsNone(pattern.search((ROOT / name).read_text(encoding="utf-8", errors="replace")))
 
 
+class PackagingChecks(unittest.TestCase):
+    def test_mcp_dependency_excludes_the_major_version_that_breaks_the_import(self):
+        """mcp 2.x removed mcp.server.fastmcp. Unbounded, a fresh install failed at import, and only CI
+        (with no old copy cached) could see it."""
+        text = (ROOT / "mcp_server" / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn("from mcp.server.fastmcp import", (ROOT / "mcp_server" / "server.py").read_text(encoding="utf-8"))
+        self.assertRegex(text, r'"mcp[^"]*<2"')
+
+
 class CloudRunRedeployTest(unittest.TestCase):
     def test_resolution_redeploy_builds_the_right_dockerfile_with_real_flags(self):
         """`gcloud builds submit` has no --file flag, so this script could never have run."""

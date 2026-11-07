@@ -68,7 +68,7 @@ The honest answer: the SAM is early and hard to size. Our thesis is that **forma
 **Defensibility:**
 - **Immutability**: Core contracts cannot be changed, upgraded, or rug-pulled. This is a trust guarantee competitors with upgradeable proxies cannot offer.
 - **Permissionless creation**: No approval needed. Anyone, human or machine, can create a wager.
-- **Machine-first interfaces**: ABI, JSON API, and MCP server (built, 16 tools) make this the easiest protocol for agents to integrate.
+- **Machine-first interfaces**: ABI, JSON API, and MCP server (built, 21 tools) make this the easiest protocol for agents to integrate.
 - **Network effects**: Proposer reputation, bettor history, and integration ecosystem create switching costs.
 
 ### Business model
@@ -103,7 +103,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 - Hackathon sponsorships and integration bounties
 
 **Phase 3: Machine distribution**
-- MCP server for LLM agent integration (built — 16 tools; publish to registries)
+- MCP server for LLM agent integration (built — 21 tools; publish to registries)
 - OpenAPI tool spec for function-calling LLMs
 - Embeddable SDK/widget for any website
 
@@ -123,7 +123,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 - dApp: functional, all lifecycle flows working, hosted on GitHub Pages
 - Indexer + API: operational, reorg-safe, deterministic, hosted on Cloud Run
 - Explorer + control panel: operational
-- MCP server: built (16 tools for LLM agent integration)
+- MCP server: built (21 tools for LLM agent integration)
 - Protocol website: live at `https://autarkenterprises.github.io/paramutuel/`
 - Live testnet integration + stress suites: passing
 
@@ -162,7 +162,7 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 ### Slide 4 — The solution
 - One-sentence: "A permissionless, immutable smart contract protocol for arbitrary parimutuel prop bets"
 - Visual: simple flow diagram — Propose -> Bet -> Resolve -> Claim
-- Key stats: 2–255 outcomes, any ERC-20, 1% fee, ~$0.02 to create a wager
+- Key stats: 2–255 outcomes, any standard ERC-20, 1% fee, ~$0.02 to create a wager
 
 ### Slide 5 — How it works
 - Visual walkthrough of wager lifecycle
@@ -211,14 +211,14 @@ Revenue accrues to the protocol treasury (governed by a multisig Safe). Addition
 - Streamer Kit concept
 
 ### Slide 14 — Machine distribution
-- MCP server (built, 16 tools), API, SDK
+- MCP server (built, 21 tools), API, SDK
 - "The protocol AI agents bet through"
 - Diagram: LLM -> MCP -> Protocol -> Settlement
 
 ### Slide 15 — Traction & status
 - Base Sepolia deployment: live
 - Test coverage: 40+ tests, all passing
-- MCP server: built and tested (16 tools)
+- MCP server: built and tested (21 tools)
 - Hosted dApp + protocol website: live on GitHub Pages
 - Indexer API: hosted on Cloud Run
 - Architecture: immutable core, modular resolution

@@ -223,7 +223,7 @@ All uint256 values are decimal strings, because JavaScript JSON parsers round nu
 - **Transaction encoding:** `encode_create_enumerated_wager`, `encode_create_freeform_wager`, `encode_place_bet`, `encode_place_bet_freeform`, `encode_place_bets`, `encode_resolve`, `encode_resolve_freeform`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
 ```bash
-pip install mcp httpx eth-abi "eth-hash[pycryptodome]"
+pip install "mcp<2" httpx eth-abi "eth-hash[pycryptodome]"
 python -m mcp_server
 ```
 

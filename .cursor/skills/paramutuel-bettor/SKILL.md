@@ -32,7 +32,7 @@ Set `INDEXER_URL` if the indexer is not the default from `config/deployments.jso
 ## How to combine with MCP (production-shaped loop)
 
 1. Use this agent for **shortlisting + rationale** (strategies are naive; treat as hints).
-2. For each chosen wager, call MCP **`quote_place_bet`** (follow indexer `protocol_version`; pass `answer` for freeform markets that use domain-separated ticket ids) or **`encode_place_bet_freeform`** / factory encoders immediately before execution so calldata matches chain state.
+2. For each chosen wager, call MCP **`quote_place_bet`** (follow indexer `protocol_version`; pass the exact `answer` for freeform markets, copied from `ticket_pools[].answer_text`, because matching is byte-exact) or **`encode_place_bet_freeform`** / factory encoders immediately before execution so calldata matches chain state.
 3. Pass `approve` + `placeBet` to the user's wallet / signer. Never ask for or embed private keys in prompts.
 
 ## Safety and disclosure

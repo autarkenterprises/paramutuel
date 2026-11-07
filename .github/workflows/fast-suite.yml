@@ -30,7 +30,7 @@ jobs:
           node-version: "22"
 
       - name: Install Python test dependencies
-        run: python3 -m pip install -q "mcp>=1.0.0" "httpx>=0.25.0" "eth-abi>=5.0.0" "eth-hash[pycryptodome]"
+        run: python3 -m pip install -q "mcp>=1.0.0,<2" "httpx>=0.25.0" "eth-abi>=5.0.0" "eth-hash[pycryptodome]"
 
       - name: Fast suite
         run: ./script/test-fast.sh

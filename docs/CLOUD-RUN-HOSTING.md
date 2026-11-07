@@ -13,7 +13,7 @@ This runbook sets up the hosted indexer on Google Cloud Run from this repository
 
 SQLite lives on the container filesystem. On Cloud Run that means:
 
-- **Cold start / new revision:** each fresh container starts with an **empty** database and must **rescan** logs from `INDEXER_FROM_BLOCK` / `indexerFromBlock` (can take many minutes over a long history).
+- **Cold start / new revision:** each fresh container starts with an **empty** database and must **rescan** logs from `INDEXER_FROM_BLOCK` / `indexerFromBlock`. This cost grows forever: at `INDEXER_CHUNK_SIZE=120` each rescan is one request per 120 blocks, and Base makes about 43,200 blocks a day, so a factory a year old takes over 130,000 requests on every cold start. On Cloud Run with CPU throttled between requests, that may never finish. Use a persistent volume ([below](#making-the-hosted-index-durable-recommended)), and keep `indexerFromBlock` at the factory's deploy block.
 - **Multiple instances:** if **maximum instances** is more than **1**, requests can hit **different** containers with **different** (or empty) DB files. `/health` may show `wager_count: 0` and `last_indexed_block: null` on one instance while another is mid-sync.
 
 So “switching contracts” is not enough if the service is scaled horizontally on ephemeral storage. See [Making the hosted index durable](#making-the-hosted-index-durable-recommended) below.
@@ -34,7 +34,7 @@ V3 is a **single** factory covering both enumerated and freeform modes (ADR-0010
 2. **Edit `config/deployments.json`** for that network:
    - Set `factoryAddress` to the **new** V3 address.
    - Set **`indexerFromBlock`** to the V3 deployment block (or earlier if you want full history). If the new factory was deployed **after** the indexer already advanced its cursor, you must **reset the cursor** (see below) or you will **never** see older creates for that factory.
-3. **Align image defaults:** if you rely on Dockerfile env for cold-start `INDEXER_FROM_BLOCK`, update `INDEXER_FROM_BLOCK` in the root `Dockerfile` to match the same starting block (or remove it and depend only on `indexerFromBlock` in JSON).
+3. **`script/testnet/set_factory_address.sh <address> <network> <deploy-block>` does step 2**, and `launch_testnet.sh` calls it. The image takes the start block only from this config, so there is no second copy to keep in step.
 4. **Redeploy Cloud Run** so the container ships the updated `config/deployments.json` and indexer code (`./script/deploy/redeploy_cloud_run_indexer.sh` or UI “Edit & deploy new revision”).
 5. **Optional Cloud Run console overrides** for emergencies (hotfix without rebuilding): set `FACTORY_ADDRESS`, `INDEXER_FROM_BLOCK`, `RPC_URL_BASE_SEPOLIA`. Do not set `INDEXER_FROM_BLOCK` to empty unless `indexerFromBlock` is present in the image’s JSON.
 6. **Verify:** `GET /health` on a **single** long-lived instance should eventually show non-null `last_indexed_block`, growing `wager_count`, and `factory_address` echoing your config.
@@ -56,12 +56,12 @@ After any of these, redeploy and confirm `/wagers` returns data and the live tes
 The root `Dockerfile` sets everything needed for a no-console deploy:
 
 - `RPC_URL_BASE_SEPOLIA` = `https://sepolia.base.org` (public RPC; override for a private endpoint if you hit rate limits)
-- `INDEXER_FROM_BLOCK` = `39608044` (factory deploy block for the current testnet factory)
+- `INDEXER_CONFIRMATIONS` = `5` (default in `live_api`): stay this many blocks behind the head, since the indexer has no reorg rewinder. See "Reorgs" below.
 - `INDEXER_NETWORK`, `INDEXER_DB_PATH`, `INDEXER_POLL_INTERVAL_SECONDS`, `PORT` = as in the Dockerfile
 
 Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC_URL_BASE_SEPOLIA`, `INDEXER_FROM_BLOCK`, `INDEXER_DB_PATH`, etc.
 
-**Do not** set `INDEXER_FROM_BLOCK` to an empty value in the console: that overrides the Dockerfile default with “unset”, and the live indexer then relies on `indexerFromBlock` in `config/deployments.json` inside the image (added in-repo next to the factory). If both are missing, the container fails fast at startup.
+The start block comes from `indexerFromBlock` in `config/deployments.json`, not the Dockerfile. **Do not** set `INDEXER_FROM_BLOCK` to an empty value in the console: that means “unset”, and the live indexer then relies on `indexerFromBlock` in `config/deployments.json` inside the image (added in-repo next to the factory). If both are missing, the container fails fast at startup.
 
 `INDEXER_CHUNK_SIZE` (default `120` in the Dockerfile) sets the first `eth_getLogs` window; the indexer **bisects** the range automatically if the RPC returns HTTP 400 for an oversized window.
 
@@ -74,6 +74,10 @@ Optional overrides in the Cloud Run UI (only if needed): `FACTORY_ADDRESS`, `RPC
 5. After deployment, verify:
    - `GET /health` returns `{"ok": true, "wager_count": N, "last_indexed_block": B, ...}`
    - `GET /wagers?limit=20&order=desc` returns populated results after sync (may take one poll interval)
+
+## Reorgs
+
+Derived state is insert-only, so a reorg that moves or drops a transaction could double-count a stake or leave a ghost one. The indexer stays `INDEXER_CONFIRMATIONS` blocks behind the head to make this unlikely. After a reorg deeper than that, rebuild the database by deleting it and letting it resync. `GET /health` reports `sync_lag_blocks`, `last_sync_error`, and `skipped_log_count`; anything above zero in the last means a log could not be applied and the index is incomplete until rebuilt.
 
 ## Redeploy after indexer or Dockerfile changes
 

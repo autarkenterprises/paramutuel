@@ -23,8 +23,8 @@ Source: `test/ParamutuelV3Gas.t.sol` (`ParamutuelV3GasReport`).
 
 | Contract | Runtime size (B) | Initcode size (B) |
 |----------|------------------|-------------------|
-| `ParamutuelFactoryV3` | **21,311** | **21,701** |
-| `ParamutuelWagerV3` | **11,651** | **15,378** |
+| `ParamutuelFactoryV3` | **22,650** | **23,031** |
+| `ParamutuelWagerV3` | **11,670** | **15,425** |
 
 V3 is a single deployment covering both enumerated and freeform modes; the legacy split of separate V1/V2/freeform factories has been removed from the tree (see ADR-0010).
 
@@ -38,54 +38,51 @@ Reported cost is **approximate** (measured as `gasBefore - gasAfter` around the 
 |------|-------------|--------|
 | `placeBet` (first **new** mask) | **~246k** | Pays for `usedMasks.push` + per-bettor mask bookkeeping + transfer. |
 | `placeBet` (same mask) | **~72k** | Hot path; no new global mask slot. |
-| `resolve` (`ANY_OF`, **2** distinct global masks) | **~136k** | Linear in `_usedMasks.length`. |
-| `resolve` (`ANY_OF`, **16** distinct global masks) | **~200k** | ~**4–5k** gas per extra distinct mask in this scenario (same order of magnitude as v2 — see [`ADR-0008-GAS.md`](ADR-0008-GAS.md)). |
+| `resolve` (`ANY_OF`, **2** distinct global masks) | **~114k** | Linear in `_usedMasks.length`. |
+| `resolve` (`ANY_OF`, **16** distinct global masks) | **~178k** | ~**4–5k** gas per extra distinct mask in this scenario (same order of magnitude as v2 — see [`ADR-0008-GAS.md`](ADR-0008-GAS.md)). |
 | `claim` (bettor used **2** masks) | **~90k** | Scales with **number of distinct masks** the bettor touched. |
-| `resolve` (`WEIGHTED_OVERLAP`, **2** masks) | **~132k** | Extra `popcount` work on intersections vs `ANY_OF`. |
+| `resolve` (`WEIGHTED_OVERLAP`, **2** masks) | **~110k** | Constant-time `popcount` on intersections, so bit count no longer affects cost. |
 
 ### Freeform mode
 
 | Step | Approx. gas | Notes |
 |------|-------------|--------|
-| `placeBet(string)` (first **new** `answerId`) | **~248k** | `keccak256` over domain-prefixed answer bytes + `usedAnswerIds.push`. |
+| `placeBet(string)` (first **new** `answerId`) | **~205k** | `keccak256` over domain-prefixed answer bytes, `usedAnswerIds.push`, and the once-per-answer `FreeformAnswerRevealedV3` event. |
 | `placeBet(string)` (same answer) | **~73k** | No new global answer slot. |
-| `resolve(string)` | **~128k** | Dominated by validation + fee path; **not** linear in distinct answers (only winning pool read). |
-| `resolve` with **16** distinct answers in pool | **~123k** | Confirms resolve stays ~flat vs pool cardinality in sampled run. |
+| `resolve(string)` | **~105k** | Dominated by validation + fee path; **not** linear in distinct answers (only winning pool read). |
+| `resolve` with **16** distinct answers in pool | **~101k** | Stays flat with pool size. `test_C2_freeform_answerSpaceCannotBeExhausted_resolveAndClaimStayFlat` pins this at 1,100 answers. |
 | `claim` (winner) | **~80k** | Single winning `answerId` leg for the bettor. |
 
 ### Factory → new wager (no seed)
 
 | Call | Approx. gas (`gasleft()`) | `--gas-report` median (reference) |
 |------|---------------------------|-------------------------------------|
-| `createEnumeratedWager` (3 outcomes, no seed) | **~2.61M** | ~2.60M |
-| `createFreeformWager` | **~2.51M** | ~2.51M |
+| `createEnumeratedWager` (3 outcomes, no seed) | **~2.62M** | ~2.60M |
+| `createFreeformWager` | **~2.52M** | ~2.51M |
 
-Per-wager bytecode is larger than v2-only because the implementation carries **both** mode branches; product default is still **one** factory address on the wire.
+Per-wager bytecode carries **both** mode branches; there is still **one** factory address on the wire.
 
-## Foundry `--gas-report` excerpt (same run as above)
+## The per-transaction gas cap
 
-| Artifact | Deployment cost | Deployment size (report column) |
-|----------|-----------------|----------------------------------|
-| `ParamutuelFactoryV3` | ~4.66M | ~21.8k |
-| `ParamutuelWagerV3` | (via factory `CREATE`) | ~16.1k (init/runtime column in report) |
+**Base enforces a hard cap of 16,777,216 gas (2^24) per transaction** (EIP-7825, activated by the Azul upgrade). A path whose worst case exceeds this is impossible, not merely expensive, so these numbers are limits rather than estimates:
 
-Function medians from `test/ParamutuelV3Gas.t.sol` only:
+| Worst case | Gas (real transaction, cold storage) | Pinned by |
+|---|---|---|
+| Griefed `resolve`: 1,024 multi-outcome masks + 255 single-outcome masks, 255 options, `WEIGHTED_OVERLAP` | **6,663,978** (40% of the cap) | `test_griefed_resolve_fits_the_real_per_transaction_gas_cap`, `test_C1_coldResolve_absoluteWorstCase_fitsTxGasCap` |
+| `createEnumeratedWager` with 255 short outcomes | ~8.8M | Long outcome labels can exceed the cap; creation then simply fails |
+| Creation with 32 extra fee recipients | ~1M above the base | `MAX_EXTRA_FEE_RECIPIENTS` |
 
-| Function | Median (approx.) |
-|----------|------------------|
-| `placeBet(uint256,uint256)` | ~160k |
-| `placeBet(string,uint256)` | ~161k |
-| `resolve(uint256)` | ~131k |
-| `resolve(string)` | ~122k |
-| `claim` | ~77k |
+Before ADR-0020, `_popcount` cost about 58 gas per set bit, and this griefed `resolve` cost **20.1M** at 255 options and **16.85M** at 200 options, so anyone could make such a wager unresolvable for about 96M gas in bets. Popcount is now constant time.
+
+**Measuring gas:** `forge test` runs a whole test in one transaction, so storage touched earlier stays warm, and `gasleft()` deltas understate real cost (by about 4M for that `resolve`). Use the `cool` cheatcode as `test/ParamutuelV3Hardening.t.sol` does, or measure a real receipt as `test/integration/test_local_e2e.py` does.
 
 ## Cost drivers & limits (safety / UX)
 
-1. **Enumerated:** `MAX_DISTINCT_TICKETS = 1024` — worst-case resolve iterates all used masks; keep **product caps** far below (e.g. tens of masks) on L2.
-2. **Enumerated:** `WEIGHTED_OVERLAP` — same mask loop as `ANY_OF` with extra intersection popcount per ticket.
+1. **Enumerated:** `MAX_DISTINCT_TICKETS = 1024` applies to new multi-outcome tickets; single-outcome tickets are exempt, so `_usedMasks` holds at most 1,279 entries. `resolve` costs about 5k gas per entry.
+2. **Enumerated:** griefers can fill the multi-outcome capacity with dust tickets. Set `minNewTicketStake` to make that cost real collateral, which then pays into the pot.
 3. **Freeform:** `MAX_ANSWER_BYTES = 1024` — long strings increase calldata cost for bettors; `answerId` is still a `bytes32`.
-4. **Freeform:** `maxDistinctAnswers` up to **1024** at factory level — each **new** answer pays a `usedAnswerIds.push` on first stake; resolve cost does not scale with that count.
-5. **Fees:** `_chargeFeesOnce` runs at resolve / retract / expire — included in the resolve numbers above.
+4. **Freeform:** no limit on distinct answers, because `resolve` and `claim` are O(1) and nothing on-chain iterates them. The indexer API bounds its response instead.
+5. **Fees:** charged once at resolve / retract / expire, about 27k gas per recipient, included in the resolve numbers above.
 
 ## Illustrative USD (planning)
 
@@ -115,16 +112,16 @@ Gas figures match the **Snapshot — `gasleft()`** section above unless noted.
 
 | Operation | ~Gas | ~USD (Base) |
 |-----------|------|-------------|
-| `createEnumeratedWager` (3 outcomes, no seed) | ~2.61M | **~$0.033** |
-| `createFreeformWager` | ~2.51M | **~$0.031** |
+| `createEnumeratedWager` (3 outcomes, no seed) | ~2.62M | **~$0.033** |
+| `createFreeformWager` | ~2.52M | **~$0.032** |
 | `placeBet` enumerated (first **new** mask) | ~246k | **~$0.003** |
 | `placeBet` enumerated (same mask) | ~72k | **~$0.0009** |
-| `placeBet` freeform (first **new** answer) | ~248k | **~$0.003** |
+| `placeBet` freeform (first **new** answer) | ~205k | **~$0.003** |
 | `placeBet` freeform (same answer) | ~73k | **~$0.0009** |
-| `resolve` enumerated (`ANY_OF`, 2 distinct masks) | ~136k | **~$0.0017** |
-| `resolve` enumerated (16 distinct masks) | ~200k | **~$0.0025** |
-| `resolve` enumerated (`WEIGHTED_OVERLAP`, 2 masks) | ~132k | **~$0.0017** |
-| `resolve` freeform | ~123–128k | **~$0.0015–0.0016** |
+| `resolve` enumerated (`ANY_OF`, 2 distinct masks) | ~114k | **~$0.0014** |
+| `resolve` enumerated (16 distinct masks) | ~178k | **~$0.0022** |
+| `resolve` enumerated (`WEIGHTED_OVERLAP`, 2 masks) | ~110k | **~$0.0014** |
+| `resolve` freeform | ~101–105k | **~$0.0013** |
 | `claim` enumerated (2 user masks) | ~90k | **~$0.0011** |
 | `claim` freeform (winner) | ~80k | **~$0.0010** |
 
@@ -137,8 +134,8 @@ Gas figures match the **Snapshot — `gasleft()`** section above unless noted.
 | Operation | ~Gas | ~USD (L1 stress) |
 |-----------|------|------------------|
 | `createEnumeratedWager` (~2.61M) | ~2.61M | **~$65** |
-| `placeBet` (first new mask ~246k) | ~246k | **~$0.006** |
-| `resolve` (~136k) | ~136k | **~$0.003** |
+| `placeBet` (first new mask ~246k) | ~246k | **~$6.15** |
+| `resolve` (~114k) | ~114k | **~$2.85** |
 
 ### Quick read
 

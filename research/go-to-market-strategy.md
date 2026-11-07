@@ -150,7 +150,7 @@ The `MACHINE.md` doc already positions the protocol for bot/agent interaction. T
 
 ### 4.1 MCP (Model Context Protocol) server
 
-**Status:** Built (`mcp_server/`). 16 tools across discovery, analysis, and transaction encoding.
+**Status:** Built (`mcp_server/`). 21 tools across discovery, analysis, and transaction encoding.
 
 **Tools available:**
 - **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`

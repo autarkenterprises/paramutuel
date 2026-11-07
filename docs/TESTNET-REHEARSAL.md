@@ -29,7 +29,7 @@ Recommended MVP chain order from Checkpoint 1: **Base first**, **Arbitrum second
 
 ## 3) Deploy and seed contracts
 
-- Deploy `ParamutuelFactory` with target fee/min windows.
+- Deploy `ParamutuelFactoryV3` with target fee/min windows.
 - Verify contracts and record addresses.
 - Fund at least 6 distinct test accounts (proposers, bettors, resolvers, closers, sweepers).
 

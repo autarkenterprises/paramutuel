@@ -29,4 +29,4 @@ Commit and push `config/deployments.json` so GitHub Pages picks up the default.
 ## Notes
 
 - Ephemeral DB: on cold start the indexer replays logs from `indexerFromBlock` / `INDEXER_FROM_BLOCK`.
-- After a **new factory** deploy, update `indexerFromBlock` (and Dockerfile `INDEXER_FROM_BLOCK` if you rely on image defaults), then redeploy the hosted indexer.
+- After a **new factory** deploy, update `factoryAddress` and `indexerFromBlock` (`script/testnet/set_factory_address.sh` does both), then redeploy the hosted indexer.

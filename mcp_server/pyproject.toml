@@ -35,7 +35,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "mcp>=1.0.0",
+    # 2.x removed mcp.server.fastmcp, which server.py imports. Unbounded, a fresh install failed at import.
+    "mcp>=1.0.0,<2",
     "httpx>=0.25.0",
     "eth-abi>=5.0.0",
     "eth-hash[pycryptodome]",
