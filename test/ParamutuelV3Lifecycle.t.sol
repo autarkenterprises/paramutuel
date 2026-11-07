@@ -220,27 +220,28 @@ contract ParamutuelV3LifecycleTest is Test {
         ParamutuelWagerV3.PayoffPolicy policy,
         uint256 policyParam,
         address[] memory feeR,
-        uint16[] memory feeB,
-        uint256 maxDistinct
+        uint16[] memory feeB
     ) internal returns (ParamutuelWagerV3) {
         return new ParamutuelWagerV3(
-            mode,
-            address(this),
-            proposer,
-            proposer,
-            proposer,
-            proposer,
-            address(token),
-            "direct",
-            outcomes,
-            policy,
-            policyParam,
-            closeAt,
-            RES_WIN,
-            closeAt + RES_WIN,
-            feeR,
-            feeB,
-            maxDistinct
+            ParamutuelWagerV3.InitParams({
+                mode: mode,
+                factory: address(this),
+                proposer: proposer,
+                resolver: proposer,
+                bettingCloser: proposer,
+                resolutionCloser: proposer,
+                collateralToken: address(token),
+                proposition: "direct",
+                outcomes: outcomes,
+                payoffPolicy: policy,
+                policyParam: policyParam,
+                bettingCloseTime: closeAt,
+                resolutionWindow: RES_WIN,
+                resolutionDeadline: closeAt + RES_WIN,
+                feeRecipients: feeR,
+                feeBps: feeB,
+                minNewTicketStake: 0
+            })
         );
     }
 
@@ -445,48 +446,43 @@ contract ParamutuelV3LifecycleTest is Test {
         address[] memory r = new address[](1);
         r[0] = alice;
         vm.expectRevert(ParamutuelWagerV3.FeeConfigMismatch.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, r, new uint16[](0), 0);
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, r, new uint16[](0));
         uint16[] memory b = new uint16[](1);
         b[0] = 10_001;
         vm.expectRevert(ParamutuelWagerV3.FeeTooHigh.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, r, b, 0);
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, r, b);
     }
 
     function test_wagerConstructor_enumeratedShapeChecks() public {
         string[] memory one = new string[](1);
         vm.expectRevert(bytes("OUTCOMES_MIN"));
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, one, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0), 0);
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, one, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0));
         vm.expectRevert(bytes("OUTCOMES_MAX"));
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _n(257), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0), 0);
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _n(256), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0));
         vm.expectRevert(ParamutuelWagerV3.InvalidPolicyParam.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.AT_LEAST_K, 0, new address[](0), new uint16[](0), 0);
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.AT_LEAST_K, 0, new address[](0), new uint16[](0));
         vm.expectRevert(ParamutuelWagerV3.InvalidPolicyParam.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.AT_LEAST_K, 3, new address[](0), new uint16[](0), 0);
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.AT_LEAST_K, 3, new address[](0), new uint16[](0));
         vm.expectRevert(ParamutuelWagerV3.InvalidPolicyParam.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.ANY_OF, 1, new address[](0), new uint16[](0), 0);
-        // 256 outcomes is the wager's own ceiling (factory caps tighter at 255).
+        _direct(ParamutuelWagerV3.WagerMode.Enumerated, _two(), ParamutuelWagerV3.PayoffPolicy.ANY_OF, 1, new address[](0), new uint16[](0));
+        // 255 outcomes is the ceiling at both layers; it keeps every mask under 256 bits wide,
+        // which is what makes `BitMath.popcount` exact.
         ParamutuelWagerV3 w = _direct(
-            ParamutuelWagerV3.WagerMode.Enumerated, _n(256), ParamutuelWagerV3.PayoffPolicy.ANY_OF, 0, new address[](0), new uint16[](0), 0
+            ParamutuelWagerV3.WagerMode.Enumerated, _n(255), ParamutuelWagerV3.PayoffPolicy.ANY_OF, 0, new address[](0), new uint16[](0)
         );
-        assertEq(w.numOptions(), 256);
-        assertEq(w.maxDistinctAnswers(), 0);
+        assertEq(w.numOptions(), 255);
     }
 
     function test_wagerConstructor_freeformShapeChecks() public {
         vm.expectRevert(ParamutuelWagerV3.InvalidOutcome.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Freeform, _two(), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0), 8);
+        _direct(ParamutuelWagerV3.WagerMode.Freeform, _two(), ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0));
         string[] memory none;
-        vm.expectRevert(ParamutuelWagerV3.InvalidDistinctCap.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Freeform, none, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0), 0);
-        vm.expectRevert(ParamutuelWagerV3.InvalidDistinctCap.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Freeform, none, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0), 1025);
         vm.expectRevert(ParamutuelWagerV3.InvalidPolicyParam.selector);
-        _direct(ParamutuelWagerV3.WagerMode.Freeform, none, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 1, new address[](0), new uint16[](0), 8);
+        _direct(ParamutuelWagerV3.WagerMode.Freeform, none, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 1, new address[](0), new uint16[](0));
         ParamutuelWagerV3 w = _direct(
-            ParamutuelWagerV3.WagerMode.Freeform, none, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0), 1024
+            ParamutuelWagerV3.WagerMode.Freeform, none, ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER, 0, new address[](0), new uint16[](0)
         );
         assertEq(w.numOptions(), 0);
-        assertEq(w.maxDistinctAnswers(), 1024);
     }
 
     // ------------------------------------------------------------------
@@ -632,33 +628,6 @@ contract ParamutuelV3LifecycleTest is Test {
         w.placeBet(1, 7);
         vm.stopPrank();
         assertEq(w.ticketPoolByMask(1), 8);
-    }
-
-    /// @notice ADR-0019 finding 3 — pins the freeform answer-space exhaustion
-    ///         boundary as an executable fact. A single address filling
-    ///         `maxDistinctAnswers` with 1-wei bets locks every other bettor out of
-    ///         *new* answers (including, potentially, the correct one). Cost is
-    ///         1024 wei of stake plus gas. Mitigation is Proposed for the next
-    ///         wager revision; if this test starts failing, the mitigation shipped
-    ///         and this test should be inverted to assert the defence.
-    function test_freeform_answerSpaceExhaustion_griefingBoundary() public {
-        ParamutuelWagerV3 f = _free(closeAt, RES_WIN, address(0), address(0));
-        vm.startPrank(bob);
-        token.approve(address(f), type(uint256).max);
-        for (uint256 i; i < 1024; i++) {
-            f.placeBet(vm.toString(i), 1);
-        }
-        vm.stopPrank();
-        assertEq(f.usedAnswerIdsCount(), f.maxDistinctAnswers());
-        assertEq(f.totalPot(), 1024);
-
-        vm.startPrank(alice);
-        token.approve(address(f), type(uint256).max);
-        vm.expectRevert(ParamutuelWagerV3.TooManyDistinctAnswers.selector);
-        f.placeBet("the real answer", 1e18);
-        // Existing (attacker-chosen) answers remain bettable.
-        f.placeBet("0", 1e18);
-        vm.stopPrank();
     }
 
     // ------------------------------------------------------------------
@@ -938,7 +907,7 @@ contract ParamutuelV3LifecycleTest is Test {
         // nobody can claim anything from it.
         vm.warp(closeAt + RES_WIN + 1);
         empty.expire();
-        assertTrue(empty.feesCharged());
+        assertEq(uint256(empty.state()), uint256(ParamutuelWagerV3.State.Retracted));
         vm.prank(alice);
         vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
         empty.claim();
@@ -1058,8 +1027,8 @@ contract ParamutuelV3LifecycleTest is Test {
         assertEq(w.feeBalances(treasury), 50);
     }
 
-    /// @dev 100% fee cap: winners get nothing (claim reverts NothingToClaim in
-    ///      resolved state; pays 0 in retracted state) and the entire pot goes
+    /// @dev 100% fee cap: bettors get nothing (claim reverts NothingToClaim in both
+    ///      resolved and retracted states; ADR-0020 C7) and the entire pot goes
     ///      to fee recipients. The wager is exactly drained either way.
     function test_fullFee_resolveAndRetract_paysOnlyFeeRecipients() public {
         factory = new ParamutuelFactoryV3(treasury, 10_000, MIN_BET_WIN, MIN_RES_WIN);
@@ -1083,7 +1052,8 @@ contract ParamutuelV3LifecycleTest is Test {
         vm.prank(resolverAddr);
         w2.retract();
         vm.prank(alice);
-        assertEq(w2.claim(), 0);
+        vm.expectRevert(ParamutuelWagerV3.NothingToClaim.selector);
+        w2.claim();
         vm.prank(treasury);
         assertEq(w2.withdrawFees(), 500);
         assertEq(token.balanceOf(address(w2)), 0);

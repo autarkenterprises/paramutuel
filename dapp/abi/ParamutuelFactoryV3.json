@@ -41,6 +41,19 @@
     },
     {
       "type": "function",
+      "name": "MAX_EXTRA_FEE_RECIPIENTS",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "MAX_OUTCOMES",
       "inputs": [],
       "outputs": [
@@ -61,19 +74,6 @@
           "name": "",
           "type": "uint16",
           "internalType": "uint16"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "WAGER_MAX_DISTINCT_ANSWERS",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint256",
-          "internalType": "uint256"
         }
       ],
       "stateMutability": "view"
@@ -225,6 +225,159 @@
           "name": "seedAmounts",
           "type": "uint256[]",
           "internalType": "uint256[]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "wager",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createEnumeratedWager",
+      "inputs": [
+        {
+          "name": "collateralToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "proposition",
+          "type": "string",
+          "internalType": "string"
+        },
+        {
+          "name": "outcomes",
+          "type": "string[]",
+          "internalType": "string[]"
+        },
+        {
+          "name": "payoffPolicy",
+          "type": "uint8",
+          "internalType": "enum ParamutuelWagerV3.PayoffPolicy"
+        },
+        {
+          "name": "policyParam",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "bettingCloseTime",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "resolutionWindow",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "resolver",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "bettingCloser",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "resolutionCloser",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "extraFeeRecipients",
+          "type": "address[]",
+          "internalType": "address[]"
+        },
+        {
+          "name": "extraFeeBps",
+          "type": "uint16[]",
+          "internalType": "uint16[]"
+        },
+        {
+          "name": "seedTicketMasks",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        },
+        {
+          "name": "seedAmounts",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        },
+        {
+          "name": "minNewTicketStake",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "wager",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createFreeformWager",
+      "inputs": [
+        {
+          "name": "collateralToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "proposition",
+          "type": "string",
+          "internalType": "string"
+        },
+        {
+          "name": "bettingCloseTime",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "resolutionWindow",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "resolver",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "bettingCloser",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "resolutionCloser",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "extraFeeRecipients",
+          "type": "address[]",
+          "internalType": "address[]"
+        },
+        {
+          "name": "extraFeeBps",
+          "type": "uint16[]",
+          "internalType": "uint16[]"
+        },
+        {
+          "name": "minNewTicketStake",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "outputs": [

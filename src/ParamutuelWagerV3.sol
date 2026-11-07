@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "./interfaces/IERC20.sol";
+import {BitMath} from "./utils/BitMath.sol";
+import {FullMath} from "./utils/FullMath.sol";
 import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 
 /// @title Paramutuel wager v3 — enumerated (ADR-0008) or freeform text (ADR-0009) in one deployable
@@ -20,24 +22,25 @@ import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 ///         reverts with `WrongMode`. Two `placeBet` and two `resolve` overloads exist (one per
 ///         mode); Solidity's overload resolution picks by argument type. State (`_outcomes`,
 ///         `numOptions`, `_usedMasks`, `betsByMask`, `_userMasks` vs `_usedAnswerIds`,
-///         `betsByAnswer`, `_userAnswerIds`) is intentionally allocated for both modes — the
-///         unused-mode storage stays zero-initialised. This wastes a few unused slots per
-///         deployment in exchange for a single audited contract bytecode.
+///         `betsByAnswer`) is intentionally declared for both modes — mappings and dynamic arrays
+///         cost nothing until written, so the unused mode's state simply stays empty, in exchange
+///         for a single audited contract bytecode.
 /// @notice Fee accounting (ADR-0002): fee recipients and bps are immutable post-construction.
-///         Fees are charged ONCE at the resolution boundary (`_chargeFeesOnce`, idempotent via
-///         `feesCharged`), debited from the gross `totalPot`, then accrued into per-recipient
-///         `feeBalances` for pull-style withdrawal. Bettor claims read `netPot = totalPot -
-///         _totalFeesAmount()` to compute the parimutuel split.
+///         Fees are charged exactly once, on the single transition out of `Open`, then accrued into
+///         per-recipient `feeBalances` for pull-style withdrawal. Bettor claims read `netPot =
+///         totalPot - _totalFeesAmount()` to compute the parimutuel split.
 /// @notice Storage layout invariants:
 ///         - `MODE`, `factory`, `proposer`, `resolver`, `bettingCloser`, `resolutionCloser`,
 ///           `collateralToken`, the three `*Time/Window/Deadline` fields, `payoffPolicy`,
-///           `policyParam`, `numOptions`, and `maxDistinctAnswers` are all `immutable` and
+///           `policyParam`, `numOptions`, and `minNewTicketStake` are all `immutable` and
 ///           live in code rather than storage.
 ///         - `proposition` and `_outcomes` are `string` / `string[]` and live in storage but
 ///           are written once in the constructor and never mutated afterwards (no setter).
 ///         - `_usedMasks` / `_usedAnswerIds` are append-only enumeration arrays that mirror
-///           the keys of `ticketPoolByMask` / `ticketPoolByAnswerId`; the wager relies on
-///           that mirror invariant to iterate the pool at resolution and claim time.
+///           the keys of `ticketPoolByMask` / `ticketPoolByAnswerId`. `_usedMasks` is iterated at
+///           enumerated resolution, so it is bounded and that bound is what keeps `resolve` under
+///           the per-transaction gas cap. `_usedAnswerIds` is only a read surface for off-chain
+///           callers: nothing on-chain iterates it, so it needs no bound (ADR-0020).
 contract ParamutuelWagerV3 is ReentrancyGuard {
     /// @dev Three states, two terminal: `Resolved` (a winning outcome was recorded;
     ///      bettors with a winning ticket can claim a parimutuel slice) and
@@ -75,6 +78,12 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
 
     event BetPlacedV3Enumerated(address indexed bettor, uint256 ticketMask, uint256 amount);
     event BetPlacedV3Freeform(address indexed bettor, bytes32 indexed answerId, uint256 amount);
+    /// @notice Emitted exactly once per distinct answer, when it receives its first stake. This is
+    ///         the only on-chain record of an answer's text: `BetPlacedV3Freeform` carries just the
+    ///         hash, and without the text bettors cannot join an existing answer and a resolver
+    ///         cannot see what was staked unless they replay calldata (ADR-0009, ADR-0020 C5).
+    ///         Emitted before the bet event in the same transaction.
+    event FreeformAnswerRevealedV3(bytes32 indexed answerId, string answer);
     event BettingClosedByAuthorityV3(uint64 closedAt);
     event ResolutionWindowClosedByAuthorityV3(uint64 closedAt);
     event ResolvedV3Enumerated(uint256 winningMask);
@@ -107,17 +116,18 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     error WrongMode();
     error EmptyAnswer();
     error AnswerTooLong();
-    error TooManyDistinctAnswers();
-    error InvalidDistinctCap();
+    error NewTicketStakeTooLow();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     /// @dev Hard cap on the byte length of a freeform answer string. 1024 bytes is
     ///      enough for any reasonable natural-language answer while bounding the
     ///      keccak input size and protecting against gas-griefing via huge calldata.
     uint256 public constant MAX_ANSWER_BYTES = 1024;
-    /// @dev Hard cap on `_usedMasks.length` (enumerated) — keeps the `O(n)` loop in
-    ///      `_accumulateWinningUnits` and the per-claim user-mask loop bounded. The
-    ///      same value also bounds `maxDistinctAnswers` in freeform mode.
+    /// @dev Cap on distinct *multi-outcome* tickets once `_usedMasks` holds this many entries. It
+    ///      bounds the `O(n)` loop in `_accumulateWinningUnits`. Single-outcome tickets are exempt
+    ///      so basic betting can never be locked out, which makes the true bound on
+    ///      `_usedMasks.length` `MAX_DISTINCT_TICKETS + numOptions` (at most 1279). Worst-case cold
+    ///      `resolve` is pinned below the 2^24 gas cap by `test_C1_coldResolve_absoluteWorstCase_*`.
     uint256 public constant MAX_DISTINCT_TICKETS = 1024;
     /// @dev Prepended to `bytes(answer)` before keccak so freeform answer ids cannot
     ///      collide with any other domain-separated `bytes32` in the protocol. The
@@ -167,9 +177,12 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     string[] private _outcomes;
     uint256 public immutable numOptions;
 
-    /// @dev Freeform mode only — cap on distinct answer ids ever recorded. Zero in
-    ///      enumerated mode. Set by factory to `WAGER_MAX_DISTINCT_ANSWERS`.
-    uint256 public immutable maxDistinctAnswers;
+    /// @dev Minimum stake that may open a *new* ticket mask or answer; zero disables it. Re-betting
+    ///      an existing ticket is never restricted. Proposer-chosen because only the proposer knows
+    ///      what a meaningful amount of their collateral is. It prices griefing by dust tickets:
+    ///      filling the multi-outcome cap costs `1024 * minNewTicketStake` at risk instead of only
+    ///      gas, and that stake pays into the pot.
+    uint256 public immutable minNewTicketStake;
 
     /// @dev Gross sum of every recorded bet (including seeds). Net pot at claim time
     ///      is `totalPot - _totalFeesAmount()`. Never decremented after a claim —
@@ -189,11 +202,14 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
 
     // --- Freeform-mode bet storage ---
     // Same shape as the enumerated side but keyed by `bytes32` answer id instead of
-    // `uint256` ticket mask. `_usedAnswerIds` is bounded by `maxDistinctAnswers`.
+    // `uint256` ticket mask. Unlike `_usedMasks`, `_usedAnswerIds` is unbounded: freeform `resolve`
+    // and `claim` are O(1) lookups, so a long list costs on-chain logic nothing. An earlier cap on
+    // this array protected nothing and let anyone lock out new answers for about a dollar of gas
+    // (ADR-0020 C2). There is no per-user answer list either, because `claim` needs only
+    // `betsByAnswer[bettor][winningAnswerId]`.
     mapping(bytes32 => uint256) public ticketPoolByAnswerId;
     bytes32[] private _usedAnswerIds;
     mapping(address => mapping(bytes32 => uint256)) public betsByAnswer;
-    mapping(address => bytes32[]) private _userAnswerIds;
 
     /// @dev `feeRecipients` / `feeBps` are written once in the constructor and never
     ///      mutated. `totalFeeBps` is the cached sum used to compute `_totalFeesAmount`
@@ -202,13 +218,10 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     uint16[] public feeBps;
     uint256 public totalFeeBps;
 
-    /// @dev Pull-pattern fee accrual: fees are credited to per-recipient balances at
-    ///      resolution time (`_chargeFeesOnce`) and recipients later call
-    ///      `withdrawFees`. `feesCharged` makes `_chargeFeesOnce` idempotent — every
-    ///      lifecycle terminus (`resolve` / `retract` / `expire`) calls it but only
-    ///      the first call accrues balances, regardless of which path got there first.
+    /// @dev Pull-pattern fee accrual: fees are credited to per-recipient balances at finalisation
+    ///      (`_chargeFees`) and recipients later call `withdrawFees`. No separate "charged" flag:
+    ///      every terminal path checks `state == Open` and leaves it, so charging cannot repeat.
     mapping(address => uint256) public feeBalances;
-    bool public feesCharged;
 
     /// @dev Resolution outputs. `winningMask` is populated only on enumerated resolve;
     ///      `winningAnswerId` only on freeform resolve. `payoutDenominator` holds the
@@ -233,81 +246,76 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     uint64 public bettingClosedAtByAuthority;
     bool public resolutionWindowClosedByAuthority;
 
+    /// @notice Everything a wager is constructed with. A struct rather than positional arguments so
+    ///         `forge coverage` can instrument the contract: its unoptimised ABI decoder ran out of
+    ///         stack on the former 17-argument constructor (ADR-0013, ADR-0020 C10).
+    struct InitParams {
+        WagerMode mode;
+        address factory;
+        address proposer;
+        address resolver;
+        address bettingCloser;
+        address resolutionCloser;
+        address collateralToken;
+        string proposition;
+        string[] outcomes;
+        PayoffPolicy payoffPolicy;
+        uint256 policyParam;
+        uint64 bettingCloseTime;
+        uint64 resolutionWindow;
+        uint64 resolutionDeadline;
+        address[] feeRecipients;
+        uint16[] feeBps;
+        uint256 minNewTicketStake;
+    }
+
     /// @dev The factory is the only sanctioned constructor caller; all validation is
     ///      duplicated here as defence-in-depth in case a future deployment path
-    ///      ever bypasses the factory. The constructor branches on `mode_` to write
-    ///      either the enumerated (`_outcomes`, `numOptions`, `policyParam`) or the
-    ///      freeform (`maxDistinctAnswers`) discriminator state, and forces the
-    ///      complement to its zero / empty default.
-    constructor(
-        WagerMode mode_,
-        address factory_,
-        address proposer_,
-        address resolver_,
-        address bettingCloser_,
-        address resolutionCloser_,
-        address collateralToken_,
-        string memory proposition_,
-        string[] memory outcomes_,
-        PayoffPolicy payoffPolicy_,
-        uint256 policyParam_,
-        uint64 bettingCloseTime_,
-        uint64 resolutionWindow_,
-        uint64 resolutionDeadline_,
-        address[] memory feeRecipients_,
-        uint16[] memory feeBps_,
-        uint256 maxDistinctAnswers_
-    ) {
-        MODE = mode_;
-        factory = factory_;
-        proposer = proposer_;
-        resolver = resolver_;
-        bettingCloser = bettingCloser_;
-        resolutionCloser = resolutionCloser_;
-        collateralToken = IERC20(collateralToken_);
-        proposition = proposition_;
-        payoffPolicy = payoffPolicy_;
-        policyParam = policyParam_;
-        bettingCloseTime = bettingCloseTime_;
-        resolutionWindow = resolutionWindow_;
-        resolutionDeadline = resolutionDeadline_;
+    ///      ever bypasses the factory. The constructor branches on `p.mode` to write
+    ///      the enumerated discriminator state (`_outcomes`, `numOptions`, `policyParam`), or
+    ///      to reject any enumerated-only input in freeform mode.
+    constructor(InitParams memory p) {
+        MODE = p.mode;
+        factory = p.factory;
+        proposer = p.proposer;
+        resolver = p.resolver;
+        bettingCloser = p.bettingCloser;
+        resolutionCloser = p.resolutionCloser;
+        collateralToken = IERC20(p.collateralToken);
+        proposition = p.proposition;
+        payoffPolicy = p.payoffPolicy;
+        policyParam = p.policyParam;
+        bettingCloseTime = p.bettingCloseTime;
+        resolutionWindow = p.resolutionWindow;
+        resolutionDeadline = p.resolutionDeadline;
+        minNewTicketStake = p.minNewTicketStake;
 
-        if (feeRecipients_.length != feeBps_.length) revert FeeConfigMismatch();
-        feeRecipients = feeRecipients_;
-        feeBps = feeBps_;
+        if (p.feeRecipients.length != p.feeBps.length) revert FeeConfigMismatch();
+        feeRecipients = p.feeRecipients;
+        feeBps = p.feeBps;
         uint256 sum;
-        for (uint256 i; i < feeBps_.length; i++) sum += feeBps_[i];
+        for (uint256 i; i < p.feeBps.length; i++) sum += p.feeBps[i];
         if (sum > BPS_DENOMINATOR) revert FeeTooHigh();
         totalFeeBps = sum;
 
-        // Mode-specific initialisation. The complement state (e.g. `maxDistinctAnswers`
-        // in enumerated mode, `numOptions` in freeform mode) is forced to zero so any
-        // stray read of the wrong-mode storage produces an obviously-invalid value
-        // rather than silently degraded behaviour.
-        if (mode_ == WagerMode.Enumerated) {
-            require(outcomes_.length >= 2, "OUTCOMES_MIN");
-            // The 256 ceiling here is the wager's own absolute maximum (it would
-            // otherwise overflow the 256-bit ticket mask). The factory enforces a
-            // tighter `MAX_OUTCOMES = 255`; this require is the in-contract floor.
-            require(outcomes_.length <= 256, "OUTCOMES_MAX");
-            _outcomes = outcomes_;
-            numOptions = outcomes_.length;
-            maxDistinctAnswers = 0;
-            if (payoffPolicy_ == PayoffPolicy.AT_LEAST_K) {
-                if (policyParam_ < 1 || policyParam_ > outcomes_.length) revert InvalidPolicyParam();
-            } else if (policyParam_ != 0) {
+        // Mode-specific initialisation. `numOptions` is forced to zero in freeform mode so any
+        // stray read of the wrong-mode value is obviously invalid rather than silently degraded.
+        if (p.mode == WagerMode.Enumerated) {
+            require(p.outcomes.length >= 2, "OUTCOMES_MIN");
+            // Same ceiling as the factory's `MAX_OUTCOMES`. It also keeps every mask at most 255
+            // bits wide, which is what makes `BitMath.popcount` exact.
+            require(p.outcomes.length <= 255, "OUTCOMES_MAX");
+            _outcomes = p.outcomes;
+            numOptions = p.outcomes.length;
+            if (p.payoffPolicy == PayoffPolicy.AT_LEAST_K) {
+                if (p.policyParam < 1 || p.policyParam > p.outcomes.length) revert InvalidPolicyParam();
+            } else if (p.policyParam != 0) {
                 revert InvalidPolicyParam();
             }
         } else {
-            if (outcomes_.length != 0) revert InvalidOutcome();
+            if (p.outcomes.length != 0) revert InvalidOutcome();
             numOptions = 0;
-            // Freeform answer-id cap must be in `[1, MAX_DISTINCT_TICKETS]`. The
-            // upper bound is 1024 inline rather than the named constant only because
-            // immutable assignment cannot read storage constants in the same expression
-            // on this Solidity version without an explicit cast.
-            if (maxDistinctAnswers_ == 0 || maxDistinctAnswers_ > 1024) revert InvalidDistinctCap();
-            maxDistinctAnswers = maxDistinctAnswers_;
-            if (policyParam_ != 0) revert InvalidPolicyParam();
+            if (p.policyParam != 0) revert InvalidPolicyParam();
         }
 
         state = State.Open;
@@ -330,38 +338,28 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         return bettingClosedByAuthority || (bettingCloseTime != 0 && block.timestamp >= bettingCloseTime);
     }
 
-    /// @dev Returns the timestamp at which betting closed, or zero if betting is still
-    ///      open. Authority-driven close beats timed close (the authority can close
-    ///      early but never late). The result anchors the resolution window — without
-    ///      a closed-at timestamp the resolution window has no start, so
-    ///      `_resolutionWindowOpen` returns false until betting actually closes.
+    /// @dev The timestamp betting closed at, which anchors the resolution window. Only meaningful
+    ///      once `_bettingClosed()` is true; every terminal path checks that first. An authority
+    ///      close can only happen before the timed close (later calls are no-ops), so when the
+    ///      flag is set its timestamp is the true close.
     function _bettingClosedAt() internal view returns (uint64) {
-        if (bettingClosedByAuthority) return bettingClosedAtByAuthority;
-        if (bettingCloseTime != 0 && block.timestamp >= bettingCloseTime) return bettingCloseTime;
-        return 0;
+        return bettingClosedByAuthority ? bettingClosedAtByAuthority : bettingCloseTime;
     }
 
     /// @dev `resolutionWindow == 0` means "no time bound" and the window is open
     ///      indefinitely until the authority closes it. Otherwise the window opens
-    ///      at `_bettingClosedAt()` and runs for `resolutionWindow` seconds.
+    ///      at `_bettingClosedAt()` and runs for `resolutionWindow` seconds. Callers must already
+    ///      have established that betting is closed.
     function _resolutionWindowOpen() internal view returns (bool) {
         if (resolutionWindowClosedByAuthority) return false;
         if (resolutionWindow == 0) return true;
-        uint64 closedAt = _bettingClosedAt();
-        if (closedAt == 0) return false;
-        return block.timestamp <= uint256(closedAt) + uint256(resolutionWindow);
+        return block.timestamp <= uint256(_bettingClosedAt()) + uint256(resolutionWindow);
     }
 
-    /// @dev Strict complement of `_resolutionWindowOpen`: only true once the window
-    ///      has actually elapsed (or the authority closed it). `expire()` gates on
-    ///      this — until `_resolutionWindowOver` returns true, anyone-can-expire is
-    ///      not yet valid; the resolver still has time to call `resolve` / `retract`.
+    /// @dev Strict complement of `_resolutionWindowOpen`, so there is no gap and no overlap between
+    ///      "the resolver may act" and "anyone may expire". `expire()` gates on this.
     function _resolutionWindowOver() internal view returns (bool) {
-        if (resolutionWindowClosedByAuthority) return true;
-        if (resolutionWindow == 0) return false;
-        uint64 closedAt = _bettingClosedAt();
-        if (closedAt == 0) return false;
-        return block.timestamp > uint256(closedAt) + uint256(resolutionWindow);
+        return !_resolutionWindowOpen();
     }
 
     /// @notice Authority-driven betting close (ADR-0005). Idempotent: re-calls after
@@ -385,7 +383,9 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     function closeResolutionWindow() external {
         if (msg.sender != resolutionCloser) revert NotResolutionCloser();
         if (!_bettingClosed()) revert BettingNotClosed();
-        if (resolutionWindowClosedByAuthority) return;
+        // Silent no-op when already closed, or when the wager is finalised and the window no longer
+        // means anything, so retried transactions neither fail nor emit a misleading event.
+        if (resolutionWindowClosedByAuthority || state != State.Open) return;
         resolutionWindowClosedByAuthority = true;
         emit ResolutionWindowClosedByAuthorityV3(uint64(block.timestamp));
     }
@@ -423,15 +423,6 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         return _usedAnswerIds[i];
     }
 
-    function _popcount(uint256 x) internal pure returns (uint256 c) {
-        unchecked {
-            while (x != 0) {
-                x &= x - 1;
-                c++;
-            }
-        }
-    }
-
     /// @dev Mask must be non-zero (the empty ticket has no semantics) and must not
     ///      have any bit set above the legal option range. Shifting by `numOptions`
     ///      isolates the high bits; if any survive, the mask references a non-
@@ -446,17 +437,15 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     ///      policy admits any non-empty mask — multi-bit tickets are the whole
     ///      point of `ANY_OF` / `EXACT_SET` / `AT_LEAST_K` / `WEIGHTED_OVERLAP`.
     function _policyAllowsTicket(PayoffPolicy policy, uint256 mask) internal pure {
-        if (policy == PayoffPolicy.SINGLE_WINNER) {
-            if (_popcount(mask) != 1) revert InvalidTicketMask();
-        }
+        if (policy == PayoffPolicy.SINGLE_WINNER && !BitMath.isSingleBit(mask)) revert InvalidTicketMask();
     }
 
     /// @dev Bound the freeform answer string. Empty answers are rejected (would map
     ///      to a degenerate hash); over-length answers are rejected for gas safety.
     function _validateAnswer(string calldata answer) internal pure {
-        bytes memory b = bytes(answer);
-        if (b.length == 0) revert EmptyAnswer();
-        if (b.length > MAX_ANSWER_BYTES) revert AnswerTooLong();
+        uint256 length = bytes(answer).length;
+        if (length == 0) revert EmptyAnswer();
+        if (length > MAX_ANSWER_BYTES) revert AnswerTooLong();
     }
 
     /// @dev Domain-separated answer id. The `FREEFORM_ANSWER_DOMAIN` byte (0x03)
@@ -468,10 +457,10 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         return keccak256(abi.encodePacked(FREEFORM_ANSWER_DOMAIN, bytes(answer)));
     }
 
-    /// @notice Enumerated-mode single-ticket bet. Pulls collateral first, then records;
-    ///         CEI ordering matters because `_recordBetMask` mutates the pool maps and
-    ///         a re-entrant token would otherwise see inconsistent intermediate state.
-    ///         `nonReentrant` is the second line of defence.
+    /// @notice Enumerated-mode single-ticket bet. Collateral is pulled before the bet is recorded,
+    ///         so bookkeeping can never exceed custody for a standard token. That is the reverse of
+    ///         checks-effects-interactions, so `nonReentrant` is what stops a hostile token from
+    ///         re-entering any state-changing entry point during the pull.
     function placeBet(uint256 ticketMask, uint256 amount) external nonReentrant onlyEnumerated {
         if (state != State.Open) revert NotOpen();
         if (_bettingClosed()) revert BettingClosed();
@@ -488,8 +477,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
 
     /// @notice Batched enumerated-mode bet. Validates and sums every entry first, then
     ///         pulls collateral once for the batch total, then records each bet. Doing
-    ///         a single `transferFrom` saves one external call per extra ticket and
-    ///         narrows the re-entrancy surface to one call site.
+    ///         a single `transferFrom` saves one external call per extra ticket.
     function placeBets(uint256[] calldata ticketMasks, uint256[] calldata amounts) external nonReentrant onlyEnumerated {
         if (state != State.Open) revert NotOpen();
         if (_bettingClosed()) revert BettingClosed();
@@ -516,9 +504,8 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     }
 
     /// @notice Freeform-mode bet. The answer string is hashed (with the domain byte)
-    ///         to a `bytes32` answer id; bets on the exact same UTF-8 byte sequence
-    ///         aggregate into the same id. Same CEI / nonReentrant posture as the
-    ///         enumerated `placeBet`.
+    ///         to a `bytes32` answer id; bets on the exact same byte sequence aggregate into the
+    ///         same id. Same pull-then-record / `nonReentrant` posture as the enumerated `placeBet`.
     function placeBet(string calldata answer, uint256 amount) external nonReentrant onlyFreeform {
         if (state != State.Open) revert NotOpen();
         if (_bettingClosed()) revert BettingClosed();
@@ -559,15 +546,20 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     ///      `prevGlobal == 0` and `prevUser == 0` checks make the enumeration arrays
     ///      (`_usedMasks`, `_userMasks[bettor]`) sets-by-construction: a mask is
     ///      pushed exactly once globally and exactly once per bettor, the first time
-    ///      it sees a non-zero amount. The cap on `_usedMasks.length` is enforced
-    ///      only at first-insert, since subsequent bets on an already-used mask do
-    ///      not grow the array. `totalPot` is incremented unconditionally because
-    ///      the parimutuel math depends on it tracking gross stake.
+    ///      it sees a non-zero amount. The minimum stake and the cap apply only at
+    ///      first-insert, since later bets on an existing mask do not grow the array.
+    ///      Single-outcome tickets skip the cap so griefing can never stop someone
+    ///      betting on one outcome; there are at most `numOptions` of them, so the loop
+    ///      in `_accumulateWinningUnits` stays bounded. `totalPot` is incremented
+    ///      unconditionally because the parimutuel math depends on it tracking gross stake.
     function _recordBetMask(address bettor, uint256 ticketMask, uint256 amount) internal {
         uint256 prevGlobal = ticketPoolByMask[ticketMask];
-        ticketPoolByMask[ticketMask] += amount;
+        ticketPoolByMask[ticketMask] = prevGlobal + amount;
         if (prevGlobal == 0) {
-            if (_usedMasks.length >= MAX_DISTINCT_TICKETS) revert TooManyDistinctTickets();
+            if (amount < minNewTicketStake) revert NewTicketStakeTooLow();
+            if (!BitMath.isSingleBit(ticketMask) && _usedMasks.length >= MAX_DISTINCT_TICKETS) {
+                revert TooManyDistinctTickets();
+            }
             _usedMasks.push(ticketMask);
         }
 
@@ -582,72 +574,66 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         emit BetPlacedV3Enumerated(bettor, ticketMask, amount);
     }
 
-    /// @dev Freeform mirror of `_recordBetMask`. The `_usedAnswerIds` cap is
-    ///      `maxDistinctAnswers` (per-wager, set at construction), not
-    ///      `MAX_DISTINCT_TICKETS`, so different freeform deployments can run with
-    ///      different answer-space caps if a future factory variant needs that.
+    /// @dev Freeform mirror of `_recordBetMask`, with no cap and no per-user list (see the storage
+    ///      comment). The first stake on an answer publishes its text exactly once.
     function _recordBetAnswer(address bettor, string calldata answer, uint256 amount) internal {
         bytes32 id = _answerId(answer);
         uint256 prevGlobal = ticketPoolByAnswerId[id];
-        ticketPoolByAnswerId[id] += amount;
+        ticketPoolByAnswerId[id] = prevGlobal + amount;
         if (prevGlobal == 0) {
-            if (_usedAnswerIds.length >= maxDistinctAnswers) revert TooManyDistinctAnswers();
+            if (amount < minNewTicketStake) revert NewTicketStakeTooLow();
             _usedAnswerIds.push(id);
+            emit FreeformAnswerRevealedV3(id, answer);
         }
 
-        uint256 prevUser = betsByAnswer[bettor][id];
         betsByAnswer[bettor][id] += amount;
         userTotalBet[bettor] += amount;
         totalPot += amount;
-        if (prevUser == 0) {
-            _userAnswerIds[bettor].push(id);
-        }
 
         emit BetPlacedV3Freeform(bettor, id, amount);
     }
 
+    /// @dev Whether ticket `T` wins against winning set `W`, under the wager's policy. `overlap` is
+    ///      returned so `WEIGHTED_OVERLAP` callers need not recompute it. SINGLE_WINNER shares the
+    ///      exact-match rule with EXACT_SET because both `T` and `W` were validated single-bit.
     function _ticketWins(uint256 T, uint256 W) internal view returns (bool wins, uint256 overlap) {
         overlap = T & W;
         if (overlap == 0) return (false, 0);
 
-        if (payoffPolicy == PayoffPolicy.SINGLE_WINNER) {
-            return (_popcount(W) == 1 && _popcount(T) == 1 && T == W, overlap);
-        }
-        if (payoffPolicy == PayoffPolicy.ANY_OF) {
-            return (true, overlap);
-        }
-        if (payoffPolicy == PayoffPolicy.EXACT_SET) {
+        PayoffPolicy policy = payoffPolicy;
+        if (policy == PayoffPolicy.SINGLE_WINNER || policy == PayoffPolicy.EXACT_SET) {
             return (T == W, overlap);
         }
-        if (payoffPolicy == PayoffPolicy.AT_LEAST_K) {
-            return (_popcount(overlap) >= policyParam, overlap);
+        if (policy == PayoffPolicy.AT_LEAST_K) {
+            return (BitMath.popcount(overlap) >= policyParam, overlap);
         }
-        if (payoffPolicy == PayoffPolicy.WEIGHTED_OVERLAP) {
-            return (true, overlap);
-        }
-        return (false, 0);
+        // ANY_OF and WEIGHTED_OVERLAP: any overlap wins.
+        return (true, overlap);
     }
 
-    function _validateWinningMask(uint256 W) internal view onlyEnumerated {
+    function _validateWinningMask(uint256 W) internal view {
         if (W == 0) revert InvalidWinningMask();
         if (W >> numOptions != 0) revert InvalidWinningMask();
-        if (payoffPolicy == PayoffPolicy.SINGLE_WINNER && _popcount(W) != 1) {
+        if (payoffPolicy == PayoffPolicy.SINGLE_WINNER && !BitMath.isSingleBit(W)) {
             revert InvalidWinningMask();
         }
     }
 
+    /// @dev Total payout-weight of all winning tickets, the denominator of every claim. Costs one
+    ///      cold mask read, one cold pool read and a constant-time popcount per used mask.
+    ///      Every mask in `_usedMasks` has a non-zero pool by construction. `pool * ov` is checked:
+    ///      it can only overflow on a pot above about 2^248 under WEIGHTED_OVERLAP, in which case
+    ///      `resolve` reverts and `retract` / `expire` remain available, so no funds are locked.
     function _accumulateWinningUnits(uint256 W) internal view returns (uint256 units) {
         uint256 len = _usedMasks.length;
         for (uint256 i; i < len; i++) {
             uint256 mask = _usedMasks[i];
-            uint256 pool = ticketPoolByMask[mask];
-            if (pool == 0) continue;
             (bool wins, uint256 overlap) = _ticketWins(mask, W);
             if (!wins) continue;
 
+            uint256 pool = ticketPoolByMask[mask];
             if (payoffPolicy == PayoffPolicy.WEIGHTED_OVERLAP) {
-                uint256 ov = _popcount(overlap);
-                units += pool * ov;
+                units += pool * BitMath.popcount(overlap);
             } else {
                 units += pool;
             }
@@ -665,7 +651,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         uint256 units = _accumulateWinningUnits(winningMask_);
         if (units == 0) revert NoWinningStake();
 
-        _chargeFeesOnce();
+        _chargeFees();
 
         state = State.Resolved;
         winningMask = winningMask_;
@@ -684,7 +670,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         uint256 winPool = ticketPoolByAnswerId[winId];
         if (winPool == 0) revert NoWinningStake();
 
-        _chargeFeesOnce();
+        _chargeFees();
 
         state = State.Resolved;
         winningAnswerId = winId;
@@ -698,7 +684,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         if (!_bettingClosed()) revert BettingNotClosed();
         if (!_resolutionWindowOpen()) revert ResolutionWindowOver();
 
-        _chargeFeesOnce();
+        _chargeFees();
         state = State.Retracted;
         emit RetractedV3();
     }
@@ -708,11 +694,17 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         if (!_bettingClosed()) revert BettingNotClosed();
         if (!_resolutionWindowOver()) revert ResolutionWindowOver();
 
-        _chargeFeesOnce();
+        _chargeFees();
         state = State.Retracted;
         emit ExpiredV3();
     }
 
+    /// @notice Pays the caller's whole entitlement once. All arithmetic is full-precision, since an
+    ///         overflow here would lock funds permanently. A zero payout reverts on every path: a
+    ///         losing ticket, dust that rounds to nothing, or a 100% fee (`hasClaimed` then stays
+    ///         false). Tokens that revert on zero transfers therefore behave like any other.
+    /// @dev `payoutDenominator` is non-zero whenever state is `Resolved`, because `resolve` reverts
+    ///      on no winning stake; and `totalPot` is non-zero whenever a stake exists.
     function claim() external nonReentrant returns (uint256 paid) {
         if (state == State.Open) revert NotOpen();
         if (hasClaimed[msg.sender]) revert NothingToClaim();
@@ -725,36 +717,26 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         uint256 netPot = totalPot - _totalFeesAmount();
 
         if (state == State.Retracted) {
-            paid = (grossUserStake * netPot) / totalPot;
+            paid = FullMath.mulDiv(grossUserStake, netPot, totalPot);
         } else if (MODE == WagerMode.Enumerated) {
             uint256 W = winningMask;
             uint256 denom = payoutDenominator;
-            if (denom == 0) revert NothingToClaim();
 
             uint256[] storage masks = _userMasks[msg.sender];
             uint256 n = masks.length;
             for (uint256 i; i < n; i++) {
                 uint256 mask = masks[i];
-                uint256 amt = betsByMask[msg.sender][mask];
-                if (amt == 0) continue;
                 (bool wins, uint256 overlap) = _ticketWins(mask, W);
                 if (!wins) continue;
 
-                if (payoffPolicy == PayoffPolicy.WEIGHTED_OVERLAP) {
-                    uint256 ov = _popcount(overlap);
-                    uint256 weight = amt * ov;
-                    paid += (weight * netPot) / denom;
-                } else {
-                    paid += (amt * netPot) / denom;
-                }
+                uint256 amt = betsByMask[msg.sender][mask];
+                uint256 weight = payoffPolicy == PayoffPolicy.WEIGHTED_OVERLAP ? amt * BitMath.popcount(overlap) : amt;
+                paid += FullMath.mulDiv(weight, netPot, denom);
             }
-            if (paid == 0) revert NothingToClaim();
         } else {
-            uint256 userWinStake = betsByAnswer[msg.sender][winningAnswerId];
-            if (userWinStake == 0) revert NothingToClaim();
-            if (payoutDenominator == 0) revert NothingToClaim();
-            paid = (userWinStake * netPot) / payoutDenominator;
+            paid = FullMath.mulDiv(betsByAnswer[msg.sender][winningAnswerId], netPot, payoutDenominator);
         }
+        if (paid == 0) revert NothingToClaim();
 
         bool ok = collateralToken.transfer(msg.sender, paid);
         require(ok, "TRANSFER");
@@ -770,9 +752,9 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         emit FeeWithdrawnV3(msg.sender, amount);
     }
 
-    function _chargeFeesOnce() internal {
-        if (feesCharged) return;
-        feesCharged = true;
+    /// @dev Called exactly once per wager, on the transition out of `Open`. Each slice is floored
+    ///      and the last recipient takes the remainder, so the slices sum to exactly the total.
+    function _chargeFees() internal {
         if (totalFeeBps == 0 || totalPot == 0) return;
 
         uint256 feesTotal = _totalFeesAmount();
@@ -783,7 +765,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
             if (i + 1 == feeRecipients.length) {
                 slice = feesTotal - paid;
             } else {
-                slice = (feesTotal * feeBps[i]) / totalFeeBps;
+                slice = FullMath.mulDiv(feesTotal, feeBps[i], totalFeeBps);
                 paid += slice;
             }
             if (slice > 0) {
@@ -793,7 +775,9 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         }
     }
 
+    /// @dev Full-precision: with plain math, a pot above `2^256 / totalFeeBps` made every terminal
+    ///      path revert and stranded all funds.
     function _totalFeesAmount() internal view returns (uint256) {
-        return (totalPot * totalFeeBps) / BPS_DENOMINATOR;
+        return FullMath.mulDiv(totalPot, totalFeeBps, BPS_DENOMINATOR);
     }
 }

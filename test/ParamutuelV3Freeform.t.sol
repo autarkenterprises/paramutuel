@@ -44,10 +44,9 @@ contract MockERC20V3Free {
 ///         `answerId` live in `ParamutuelV3AnswerId.t.sol`.
 ///
 ///         Freeform mode accepts arbitrary UTF-8 strings bounded by
-///         `MAX_ANSWER_BYTES` (1024). The factory hard-codes the pot's
-///         `maxDistinctAnswers` to `WAGER_MAX_DISTINCT_ANSWERS` (1024); direct
-///         construction is used in one test to validate the distinct-cap path
-///         at a smaller bound.
+///         `MAX_ANSWER_BYTES` (1024). The number of distinct answers is deliberately
+///         unbounded because nothing on-chain iterates them; see
+///         `test_C2_freeform_answerSpaceCannotBeExhausted_resolveAndClaimStayFlat`.
 contract ParamutuelV3FreeformTest is Test {
     ParamutuelFactoryV3 factory;
     MockERC20V3Free token;
@@ -99,42 +98,12 @@ contract ParamutuelV3FreeformTest is Test {
         w = ParamutuelWagerV3(wa);
     }
 
-    /// @dev Direct construction lets us dial `maxDistinctAnswers` below the
-    ///      factory's 1024 ceiling so we can cover `TooManyDistinctAnswers`
-    ///      without generating a thousand bets.
-    function _deployWagerDirect(uint256 maxDistinct) internal returns (ParamutuelWagerV3 w) {
-        (uint64 close, uint64 resWin) = _futureWindows();
-        uint64 deadline = close + resWin;
-        string[] memory emptyOutcomes;
-        w = new ParamutuelWagerV3(
-            ParamutuelWagerV3.WagerMode.Freeform,
-            address(this),
-            proposer,
-            proposer, // resolver
-            proposer, // bettingCloser
-            proposer, // resolutionCloser
-            address(token),
-            "direct",
-            emptyOutcomes,
-            ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER,
-            0,
-            close,
-            resWin,
-            deadline,
-            new address[](0),
-            new uint16[](0),
-            maxDistinct
-        );
-    }
-
     // ---- Protocol constants ----------------------------------------------
 
     function test_factory_wager_exposes_protocol_constants() public {
         ParamutuelWagerV3 w = _createViaFactory();
         assertEq(w.MAX_ANSWER_BYTES(), 1024);
-        assertEq(w.maxDistinctAnswers(), 1024);
         assertEq(w.outcomesCount(), 0, "freeform wagers publish zero outcomes");
-        assertEq(factory.WAGER_MAX_DISTINCT_ANSWERS(), 1024);
         assertEq(uint256(w.MODE()), uint256(ParamutuelWagerV3.WagerMode.Freeform));
     }
 
@@ -261,18 +230,6 @@ contract ParamutuelV3FreeformTest is Test {
         vm.prank(proposer);
         vm.expectRevert(ParamutuelWagerV3.NoWinningStake.selector);
         w.resolve("B");
-    }
-
-    function test_TooManyDistinctAnswers_reverts() public {
-        ParamutuelWagerV3 w = _deployWagerDirect(3);
-        vm.startPrank(bettor1);
-        token.approve(address(w), type(uint256).max);
-        w.placeBet("a", 1);
-        w.placeBet("b", 1);
-        w.placeBet("c", 1);
-        vm.expectRevert(ParamutuelWagerV3.TooManyDistinctAnswers.selector);
-        w.placeBet("d", 1);
-        vm.stopPrank();
     }
 
     function test_retract_pro_rata_refund() public {

@@ -537,7 +537,7 @@ contract ParamutuelV3EnumeratedTest is Test {
         w.resolve(M0);
 
         uint256 fees = (1000 ether * 100) / 10_000;
-        assertEq(w.feesCharged(), true);
+        assertEq(w.feeBalances(treasury) > 0, true, "fees accrue at finalisation");
 
         uint256 tBalBefore = token.balanceOf(treasury);
         vm.prank(alice);

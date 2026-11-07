@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ParamutuelWagerV3} from "./ParamutuelWagerV3.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
+import {BitMath} from "./utils/BitMath.sol";
 
 /// @title Paramutuel V3 factory — single deployer for both wager modes
 /// @notice Per ADR-0010, V3 collapsed three previously-separate contract surfaces
@@ -16,14 +17,12 @@ import {IERC20} from "./interfaces/IERC20.sol";
 ///         per-wager contract: `treasury` and `protocolFeeBps` are read once per
 ///         deployment and baked into each wager's immutable fee recipient list. The
 ///         factory itself is deployed once per environment (see `config/deployments.json`).
-/// @dev Storage layout invariant: `treasury` and `protocolFeeBps` are mutable in source
-///      but have no setter — they are effectively immutable post-deploy and any future
-///      governance change requires deploying a new factory (ADR-0002 §"fee-setting
-///      authority"). `minBettingWindow` / `minResolutionWindow` are true `immutable`
-///      and constrain every wager this factory ever produces.
-/// @dev The two `createEnumeratedWager` overloads exist solely so the simpler signature
-///      does not force callers to pass empty seed arrays — the seeded form is the
-///      canonical one and the un-seeded form delegates into it with zero-length arrays.
+/// @dev `treasury`, `protocolFeeBps`, `minBettingWindow` and `minResolutionWindow` are all
+///      `immutable`: any change of protocol-fee policy means deploying a new factory (ADR-0002 §
+///      "fee-setting authority"), and they constrain every wager this factory ever produces.
+/// @dev The creation overloads form a ladder so simple callers need not pass empty arrays or a zero
+///      minimum. Every overload funnels into the one internal builder for its mode, and the older
+///      signatures remain so existing clients and encoders keep working unchanged (ADR-0020).
 contract ParamutuelFactoryV3 {
     /// @dev Two distinct creation events (rather than one with a `mode` field) because
     ///      the indexer treats them as separate streams: enumerated wagers carry an
@@ -66,15 +65,15 @@ contract ParamutuelFactoryV3 {
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 10_000;
-    /// @dev Capped at 255 (not 256) so the bitmask fits comfortably in `uint256` and
-    ///      so a single `uint8` index can address every option off-chain. The wager
-    ///      enforces its own ceiling (256) — the factory's tighter cap leaves headroom
-    ///      for the indexer's `option_index = uint8` columns.
+    /// @dev Capped at 255 (not 256) so every mask is at most 255 bits wide, which keeps
+    ///      `BitMath.popcount` exact, and a single `uint8` index can address every option off-chain.
+    ///      The wager enforces the same ceiling.
     uint256 public constant MAX_OUTCOMES = 255;
-    /// @dev Default cap on distinct freeform answer ids per wager. Identical to the
-    ///      wager's own `MAX_DISTINCT_TICKETS` ceiling — chosen to bound the storage
-    ///      cost of the resolution-time accumulation loop and the claim-time replay.
-    uint256 public constant WAGER_MAX_DISTINCT_ANSWERS = 1024;
+    /// @dev Cap on proposer-supplied fee recipients. Every terminal path walks the recipient list,
+    ///      at about 27k gas each. Without a cap, an L1 deposit transaction (exempt from the 2^24
+    ///      per-transaction gas cap) could create a wager that an ordinary resolver, or anyone
+    ///      trying to `expire` it, could never finalise (ADR-0020 C9).
+    uint256 public constant MAX_EXTRA_FEE_RECIPIENTS = 32;
 
     /// @dev Per-environment minimum windows: prevents accidentally-immediate or
     ///      vanishingly-short wagers in production while allowing tests to deploy a
@@ -82,15 +81,12 @@ contract ParamutuelFactoryV3 {
     uint64 public immutable minBettingWindow;
     uint64 public immutable minResolutionWindow;
 
-    /// @dev `treasury` and `protocolFeeBps` are mutable-by-syntax but have no setter;
-    ///      they are effectively immutable for the life of the factory. Any change of
-    ///      protocol-fee policy requires a new factory deployment (ADR-0002).
-    address public treasury;
-    uint16 public protocolFeeBps;
+    /// @dev Fixed for the life of the factory; see the contract-level note on ADR-0002.
+    address public immutable treasury;
+    uint16 public immutable protocolFeeBps;
 
-    /// @dev Append-only registry of wagers this factory has produced. Indexer / explorer
-    ///      services treat this as a discovery surface in addition to the events above —
-    ///      events are the primary path; this array is a fallback for cold reads.
+    /// @dev Append-only registry of wagers this factory has produced, for on-chain discovery.
+    ///      The indexer itself discovers wagers through the events above.
     address[] public wagers;
 
     constructor(address treasury_, uint16 protocolFeeBps_, uint64 minBettingWindow_, uint64 minResolutionWindow_) {
@@ -106,6 +102,7 @@ contract ParamutuelFactoryV3 {
         return wagers.length;
     }
 
+    /// @notice Enumerated wager with no seed bets and no minimum new-ticket stake.
     function createEnumeratedWager(
         address collateralToken,
         string memory proposition,
@@ -120,26 +117,28 @@ contract ParamutuelFactoryV3 {
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps
     ) external returns (address wager) {
-        uint256[] memory seedMasks = new uint256[](0);
-        uint256[] memory seedAmounts = new uint256[](0);
         return _createEnumerated(
-            collateralToken,
-            proposition,
-            outcomes,
-            payoffPolicy,
-            policyParam,
-            bettingCloseTime,
-            resolutionWindow,
-            resolver,
-            bettingCloser,
-            resolutionCloser,
-            extraFeeRecipients,
-            extraFeeBps,
-            seedMasks,
-            seedAmounts
+            EnumeratedArgs(
+                collateralToken,
+                proposition,
+                outcomes,
+                payoffPolicy,
+                policyParam,
+                bettingCloseTime,
+                resolutionWindow,
+                resolver,
+                bettingCloser,
+                resolutionCloser,
+                extraFeeRecipients,
+                extraFeeBps,
+                new uint256[](0),
+                new uint256[](0),
+                0
+            )
         );
     }
 
+    /// @notice Enumerated wager seeded with the proposer's own bets in the creation transaction.
     function createEnumeratedWager(
         address collateralToken,
         string memory proposition,
@@ -157,30 +156,30 @@ contract ParamutuelFactoryV3 {
         uint256[] memory seedAmounts
     ) external returns (address wager) {
         return _createEnumerated(
-            collateralToken,
-            proposition,
-            outcomes,
-            payoffPolicy,
-            policyParam,
-            bettingCloseTime,
-            resolutionWindow,
-            resolver,
-            bettingCloser,
-            resolutionCloser,
-            extraFeeRecipients,
-            extraFeeBps,
-            seedTicketMasks,
-            seedAmounts
+            EnumeratedArgs(
+                collateralToken,
+                proposition,
+                outcomes,
+                payoffPolicy,
+                policyParam,
+                bettingCloseTime,
+                resolutionWindow,
+                resolver,
+                bettingCloser,
+                resolutionCloser,
+                extraFeeRecipients,
+                extraFeeBps,
+                seedTicketMasks,
+                seedAmounts,
+                0
+            )
         );
     }
 
-    /// @dev Centralised enumerated-wager construction path. Both public overloads
-    ///      funnel here so the validation and event-emission logic exists in exactly
-    ///      one place. Validation order is deliberate: cheap shape checks first
-    ///      (outcomes count, seed array parity), then policy / mask validation, then
-    ///      lifecycle-config checks, then fee-config — this fails fast on the most
-    ///      common misconfigurations before any bytecode is deployed.
-    function _createEnumerated(
+    /// @notice Enumerated wager with optional seeds and a minimum stake to open a new ticket, which
+    ///         prices griefing by dust tickets in units of the proposer's chosen collateral.
+    /// @dev Seed tickets are new tickets, so each seed amount must also meet the minimum.
+    function createEnumeratedWager(
         address collateralToken,
         string memory proposition,
         string[] memory outcomes,
@@ -194,67 +193,100 @@ contract ParamutuelFactoryV3 {
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps,
         uint256[] memory seedTicketMasks,
-        uint256[] memory seedAmounts
-    ) internal returns (address wager) {
-        if (outcomes.length < 2) revert BadOutcomes();
-        if (outcomes.length > MAX_OUTCOMES) revert TooManyOutcomes();
-        if (seedTicketMasks.length != seedAmounts.length) revert BadSeedConfig();
+        uint256[] memory seedAmounts,
+        uint256 minNewTicketStake
+    ) external returns (address wager) {
+        return _createEnumerated(
+            EnumeratedArgs(
+                collateralToken,
+                proposition,
+                outcomes,
+                payoffPolicy,
+                policyParam,
+                bettingCloseTime,
+                resolutionWindow,
+                resolver,
+                bettingCloser,
+                resolutionCloser,
+                extraFeeRecipients,
+                extraFeeBps,
+                seedTicketMasks,
+                seedAmounts,
+                minNewTicketStake
+            )
+        );
+    }
+
+    /// @dev All overloads' arguments, as a struct so the builder stays within the stack limit even
+    ///      in the unoptimised build `forge coverage` uses.
+    struct EnumeratedArgs {
+        address collateralToken;
+        string proposition;
+        string[] outcomes;
+        ParamutuelWagerV3.PayoffPolicy payoffPolicy;
+        uint256 policyParam;
+        uint64 bettingCloseTime;
+        uint64 resolutionWindow;
+        address resolver;
+        address bettingCloser;
+        address resolutionCloser;
+        address[] extraFeeRecipients;
+        uint16[] extraFeeBps;
+        uint256[] seedTicketMasks;
+        uint256[] seedAmounts;
+        uint256 minNewTicketStake;
+    }
+
+    /// @dev Centralised enumerated-wager construction path. Validation order is deliberate: cheap
+    ///      shape checks first (outcomes count, seed array parity), then policy / mask validation,
+    ///      then lifecycle-config checks, then fee-config. This fails fast on the most common
+    ///      misconfigurations before any bytecode is deployed.
+    function _createEnumerated(EnumeratedArgs memory a) internal returns (address wager) {
+        if (a.outcomes.length < 2) revert BadOutcomes();
+        if (a.outcomes.length > MAX_OUTCOMES) revert TooManyOutcomes();
+        if (a.seedTicketMasks.length != a.seedAmounts.length) revert BadSeedConfig();
 
         uint256 seedTotal;
-        for (uint256 i; i < seedAmounts.length; i++) {
-            if (seedAmounts[i] == 0) revert BadSeedConfig();
-            seedTotal += seedAmounts[i];
+        for (uint256 i; i < a.seedAmounts.length; i++) {
+            if (a.seedAmounts[i] == 0) revert BadSeedConfig();
+            seedTotal += a.seedAmounts[i];
         }
 
-        uint256 nOpt = outcomes.length;
-        _validatePolicyParam(payoffPolicy, policyParam, nOpt);
-        for (uint256 s; s < seedTicketMasks.length; s++) {
-            _validateSeedTicketMask(seedTicketMasks[s], payoffPolicy, nOpt);
+        _validatePolicyParam(a.payoffPolicy, a.policyParam, a.outcomes.length);
+        for (uint256 s; s < a.seedTicketMasks.length; s++) {
+            _validateSeedTicketMask(a.seedTicketMasks[s], a.payoffPolicy, a.outcomes.length);
         }
 
-        uint64 nowTs = uint64(block.timestamp);
-        if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
-        if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
-        // ADR-0005: a zero-time lifecycle is permitted only when the corresponding
-        // human authority is configured. Without one, the wager would be unable to
-        // ever transition state — `expire()` requires `_resolutionWindowOver()` and
-        // `resolve()` requires `_bettingClosed()`, both of which gate on these values.
-        if (bettingCloseTime == 0 && bettingCloser == address(0)) revert InvalidLifecycleConfig();
-        if (resolutionWindow == 0 && resolutionCloser == address(0)) revert InvalidLifecycleConfig();
+        _validateLifecycle(a.bettingCloseTime, a.resolutionWindow, a.bettingCloser, a.resolutionCloser);
+        (address[] memory feeRecipients, uint16[] memory feeBps) = _buildFeeConfig(a.extraFeeRecipients, a.extraFeeBps);
 
-        (address[] memory feeRecipients, uint16[] memory feeBps, uint256 totalFeeBps) =
-            _buildFeeConfig(extraFeeRecipients, extraFeeBps);
-        if (totalFeeBps > MAX_TOTAL_FEE_BPS) revert BadFeeConfig();
-
-        // Resolution deadline is only meaningful when both windows are time-bounded;
-        // if either is delegated to a human authority, `0` signals "no automatic
-        // expiry" and the wager relies on `closeBetting()` / `closeResolutionWindow()`.
-        uint64 resolutionDeadline =
-            (bettingCloseTime == 0 || resolutionWindow == 0) ? uint64(0) : bettingCloseTime + resolutionWindow;
+        uint64 resolutionDeadline = _resolutionDeadline(a.bettingCloseTime, a.resolutionWindow);
 
         // Default the resolver to the proposer (msg.sender) when zero is passed. ADR-0001
         // makes the resolver immutable post-construction; defaulting here lets the
         // simplest case ("I propose and I resolve") skip an explicit argument.
-        address resolvedResolver = resolver == address(0) ? msg.sender : resolver;
+        address resolvedResolver = a.resolver == address(0) ? msg.sender : a.resolver;
 
         ParamutuelWagerV3 w = new ParamutuelWagerV3(
-            ParamutuelWagerV3.WagerMode.Enumerated,
-            address(this),
-            msg.sender,
-            resolvedResolver,
-            bettingCloser,
-            resolutionCloser,
-            collateralToken,
-            proposition,
-            outcomes,
-            payoffPolicy,
-            policyParam,
-            bettingCloseTime,
-            resolutionWindow,
-            resolutionDeadline,
-            feeRecipients,
-            feeBps,
-            0
+            ParamutuelWagerV3.InitParams({
+                mode: ParamutuelWagerV3.WagerMode.Enumerated,
+                factory: address(this),
+                proposer: msg.sender,
+                resolver: resolvedResolver,
+                bettingCloser: a.bettingCloser,
+                resolutionCloser: a.resolutionCloser,
+                collateralToken: a.collateralToken,
+                proposition: a.proposition,
+                outcomes: a.outcomes,
+                payoffPolicy: a.payoffPolicy,
+                policyParam: a.policyParam,
+                bettingCloseTime: a.bettingCloseTime,
+                resolutionWindow: a.resolutionWindow,
+                resolutionDeadline: resolutionDeadline,
+                feeRecipients: feeRecipients,
+                feeBps: feeBps,
+                minNewTicketStake: a.minNewTicketStake
+            })
         );
 
         wager = address(w);
@@ -263,14 +295,14 @@ contract ParamutuelFactoryV3 {
             wager,
             msg.sender,
             resolvedResolver,
-            collateralToken,
-            uint8(payoffPolicy),
-            policyParam,
-            bettingCloseTime,
-            resolutionWindow,
+            a.collateralToken,
+            uint8(a.payoffPolicy),
+            a.policyParam,
+            a.bettingCloseTime,
+            a.resolutionWindow,
             resolutionDeadline,
-            bettingCloser,
-            resolutionCloser
+            a.bettingCloser,
+            a.resolutionCloser
         );
 
         // Seed-bet flow: the factory pulls collateral from `msg.sender` directly into
@@ -280,23 +312,17 @@ contract ParamutuelFactoryV3 {
         // wager itself unable to pull funds from arbitrary addresses. Ordering is
         // post-event so external observers see creation before the seed bets are
         // recorded; the seeder emits its own per-bet events from inside the wager.
-        if (seedAmounts.length > 0) {
-            bool ok = IERC20(collateralToken).transferFrom(msg.sender, wager, seedTotal);
+        if (a.seedAmounts.length > 0) {
+            bool ok = IERC20(a.collateralToken).transferFrom(msg.sender, wager, seedTotal);
             require(ok, "TRANSFER_FROM");
-            ParamutuelWagerV3(wager).seedInitialBetsFromFactory(msg.sender, seedTicketMasks, seedAmounts);
+            ParamutuelWagerV3(wager).seedInitialBetsFromFactory(msg.sender, a.seedTicketMasks, a.seedAmounts);
         }
     }
 
     /// @notice Deploy a freeform-text wager (ADR-0009 lineage, hosted in V3 under
     ///         `WagerMode.Freeform`). No `outcomes[]`, no payoff-policy parameter, no
-    ///         seed-bets — answer space is unbounded UTF-8 and bettors create new
-    ///         answer ids by placing the first bet on a string. The wager is
-    ///         constructed with `WAGER_MAX_DISTINCT_ANSWERS` as the cap on how many
-    ///         distinct answer ids it will record before reverting further bets.
-    /// @dev The freeform path duplicates the lifecycle/fee validation from
-    ///      `_createEnumerated` rather than sharing it because the seed-bet branch and
-    ///      the policy-param validation are enumerated-only; sharing would require
-    ///      threading a mode flag through helper functions for marginal LoC savings.
+    ///         seed-bets: the answer space is open, and bettors create new answer ids
+    ///         by placing the first bet on a string.
     function createFreeformWager(
         address collateralToken,
         string memory proposition,
@@ -308,43 +334,89 @@ contract ParamutuelFactoryV3 {
         address[] memory extraFeeRecipients,
         uint16[] memory extraFeeBps
     ) external returns (address wager) {
-        uint64 nowTs = uint64(block.timestamp);
-        if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
-        if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
-        if (bettingCloseTime == 0 && bettingCloser == address(0)) revert InvalidLifecycleConfig();
-        if (resolutionWindow == 0 && resolutionCloser == address(0)) revert InvalidLifecycleConfig();
-
-        (address[] memory feeRecipients, uint16[] memory feeBps, uint256 totalFeeBps) =
-            _buildFeeConfig(extraFeeRecipients, extraFeeBps);
-        if (totalFeeBps > MAX_TOTAL_FEE_BPS) revert BadFeeConfig();
-
-        uint64 resolutionDeadline =
-            (bettingCloseTime == 0 || resolutionWindow == 0) ? uint64(0) : bettingCloseTime + resolutionWindow;
-
-        address resolvedResolver = resolver == address(0) ? msg.sender : resolver;
-
-        // Freeform mode requires zero outcomes at construction; the wager's
-        // constructor enforces that as well, but passing an empty memory array here
-        // keeps the call shape uniform with the enumerated path.
-        string[] memory emptyOutcomes;
-        ParamutuelWagerV3 w = new ParamutuelWagerV3(
-            ParamutuelWagerV3.WagerMode.Freeform,
-            address(this),
-            msg.sender,
-            resolvedResolver,
-            bettingCloser,
-            resolutionCloser,
+        return _createFreeform(
             collateralToken,
             proposition,
-            emptyOutcomes,
-            ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER,
-            0,
             bettingCloseTime,
             resolutionWindow,
-            resolutionDeadline,
-            feeRecipients,
-            feeBps,
-            WAGER_MAX_DISTINCT_ANSWERS
+            resolver,
+            bettingCloser,
+            resolutionCloser,
+            extraFeeRecipients,
+            extraFeeBps,
+            0
+        );
+    }
+
+    /// @notice Freeform wager with a minimum stake to open a new answer. Without one, dust answers
+    ///         cannot harm settlement but can clutter off-chain answer lists.
+    function createFreeformWager(
+        address collateralToken,
+        string memory proposition,
+        uint64 bettingCloseTime,
+        uint64 resolutionWindow,
+        address resolver,
+        address bettingCloser,
+        address resolutionCloser,
+        address[] memory extraFeeRecipients,
+        uint16[] memory extraFeeBps,
+        uint256 minNewTicketStake
+    ) external returns (address wager) {
+        return _createFreeform(
+            collateralToken,
+            proposition,
+            bettingCloseTime,
+            resolutionWindow,
+            resolver,
+            bettingCloser,
+            resolutionCloser,
+            extraFeeRecipients,
+            extraFeeBps,
+            minNewTicketStake
+        );
+    }
+
+    function _createFreeform(
+        address collateralToken,
+        string memory proposition,
+        uint64 bettingCloseTime,
+        uint64 resolutionWindow,
+        address resolver,
+        address bettingCloser,
+        address resolutionCloser,
+        address[] memory extraFeeRecipients,
+        uint16[] memory extraFeeBps,
+        uint256 minNewTicketStake
+    ) internal returns (address wager) {
+        _validateLifecycle(bettingCloseTime, resolutionWindow, bettingCloser, resolutionCloser);
+        (address[] memory feeRecipients, uint16[] memory feeBps) = _buildFeeConfig(extraFeeRecipients, extraFeeBps);
+
+        uint64 resolutionDeadline = _resolutionDeadline(bettingCloseTime, resolutionWindow);
+        address resolvedResolver = resolver == address(0) ? msg.sender : resolver;
+
+        // Freeform mode requires zero outcomes at construction; the wager's constructor enforces
+        // that as well.
+        string[] memory emptyOutcomes;
+        ParamutuelWagerV3 w = new ParamutuelWagerV3(
+            ParamutuelWagerV3.InitParams({
+                mode: ParamutuelWagerV3.WagerMode.Freeform,
+                factory: address(this),
+                proposer: msg.sender,
+                resolver: resolvedResolver,
+                bettingCloser: bettingCloser,
+                resolutionCloser: resolutionCloser,
+                collateralToken: collateralToken,
+                proposition: proposition,
+                outcomes: emptyOutcomes,
+                payoffPolicy: ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER,
+                policyParam: 0,
+                bettingCloseTime: bettingCloseTime,
+                resolutionWindow: resolutionWindow,
+                resolutionDeadline: resolutionDeadline,
+                feeRecipients: feeRecipients,
+                feeBps: feeBps,
+                minNewTicketStake: minNewTicketStake
+            })
         );
 
         wager = address(w);
@@ -362,18 +434,41 @@ contract ParamutuelFactoryV3 {
         );
     }
 
+    /// @dev Shared window guardrails. A zero time is permitted only when the matching authority is
+    ///      configured (ADR-0005): without one, the wager could never leave its current phase.
+    ///      Betting cannot close before `minBettingWindow` from now, and a time-bounded resolution
+    ///      window cannot be shorter than `minResolutionWindow`.
+    function _validateLifecycle(
+        uint64 bettingCloseTime,
+        uint64 resolutionWindow,
+        address bettingCloser,
+        address resolutionCloser
+    ) internal view {
+        uint64 nowTs = uint64(block.timestamp);
+        if (bettingCloseTime != 0 && bettingCloseTime < nowTs + minBettingWindow) revert WindowTooShort();
+        if (resolutionWindow != 0 && resolutionWindow < minResolutionWindow) revert WindowTooShort();
+        if (bettingCloseTime == 0 && bettingCloser == address(0)) revert InvalidLifecycleConfig();
+        if (resolutionWindow == 0 && resolutionCloser == address(0)) revert InvalidLifecycleConfig();
+    }
+
+    /// @dev Latest possible deadline, for display only: zero when either window is closer-managed,
+    ///      and superseded by an earlier `closeBetting`, which re-anchors the resolution window.
+    function _resolutionDeadline(uint64 bettingCloseTime, uint64 resolutionWindow) internal pure returns (uint64) {
+        return (bettingCloseTime == 0 || resolutionWindow == 0) ? uint64(0) : bettingCloseTime + resolutionWindow;
+    }
+
     /// @dev Composes the wager's immutable fee-recipient list. The protocol's own
     ///      `(treasury, protocolFeeBps)` is prepended at slot 0 when `protocolFeeBps`
-    ///      is non-zero; proposer-supplied extras follow. The order matters at claim
-    ///      time: `_chargeFeesOnce` in the wager pays each slice in declared order
-    ///      with the last slice taking the rounding remainder, so slot 0 (the
-    ///      protocol) absorbs the smallest dust on average.
+    ///      is non-zero; proposer-supplied extras follow. Order matters at finalisation:
+    ///      `_chargeFeesOnce` floors each slice in declared order and gives the last slice
+    ///      the rounding remainder.
     function _buildFeeConfig(address[] memory extraRecipients, uint16[] memory extraBps)
         internal
         view
-        returns (address[] memory feeRecipients, uint16[] memory feeBps, uint256 totalFeeBps)
+        returns (address[] memory feeRecipients, uint16[] memory feeBps)
     {
         if (extraRecipients.length != extraBps.length) revert BadFeeConfig();
+        if (extraRecipients.length > MAX_EXTRA_FEE_RECIPIENTS) revert BadFeeConfig();
 
         // Pre-size the output once. A protocol slot is reserved iff `protocolFeeBps > 0`
         // — keeping a zero-bps protocol slot in the array would force the wager to
@@ -384,6 +479,7 @@ contract ParamutuelFactoryV3 {
         feeBps = new uint16[](n);
 
         uint256 idx;
+        uint256 totalFeeBps;
         if (protocolFeeBps > 0) {
             feeRecipients[idx] = treasury;
             feeBps[idx] = protocolFeeBps;
@@ -399,6 +495,7 @@ contract ParamutuelFactoryV3 {
             totalFeeBps += extraBps[i];
             idx++;
         }
+        if (totalFeeBps > MAX_TOTAL_FEE_BPS) revert BadFeeConfig();
     }
 
     /// @dev Only `AT_LEAST_K` consumes `policyParam` (as the threshold K). For every
@@ -417,19 +514,6 @@ contract ParamutuelFactoryV3 {
         }
     }
 
-    /// @dev Brian Kernighan bit-count. Used only for seed-mask validation, where the
-    ///      mask is bounded by `MAX_OUTCOMES` so the loop is small. Duplicated rather
-    ///      than imported from the wager because keeping the factory free of internal
-    ///      cross-imports simplifies the deployment graph.
-    function _popcount(uint256 x) internal pure returns (uint256 c) {
-        unchecked {
-            while (x != 0) {
-                x &= x - 1;
-                c++;
-            }
-        }
-    }
-
     /// @dev Pre-flight for seed-bet masks before they reach the wager. Mirrors the
     ///      wager's own `_validateMask` + `_policyAllowsTicket` so a malformed seed
     ///      reverts at creation time rather than after deployment, leaving an
@@ -441,7 +525,7 @@ contract ParamutuelFactoryV3 {
     {
         if (mask == 0) revert BadSeedConfig();
         if (mask >> numOptions_ != 0) revert BadSeedConfig();
-        if (policy == ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER && _popcount(mask) != 1) {
+        if (policy == ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER && !BitMath.isSingleBit(mask)) {
             revert BadSeedConfig();
         }
     }

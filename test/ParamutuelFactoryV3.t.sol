@@ -362,6 +362,5 @@ contract ParamutuelFactoryV3Test is Test {
         assertEq(factory.wagers(0), wa);
         ParamutuelWagerV3 w = ParamutuelWagerV3(wa);
         assertEq(uint256(w.MODE()), uint256(ParamutuelWagerV3.WagerMode.Freeform));
-        assertEq(w.maxDistinctAnswers(), 1024);
     }
 }

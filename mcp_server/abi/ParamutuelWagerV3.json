@@ -4,89 +4,96 @@
       "type": "constructor",
       "inputs": [
         {
-          "name": "mode_",
-          "type": "uint8",
-          "internalType": "enum ParamutuelWagerV3.WagerMode"
-        },
-        {
-          "name": "factory_",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "proposer_",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "resolver_",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "bettingCloser_",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "resolutionCloser_",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "collateralToken_",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "proposition_",
-          "type": "string",
-          "internalType": "string"
-        },
-        {
-          "name": "outcomes_",
-          "type": "string[]",
-          "internalType": "string[]"
-        },
-        {
-          "name": "payoffPolicy_",
-          "type": "uint8",
-          "internalType": "enum ParamutuelWagerV3.PayoffPolicy"
-        },
-        {
-          "name": "policyParam_",
-          "type": "uint256",
-          "internalType": "uint256"
-        },
-        {
-          "name": "bettingCloseTime_",
-          "type": "uint64",
-          "internalType": "uint64"
-        },
-        {
-          "name": "resolutionWindow_",
-          "type": "uint64",
-          "internalType": "uint64"
-        },
-        {
-          "name": "resolutionDeadline_",
-          "type": "uint64",
-          "internalType": "uint64"
-        },
-        {
-          "name": "feeRecipients_",
-          "type": "address[]",
-          "internalType": "address[]"
-        },
-        {
-          "name": "feeBps_",
-          "type": "uint16[]",
-          "internalType": "uint16[]"
-        },
-        {
-          "name": "maxDistinctAnswers_",
-          "type": "uint256",
-          "internalType": "uint256"
+          "name": "p",
+          "type": "tuple",
+          "internalType": "struct ParamutuelWagerV3.InitParams",
+          "components": [
+            {
+              "name": "mode",
+              "type": "uint8",
+              "internalType": "enum ParamutuelWagerV3.WagerMode"
+            },
+            {
+              "name": "factory",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "proposer",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "resolver",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "bettingCloser",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "resolutionCloser",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "collateralToken",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "proposition",
+              "type": "string",
+              "internalType": "string"
+            },
+            {
+              "name": "outcomes",
+              "type": "string[]",
+              "internalType": "string[]"
+            },
+            {
+              "name": "payoffPolicy",
+              "type": "uint8",
+              "internalType": "enum ParamutuelWagerV3.PayoffPolicy"
+            },
+            {
+              "name": "policyParam",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "bettingCloseTime",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "resolutionWindow",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "resolutionDeadline",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "feeRecipients",
+              "type": "address[]",
+              "internalType": "address[]"
+            },
+            {
+              "name": "feeBps",
+              "type": "uint16[]",
+              "internalType": "uint16[]"
+            },
+            {
+              "name": "minNewTicketStake",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ]
         }
       ],
       "stateMutability": "nonpayable"
@@ -375,19 +382,6 @@
     },
     {
       "type": "function",
-      "name": "feesCharged",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool",
-          "internalType": "bool"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
       "name": "hasClaimed",
       "inputs": [
         {
@@ -407,7 +401,7 @@
     },
     {
       "type": "function",
-      "name": "maxDistinctAnswers",
+      "name": "minNewTicketStake",
       "inputs": [],
       "outputs": [
         {
@@ -1073,6 +1067,25 @@
     },
     {
       "type": "event",
+      "name": "FreeformAnswerRevealedV3",
+      "inputs": [
+        {
+          "name": "answerId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "answer",
+          "type": "string",
+          "indexed": false,
+          "internalType": "string"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "ResolutionWindowClosedByAuthorityV3",
       "inputs": [
         {
@@ -1158,11 +1171,6 @@
     },
     {
       "type": "error",
-      "name": "InvalidDistinctCap",
-      "inputs": []
-    },
-    {
-      "type": "error",
       "name": "InvalidOutcome",
       "inputs": []
     },
@@ -1179,6 +1187,16 @@
     {
       "type": "error",
       "name": "InvalidWinningMask",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "MulDivOverflow",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NewTicketStakeTooLow",
       "inputs": []
     },
     {
@@ -1219,11 +1237,6 @@
     {
       "type": "error",
       "name": "ResolutionWindowOver",
-      "inputs": []
-    },
-    {
-      "type": "error",
-      "name": "TooManyDistinctAnswers",
       "inputs": []
     },
     {
