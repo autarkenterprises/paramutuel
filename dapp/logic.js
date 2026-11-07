@@ -303,6 +303,26 @@
     }
   }
 
+  /**
+   * Validate a user-typed token amount and return it as text, ready for `ethers.parseUnits`.
+   * Deliberately never goes through `Number`: that turned 0.0000001 into "1e-7", which parseUnits
+   * rejects, and silently rounded large values, so the wallet would approve a different amount than
+   * the one typed (ADR-0020).
+   * @param {string} raw
+   * @returns {string}
+   */
+  function parseHumanAmount(raw) {
+    const text = String(raw == null ? "" : raw).trim();
+    if (!/^(\d+\.?\d*|\.\d+)$/.test(text)) {
+      throw new Error(`Invalid amount: ${JSON.stringify(text)}. Use plain digits, like 10 or 0.25.`);
+    }
+    const normalized = (text.startsWith(".") ? `0${text}` : text).replace(/\.$/, "");
+    if (!/[1-9]/.test(normalized)) {
+      throw new Error("Invalid amount: it must be greater than zero.");
+    }
+    return normalized;
+  }
+
   function parseMultiBetInputs(indicesCsv, amountsCsv, allowEmpty = true) {
     const parseCsv = (s) =>
       String(s || "")
@@ -314,7 +334,7 @@
     const rawAmounts = parseCsv(amountsCsv);
 
     if (rawIndices.length === 0 && rawAmounts.length === 0 && allowEmpty) {
-      return { outcomeIndices: [], amountNumbers: [] };
+      return { outcomeIndices: [], amountStrings: [] };
     }
     if (rawIndices.length === 0 || rawAmounts.length === 0) {
       throw new Error("Both outcome indices and amounts are required.");
@@ -328,12 +348,8 @@
       if (!Number.isInteger(n) || n < 0) throw new Error(`Invalid outcome index: ${v}`);
       return n;
     });
-    const amountNumbers = rawAmounts.map((v) => {
-      const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0) throw new Error(`Invalid amount: ${v}`);
-      return n;
-    });
-    return { outcomeIndices, amountNumbers };
+    const amountStrings = rawAmounts.map(parseHumanAmount);
+    return { outcomeIndices, amountStrings };
   }
 
   const WAGER_ACTION_CONFIG = {
@@ -386,6 +402,7 @@
     computeWindowArgs,
     validateWindowMins,
     parseMultiBetInputs,
+    parseHumanAmount,
     computeAbsoluteTemplateClose,
     resolveTemplate,
     WAGER_ACTION_CONFIG,

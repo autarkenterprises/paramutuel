@@ -1,6 +1,6 @@
 ## Minimal dApp (MVP)
 
-**Paramutuel** is permissionless, on-chain prop betting in any ERC-20, with configurable resolution and roles per wager—no centralized approval of markets or payouts. This dApp is the **self-custody** UI for that protocol: you connect a wallet and interact with contracts directly.
+**Paramutuel** is permissionless, on-chain prop betting in any standard ERC-20, with configurable resolution and roles per wager—no centralized approval of markets or payouts. This dApp is the **self-custody** UI for that protocol: you connect a wallet and interact with contracts directly.
 
 This is a minimal, no-build frontend that uses `ethers` from a CDN (UMD bundle) and loads contract ABIs from committed files in `dapp/abi/`, with a fallback to Foundry build artifacts in `out/`.
 

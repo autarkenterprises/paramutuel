@@ -53,6 +53,15 @@
           Connect wallet to auto-detect network and token decimals.
           Pick a known token preset, or keep custom entry.
         </div>
+        <label class="span-2">
+          <input id="allowUnlistedCollateral" type="checkbox" />
+          Use an unlisted token. I understand fee-on-transfer and rebasing tokens can leave the last claimants unpaid.
+        </label>
+        <label>
+          Minimum stake to open a new ticket (optional, in tokens)
+          <input id="minNewTicketStake" inputmode="decimal" autocomplete="off" placeholder="e.g. 1"
+                 title="Makes griefing with dust tickets cost real collateral. Needs a factory deployed after ADR-0020." />
+        </label>
 
         <label>
           Proposition
@@ -229,6 +238,7 @@
         <button id="loadWagerBtn">Load Wager</button>
       </div>
       <div id="activeWagerCollateralMeta" class="muted" hidden></div>
+      <div id="activeWagerWarnings" class="warn" role="alert" hidden></div>
       <div class="grid">
         <label>
           <span id="betOutcomeFieldLabel">Outcome index (single integer)</span>
@@ -294,6 +304,7 @@
           <span id="winningOutcomeFieldLabel">Winning outcome index</span>
           <input id="winningOutcomeIndex" type="text" value="0" inputmode="numeric" autocomplete="off" />
         </label>
+        <div id="winningAnswerBytes" class="muted span-2" hidden></div>
       </div>
       <div class="row">
         <button id="closeBettingBtn">Close betting (closer)</button>

@@ -5,6 +5,7 @@
   // Pure open-for-stakes / odds-accuracy decisions (site/bet-logic.js, unit-tested; ADR-0019).
   const BetLogic = globalThis.ParamutuelBetLogic;
   const CONFIG_URL = "config/deployments.json";
+  const COLLATERAL_ALLOWLIST_URL = "config/collateral-allowlist.json";
   const WAGER_ABI_V3_URL = "dapp/abi/ParamutuelWagerV3.json";
 
   const CHAIN_NAMES = {
@@ -12,25 +13,11 @@
     84532: "Base Sepolia",
   };
 
-  /** Base / Base Sepolia presets (aligned with dApp TOKEN_PRESETS). */
-  const KNOWN_COLLATERAL_SYMBOLS = {
-    84532: {
-      "0x036cbd53842c5426634e7929541ec2318f3dcf7e": "USDC",
-      "0x4200000000000000000000000000000000000006": "WETH",
-    },
-    8453: {
-      "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": "USDC",
-      "0x4200000000000000000000000000000000000006": "WETH",
-      "0x50c5725949a6f0c72e6c4a641f24049a917db0cb": "DAI",
-      "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf": "cbBTC",
-    },
-  };
-
   const ERC20_DECIMALS_ABI = ["function decimals() view returns (uint8)"];
-  const ERC20_SYMBOL_STRING_ABI = ["function symbol() view returns (string)"];
-  const ERC20_SYMBOL_BYTES32_ABI = ["function symbol() view returns (bytes32)"];
-
   let deployments = null;
+  /** Parsed collateral allowlist (ADR-0018); null if it failed to load. */
+  let collateralAllowlist = null;
+  let activeNetworkKey = null;
   let expectedChainId = null;
   let wagerAbi = null;
   /** @type {"enumerated"|"freeform"} */
@@ -43,6 +30,12 @@
   let outcomeLabels = [];
   /** Checksum address of the wager currently shown (for copy / reload). */
   let loadedWagerAddress = null;
+  /** Indexer row of the wager currently shown; drives whether it can take a stake. */
+  let currentWagerRow = null;
+  /** True once token decimals came from the chain or the user opted into manual entry. */
+  let decimalsKnown = false;
+  /** An answer picked from the list: sent byte-exact, since it may legitimately carry spaces. */
+  let pickedAnswer = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -78,8 +71,25 @@
     }
   }
 
-  function parseAmountHuman(amountNumber, decimals) {
-    return ethers.parseUnits(String(amountNumber), decimals);
+  function parseAmountHuman(amountText, decimals) {
+    return ethers.parseUnits(BetLogic.parseHumanAmount(amountText), decimals);
+  }
+
+  /**
+   * The single writer of the submit button's state, so that no path can re-enable staking on its own.
+   * Called whenever the wager, the wallet, the decimals, or the wall clock might have changed the answer.
+   */
+  function syncSubmitState() {
+    const reason = currentWagerRow
+      ? BetLogic.stakeBlockReason({
+          wager: currentWagerRow,
+          nowSec: Math.floor(Date.now() / 1000),
+          walletConnected: Boolean(signer),
+          decimalsKnown,
+        })
+      : "Load a wager first.";
+    $("betSubmitBtn").disabled = reason !== "";
+    return reason;
   }
 
   async function loadJson(url) {
@@ -95,6 +105,13 @@
     const netKey = PSN
       ? PSN.getActiveNetworkKey(data)
       : String(data?.defaultNetwork || "baseSepolia").trim();
+    activeNetworkKey = netKey;
+    try {
+      collateralAllowlist = await loadJson(COLLATERAL_ALLOWLIST_URL);
+    } catch (e) {
+      console.warn("Collateral allowlist unavailable:", e);
+      collateralAllowlist = null;
+    }
     const net = PSN ? PSN.getNetworkEntry(data, netKey) : data?.[netKey] || {};
     indexerBase = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
     const cid = net.chainId;
@@ -137,6 +154,8 @@
   function showError(msg) {
     clearLoading();
     loadedWagerAddress = null;
+    currentWagerRow = null;
+    syncSubmitState();
     showEl("betError", true);
     showEl("betSummary", false);
     showEl("betFormSection", false);
@@ -211,12 +230,13 @@
     const feeBps = BigInt(String(feeBpsRaw || "0"));
     const net = netPotAfterFees(totalPot, feeBps);
     const rows = (ticketPoolsArr || []).filter((r) => BigInt(String(r.pool_total || "0")) > 0n);
-    const sumStakes = rows.reduce((a, r) => a + BigInt(String(r.pool_total || "0")), 0n);
+    const sumStakes = totalPot;
 
     tbody.innerHTML = "";
     rows
       .map((r) => ({
         mask: String(r.ticket_mask || "").trim(),
+        answer: r.answer_text === undefined ? null : r.answer_text,
         stake: BigInt(String(r.pool_total || "0")),
       }))
       .sort((a, b) => (a.stake > b.stake ? -1 : a.stake < b.stake ? 1 : 0))
@@ -226,13 +246,33 @@
         const mult =
           row.stake > 0n ? `${formatRatioBig(net, row.stake, 4)}x` : "—";
         const tr = document.createElement("tr");
+        const note = BetLogic.answerNote(row.answer);
+        // White-space is preserved because it is part of the answer. Text arrives from any bettor, so
+        // it is escaped here, and handed to the form below through a closure, never through markup.
         tr.innerHTML = `
         <td>${i}</td>
-        <td class="bet-outcome-name-cell"><code>${escapeHtml(row.mask)}</code></td>
+        <td class="bet-outcome-name-cell">
+          ${row.answer !== null ? `<span style="white-space:pre-wrap;">${escapeHtml(row.answer)}</span>` : `<code>${escapeHtml(row.mask)}</code>`}
+          ${note ? `<div class="muted" style="font-size:0.85rem;">${escapeHtml(note)}</div>` : ""}
+        </td>
         <td>${formatPot(row.stake)}</td>
         <td>${poolPct.toFixed(1)}%</td>
         <td>${escapeHtml(mult)}</td>
       `;
+        if (row.answer !== null) {
+          const pick = document.createElement("button");
+          pick.type = "button";
+          pick.className = "btn btn-secondary";
+          pick.textContent = "Back this answer";
+          pick.addEventListener("click", () => {
+            const input = $("betFreeformAnswerInput");
+            if (!input) return;
+            input.value = row.answer;
+            pickedAnswer = row.answer;
+            input.focus();
+          });
+          tr.querySelector(".bet-outcome-name-cell").appendChild(pick);
+        }
         tbody.appendChild(tr);
       });
     if (rows.length === 0) {
@@ -327,33 +367,6 @@
       .replace(/"/g, "&quot;");
   }
 
-  function knownCollateralSymbol(addr) {
-    if (!addr || expectedChainId == null) return null;
-    const m = KNOWN_COLLATERAL_SYMBOLS[expectedChainId];
-    return m ? m[String(addr).toLowerCase()] || null : null;
-  }
-
-  async function fetchCollateralSymbolFromChain(addr) {
-    if (!provider || !ethers.isAddress(addr)) return null;
-    const cStr = new ethers.Contract(addr, ERC20_SYMBOL_STRING_ABI, provider);
-    try {
-      const s = await cStr.symbol();
-      if (typeof s === "string") {
-        const t = s.trim();
-        if (t) return t.slice(0, 32);
-      }
-    } catch (_) {}
-    try {
-      const cB = new ethers.Contract(addr, ERC20_SYMBOL_BYTES32_ABI, provider);
-      const b = await cB.symbol();
-      if (b != null && typeof ethers.decodeBytes32String === "function") {
-        const t = ethers.decodeBytes32String(b).trim();
-        if (t) return t.slice(0, 32);
-      }
-    } catch (_) {}
-    return null;
-  }
-
   async function updateBetCollateralDisplay() {
     const human = $("betCollateralHuman");
     const code = $("betCollateral");
@@ -369,23 +382,26 @@
     }
     const checksum = ethers.getAddress(addr);
     code.textContent = checksum;
-    let sym = knownCollateralSymbol(addr);
-    if (!sym && provider) {
-      try {
-        sym = await fetchCollateralSymbolFromChain(addr);
-      } catch (_) {
-        sym = null;
-      }
-    }
+    // The name comes only from the curated list. A token's own symbol() is whatever its deployer
+    // chose, so showing it would let a fake token present itself as USDC (ADR-0018).
+    const trust = BetLogic.collateralTrust(collateralAllowlist, activeNetworkKey, addr);
     if (human) {
-      if (sym) {
-        human.hidden = false;
-        human.textContent = `${sym} ·`;
-      } else {
-        human.hidden = true;
-        human.textContent = "";
-      }
+      human.hidden = !trust.symbol;
+      human.textContent = trust.symbol ? `${trust.symbol} ·` : "";
     }
+    const warningEl = $("betCollateralWarning");
+    if (warningEl) {
+      warningEl.textContent = trust.warning;
+      warningEl.hidden = !trust.warning;
+    }
+  }
+
+  function renderWagerWarnings(w) {
+    const el = $("betLivenessWarning");
+    if (!el) return;
+    const warnings = BetLogic.livenessWarnings(w);
+    el.textContent = warnings.join(" ");
+    el.hidden = warnings.length === 0;
   }
 
   async function applyWagerDetail(address, detail) {
@@ -393,6 +409,9 @@
     if (!w) throw new Error("Indexer response missing wager.");
 
     loadedWagerAddress = address;
+    currentWagerRow = w;
+    decimalsKnown = false;
+    pickedAnswer = null;
 
     const pvRaw = String(w.protocol_version || "").trim().toLowerCase();
     let pv = "enumerated";
@@ -479,7 +498,10 @@
     $("betPot").textContent = formatPot(totalPotVal);
     $("betFeeBps").textContent = String(feeBpsVal);
     $("betBettingClose").textContent = formatUtcSeconds(w.betting_close_time);
-    $("betResolutionDeadline").textContent = formatUtcSeconds(w.resolution_deadline);
+    // Not `w.resolution_deadline`: that is fixed at creation, and an early closeBetting moves the real
+    // deadline earlier.
+    $("betResolutionDeadline").textContent = formatUtcSeconds(BetLogic.effectiveResolutionDeadline(w));
+    renderWagerWarnings(w);
     $("betResolutionWindow").textContent =
       w.resolution_window != null && w.resolution_window !== "" ? String(w.resolution_window) : "—";
 
@@ -544,7 +566,7 @@
     // betting closer), so mirror the contract's placeBet gates instead.
     const betStatus = BetLogic.bettingOpenStatus(w, Math.floor(Date.now() / 1000));
     const open = betStatus.open;
-    $("betSubmitBtn").disabled = !open || !signer;
+    syncSubmitState();
     if (!open) {
       let msg = betStatus.reason || "This wager is not open for new stakes.";
       if (state === "RESOLVED") msg = "Resolved — staking is closed. Winners can claim from the full dApp if applicable.";
@@ -569,11 +591,15 @@
       return;
     }
     if ($("betDecimalsManual").checked) {
+      decimalsKnown = true;
       $("betDecimalsHint").textContent = "Using manual decimals below.";
+      syncSubmitState();
       return;
     }
+    decimalsKnown = false;
     if (!provider) {
       $("betDecimalsHint").textContent = "Connect wallet to read decimals().";
+      syncSubmitState();
       return;
     }
     try {
@@ -582,10 +608,14 @@
       const n = Number(d);
       if (!Number.isFinite(n) || n < 0 || n > 77) throw new Error("Unusual decimals()");
       $("betDecimals").value = String(n);
+      decimalsKnown = true;
       $("betDecimalsHint").textContent = `Token decimals: ${n} (from chain).`;
     } catch (e) {
-      $("betDecimalsHint").textContent = `Could not read decimals(): ${e.message} — enable manual decimals.`;
+      // The field's default stays in place, so without this block a stake could be wrong by many
+      // orders of magnitude (6 assumed on an 18-decimal token).
+      $("betDecimalsHint").textContent = `Could not read decimals(): ${e.message} — enable manual decimals to stake.`;
     }
+    syncSubmitState();
   }
 
   async function ensureChain() {
@@ -618,12 +648,11 @@
     const wa = normalizeAddress($("wagerAddressInput").value) || getWagerFromQuery();
     if (wa && wagerAbi) {
       wagerContract = new ethers.Contract(wa, wagerAbi, signer);
-      const st = String($("betState").textContent || "").toUpperCase();
-      $("betSubmitBtn").disabled = st !== "OPEN";
       await refreshDecimals();
     }
     await updateBetCollateralDisplay();
     syncDecimalsReadonly();
+    syncSubmitState();
   }
 
   function syncDecimalsReadonly() {
@@ -665,16 +694,16 @@
     }
     if (currentProtocolVersion === "freeform") {
       const ansInp = $("betFreeformAnswerInput");
-      const answer = ansInp ? String(ansInp.value || "").trim() : "";
+      const typed = ansInp ? String(ansInp.value || "") : "";
+      // Trimming typed text forgives stray spaces, an off-chain convention ADR-0009 §5 allows. An
+      // answer picked from the list is sent exactly, or it would land in a different pool.
+      const answer = typed === pickedAnswer ? typed : typed.trim();
       if (!answer) throw new Error("Enter a non-empty answer string.");
       const amtInp = document.querySelector(".bet-amount-input[data-freeform-amount]");
-      const raw = amtInp ? String(amtInp.value || "").trim() : "";
-      const n = Number(raw);
-      if (!Number.isFinite(n) || n <= 0) throw new Error("Enter a positive stake amount.");
       return {
         freeform: true,
         answer,
-        amount: parseAmountHuman(n, decimals),
+        amount: parseAmountHuman(amtInp ? amtInp.value : "", decimals),
         decimals,
       };
     }
@@ -684,11 +713,9 @@
     for (const inp of inputs) {
       const raw = String(inp.value || "").trim();
       if (raw === "" || raw === "0") continue;
-      const n = Number(raw);
-      if (!Number.isFinite(n) || n <= 0) throw new Error("Each non-empty amount must be a positive number.");
       const idx = Number(inp.getAttribute("data-outcome-index"));
       indices.push(idx);
-      amounts.push(parseAmountHuman(n, decimals));
+      amounts.push(parseAmountHuman(raw, decimals));
     }
     if (indices.length === 0) throw new Error("Enter at least one positive stake amount.");
     return { indices, amounts, decimals, freeform: false };
@@ -700,7 +727,12 @@
     const code = await provider.getCode(wagerContract.target);
     if (code === "0x") throw new Error("No contract at this address on the current network.");
 
+    // Time may have passed since the page loaded. Checking now avoids an approve the bet would waste.
+    const blocked = syncSubmitState();
+    if (blocked) throw new Error(blocked);
+
     const packed = collectBets();
+    await assertMeetsMinimum(packed);
     const erc20Abi = ["function approve(address spender,uint256 amount) external returns (bool)"];
     const token = new ethers.Contract(collateralTokenAddr, erc20Abi, signer);
     const c = wagerContract.connect(signer);
@@ -728,6 +760,38 @@
       $("betTxStatus").textContent = "Bets placed successfully.";
     }
     await refreshWagerFromIndexerSilently();
+  }
+
+  /**
+   * A new ticket below the wager's minimum would revert after the user paid for an approve. Wagers from
+   * factories deployed before ADR-0020 have no `minNewTicketStake()`, so a revert means no minimum.
+   */
+  async function assertMeetsMinimum(packed) {
+    let minStake = 0n;
+    try {
+      minStake = await wagerContract.minNewTicketStake();
+    } catch (_) {
+      return;
+    }
+    if (minStake === 0n) return;
+    const legs = packed.freeform
+      ? [{
+          amount: packed.amount,
+          pool: await wagerContract.ticketPoolByAnswerId(
+            ethers.keccak256(ethers.concat([new Uint8Array([3]), ethers.toUtf8Bytes(packed.answer)]))
+          ),
+        }]
+      : await Promise.all(
+          packed.indices.map(async (i, n) => ({
+            amount: packed.amounts[n],
+            pool: await wagerContract.ticketPoolByMask(1n << BigInt(i)),
+          }))
+        );
+    for (const leg of legs) {
+      if (BetLogic.belowMinNewTicketStake({ minStake, poolTotal: leg.pool, amount: leg.amount })) {
+        throw new Error(`Opening a new ticket on this wager needs at least ${minStake} raw token units.`);
+      }
+    }
   }
 
   async function copyLoadedWagerAddress() {

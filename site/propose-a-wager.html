@@ -113,6 +113,10 @@
         <label for="proposeCollateral">Collateral token</label>
         <select id="proposeCollateral"></select>
         <input type="text" id="proposeCollateralCustom" class="propose-collateral-custom" placeholder="0x… ERC-20 address" hidden />
+        <label id="proposeUnlistedAckRow" class="propose-collateral-custom" hidden>
+          <input type="checkbox" id="proposeUnlistedAck" />
+          Use a token that is not on the curated list. I understand fee-on-transfer and rebasing tokens can leave the last claimants unpaid.
+        </label>
       </div>
 
       <div class="propose-timing-row">

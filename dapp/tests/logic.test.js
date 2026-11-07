@@ -107,13 +107,13 @@ test("validateWindowMins ignores min checks in no-max mode", () => {
 test("parseMultiBetInputs parses aligned indices and amounts", () => {
   const parsed = parseMultiBetInputs("0, 2,1", "1.5,3,4.25", false);
   assert.deepEqual(parsed.outcomeIndices, [0, 2, 1]);
-  assert.deepEqual(parsed.amountNumbers, [1.5, 3, 4.25]);
+  assert.deepEqual(parsed.amountStrings, ["1.5", "3", "4.25"]);
 });
 
 test("parseMultiBetInputs allows empty when requested", () => {
   const parsed = parseMultiBetInputs("", "", true);
   assert.deepEqual(parsed.outcomeIndices, []);
-  assert.deepEqual(parsed.amountNumbers, []);
+  assert.deepEqual(parsed.amountStrings, []);
 });
 
 test("parseMultiBetInputs rejects invalid input shapes", () => {
