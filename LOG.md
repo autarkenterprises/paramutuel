@@ -180,6 +180,12 @@ Implementation runbook in `docs/ADR-0017-IMPLEMENTATION.md`. Gated on operator i
 
 This concludes the testnet-as-production recalibration round. Three design ADRs (0015 / 0016 / 0017) propose, with implementation gated on operator input. AAR revisions on 0002 / 0003 / 0007 / 0014 already landed; site Resonance comment audit closed; `MEMORY.md` carries the active design ADR list. All five branches preserved on origin per practice #5.
 
+## 2026-06-19 — ADR-0018 proposed: collateral curation as an opt-in overlay
+
+A codebase review (2026-06-19) re-examined the "any ERC-20" claim against the frozen-bytecode standard the Resonance Exchange ARG imposes (the testnet deploy *is* the mainnet bytecode; there is no post-mint patch path). Finding: the core guarantees non-custody and solvency for *standard* ERC-20 only — no-bool-return tokens (USDT-class) revert (**fail-safe**), while fee-on-transfer / rebasing tokens break pot solvency (**fail-unsafe**). The policy answer already exists and is accepted: ADR-0006 §4 ratified "collateral-agnostic core, curated happy paths," and its own AAR records the curation as "copy, not flow code."
+
+ADR-0018 records the implementation under the project's standing **"neutral core, safety as opt-in overlay"** principle — the same pattern already used for resolution (the resolver is a swappable per-wager address, not baked into the core). Key decision: **no `src/` change.** An off-chain `config/collateral-allowlist.json` (network-keyed, mirroring `config/deployments.json`) is consumed by the dApp create/bet flows and the bet surfaces; the universal-fallback path is preserved behind a warned opt-in (permissionlessness intact); the core's boundary is pinned by two regression tests (no-bool revert; fee-on-transfer solvency-break); and the "any ERC-20" claim is narrowed to "any *standard* ERC-20." Implementation gated on operator input on the curated token set per network. Branch `adr-0018-collateral-curation-overlay`; implementation runbook (`docs/ADR-0018-IMPLEMENTATION.md`) to follow on acceptance.
+
 ## 2026-09-26 — ADR-0019: V3 verification audit (correctness vs intent)
 
 Operator asked for an independent verification of a codebase largely written by earlier, weaker agents. Lead agent reviewed `src/` line by line and verified cross-language invariants itself; two read-only Cursor sub-agents (`composer-2.5` — Opus/GPT Cursor quota exhausted mid-run) swept `service/` and the clients, and every lead they raised was re-verified against the code before acting.
