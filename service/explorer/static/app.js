@@ -23,7 +23,9 @@ if (BRAND === "resonance") {
   if (subEl) subEl.textContent = "Reads wager state from the indexer API.";
 }
 const DEPLOYMENTS_CONFIG_URL = "../config/deployments.json";
-const API_BASE_NORMALIZED = API_BASE.replace(/\/$/, "");
+// Empty means same origin, which suits `service/explorer/server.py`. On the static site there is no
+// API at this origin, so `loadDeploymentContext` fills it in from the deployment config.
+let API_BASE_NORMALIZED = API_BASE.replace(/\/$/, "");
 const PAGE_SIZE = 20;
 
 function wagerIsCurrentProtocol(w) {
@@ -240,7 +242,11 @@ function setLoadMoreEnabled(enabled) {
   button.disabled = !enabled;
 }
 
-async function loadConfiguredFactoryAddress() {
+/**
+ * Read the deployment config, when this page is served alongside one. The proxy server has none, and
+ * answers 404, which leaves same-origin requests in place.
+ */
+async function loadDeploymentContext() {
   const node = document.getElementById("factoryAddressDisplay");
   try {
     const response = await fetch(DEPLOYMENTS_CONFIG_URL);
@@ -253,6 +259,8 @@ async function loadConfiguredFactoryAddress() {
     if (!Number.isNaN(parsed)) explorerChainId = parsed;
     const addr = String((net.factoryAddress || "")).trim();
     if (node && addr) node.textContent = addr;
+    const configuredApi = String(net.explorerApiBase || "").trim().replace(/\/$/, "");
+    if (!API_BASE_NORMALIZED && configuredApi) API_BASE_NORMALIZED = configuredApi;
   } catch (_) {
     // Optional when explorer is served standalone without deployments config.
   }
@@ -471,12 +479,14 @@ document.getElementById("wagerSearch").addEventListener("keydown", (ev) => {
 
 setupFieldPicker();
 renderHeader();
-loadWagers({ append: false }).catch((e) => {
-  console.error(e);
-});
+// The config may name the API, so it comes first.
+loadDeploymentContext()
+  .catch((e) => {
+    console.error(e);
+  })
+  .then(() => loadWagers({ append: false }))
+  .catch((e) => {
+    console.error(e);
+  });
 
 syncAutoRefresh();
-
-loadConfiguredFactoryAddress().catch((e) => {
-  console.error(e);
-});

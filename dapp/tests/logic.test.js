@@ -16,6 +16,8 @@ const {
   seedOutcomeIndicesToTicketMasks,
   validatePolicyParamForCreate,
   freeformV3AnswerId,
+  outcomeIndicesToTicketMask,
+  payoffPolicyLabel,
 } = require("../logic.js");
 
 test("template lookup falls back to custom", () => {
@@ -235,4 +237,46 @@ test("validatePolicyParamForCreate enforces AT_LEAST_K k", () => {
     () => validatePolicyParamForCreate(PAYOFF_POLICY.ANY_OF, 1, 3),
     /must be 0/
   );
+});
+
+// ADR-0020: validation paths that had no test. Each one turns a transaction that would revert, after
+// gas and an approve, into a message the user can act on.
+test("tickets respect the contract's ceiling of 255 outcomes", () => {
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("0", 256), /2 to 255/);
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("0", 1), /2 to 255/);
+  assert.equal(parseOutcomeIndicesCsvToTicketMask("254", 255), 1n << 254n);
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("255", 255), /out of range/);
+});
+
+test("ticket input is explained when it cannot be used", () => {
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask(" , ", 3), /at least one outcome index/);
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("0,x", 3), /Invalid outcome index: x/);
+  assert.throws(() => parseOutcomeIndicesCsvToTicketMask("-1", 3), /Invalid outcome index: -1/);
+  assert.throws(() => outcomeIndicesToTicketMask([], 3), /Select at least one/);
+  assert.throws(() => seedOutcomeIndicesToTicketMasks([0, 1.5]), /Invalid seed outcome index: 1.5/);
+});
+
+test("window modes must be ones the form offers", () => {
+  const args = [1000, 60, 60, false, false];
+  assert.throws(() => computeWindowArgs(...args, "someday"), /bettingCloseMode/);
+  assert.throws(() => computeWindowArgs(...args, "relative", null, "someday"), /resolutionWindowMode/);
+});
+
+test("a relative template is returned as it is", () => {
+  assert.deepEqual(resolveTemplate("custom", 1000), getTemplate("custom"));
+});
+
+test("policy labels accept what the contract returns and flag anything unknown", () => {
+  assert.equal(payoffPolicyLabel(0), "SINGLE_WINNER");
+  assert.equal(payoffPolicyLabel(4n), "WEIGHTED_OVERLAP", "ethers returns enums as bigint");
+  assert.equal(payoffPolicyLabel(9), "UNKNOWN(9)");
+});
+
+test("batch input needs both lists", () => {
+  assert.throws(() => parseMultiBetInputs("0", ""), /Both outcome indices and amounts/);
+  assert.throws(() => parseMultiBetInputs("", "1"), /Both outcome indices and amounts/);
+});
+
+test("the freeform answer id needs ethers, and says so", () => {
+  assert.throws(() => freeformV3AnswerId("x"), /requires ethers/);
 });

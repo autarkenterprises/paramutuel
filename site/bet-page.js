@@ -36,6 +36,15 @@
   let decimalsKnown = false;
   /** An answer picked from the list: sent byte-exact, since it may legitimately carry spaces. */
   let pickedAnswer = null;
+  /** Wallet events are subscribed once, however many times the user connects. */
+  let walletListenersAttached = false;
+  /**
+   * After a transaction, when to re-read the indexer. It only sees a block some way behind the chain
+   * head (5 confirmations by default, so 10 seconds or more on Base), so one immediate read would show
+   * the old figures and never correct them.
+   */
+  const REFRESH_AFTER_TX_MS = [0, 5000, 15000, 30000];
+  const AFTER_TX_NOTE = "The figures above update once the indexer catches up, usually within 30 seconds.";
 
   function $(id) {
     return document.getElementById(id);
@@ -171,16 +180,32 @@
     return r.json();
   }
 
-  /** Refresh summary/odds after a successful tx without toggling the loading panel. */
+  /** Update the figures after a successful tx, leaving the form and its status message alone. */
   async function refreshWagerFromIndexerSilently() {
-    if (!loadedWagerAddress) return;
+    const address = loadedWagerAddress;
+    if (!address) return;
     try {
       await loadDeployments();
-      const detail = await fetchWagerFromIndexer(loadedWagerAddress);
-      await applyWagerDetail(loadedWagerAddress, detail);
+      const detail = await fetchWagerFromIndexer(address);
+      // The user may have loaded a different wager while this was in flight.
+      if (address === loadedWagerAddress) await applyWagerDetail(address, detail, { silent: true });
     } catch (e) {
       console.warn("Could not refresh wager from indexer:", e);
     }
+  }
+
+  function refreshAfterTransaction() {
+    for (const delay of REFRESH_AFTER_TX_MS) setTimeout(refreshWagerFromIndexerSilently, delay);
+  }
+
+  /** Empties the form after a stake, so a second click cannot send the same stake again. */
+  function clearStakeInputs() {
+    document.querySelectorAll(".bet-amount-input").forEach((input) => {
+      input.value = "";
+    });
+    const answer = $("betFreeformAnswerInput");
+    if (answer) answer.value = "";
+    pickedAnswer = null;
   }
 
   function formatPot(raw) {
@@ -404,14 +429,21 @@
     el.hidden = warnings.length === 0;
   }
 
-  async function applyWagerDetail(address, detail) {
+  /**
+   * Show a wager. With `silent`, as after the user's own transaction, only the figures change: the
+   * form is not rebuilt and the status line stays, so a confirmation is not erased and text the user
+   * has started typing is not lost.
+   */
+  async function applyWagerDetail(address, detail, { silent = false } = {}) {
     const w = detail.wager;
     if (!w) throw new Error("Indexer response missing wager.");
 
     loadedWagerAddress = address;
     currentWagerRow = w;
-    decimalsKnown = false;
-    pickedAnswer = null;
+    if (!silent) {
+      decimalsKnown = false;
+      pickedAnswer = null;
+    }
 
     const pvRaw = String(w.protocol_version || "").trim().toLowerCase();
     let pv = "enumerated";
@@ -554,6 +586,12 @@
       renderOutcomesOddsTable(labels, totalPotVal, feeBpsVal, tPools, w.payoff_policy);
     }
 
+    if (silent) {
+      // The refreshed row may show betting has since closed.
+      syncSubmitState();
+      return;
+    }
+
     wagerContract = signer ? new ethers.Contract(address, wagerAbi, signer) : null;
 
     if (pv === "freeform") {
@@ -636,6 +674,11 @@
         "No EIP-1193 wallet found. Use a browser wallet that injects window.ethereum (MetaMask, Rabby, Coinbase Wallet, …)."
       );
     }
+    attachWalletListeners(eip1193);
+    // The account or network may be changing, so decimals are unconfirmed until read again below, and
+    // staking stays off until then.
+    decimalsKnown = false;
+    syncSubmitState();
     provider = new ethers.BrowserProvider(eip1193);
     await provider.send("eth_requestAccounts", []);
     signer = await provider.getSigner();
@@ -653,6 +696,31 @@
     await updateBetCollateralDisplay();
     syncDecimalsReadonly();
     syncSubmitState();
+  }
+
+  /**
+   * Follow the wallet. Without this the page keeps showing and signing as the old account, and ethers
+   * fails every call on a provider whose network has changed.
+   */
+  function attachWalletListeners(eip1193) {
+    if (walletListenersAttached || typeof eip1193.on !== "function") return;
+    walletListenersAttached = true;
+    const reconnect = () => {
+      connectWallet().catch((e) => {
+        $("betNetworkStatus").textContent = e.message || String(e);
+      });
+    };
+    eip1193.on("accountsChanged", (accounts) => {
+      if (accounts && accounts.length > 0) {
+        reconnect();
+        return;
+      }
+      signer = null;
+      wagerContract = null;
+      $("betWalletAddr").textContent = "";
+      syncSubmitState();
+    });
+    eip1193.on("chainChanged", reconnect);
   }
 
   function syncDecimalsReadonly() {
@@ -743,9 +811,11 @@
       const approveTx = await token.approve(wagerContract.target, total);
       await approveTx.wait();
       $("betTxStatus").textContent = "Submitting placeBet…";
-      const tx = await c.placeBet(packed.answer, total);
+      // Named in full: ethers v6 cannot pick between same-length overloads by value, and a bare
+      // `c.placeBet(...)` throws "ambiguous function description" (ADR-0020).
+      const tx = await c["placeBet(string,uint256)"](packed.answer, total);
       await tx.wait();
-      $("betTxStatus").textContent = "Bet placed successfully.";
+      $("betTxStatus").textContent = `Bet placed successfully. ${AFTER_TX_NOTE}`;
     } else {
       const { indices, amounts } = packed;
       let total = 0n;
@@ -757,9 +827,10 @@
       const firstArr = indices.map((i) => 1n << BigInt(i));
       const tx = await c.placeBets(firstArr, amounts);
       await tx.wait();
-      $("betTxStatus").textContent = "Bets placed successfully.";
+      $("betTxStatus").textContent = `Bets placed successfully. ${AFTER_TX_NOTE}`;
     }
-    await refreshWagerFromIndexerSilently();
+    clearStakeInputs();
+    refreshAfterTransaction();
   }
 
   /**

@@ -105,3 +105,29 @@ test("every external script is pinned with subresource integrity", () => {
 test("collateral allowlist ships with the site", () => {
   assert.ok(fs.existsSync(path.join(artifact, "config", "collateral-allowlist.json")));
 });
+
+test("the integrity hash on every page matches the ethers that the tests use", () => {
+  // Tests used to run a newer ethers than the pages load, so they could pass on behaviour production
+  // does not have. Pinning one version also verifies the hash here, with no network needed.
+  const crypto = require("node:crypto");
+  const dappDir = path.join(__dirname, "..");
+  const pinned = JSON.parse(fs.readFileSync(path.join(dappDir, "package.json"), "utf8")).devDependencies.ethers;
+  const bundle = fs.readFileSync(path.join(dappDir, "node_modules", "ethers", "dist", "ethers.umd.min.js"));
+  const expected = `sha384-${crypto.createHash("sha384").update(bundle).digest("base64")}`;
+  const pages = [
+    path.join(dappDir, "index.html"),
+    ...fs
+      .readdirSync(path.join(dappDir, "..", "site"))
+      .filter((f) => f.endsWith(".html"))
+      .map((f) => path.join(dappDir, "..", "site", f)),
+  ];
+  let checked = 0;
+  for (const page of pages) {
+    for (const tag of fs.readFileSync(page, "utf8").match(/<script[^>]*ethers[^>]*>/g) || []) {
+      assert.ok(tag.includes(`ethers@${pinned}/dist/ethers.umd.min.js`), `${page} loads a different ethers: ${tag}`);
+      assert.ok(tag.includes(`integrity="${expected}"`), `${page} has the wrong integrity hash: ${tag}`);
+      checked += 1;
+    }
+  }
+  assert.equal(checked, 5, "the five wallet pages");
+});

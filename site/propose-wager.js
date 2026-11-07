@@ -43,6 +43,10 @@
   let provider = null;
   let signer = null;
   let selectedTemplate = "yesno";
+  /** Wallet events are subscribed once, however many times the user connects. */
+  let walletListenersAttached = false;
+  /** The resolver this page suggested, so it can follow the wallet without overwriting a user's choice. */
+  let suggestedResolver = "";
 
   function $(id) { return document.getElementById(id); }
 
@@ -234,6 +238,7 @@
     if (!eip1193?.request) {
       throw new Error("No wallet found. Install MetaMask, Coinbase Wallet, or another browser wallet.");
     }
+    attachWalletListeners(eip1193);
     provider = new ethers.BrowserProvider(eip1193);
     await provider.send("eth_requestAccounts", []);
     signer = await provider.getSigner();
@@ -249,11 +254,35 @@
       $("proposeNetworkStatus").textContent += ` (expected ${CHAIN_NAMES[expectedChainId] || expectedChainId})`;
     }
 
-    // Default resolver to connected wallet
+    // Default the resolver to the connected wallet, and keep following it for as long as the user has
+    // not typed their own, so switching account cannot leave the old one in charge unnoticed.
     const resolverInput = $("proposeResolver");
-    if (resolverInput && !resolverInput.value) {
+    if (resolverInput && (!resolverInput.value || resolverInput.value === suggestedResolver)) {
       resolverInput.value = addr;
+      suggestedResolver = addr;
     }
+  }
+
+  /**
+   * Follow the wallet. Without this the page keeps showing and signing as the old account, and ethers
+   * fails every call on a provider whose network has changed.
+   */
+  function attachWalletListeners(eip1193) {
+    if (walletListenersAttached || typeof eip1193.on !== "function") return;
+    walletListenersAttached = true;
+    const reconnect = () => {
+      connectWallet().catch((e) => setError(e.message || String(e)));
+    };
+    eip1193.on("accountsChanged", (accounts) => {
+      if (accounts && accounts.length > 0) {
+        reconnect();
+        return;
+      }
+      signer = null;
+      $("proposeWalletAddr").textContent = "";
+      $("proposeConnectBtn").textContent = "Connect wallet";
+    });
+    eip1193.on("chainChanged", reconnect);
   }
 
   async function submitProposal() {
