@@ -8,7 +8,8 @@ on:
       - ".github/workflows/bettor-agent-ci.yml"
       - "deploy/betting-agents/**"
   push:
-    branches: [master]
+    # Every branch, not only master: limited to master, a broken test here was first seen after a merge.
+    branches: ["**"]
     paths:
       - "agents/**"
       - "pyproject.toml"
@@ -24,6 +25,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # The package is stdlib-only, but its tests check its encoder against eth_abi and eth_hash as an
+      # independent oracle. These are test dependencies only; the smoke install below has none of them.
+      - name: Install test-only oracles
+        run: python3 -m pip install -q "eth-abi>=5.0.0" "eth-hash[pycryptodome]"
 
       - name: Unit tests
         run: |

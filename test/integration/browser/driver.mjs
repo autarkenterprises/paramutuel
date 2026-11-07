@@ -371,7 +371,11 @@ const scenarios = {
     await proposeReady(p);
     await p.click("#proposeConnectBtn");
     await waitForAddress(p, "#proposeWalletAddr", cfg.accounts.alice);
-    assert.equal((await p.value("#proposeResolver")).toLowerCase(), cfg.accounts.alice.toLowerCase(), "resolver defaults to the wallet");
+    // The page shows the address first and suggests the resolver a moment later, so wait for both.
+    await p.waitFor(
+      `${p.el("#proposeResolver")}.value.toLowerCase() === ${JSON.stringify(cfg.accounts.alice.toLowerCase())}`,
+      "resolver defaults to the wallet"
+    );
 
     await p.fill("#proposeProposition", cfg.proposition);
     await p.fill("#proposeCollateral", "custom");
