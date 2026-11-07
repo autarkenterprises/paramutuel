@@ -39,7 +39,7 @@ Use any subset; combine for reach.
 ### Machine-readable discovery
 
 - **`agents/subagent-manifest.json`** — stable `id`, ops, complements; fetchable without clone.
-- **`AGENTS.md`** — human index; link from root `README.md` (already linked).
+- **`docs/MACHINE.md`** — the protocol reference for agents; linked from root `README.md`.
 
 ### Hosted execution (operators)
 
@@ -101,7 +101,7 @@ This split avoids putting private material in the scout image and matches safe a
 
 ## 5. References
 
-- [`AGENTS.md`](../AGENTS.md)
+- [`MACHINE.md`](MACHINE.md)
 - [`BET-AGENT.md`](BET-AGENT.md)
 - [`deploy/betting-agents/README.md`](../deploy/betting-agents/README.md)
 - [`pypa/gh-action-pypi-publish`](https://github.com/pypa/gh-action-pypi-publish)

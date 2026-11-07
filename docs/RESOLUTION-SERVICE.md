@@ -11,7 +11,7 @@ It is intentionally simple and deterministic for MVP operations.
 
 ## Endpoints
 
-- `GET /health` - liveness + indexer connectivity + resolver address.
+- `GET /health` - liveness, indexer connectivity, resolver address, and whether the decision file is readable (`decisions_ok`, `decisions_error`). A corrupt file also makes `/candidates` and `/run-once` return a JSON 500, and nothing is sent until it is fixed.
 - `GET /candidates` - open wagers with actionability diagnostics. Decision **contents** appear only with the token: a decision written before betting closes tells a reader the winner while they can still bet (ADR-0020). Without it, `decision_present` shows only that one exists.
 - `POST /run-once` - run one cycle over actionable decisions. **Requires** `Authorization: Bearer $RESOLUTION_SERVICE_TOKEN` (or `X-Token: $RESOLUTION_SERVICE_TOKEN`); returns `401` otherwise, and rejects every request when the token is unset (fail closed, ADR-0019).
   - body: `{"execute": false}` for dry run (default) — echoed `cast` commands have `--private-key` redacted

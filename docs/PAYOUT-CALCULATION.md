@@ -100,7 +100,7 @@ After **`retract()`** or **`expire()`**, state is **Retracted**. Every bettor wi
 - A **ticket** is a non-zero bitmask **`T`**: bit \(i\) is set iff the ticket includes option \(i\). Only bits below **`numOptions`** are valid.
 - The resolver calls **`resolve(winningMask)`** with bitmask **`W`**: bit \(i\) set means option \(i\) is in the **true / winning set**.
 
-Stake is pooled **per ticket mask**: **`ticketPoolTotal[T]`** is the sum of all stakes on ticket **`T`**. **`bets[bettor][T]`** is that bettor’s stake on **`T`**.
+Stake is pooled **per ticket mask**: **`ticketPoolByMask[T]`** is the sum of all stakes on ticket **`T`**. **`bets[bettor][T]`** is that bettor’s stake on **`T`**.
 
 ### When is a ticket a “winner”?
 
@@ -136,7 +136,7 @@ If **`resolve`** would yield **no** winning ticket with positive pool, the call 
 
 At **`resolve`**, the contract sums over every **distinct** ticket mask that ever received stake (`usedMasks`):
 
-- For policies **other than** **WEIGHTED_OVERLAP**, for each winning ticket **`T`** with pool **`P = ticketPoolTotal[T]`**:
+- For policies **other than** **WEIGHTED_OVERLAP**, for each winning ticket **`T`** with pool **`P = ticketPoolByMask[T]`**:
 
   \[
   \texttt{totalWinningUnits} \mathrel{+}= P
@@ -197,7 +197,7 @@ Note Alice holds **two tickets** — one losing, one winning. Both stakes contri
 
 **`totalPot`** = 100 + 50 + 200 + 150 = **500**; **`netPot`** = **500**.
 
-Only one distinct **winning** mask appears: **`2`**. Its pool is **`ticketPoolTotal[2]`** = 50 + 200 = **250**, so **`totalWinningUnits` = 250**.
+Only one distinct **winning** mask appears: **`2`**. Its pool is **`ticketPoolByMask[2]`** = 50 + 200 = **250**, so **`totalWinningUnits` = 250**.
 
 **Claims** (\(\lfloor \texttt{amt} \times \texttt{netPot} / \texttt{denom} \rfloor\)):
 
@@ -395,7 +395,7 @@ Resolver calls **`resolve("rosebud")`**.
 
 **`totalPot`** = 200 + 100 + 150 + 50 = **500**; **`netPot`** = **500**.
 
-Only one winning `answerId` — the keccak of `0x03 || "rosebud"`. Its pool is **`ticketPoolTotal[that id]`** = 200 + 100 = **300**. So **`totalWinningStake`** = **300**.
+Only one winning `answerId` — the keccak of `0x03 || "rosebud"`. Its pool is **`ticketPoolByAnswerId[that id]`** = 200 + 100 = **300**. So **`totalWinningStake`** = **300**.
 
 **Claims:**
 

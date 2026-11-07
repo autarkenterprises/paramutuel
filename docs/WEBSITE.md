@@ -76,6 +76,34 @@ cd _site && python3 -m http.server 8080
 
 Open `http://127.0.0.1:8080/` and confirm the banner, ticker, `operator.html`, and `app.html` iframe load.
 
+## What ships
+
+`script/assemble-site.sh` is the single definition of the deployed artifact. The Pages workflow calls it, and `dapp/tests/site-artifact.test.js` checks every local reference against the result. It copies by glob, because a hard-coded list once left the propose scripts out and took the hosted flow down.
+
+`test/integration/test_browser_e2e.py` drives these pages in a real browser against a local chain, wallet to on-chain state. Run it (with everything else local) through `./script/test-local-e2e.sh`.
+
+## Collateral allowlist (ADR-0018)
+
+`config/collateral-allowlist.json` lists the tokens the site presents as vetted, keyed by network like `config/deployments.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "baseSepolia": {
+    "chainId": 84532,
+    "tokens": [{ "address": "0x…", "symbol": "USDC", "decimals": 6, "tier": 1, "class": "standard" }]
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `symbol`, `decimals` | What the site shows. A token's own `symbol()` is never shown as fact, since its deployer chooses it. |
+| `tier` | `1` eligible for assisted transactions (ADR-0016), `2` curated without them. |
+| `class` | `standard` is a plain ERC-20. The contracts' solvency guarantee only covers these. |
+
+This is an overlay, not a gate. The contracts take any token. An unlisted one takes an explicit opt-in to create, and the bet page shows a warning and no symbol. Changing the list changes only what surfaces say.
+
 ## Related
 
 - Root **`README.md`** — GitHub Pages deployment summary.

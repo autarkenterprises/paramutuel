@@ -20,7 +20,7 @@ PYTHONPATH=. coverage run --append --source=mcp_server,service,agents \
   -m unittest discover -s agents/paramutuel_bettor/tests -p "test_*.py"
 coverage report
 
-# Solidity / Foundry — see "Solidity coverage" below for current obstacle.
+# Solidity / Foundry — see "Solidity coverage" below.
 ```
 
 ## Python — 2026-05-06 baseline
@@ -58,24 +58,57 @@ The 50-80% band covers the production-critical pure-logic modules. Each has work
 
 ## Solidity coverage
 
-**Status: blocked.** `forge coverage` (and `forge coverage --ir-minimum`) currently fails to compile `src/ParamutuelWagerV3.sol` with **stack-too-deep** errors when the optimizer / via-IR are disabled (which `forge coverage` does to keep source mappings accurate). This is a known Foundry limitation against complex contracts.
-
-**Re-verified 2026-09-26 (ADR-0019):** still blocked with forge 1.5.1 — `forge coverage --ir-minimum` fails with "Cannot swap Slot RET with Variable ret_param: too deep in the stack by 1 slots", i.e. in the ABI decoder of the 17-argument `ParamutuelWagerV3` constructor. Substitute evidence now in place: (a) `script/check-revert-coverage.py` (fast suite) requires every custom error and `require` string in `src/` to be asserted by a `vm.expectRevert` — currently 30 errors + 8 strings, all asserted; (b) `test/ParamutuelV3Lifecycle.t.sol` restores the lifecycle / access-control coverage lost in `b2a2f28`, with a mutation run recorded in `docs/ADR-0019-IMPLEMENTATION.md`. Total: 109 Foundry tests.
-
-**Status of the contract logic itself (2026-05-06 text, kept for history):** all 65 Foundry tests pass under the production compile (`forge test`). Functional coverage is high — `test/ParamutuelV3Enumerated.t.sol` alone has 26 tests covering all five payoff policies plus seed / lifecycle / fee paths, with two fuzz tests. Worked-example tests pin the documentation (`docs/PAYOUT-CALCULATION.md`) to specific named regression tests per `LESSONS.md` L-003.
-
-**Path forward** (follow-up, not blocking ADR-0013):
-
-1. Split `ParamutuelWagerV3` constructor into a separate factory-callable initializer plus a smaller bytecode constructor, reducing local-variable pressure.
-2. Or move pure helpers into a library so the wager itself fits coverage instrumentation.
-3. Or use a separate coverage tool (e.g. `solidity-coverage` for Hardhat side) once a Hardhat side exists.
-
-**Recipe (will work once stack-too-deep is resolved):**
+**Unblocked by ADR-0020.** The 17-argument wager constructor caused the stack-too-deep error that blocked `forge coverage` from ADR-0013 on. It now takes a struct.
 
 ```bash
-forge coverage --report summary
-forge coverage --report lcov   # for tooling consumption
+forge coverage --ir-minimum --report summary \
+  --no-match-test 'C1_coldResolve|test_C2_freeform|test_C6_' --no-match-path 'test/ParamutuelV3Invariant.t.sol'
 ```
+
+The excluded tests pin gas bounds, or take very long instrumented. They add no line coverage.
+
+| File | Lines | Statements | Functions |
+|---|---|---|---|
+| `src/ParamutuelFactoryV3.sol` | 98.90% (90/91) | 99.22% (128/129) | 100% |
+| `src/ParamutuelWagerV3.sol` | 98.52% (266/270) | 98.55% (341/346) | 100% |
+| `src/utils/BitMath.sol` | 100% (7/7) | 100% (10/10) | 100% |
+| `src/utils/FullMath.sol` | 64% (16/25) | 68.97% (20/29) | 100% |
+| `src/utils/ReentrancyGuard.sol` | 100% (4/4) | 100% (3/3) | 100% |
+
+**Every remaining gap is an instrumentation artifact, not untested code:**
+
+- `--ir-minimum` loses source mappings. It reports `_chargeFees();` as never run at all four call sites, although `fees-skip-charge-on-retract` and `fee-remainder-to-last` in `script/mutation-check.py` are killed by failing tests.
+- Inline assembly has no line mapping, which accounts for all of `FullMath`'s gaps. `test_mulDiv_fullPrecision_fuzz` and the `C4-*` mutations exercise that path.
+- The branch column (78% on both contracts) counts the failure side of every `require` as never taken. `script/check-revert-coverage.py` shows each is asserted by a `vm.expectRevert`, and `test/ParamutuelV3Hardening.t.sol` adds per-site guards.
+
+The stronger evidence is mutation testing: `python3 script/mutation-check.py` kills 66 of 66 mutations, with the suite passing on the unmodified code first. It takes about 45 minutes, so it runs on the extended path.
+
+## Python — current (ADR-0020, 2026-11-07)
+
+Unit suites only. **99%** of 2,967 statements, up from 78% when ADR-0020 first measured it, and the end-to-end suites run on top of this.
+
+```bash
+for d in mcp_server/tests service/indexer/tests service/proposition/tests service/explorer/tests \
+         service/resolution/tests service/control_panel/tests agents/paramutuel_bettor/tests; do
+  PYTHONPATH=. python3 -m coverage run --append --source=mcp_server,service,agents \
+    -m unittest discover -s "$d" -p "test_*.py"
+done
+python3 -m coverage report -m --omit='*/tests/*,*/__init__.py'
+```
+
+**The 16 statements not covered, and why that is accepted (AGENTS.md #2):**
+
+| Statements | Where | Rationale |
+|---|---|---|
+| 10 | `if __name__ == "__main__": main()` in each service | One-line entry guards. Each `main` is tested directly, and `test_browser_e2e.py` runs `live_api` as a real process. |
+| 5 | Script-mode error block in `agents/paramutuel_bettor/__main__.py` | Exercised by `test_script_mode_reports_errors_as_json_with_a_failing_exit_code`, through a subprocess that coverage does not follow. |
+| 1 | The `unknown command` branch in the same file | `argparse` with `required=True` rejects these first. Kept so that adding a subcommand without a handler fails loudly. |
+
+## JavaScript
+
+`node --test --experimental-test-coverage` (from `dapp/`) puts `logic.js` at 99.5% of lines and `bet-logic.js` at 98.9%. Those files hold the pure decisions, and their only gaps are the browser branch of the UMD wrapper, which the browser test runs. The wiring in `dapp/app.js`, `site/bet-page.js`, `site/propose-wager.js` and `service/explorer/static/app.js` needs a page around it, so it is not measured by line. `test/integration/test_browser_e2e.py` covers it by behaviour instead: each person-facing flow runs in real Chrome, and the result is checked on chain. That test found the most serious defect of ADR-0020, which no unit test could have.
+
+**Accepted gaps:** the network toggle's mainnet path and the operator hub's outbound links are only load-tested, because `baseMainnet` has no factory yet. Rarely used dApp form modes (absolute dates, no-max windows) are covered by unit tests of `computeWindowArgs` and not by a browser run.
 
 ## Refresh cadence
 

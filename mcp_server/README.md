@@ -4,7 +4,7 @@ MCP server for the [Paramutuel](https://github.com/autarkenterprises/paramutuel)
 
 Exposes 21 tools that let LLM agents discover wagers, analyze odds, and prepare transactions — no private keys required on the server side.
 
-**Adoption complement:** the repo ships a **bet scout subagent** (`agents/paramutuel_bettor`, JSON stdin/stdout) with a **machine manifest** at `agents/subagent-manifest.json` and human index [`AGENTS.md`](../AGENTS.md). See [`docs/BET-AGENT.md`](../docs/BET-AGENT.md); use MCP for final `quote_place_bet` (enumerated) or `encode_place_bet_freeform` (freeform, ADR-0010) / calldata right before signing.
+**Adoption complement:** the repo ships a **bet scout subagent** (`agents/paramutuel_bettor`, JSON stdin/stdout) with a **machine manifest** at `agents/subagent-manifest.json` and reference [`docs/MACHINE.md`](../docs/MACHINE.md). See [`docs/BET-AGENT.md`](../docs/BET-AGENT.md); use MCP for final `quote_place_bet` (enumerated) or `encode_place_bet_freeform` (freeform, ADR-0010) / calldata right before signing.
 
 ## Quick start
 
