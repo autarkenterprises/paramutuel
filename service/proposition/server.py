@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
-"""Proposition Service — HTTP server (operator panel + ingest scheduler).
+"""Proposition Service — HTTP server (operator review panel).
 
-Stands up the operator review UI plus a small JSON API. Read endpoints (list
-items, list proposals) are unauthenticated; mutating endpoints (approve,
-reject, dispatch) gate on a bearer token via
-:func:`service.control_panel.security.token_authorized`. The optional
-``--allow-execute`` flag is required before any dispatch path will actually
-broadcast a transaction; without it the dispatch endpoints return the
-prepared command dry-run-style, mirroring the control_panel security model.
+Stands up the operator review UI plus a small JSON API. Only ``/health`` and the static assets are
+open; every ``/api`` route requires a bearer token via
+:func:`service.control_panel.security.token_authorized`, and the service refuses to start without one.
+``--allow-execute`` (or ``PROPOSITION_ALLOW_EXECUTE=1``) is required before dispatch will broadcast;
+without it, dispatch returns 403.
 
-The server runs the periodic :func:`service.proposition.ingest.run_ingest`
-loop on a background thread when started with ``--ingest-interval``; the
-HTTP server itself is :class:`ThreadingHTTPServer`, so each request handler
-runs concurrently and shares the SQLite connection via the cross-thread
-flag in :mod:`service.proposition.db`.
+Ingestion runs on demand through ``POST /api/ingest``; schedule it with cron or a Cloud Scheduler job.
+The HTTP server is :class:`ThreadingHTTPServer`, and each request opens its own short-lived SQLite
+connection.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -57,6 +54,11 @@ def _load_deployments_factory(root: Path) -> str:
     except (json.JSONDecodeError, TypeError):
         return ""
 
+
+# Held across the status check and the transaction. Otherwise two requests can both read `approved`
+# and both create a wager on-chain, which is real money and cannot be undone. Dispatch is
+# operator-paced, so serialising it costs nothing. The server is single-process by design.
+_DISPATCH_LOCK = threading.Lock()
 
 STATIC_DIR = Path(__file__).resolve().with_name("static")
 SCHEMA_PATH = Path(__file__).resolve().with_name("schema.sql")
@@ -209,13 +211,16 @@ class Handler(BaseHTTPRequestHandler):
                 return _json_response(self, 401, {"error": "unauthorized"})
             tail = path[len("/api/proposals/") :].strip("/")
             segs = tail.split("/")
-            if len(segs) != 2 or segs[1] not in ("approve", "reject", "dispatch"):
+            if len(segs) != 2 or segs[1] not in ("approve", "reject", "dispatch", "retry"):
                 return _json_response(self, 404, {"error": "not found"})
             try:
                 pid = int(segs[0])
             except ValueError:
                 return _json_response(self, 400, {"error": "bad id"})
             action = segs[1]
+            if action == "dispatch":
+                with _DISPATCH_LOCK:
+                    return self._dispatch(pid)
             conn = dbm.connect(self.db_path)
             row = dbm.get_proposal(conn, pid)
             if not row:
@@ -238,53 +243,67 @@ class Handler(BaseHTTPRequestHandler):
                 conn.close()
                 return _json_response(self, 200, {"ok": True})
 
-            if action == "dispatch":
-                if row["status"] != "approved":
+            if action == "retry":
+                # An explicit operator step, because the failed transaction may in fact have landed
+                # (for example after a timeout). The panel shows its error and hash first.
+                if row["status"] != "dispatch_failed":
                     conn.close()
-                    return _json_response(self, 400, {"error": "must approve before dispatch"})
-                if not self.allow_execute:
-                    conn.close()
-                    return _json_response(self, 403, {"error": "execute disabled on server"})
-                if not self.private_key or not self.rpc_url or not self.factory or not self.collateral:
-                    conn.close()
-                    return _json_response(self, 400, {"error": "missing factory/collateral/rpc/key env"})
-                outcomes = json.loads(row["outcomes_json"] or "[]")
-                close_ts = int(time.time()) + int(self.betting_close_offset)
-                result = dispatchm.dispatch_proposal(
-                    proposition=row["proposition"],
-                    outcomes=outcomes,
-                    factory=self.factory,
-                    collateral=self.collateral,
-                    rpc_url=self.rpc_url,
-                    private_key=self.private_key,
-                    betting_close_time=close_ts,
-                    resolution_window=int(self.resolution_window),
-                    resolver=self.resolver or "0x0000000000000000000000000000000000000000",
-                    betting_closer=self.betting_closer or "0x0000000000000000000000000000000000000000",
-                    resolution_closer=self.resolution_closer or "0x0000000000000000000000000000000000000000",
-                    extra_recipients=list(self.extra_recipients),
-                    extra_bps=list(self.extra_bps),
-                    dry_run=False,
-                )
-                if result.get("ok"):
-                    dbm.update_proposal_status(
-                        conn,
-                        pid,
-                        status="dispatched",
-                        tx_hint=(result.get("stdout") or "")[:4000],
-                    )
-                else:
-                    dbm.update_proposal_status(
-                        conn,
-                        pid,
-                        status="dispatch_failed",
-                        tx_hint=(result.get("stdout") or "")[:2000],
-                        dispatch_error=(result.get("stderr") or "dispatch failed")[:4000],
-                    )
+                    return _json_response(self, 400, {"error": "only a failed dispatch can be retried"})
+                dbm.update_proposal_status(conn, pid, status="approved")
                 conn.close()
-                return _json_response(self, 200, result)
+                return _json_response(self, 200, {"ok": True})
 
         self.send_error(404)
+
+    def _dispatch(self, pid: int) -> None:
+        """Send the create transaction for one approved proposal. Caller holds `_DISPATCH_LOCK`."""
+        conn = dbm.connect(self.db_path)
+        try:
+            row = dbm.get_proposal(conn, pid)
+            if not row:
+                return _json_response(self, 404, {"error": "not found"})
+            if row["status"] != "approved":
+                return _json_response(self, 400, {"error": "must approve before dispatch"})
+            if not self.allow_execute:
+                return _json_response(self, 403, {"error": "execute disabled on server"})
+            if not self.private_key or not self.rpc_url or not self.factory or not self.collateral:
+                return _json_response(self, 400, {"error": "missing factory/collateral/rpc/key env"})
+            outcomes = json.loads(row["outcomes_json"] or "[]")
+            close_ts = int(time.time()) + int(self.betting_close_offset)
+            result = dispatchm.dispatch_proposal(
+                proposition=row["proposition"],
+                outcomes=outcomes,
+                factory=self.factory,
+                collateral=self.collateral,
+                rpc_url=self.rpc_url,
+                private_key=self.private_key,
+                betting_close_time=close_ts,
+                resolution_window=int(self.resolution_window),
+                resolver=self.resolver or "0x0000000000000000000000000000000000000000",
+                betting_closer=self.betting_closer or "0x0000000000000000000000000000000000000000",
+                resolution_closer=self.resolution_closer or "0x0000000000000000000000000000000000000000",
+                extra_recipients=list(self.extra_recipients),
+                extra_bps=list(self.extra_bps),
+                dry_run=False,
+            )
+            if result.get("ok"):
+                dbm.update_proposal_status(
+                    conn,
+                    pid,
+                    status="dispatched",
+                    tx_hint=(result.get("stdout") or "")[:4000],
+                )
+            else:
+                dbm.update_proposal_status(
+                    conn,
+                    pid,
+                    status="dispatch_failed",
+                    tx_hint=(result.get("stdout") or "")[:2000],
+                    dispatch_error=(result.get("stderr") or "dispatch failed")[:4000],
+                )
+            return _json_response(self, 200, result)
+        finally:
+            conn.close()
 
     def _send_static(self, name: str) -> None:
         path = STATIC_DIR / name

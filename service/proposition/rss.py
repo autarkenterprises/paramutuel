@@ -14,6 +14,8 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib import error as urlerror
 from urllib import request
@@ -34,9 +36,10 @@ def _strip_ns(tag: str) -> str:
 
 
 def _text(el: ET.Element | None) -> str:
-    if el is None or el.text is None:
+    """All text inside an element, including nested markup such as `<title><b>x</b> y</title>`."""
+    if el is None:
         return ""
-    return " ".join(el.itertext()).strip()
+    return " ".join(part.strip() for part in el.itertext() if part.strip())
 
 
 def _first_child(parent: ET.Element, *local_names: str) -> ET.Element | None:
@@ -51,11 +54,10 @@ def parse_feed_xml(xml_bytes: bytes) -> list[FeedItem]:
     tag = _strip_ns(root.tag).lower()
     items: list[FeedItem] = []
 
-    if tag == "rss" or tag == "rdf:rdf":
-        channel = root.find("channel")
-        if channel is None:
-            channel = root
-        for node in channel:
+    # RSS 2.0 nests items in <channel>; RSS 1.0 (RDF) makes them siblings of it. Walking the whole tree
+    # covers both, and namespaces are already stripped from the tag being compared.
+    if tag in ("rss", "rdf"):
+        for node in root.iter():
             if _strip_ns(node.tag).lower() != "item":
                 continue
             title = _text(_first_child(node, "title")) or "(no title)"
@@ -64,7 +66,7 @@ def parse_feed_xml(xml_bytes: bytes) -> list[FeedItem]:
             guid = _text(guid_el) or link
             ext = guid or link or title
             desc = _text(_first_child(node, "description"))
-            pub = _text(_first_child(node, "pubDate")) or None
+            pub = _text(_first_child(node, "pubDate", "date")) or None
             items.append(
                 FeedItem(
                     external_id=ext[:512],
@@ -120,16 +122,22 @@ def fetch_rss_items(url: str, timeout: int = 25) -> list[FeedItem]:
 
 
 def published_ts(pub: str | None) -> int | None:
+    """Parse a feed timestamp to unix seconds: RFC 2822 (RSS), ISO 8601 (Atom), or a bare epoch."""
     if not pub:
         return None
-    # Best-effort: digits-only epoch
-    if re.fullmatch(r"\d+", pub.strip()):
+    text = pub.strip()
+    if re.fullmatch(r"\d+", text):
+        value = int(text)
+        if value > 1_000_000_000_000:  # milliseconds since epoch
+            return value // 1000
+        return value if value > 1_000_000_000 else None
+    try:
+        parsed = parsedate_to_datetime(text)
+    except (TypeError, ValueError):
         try:
-            v = int(pub.strip())
-            if v > 1_000_000_000_000:  # milliseconds since epoch
-                return v // 1000
-            if v > 1_000_000_000:  # seconds since epoch
-                return v
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
         except ValueError:
             return None
-    return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp())

@@ -3,26 +3,28 @@
 
 Each subcommand maps to one V3 lifecycle action: create (enumerated or
 freeform), close betting, resolve, retract, expire, withdraw fees. The CLI
-defaults to dry-run; ``--allow-execute`` is required to actually broadcast
-via ``cast send``. Calldata is constructed in :mod:`commands`; this module
-only handles argparse wiring, env-var hydration, and subprocess invocation.
+defaults to dry-run; ``--execute`` is required to actually broadcast via
+``cast send``. Calldata is constructed in :mod:`commands`; this module only
+handles argparse wiring, env-var hydration, and running the command.
 
-Refusal posture: a missing ``PRIVATE_KEY``, missing ``RPC_URL_*``, or unset
-``--allow-execute`` flag each abort the dispatch path with a non-zero exit
-and a clear stderr message. Operators expect dry-run to be the default —
-the safety contract is "nothing happens unless I explicitly say so".
+Refusal posture: a missing ``PRIVATE_KEY`` or ``RPC_URL`` aborts with exit 2
+and a clear stderr message. Operators expect dry-run to be the default — the
+safety contract is "nothing happens unless I explicitly say so" — and dry-run
+output never contains the key, because terminal scrollback and CI logs outlive
+the session.
 """
 from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import sys
 
 from .commands import (
+    CastCommand,
     build_create_freeform_wager_command,
     build_create_wager_command,
     build_wager_action_command,
+    run_cast_send,
 )
 
 
@@ -36,11 +38,19 @@ def _split_int_csv(s: str) -> list[int]:
     return [int(x) for x in _split_csv(s)]
 
 
-def _run_or_print(cmd: list[str], execute: bool) -> int:
+def _run_or_print(cmd: CastCommand, execute: bool) -> int:
+    """Print the redacted command, or broadcast it. Exit 1 means it did not succeed on-chain."""
     if not execute:
-        print(" ".join(cmd))
+        print(f"# function: {cmd.signature}")
+        print(cmd.shell())
         return 0
-    return subprocess.run(cmd, check=False).returncode
+    result = run_cast_send(cmd.command)
+    if result.stdout:
+        print(result.stdout)
+    if not result.ok:
+        print(f"error: {result.stderr}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main() -> int:
@@ -76,6 +86,12 @@ def main() -> int:
         default=0,
         help="k for AT_LEAST_K; 0 otherwise",
     )
+    c.add_argument(
+        "--min-new-ticket-stake",
+        type=int,
+        default=0,
+        help="Raw token amount needed to open a new ticket; prices griefing by dust tickets (ADR-0020).",
+    )
 
     ff = sub.add_parser("create-freeform-wager")
     ff.add_argument("--factory", required=True)
@@ -88,6 +104,7 @@ def main() -> int:
     ff.add_argument("--resolution-closer", default="0x0000000000000000000000000000000000000000")
     ff.add_argument("--extra-recipients", default="")
     ff.add_argument("--extra-bps", default="")
+    ff.add_argument("--min-new-ticket-stake", type=int, default=0, help="Raw token amount needed to open a new answer.")
 
     a = sub.add_parser("wager-action")
     a.add_argument("--wager", required=True)
@@ -104,7 +121,10 @@ def main() -> int:
             "withdraw-fees",
         ],
     )
-    a.add_argument("--outcome-index", type=int, help="For enumerated resolve: winning ticket bitmask (uint256)")
+    a.add_argument(
+        "--winning-mask",
+        help="For enumerated resolve: winning set as a bitmask (decimal or 0x hex). Outcome i alone is 1<<i.",
+    )
     a.add_argument(
         "--protocol-version",
         default="enumerated",
@@ -136,10 +156,11 @@ def main() -> int:
                 policy_param=args.policy_param,
                 seed_outcome_indices=_split_int_csv(args.seed_outcome_indices),
                 seed_amounts=_split_int_csv(args.seed_amounts),
+                min_new_ticket_stake=args.min_new_ticket_stake,
                 rpc_url=args.rpc_url,
                 private_key=args.private_key,
             )
-            return _run_or_print(cmd.command, args.execute)
+            return _run_or_print(cmd, args.execute)
 
         if args.cmd == "create-freeform-wager":
             cmd = build_create_freeform_wager_command(
@@ -153,22 +174,23 @@ def main() -> int:
                 resolution_closer=args.resolution_closer,
                 extra_recipients=_split_csv(args.extra_recipients),
                 extra_bps=_split_int_csv(args.extra_bps),
+                min_new_ticket_stake=args.min_new_ticket_stake,
                 rpc_url=args.rpc_url,
                 private_key=args.private_key,
             )
-            return _run_or_print(cmd.command, args.execute)
+            return _run_or_print(cmd, args.execute)
 
-        wa = args.winning_answer.strip() if args.winning_answer else None
+        # Byte-exact: V3 hashes these bytes verbatim to find the winning pool, so never trim.
         cmd = build_wager_action_command(
             wager=args.wager,
             action=args.action,
-            outcome_index=args.outcome_index,
+            winning_mask=args.winning_mask,
             protocol_version=args.protocol_version,
-            winning_answer=wa,
+            winning_answer=args.winning_answer or None,
             rpc_url=args.rpc_url,
             private_key=args.private_key,
         )
-        return _run_or_print(cmd.command, args.execute)
+        return _run_or_print(cmd, args.execute)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

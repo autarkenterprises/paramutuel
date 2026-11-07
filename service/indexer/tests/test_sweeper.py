@@ -1,10 +1,14 @@
+import contextlib
+import io
+import json
 import os
 import sqlite3
 import tempfile
 import unittest
+from unittest import mock
 
 from service.indexer.indexer import init_db
-from service.indexer.sweeper import sweep_once
+from service.indexer.sweeper import parse_args, sweep_once
 
 
 class SweeperTests(unittest.TestCase):
@@ -58,6 +62,38 @@ class SweeperTests(unittest.TestCase):
         self.assertEqual(result.attempted, 1)
         self.assertEqual(result.succeeded, 1)
         self.assertEqual(result.failed, 0)
+
+    def test_dry_run_never_prints_the_private_key(self):
+        """Dry-run is the default and its output goes to logs (ADR-0020 O2)."""
+        key = "0x" + "cd" * 32
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            sweep_once(db_path=self.db_path, rpc_url="http://localhost:8545", private_key=key, now_ts=5000, execute=False)
+        self.assertIn("DRY_RUN", out.getvalue())
+        self.assertNotIn("cd" * 32, out.getvalue())
+
+    def _execute_with(self, proc):
+        return sweep_once(
+            db_path=self.db_path, rpc_url="http://localhost:8545", private_key="0xabc", now_ts=5000,
+            execute=True, runner=lambda *a, **k: proc,
+        )
+
+    def test_mined_revert_counts_as_failure(self):
+        """`cast send` exits 0 for a reverted transaction, e.g. when someone else expired it first."""
+        proc = mock.Mock(returncode=0, stdout=json.dumps({"status": "0x0", "transactionHash": "0xfeed"}), stderr="")
+        result = self._execute_with(proc)
+        self.assertEqual((result.succeeded, result.failed), (0, 1))
+
+    def test_mined_success_counts_as_success(self):
+        proc = mock.Mock(returncode=0, stdout=json.dumps({"status": "0x1", "transactionHash": "0xfeed"}), stderr="")
+        result = self._execute_with(proc)
+        self.assertEqual((result.succeeded, result.failed), (1, 0))
+
+    def test_private_key_can_come_from_the_environment(self):
+        with mock.patch.dict("os.environ", {"PRIVATE_KEY": "0xfromenv", "RPC_URL": "http://r"}), mock.patch("sys.argv", ["sweeper"]):
+            args = parse_args()
+        self.assertEqual(args.private_key, "0xfromenv")
+        self.assertEqual(args.rpc_url, "http://r")
 
     def test_sweep_once_execute_failure_counted(self):
         def bad_runner(*args, **kwargs):  # noqa: ANN002, ANN003

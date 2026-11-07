@@ -27,8 +27,8 @@
         <option value="freeform">freeform</option>
       </select>
     </label>
-    <label>Winning ticket bitmask (enumerated resolve) <input id="outcomeIndex" type="number" /></label>
-    <label>Winning answer UTF-8 (freeform resolve only) <input id="winningAnswer" placeholder="exact string" /></label>
+    <label>Winning set as a bitmask, decimal or 0x hex (enumerated resolve; outcome i alone is 1&lt;&lt;i) <input id="winningMask" inputmode="numeric" /></label>
+    <label>Winning answer UTF-8 (freeform resolve only; byte-exact, spaces count) <input id="winningAnswer" placeholder="exact string" /></label>
     <button id="preview">Preview</button>
     <pre id="out"></pre>
   </section>

@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """Control panel — token-gated HTTP shell.
 
-Mirrors the CLI commands behind a ``ThreadingHTTPServer``. Every mutating
-endpoint goes through :func:`service.control_panel.security.token_authorized`
-before executing; the bearer token is read from
-``CONTROL_PANEL_TOKEN`` at process start and never logged. Like the CLI,
-the dispatch path requires ``--allow-execute``; without it, every write
-endpoint returns the prepared dry-run command for operator review rather
-than broadcasting.
+Mirrors the CLI commands behind a ``ThreadingHTTPServer``. Every endpoint builds a command and returns
+a preview for operator review; sending ``"execute": true`` broadcasts it, which requires both
+``--allow-execute`` and a valid token (``--auth-token`` / ``CONTROL_PANEL_TOKEN``, sent as
+``Authorization: Bearer`` or ``X-Control-Token``). Previews need no token because they run nothing and
+never contain the key.
 
-Read paths (operator dashboard) are unauthenticated — they only proxy
-indexer queries and never expose keying material. The split between this
-service (operator-only, write-capable) and the public explorer
-(:mod:`service.explorer.server`, read-only, public) is the surface
-boundary defined in ADR-0006.
+The split between this service (operator-only, write-capable) and the public explorer
+(:mod:`service.explorer.server`, read-only, public) is the surface boundary defined in ADR-0006. The
+default bind address is localhost: this is not meant to be exposed publicly.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import subprocess
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -28,6 +24,7 @@ from .commands import (
     build_create_freeform_wager_command,
     build_create_wager_command,
     build_wager_action_command,
+    run_cast_send,
 )
 from .security import token_authorized
 
@@ -40,14 +37,6 @@ class Handler(BaseHTTPRequestHandler):
     private_key: str = ""
     allow_execute: bool = False
     auth_token: str | None = None
-
-    @staticmethod
-    def _redact_command(cmd: list[str]) -> list[str]:
-        out = list(cmd)
-        for i, token in enumerate(out[:-1]):
-            if token == "--private-key":
-                out[i + 1] = "<redacted>"
-        return out
 
     def _send_json(self, code: int, body: dict) -> None:
         data = json.dumps(body).encode()
@@ -83,7 +72,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         raw = self.rfile.read(int(self.headers.get("Content-Length", "0")) or 0)
-        payload = json.loads(raw.decode() or "{}")
+        try:
+            payload = json.loads(raw.decode() or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return self._send_json(400, {"error": "request body is not valid JSON"})
+        if not isinstance(payload, dict):
+            return self._send_json(400, {"error": "request body must be a JSON object"})
+        zero = "0x0000000000000000000000000000000000000000"
         try:
             if path == "/api/preview/create-wager":
                 cmd = build_create_wager_command(
@@ -93,13 +88,16 @@ class Handler(BaseHTTPRequestHandler):
                     outcomes=payload["outcomes"],
                     betting_close_time=int(payload["bettingCloseTime"]),
                     resolution_window=int(payload["resolutionWindow"]),
-                    resolver=payload.get("resolver", "0x0000000000000000000000000000000000000000"),
-                    betting_closer=payload.get("bettingCloser", "0x0000000000000000000000000000000000000000"),
-                    resolution_closer=payload.get("resolutionCloser", "0x0000000000000000000000000000000000000000"),
+                    resolver=payload.get("resolver", zero),
+                    betting_closer=payload.get("bettingCloser", zero),
+                    resolution_closer=payload.get("resolutionCloser", zero),
                     extra_recipients=payload.get("extraRecipients", []),
                     extra_bps=payload.get("extraBps", []),
+                    payoff_policy=int(payload.get("payoffPolicy", 0)),
+                    policy_param=int(payload.get("policyParam", 0)),
                     seed_outcome_indices=payload.get("seedOutcomeIndices", []),
                     seed_amounts=payload.get("seedAmounts", []),
+                    min_new_ticket_stake=int(payload.get("minNewTicketStake", 0)),
                     rpc_url=self.rpc_url,
                     private_key=self.private_key,
                 )
@@ -110,11 +108,12 @@ class Handler(BaseHTTPRequestHandler):
                     proposition=payload["proposition"],
                     betting_close_time=int(payload["bettingCloseTime"]),
                     resolution_window=int(payload["resolutionWindow"]),
-                    resolver=payload.get("resolver", "0x0000000000000000000000000000000000000000"),
-                    betting_closer=payload.get("bettingCloser", "0x0000000000000000000000000000000000000000"),
-                    resolution_closer=payload.get("resolutionCloser", "0x0000000000000000000000000000000000000000"),
+                    resolver=payload.get("resolver", zero),
+                    betting_closer=payload.get("bettingCloser", zero),
+                    resolution_closer=payload.get("resolutionCloser", zero),
                     extra_recipients=payload.get("extraRecipients", []),
                     extra_bps=payload.get("extraBps", []),
+                    min_new_ticket_stake=int(payload.get("minNewTicketStake", 0)),
                     rpc_url=self.rpc_url,
                     private_key=self.private_key,
                 )
@@ -122,7 +121,7 @@ class Handler(BaseHTTPRequestHandler):
                 cmd = build_wager_action_command(
                     wager=payload["wager"],
                     action=payload["action"],
-                    outcome_index=payload.get("outcomeIndex"),
+                    winning_mask=payload.get("winningMask"),
                     protocol_version=payload.get("protocolVersion"),
                     winning_answer=payload.get("winningAnswer"),
                     rpc_url=self.rpc_url,
@@ -130,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             else:
                 return self._send_json(404, {"error": "not found"})
-        except (KeyError, ValueError) as e:
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
             return self._send_json(400, {"error": str(e)})
 
         if payload.get("execute"):
@@ -142,28 +141,40 @@ class Handler(BaseHTTPRequestHandler):
                 x_token=self.headers.get("X-Control-Token"),
             ):
                 return self._send_json(401, {"error": "unauthorized"})
-            proc = subprocess.run(cmd.command, check=False, capture_output=True, text=True)
+            result = run_cast_send(cmd.command)
             return self._send_json(
                 200,
                 {
-                    "command": self._redact_command(cmd.command),
-                    "exit_code": proc.returncode,
-                    "stdout": proc.stdout,
-                    "stderr": proc.stderr,
+                    **cmd.preview(),
+                    "ok": result.ok,
+                    "tx_hash": result.tx_hash,
+                    "exit_code": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
                 },
             )
-        return self._send_json(200, {"command": self._redact_command(cmd.command)})
+        return self._send_json(200, cmd.preview())
 
 
-def main() -> None:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Paramutuel control panel web")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8092)
-    parser.add_argument("--rpc-url", required=True)
-    parser.add_argument("--private-key", required=True)
+    parser.add_argument("--rpc-url", default=os.environ.get("RPC_URL", ""))
+    parser.add_argument("--private-key", default=os.environ.get("PRIVATE_KEY", ""), help="Prefer the PRIVATE_KEY env var: flags are visible in process listings.")
     parser.add_argument("--allow-execute", action="store_true")
-    parser.add_argument("--auth-token", default=None, help="Required bearer or X-Control-Token for execute requests.")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--auth-token",
+        default=os.environ.get("CONTROL_PANEL_TOKEN") or None,
+        help="Required bearer or X-Control-Token for execute requests (or CONTROL_PANEL_TOKEN).",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if not args.rpc_url or not args.private_key:
+        raise SystemExit("RPC URL and private key are required (--rpc-url / RPC_URL, --private-key / PRIVATE_KEY)")
 
     Handler.rpc_url = args.rpc_url
     Handler.private_key = args.private_key

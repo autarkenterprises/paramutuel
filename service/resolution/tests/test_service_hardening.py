@@ -59,7 +59,10 @@ class TestFreeformAnswerIsByteExact(unittest.TestCase):
             protocol_version="freeform",
             winning_answer=" Paris ",
         )
-        self.assertEqual(cmd[cmd.index("resolve(string)") + 1], " Paris ")
+        # Decode what reaches the chain: `cast` itself alters strings, so an argv check proves nothing.
+        data = cmd[-1]
+        self.assertEqual(int.from_bytes(bytes.fromhex(data[10:])[32:64], "big"), len(" Paris "))
+        self.assertEqual(bytes.fromhex(data[10:])[64:71], b" Paris ")
 
 
 class TestRunOnceEndpoint(unittest.TestCase):
@@ -133,7 +136,7 @@ class TestRunOnceEndpoint(unittest.TestCase):
         cmd = data["results"][0]["command"]
         self.assertIn("<redacted>", cmd)
         # outcomeIndex 1 -> mask 2 (outcome #1), never raw 1 (outcome #0).
-        self.assertEqual(cmd[cmd.index("resolve(uint256)") + 1], "2")
+        self.assertEqual(int(cmd[-1][10:], 16), 2)
 
 
 if __name__ == "__main__":

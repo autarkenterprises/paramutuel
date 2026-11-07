@@ -1,59 +1,164 @@
-"""Control panel — calldata builders for V3 wager-lifecycle actions.
+"""Control panel — calldata builders and transaction runner for V3 wager actions.
 
-Pure functions over operator inputs that produce ``cast send`` argument
-lists. Centralising the encoders here means the proposition service
-(which dispatches its own create commands) and the control-panel CLI /
-web shell agree byte-for-byte on calldata; encoding drift between the
-two would silently mint differently-encoded wagers.
+Pure functions over operator inputs that produce ``cast send`` argument lists. Centralising the
+encoders here means the proposition service, the resolution service, the sweeper and the control-panel
+CLI / web shell agree byte-for-byte on calldata; encoding drift between them would silently mint
+differently-encoded wagers.
 
-V3 protocol surface assumptions baked in:
+Every argument travels as ABI-encoded calldata rather than as ``cast`` positional arguments, because
+``cast`` alters strings and can mistake them for flags; :mod:`service.control_panel.abi` has the
+details. ``CastCommand`` therefore also carries the function and readable arguments, for previews.
 
-- Two factory entry points: ``createEnumeratedWager`` (12-arg or 14-arg
-  with seed bets) and ``createFreeformWager``.
-- Lifecycle actions are scoped to a wager address: ``closeBetting``,
-  ``resolve``, ``retract``, ``expire``, ``withdrawFees``. The encoders
-  produce the function selector + ABI-packed args; the CLI handles the
-  ``--rpc-url`` / ``--private-key`` / ``--allow-execute`` plumbing.
+V3 protocol surface:
 
-Address handling uses the EIP-55 checksum form except where the protocol
-explicitly accepts ``0x0``: for ``resolver`` it means "default to
-proposer"; for ``betting closer`` / ``resolution closer`` it means "role
-disabled" (time-based close only) — see ADR-0005's 2026-09-26 AAR revision.
+- ``createEnumeratedWager`` and ``createFreeformWager``. The overloads that take
+  ``minNewTicketStake`` are used only when it is non-zero, so a zero minimum works against every
+  deployed factory.
+- Lifecycle actions scoped to a wager address: ``closeBetting``, ``closeResolutionWindow``,
+  ``resolve``, ``retract``, ``expire``, ``claim``, ``withdrawFees``.
+
+For ``resolver`` the zero address means "default to proposer"; for the betting and resolution closers
+it means "role disabled" (time-based close only) — see ADR-0005's 2026-09-26 AAR revision.
 """
 from __future__ import annotations
 
 import json
 import shlex
-from dataclasses import dataclass
+import subprocess
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+from .abi import encode, encode_call
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+REDACTED = "<redacted>"
+# Long enough for inclusion on a congested chain, short enough that a stuck RPC cannot hang a service.
+CAST_TIMEOUT_SECONDS = 180
+
+
+def redact_argv(argv: list[str]) -> list[str]:
+    """Copy of a ``cast`` argv with the ``--private-key`` value masked, safe to log or return."""
+    out = list(argv)
+    for i, token in enumerate(out[:-1]):
+        if token == "--private-key":
+            out[i + 1] = REDACTED
+    return out
 
 
 @dataclass
 class CastCommand:
+    """A ready-to-run ``cast send``, plus what it does in readable form.
+
+    ``command`` holds the private key and must never be logged or returned; use :meth:`shell` or
+    :meth:`preview`, which redact it.
+    """
+
     command: list[str]
+    signature: str = ""
+    args: list[Any] = field(default_factory=list)
 
     def shell(self) -> str:
-        return " ".join(shlex.quote(x) for x in self.command)
+        """Copy-pasteable shell line with the key masked."""
+        return " ".join(shlex.quote(x) for x in redact_argv(self.command))
+
+    def preview(self) -> dict[str, Any]:
+        """JSON-safe description for operator review. Integers become strings so a uint256 mask or
+        stake survives a JavaScript client."""
+        return {
+            "command": redact_argv(self.command),
+            "function": self.signature,
+            "args": _jsonable(self.args),
+        }
 
 
-def _json_arg(items: list[str] | list[int]) -> str:
-    return json.dumps(items, separators=(",", ":"))
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return str(value) if isinstance(value, int) and not isinstance(value, bool) else value
 
 
-# ADR-0010 unified V3 factory signatures.
-#
-# `createEnumeratedWager` has two overloads: the shorter one with no seed
-# arrays, and a longer one that appends `(uint256[] seedTicketMasks,
-# uint256[] seedAmounts)`. The control panel always emits the long form —
-# when the caller provides no seeds it simply passes empty arrays, which
-# the factory treats as "no seeds" without altering semantics.
+@dataclass
+class CastResult:
+    """Outcome of one ``cast send``. ``ok`` means mined with status 1, and nothing weaker."""
+
+    ok: bool
+    stdout: str = ""
+    stderr: str = ""
+    tx_hash: str | None = None
+    returncode: int | None = None
+
+
+def _scrub_key(text: str, argv: list[str]) -> str:
+    """Remove the private key from text that came back from ``cast``, in case an error echoed it."""
+    for i, token in enumerate(argv[:-1]):
+        if token == "--private-key" and argv[i + 1]:
+            key = argv[i + 1]
+            text = text.replace(key, REDACTED).replace(key.removeprefix("0x"), REDACTED)
+    return text
+
+
+def run_cast_send(
+    argv: list[str],
+    *,
+    runner: Callable[..., Any] | None = None,
+    timeout: int = CAST_TIMEOUT_SECONDS,
+) -> CastResult:
+    """Run a ``cast send --json`` and report what actually happened on-chain.
+
+    The exit code is not enough: ``cast send`` exits 0 for a transaction that was mined and reverted,
+    which is reachable whenever chain state changes between gas estimation and inclusion. Before this
+    existed, services recorded such a transaction as a success. Success therefore requires a JSON
+    receipt with status 1, so any other output (help text, an empty result) is a failure too.
+    """
+    run = runner or subprocess.run
+    try:
+        proc = run(argv, check=False, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return CastResult(False, stderr="`cast` not found on PATH. Install Foundry, or use an image that includes it.")
+    except subprocess.TimeoutExpired:
+        return CastResult(False, stderr=f"`cast send` timed out after {timeout}s; the transaction may still be mined. Check the chain before retrying.")
+
+    stdout = _scrub_key(getattr(proc, "stdout", "") or "", argv)
+    stderr = _scrub_key(getattr(proc, "stderr", "") or "", argv)
+    if proc.returncode != 0:
+        return CastResult(False, stdout, stderr or f"cast exited {proc.returncode}", returncode=proc.returncode)
+    try:
+        receipt = json.loads(stdout)
+    except json.JSONDecodeError:
+        receipt = None
+    if not isinstance(receipt, dict) or "status" not in receipt:
+        return CastResult(False, stdout, f"unexpected cast output, not a transaction receipt: {stdout[:200]}", returncode=0)
+    tx_hash = receipt.get("transactionHash")
+    if str(receipt["status"]).lower() not in ("0x1", "1"):
+        return CastResult(False, stdout, f"transaction {tx_hash} was mined but reverted on-chain (status {receipt['status']})", tx_hash, 0)
+    return CastResult(True, stdout, stderr, tx_hash, 0)
+
+
+def cast_send_argv(*, to: str, calldata: str, rpc_url: str, private_key: str) -> list[str]:
+    """Argv for sending prepared calldata. ``--json`` is what lets :func:`run_cast_send` read the receipt."""
+    return ["cast", "send", "--json", "--rpc-url", rpc_url, "--private-key", private_key, to, calldata]
+
+
+def _command(*, to: str, signature: str, types: list[str], values: list, rpc_url: str, private_key: str) -> CastCommand:
+    # `to` is not part of the calldata, so validate it explicitly with the encoder's address rule.
+    encode(["address"], [to])
+    calldata = encode_call(signature, types, values)
+    return CastCommand(cast_send_argv(to=to, calldata=calldata, rpc_url=rpc_url, private_key=private_key), signature, list(values))
+
+
+# `createEnumeratedWager` long form. The control panel always emits a form that takes seed arrays; empty
+# arrays mean "no seeds" without altering semantics.
 ENUMERATED_CREATE_SIG_WITH_SEEDS = (
     "createEnumeratedWager("
     "address,string,string[],uint8,uint256,uint64,uint64,"
     "address,address,address,address[],uint16[],uint256[],uint256[]"
     ")"
 )
+ENUMERATED_CREATE_SIG_WITH_MIN_STAKE = ENUMERATED_CREATE_SIG_WITH_SEEDS[:-1] + ",uint256)"
+_ENUMERATED_CREATE_TYPES = [
+    "address", "string", "string[]", "uint8", "uint256", "uint64", "uint64",
+    "address", "address", "address", "address[]", "uint16[]", "uint256[]", "uint256[]",
+]
 
 
 def build_create_wager_command(
@@ -73,21 +178,22 @@ def build_create_wager_command(
     policy_param: int = 0,
     seed_outcome_indices: list[int] | None = None,
     seed_amounts: list[int] | None = None,
+    min_new_ticket_stake: int = 0,
     rpc_url: str,
     private_key: str,
 ) -> CastCommand:
-    """Build a `cast send` command for `ParamutuelFactoryV3.createEnumeratedWager`.
+    """Build a ``cast send`` command for ``ParamutuelFactoryV3.createEnumeratedWager``.
 
-    `seed_outcome_indices` is an ergonomic shorthand: each index `i` is
-    promoted to the single-outcome ticket bitmask `1 << i` before it is
-    passed to the factory's `uint256[] seedTicketMasks` argument. Multi-bit
-    seeds (for `ANY_OF` / `EXACT_SET` policies) are NOT expressible here —
+    ``seed_outcome_indices`` is an ergonomic shorthand: each index ``i`` is
+    promoted to the single-outcome ticket bitmask ``1 << i`` before it is
+    passed to the factory's ``uint256[] seedTicketMasks`` argument. Multi-bit
+    seeds (for ``ANY_OF`` / ``EXACT_SET`` policies) are NOT expressible here —
     a mask passed as an "index" would itself be shifted — so call the
     factory directly with explicit masks for those.
 
-    `payoff_policy` is the `ParamutuelWagerV3.PayoffPolicy` enum:
-    `0=SINGLE_WINNER, 1=ANY_OF, 2=EXACT_SET, 3=AT_LEAST_K, 4=WEIGHTED_OVERLAP`.
-    `policy_param` is `k` for `AT_LEAST_K` and `0` otherwise.
+    ``payoff_policy`` is the ``ParamutuelWagerV3.PayoffPolicy`` enum:
+    ``0=SINGLE_WINNER, 1=ANY_OF, 2=EXACT_SET, 3=AT_LEAST_K, 4=WEIGHTED_OVERLAP``.
+    ``policy_param`` is ``k`` for ``AT_LEAST_K`` and ``0`` otherwise.
     """
     if seed_outcome_indices is None:
         seed_outcome_indices = []
@@ -111,47 +217,40 @@ def build_create_wager_command(
     if resolution_window == 0 and resolution_closer.lower() == ZERO_ADDRESS:
         raise ValueError("resolution_window=0 requires a non-zero resolution_closer")
 
-    # Each `seed_outcome_indices[i]` becomes the single-outcome ticket
-    # bitmask `1 << i`. Callers that need multi-bit seed tickets (e.g.
-    # `ANY_OF` covering outcomes {0,2}) should call the factory directly
-    # with the explicit mask.
     seed_ticket_masks = [1 << int(i) for i in seed_outcome_indices]
     for mask in seed_ticket_masks:
         if mask == 0 or mask.bit_length() > len(outcomes):
-            raise ValueError(
-                "seed_outcome_indices entries must be in [0, len(outcomes)-1]"
-            )
+            raise ValueError("seed_outcome_indices entries must be in [0, len(outcomes)-1]")
 
-    cmd = [
-        "cast",
-        "send",
-        factory,
-        ENUMERATED_CREATE_SIG_WITH_SEEDS,
-        collateral,
-        proposition,
-        _json_arg(outcomes),
-        str(int(payoff_policy)),
-        str(int(policy_param)),
-        str(betting_close_time),
-        str(resolution_window),
-        resolver,
-        betting_closer,
-        resolution_closer,
-        _json_arg(extra_recipients),
-        _json_arg(extra_bps),
-        _json_arg(seed_ticket_masks),
-        _json_arg(seed_amounts),
-        "--rpc-url",
-        rpc_url,
-        "--private-key",
-        private_key,
+    values: list[Any] = [
+        collateral, proposition, list(outcomes), int(payoff_policy), int(policy_param),
+        betting_close_time, resolution_window, resolver, betting_closer, resolution_closer,
+        list(extra_recipients), list(extra_bps), seed_ticket_masks, list(seed_amounts),
     ]
-    return CastCommand(cmd)
+    if min_new_ticket_stake:
+        return _command(
+            to=factory,
+            signature=ENUMERATED_CREATE_SIG_WITH_MIN_STAKE,
+            types=_ENUMERATED_CREATE_TYPES + ["uint256"],
+            values=values + [min_new_ticket_stake],
+            rpc_url=rpc_url,
+            private_key=private_key,
+        )
+    return _command(
+        to=factory,
+        signature=ENUMERATED_CREATE_SIG_WITH_SEEDS,
+        types=_ENUMERATED_CREATE_TYPES,
+        values=values,
+        rpc_url=rpc_url,
+        private_key=private_key,
+    )
 
 
 FREEFORM_CREATE_SIG = (
     "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
 )
+FREEFORM_CREATE_SIG_WITH_MIN_STAKE = FREEFORM_CREATE_SIG[:-1] + ",uint256)"
+_FREEFORM_CREATE_TYPES = ["address", "string", "uint64", "uint64", "address", "address", "address", "address[]", "uint16[]"]
 
 
 def build_create_freeform_wager_command(
@@ -166,9 +265,11 @@ def build_create_freeform_wager_command(
     resolution_closer: str,
     extra_recipients: list[str],
     extra_bps: list[int],
+    min_new_ticket_stake: int = 0,
     rpc_url: str,
     private_key: str,
 ) -> CastCommand:
+    """Build a ``cast send`` command for ``ParamutuelFactoryV3.createFreeformWager``."""
     if len(extra_recipients) != len(extra_bps):
         raise ValueError("extra_recipients and extra_bps length mismatch")
     if betting_close_time == 0 and betting_closer.lower() == ZERO_ADDRESS:
@@ -176,26 +277,40 @@ def build_create_freeform_wager_command(
     if resolution_window == 0 and resolution_closer.lower() == ZERO_ADDRESS:
         raise ValueError("resolution_window=0 requires a non-zero resolution_closer")
 
-    cmd = [
-        "cast",
-        "send",
-        factory,
-        FREEFORM_CREATE_SIG,
-        collateral,
-        proposition,
-        str(betting_close_time),
-        str(resolution_window),
-        resolver,
-        betting_closer,
-        resolution_closer,
-        _json_arg(extra_recipients),
-        _json_arg(extra_bps),
-        "--rpc-url",
-        rpc_url,
-        "--private-key",
-        private_key,
+    values: list[Any] = [
+        collateral, proposition, betting_close_time, resolution_window, resolver, betting_closer,
+        resolution_closer, list(extra_recipients), list(extra_bps),
     ]
-    return CastCommand(cmd)
+    if min_new_ticket_stake:
+        return _command(
+            to=factory,
+            signature=FREEFORM_CREATE_SIG_WITH_MIN_STAKE,
+            types=_FREEFORM_CREATE_TYPES + ["uint256"],
+            values=values + [min_new_ticket_stake],
+            rpc_url=rpc_url,
+            private_key=private_key,
+        )
+    return _command(
+        to=factory,
+        signature=FREEFORM_CREATE_SIG,
+        types=_FREEFORM_CREATE_TYPES,
+        values=values,
+        rpc_url=rpc_url,
+        private_key=private_key,
+    )
+
+
+def _parse_winning_mask(raw: Any) -> int:
+    """Accept an integer or a decimal/hex string; a mask can be far wider than a JavaScript number."""
+    if isinstance(raw, bool) or isinstance(raw, float):
+        raise ValueError(f"winning_mask must be a positive integer, got {raw!r}")
+    try:
+        mask = int(raw, 0) if isinstance(raw, str) else int(raw)
+    except (TypeError, ValueError):
+        raise ValueError(f"winning_mask must be a positive integer, got {raw!r}") from None
+    if mask <= 0:
+        raise ValueError(f"winning_mask must be a positive integer, got {raw!r}")
+    return mask
 
 
 def build_wager_action_command(
@@ -204,10 +319,17 @@ def build_wager_action_command(
     action: str,
     rpc_url: str,
     private_key: str,
-    outcome_index: int | None = None,
+    winning_mask: Any = None,
     protocol_version: str | None = None,
     winning_answer: str | None = None,
 ) -> CastCommand:
+    """Build a ``cast send`` for one lifecycle action.
+
+    ``winning_mask`` is the raw bitmask for ``resolve(uint256)``, so outcome 0 alone is mask 1. It was
+    previously named ``outcome_index``, which invited exactly the confusion that made the resolution
+    service pay the wrong outcome before ADR-0019. ``winning_answer`` is sent byte-exact: V3 hashes
+    those bytes to find the winning pool, so nothing here may trim or normalise it (ADR-0009 §5).
+    """
     action_to_sig = {
         "close-betting": "closeBetting()",
         "close-resolution-window": "closeResolutionWindow()",
@@ -219,36 +341,18 @@ def build_wager_action_command(
     pv = (protocol_version or "enumerated").strip().lower()
     if action == "resolve":
         if pv == "freeform":
-            # Byte-exact: never trim (ADR-0009 §5 / ADR-0019) — the wager
-            # hashes these bytes verbatim to find the winning pool.
-            ans = winning_answer or ""
-            if not ans:
+            if not winning_answer:
                 raise ValueError("winning_answer required for freeform resolve(string)")
-            sig = "resolve(string)"
-            args = [ans]
+            signature, types, values = "resolve(string)", ["string"], [winning_answer]
         else:
-            if outcome_index is None:
-                raise ValueError("outcome_index (winning index or bitmask) required for resolve(uint256)")
-            sig = "resolve(uint256)"
-            args = [str(int(outcome_index))]
+            if winning_mask is None:
+                raise ValueError("winning_mask required for resolve(uint256)")
+            signature, types, values = "resolve(uint256)", ["uint256"], [_parse_winning_mask(winning_mask)]
     else:
         if action not in action_to_sig:
             raise ValueError(f"unsupported action: {action}")
-        sig = action_to_sig[action]
-        args = []
-
-    cmd = [
-        "cast",
-        "send",
-        wager,
-        sig,
-        *args,
-        "--rpc-url",
-        rpc_url,
-        "--private-key",
-        private_key,
-    ]
-    return CastCommand(cmd)
+        signature, types, values = action_to_sig[action], [], []
+    return _command(to=wager, signature=signature, types=types, values=values, rpc_url=rpc_url, private_key=private_key)
 
 
 def lifecycle_workflow(*, no_max_betting: bool, no_max_resolution: bool) -> list[str]:

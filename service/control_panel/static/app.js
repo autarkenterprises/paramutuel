@@ -1,12 +1,14 @@
 async function previewAction() {
   const wager = document.getElementById("wager").value.trim();
   const action = document.getElementById("action").value;
-  const outcomeRaw = document.getElementById("outcomeIndex").value;
+  // Kept as text: a mask can be far wider than a JavaScript number can represent exactly.
+  const maskRaw = document.getElementById("winningMask").value.trim();
   const pv = document.getElementById("protocolVersion").value;
   const winAns = document.getElementById("winningAnswer").value;
   const body = { wager, action, protocolVersion: pv };
-  if (action === "resolve" && outcomeRaw !== "") body.outcomeIndex = Number(outcomeRaw);
-  if (action === "resolve" && pv === "freeform" && winAns.trim() !== "") body.winningAnswer = winAns;
+  if (action === "resolve" && maskRaw !== "") body.winningMask = maskRaw;
+  // Not trimmed: answers are matched byte-exactly on-chain.
+  if (action === "resolve" && pv === "freeform" && winAns !== "") body.winningAnswer = winAns;
 
   const res = await fetch("/api/preview/action", {
     method: "POST",

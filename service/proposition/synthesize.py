@@ -6,9 +6,7 @@ label. The cadence label informs operator filtering; it is not authoritative
 on-chain (the wager's ``bettingCloseTime`` is what matters).
 
 This module is deliberately rule-based rather than LLM-backed at the time of
-writing — every call is deterministic for a given input and clock. An
-LLM-backed branch is reserved for future expansion under a feature flag and
-would route through :mod:`service.proposition.dispatch`'s synthesis hook.
+writing — every call is deterministic for a given input and clock.
 """
 from __future__ import annotations
 
@@ -21,15 +19,19 @@ from typing import Any
 def _truncate(s: str, max_len: int) -> str:
     """Truncate ``s`` to ``max_len`` characters with a single-ellipsis suffix.
 
-    Used to fit synthesised propositions inside the on-chain string limits
-    that the V3 factory imposes via :class:`service.control_panel.commands`
-    validators. Non-strict — callers that need byte-exact bounds should
-    measure UTF-8 byte length separately.
+    V3 sets no limit on proposition length, but every byte costs gas at creation
+    and has to read well in the explorer, so drafts stay short.
     """
     s = s.strip()
     if len(s) <= max_len:
         return s
     return s[: max_len - 1] + "…"
+
+
+def _safe_url(link: str) -> str:
+    """Keep only http(s) links. Feed content is untrusted, and a `javascript:` URL here would become
+    a clickable link in the operator panel, next to the token that controls dispatch."""
+    return link if re.match(r"^https?://", (link or "").strip(), re.IGNORECASE) else ""
 
 
 def infer_cadence(source: dict[str, Any], *, now: datetime | None = None) -> str:
@@ -73,7 +75,7 @@ def build_proposition_bundle(
         "Operator must verify wording, outcome rubric, and resolver policy before approval."
     )
     refs = [
-        {"label": source_label, "url": link},
+        {"label": source_label, "url": _safe_url(link)},
     ]
     return prop, outcomes, rationale, refs
 

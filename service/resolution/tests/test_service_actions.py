@@ -13,8 +13,8 @@ class TestResolutionActions(unittest.TestCase):
             protocol_version="enumerated",
             resolve_uint256=1 << 4,
         )
-        self.assertIn("resolve(uint256)", cmd)
-        self.assertIn(str(1 << 4), cmd)
+        self.assertTrue(cmd[-1].startswith("0x4f896d4f"), "resolve(uint256) selector")
+        self.assertEqual(int(cmd[-1][10:], 16), 1 << 4)
 
     def test_resolve_command_freeform_uses_string(self) -> None:
         cmd = _action_command(
@@ -25,8 +25,8 @@ class TestResolutionActions(unittest.TestCase):
             protocol_version="freeform",
             winning_answer="yes",
         )
-        self.assertIn("resolve(string)", cmd)
-        self.assertIn("yes", cmd)
+        self.assertTrue(cmd[-1].startswith("0x461a4478"), "resolve(string) selector")
+        self.assertIn(b"yes", bytes.fromhex(cmd[-1][10:]))
 
     def test_resolve_command_enumerated_requires_value(self) -> None:
         # Default protocol is enumerated; omitting the numeric arg must error.

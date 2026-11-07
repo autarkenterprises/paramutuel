@@ -9,6 +9,8 @@ in that case rather than ``True``.
 """
 from __future__ import annotations
 
+import hmac
+
 
 def token_authorized(*, expected_token: str | None, auth_header: str | None, x_token: str | None) -> bool:
     """Return True iff the caller presents a token matching ``expected_token``.
@@ -18,8 +20,11 @@ def token_authorized(*, expected_token: str | None, auth_header: str | None, x_t
     """
     if not expected_token:
         return False
-    if x_token and x_token == expected_token:
+    expected = expected_token.encode()
+    # `compare_digest` takes time independent of where the strings differ, so an attacker cannot
+    # recover the token one character at a time by measuring response times.
+    if x_token and hmac.compare_digest(x_token.encode(), expected):
         return True
     if auth_header and auth_header.startswith("Bearer "):
-        return auth_header[len("Bearer ") :] == expected_token
+        return hmac.compare_digest(auth_header[len("Bearer ") :].encode(), expected)
     return False

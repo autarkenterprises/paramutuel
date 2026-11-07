@@ -35,9 +35,18 @@ Decision JSON shape (one entry per wager address):
 bearer token (`RESOLUTION_SERVICE_TOKEN` / `--auth-token`, sent as
 `Authorization: Bearer <t>` or `X-Token: <t>`) and fails closed when no
 token is configured; the dry-run response redacts `--private-key`
-(ADR-0019 — previously the endpoint was unauthenticated, CORS-open, and
-echoed the resolver key). `GET` endpoints stay open and never carry key
-material. The fast suite exercises the dry-run pipeline end to end.
+(ADR-0019). `GET /health` stays open and `GET /candidates` shows full
+decisions only with the token, because a decision written before betting
+closes tells a reader the winner while they can still bet on it (ADR-0020).
+
+Winning answers and masks reach the chain as ABI-encoded calldata, because
+`cast` alters strings it parses: see `service/control_panel/abi.py`. A
+transaction counts as successful only when its receipt says so, because
+`cast send` exits 0 for a mined revert.
+
+The container image (`Dockerfile.resolution`) includes `cast`, which signs and
+broadcasts. `cast` takes the raw key only as a process argument, so run this
+service alone in its container or on a host with no other local users.
 """
 from __future__ import annotations
 
@@ -51,6 +60,7 @@ from pathlib import Path
 from urllib import request
 from urllib.parse import parse_qs, urlparse
 
+from service.control_panel.commands import build_wager_action_command, redact_argv, run_cast_send
 from service.control_panel.security import token_authorized
 
 from .logic import actionability_reason, normalize_address
@@ -58,6 +68,10 @@ from .logic import actionability_reason, normalize_address
 # `numOptions <= 255` (factory `MAX_OUTCOMES`), so a valid outcome index is
 # in [0, 254] and its single-bit mask `1 << i` always fits in uint256.
 MAX_OUTCOME_INDEX = 254
+# The indexer caps one /wagers page at this size.
+INDEXER_PAGE_SIZE = 1000
+# Stops a misbehaving indexer from looping forever; 50,000 open wagers is far beyond current scale.
+MAX_INDEXER_PAGES = 50
 
 
 def _env(name: str, default: str = "") -> str:
@@ -108,28 +122,20 @@ def _extract_resolver_address(explicit: str, private_key: str) -> str:
         return normalize_address(explicit)
     if not private_key:
         raise RuntimeError("resolver address required (RESOLUTION_SERVICE_ADDRESS or --private-key)")
-    proc = subprocess.run(
-        ["cast", "wallet", "address", "--private-key", private_key],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            ["cast", "wallet", "address", "--private-key", private_key],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "`cast` not found on PATH: install Foundry or set RESOLUTION_SERVICE_ADDRESS explicitly"
+        ) from None
     if proc.returncode != 0:
         raise RuntimeError(f"failed to derive resolver address: {proc.stderr.strip()}")
     return normalize_address(proc.stdout.strip())
-
-
-def _redact_command(cmd: list[str]) -> list[str]:
-    """Return a copy of a `cast` argv with the `--private-key` value masked.
-
-    Mirrors `control_panel.web.Handler._redact_command`; used for every
-    command echoed back over HTTP so key material never leaves the process.
-    """
-    out = list(cmd)
-    for i, token in enumerate(out[:-1]):
-        if token == "--private-key":
-            out[i + 1] = "<redacted>"
-    return out
 
 
 def resolve_uint256_from_decision(decision: dict) -> int | None:
@@ -156,10 +162,23 @@ def resolve_uint256_from_decision(decision: dict) -> int | None:
     return 1 << idx
 
 
-def _load_open_wagers(indexer_base_url: str, limit: int = 300) -> list[dict]:
+def _load_open_wagers(indexer_base_url: str, limit: int | None = 300) -> list[dict]:
+    """Fetch open wagers, oldest first; `limit=None` walks every page.
+
+    Actionable wagers are the oldest: betting has closed and the window is running. Reading only the
+    newest page would starve exactly those once more than one page of wagers was open.
+    """
     base = indexer_base_url.rstrip("/")
-    body = _http_get_json(f"{base}/wagers?state=OPEN&limit={limit}&order=desc")
-    return list(body.get("wagers") or [])
+    rows: list[dict] = []
+    for page in range(MAX_INDEXER_PAGES):
+        size = INDEXER_PAGE_SIZE if limit is None else min(INDEXER_PAGE_SIZE, limit - len(rows))
+        offset = len(rows)
+        body = _http_get_json(f"{base}/wagers?state=OPEN&limit={size}&offset={offset}&order=asc")
+        batch = list(body.get("wagers") or [])
+        rows.extend(batch)
+        if len(batch) < size or (limit is not None and len(rows) >= limit):
+            break
+    return rows
 
 
 def _action_command(
@@ -174,62 +193,27 @@ def _action_command(
 ) -> list[str]:
     """Translate a (wager, decision) pair into the `cast send` argv list.
 
-    This is the decision JSON → calldata pipeline: the caller has
-    already verified the wager is actionable (see
-    `logic.actionability_reason`) and looked up its decision row;
-    here we map `action` plus the wager's `protocol_version` to the
-    correct V3 function selector (`resolve(uint256)`,
-    `resolve(string)`, or `retract()`) and emit the full argv. The
-    return value is a list, not a string, so it can be passed
-    directly to `subprocess.run` without shell quoting.
+    The caller has already verified the wager is actionable (see `logic.actionability_reason`) and
+    looked up its decision row. The return value is a list, not a string, so it can be passed directly
+    to a subprocess without shell quoting. Anything but `resolve` or `retract` is refused: the decision
+    file must not be able to trigger other wager actions under the resolver's key.
     """
-    # ADR-0010 collapses `protocol_version` to two values: "enumerated" (bitmask
-    # tickets) and "freeform" (UTF-8 answers). Any other value is treated as
-    # enumerated and requires a numeric winning mask.
-    if action == "resolve":
-        pv = (protocol_version or "enumerated").strip().lower()
-        if pv == "freeform":
-            # Byte-exact: never trim. V3 hashes the answer bytes verbatim
-            # (ADR-0009 §5), so " Paris " and "Paris" are different pools.
-            ans = winning_answer or ""
-            if not ans:
-                raise ValueError("freeform resolve requires decision.winningAnswer (exact UTF-8 string)")
-            return [
-                "cast",
-                "send",
-                wager_address,
-                "resolve(string)",
-                ans,
-                "--rpc-url",
-                rpc_url,
-                "--private-key",
-                private_key,
-            ]
-        if resolve_uint256 is None:
-            raise ValueError("enumerated resolve requires outcomeIndex or winningMask")
-        return [
-            "cast",
-            "send",
-            wager_address,
-            "resolve(uint256)",
-            str(resolve_uint256),
-            "--rpc-url",
-            rpc_url,
-            "--private-key",
-            private_key,
-        ]
-    if action == "retract":
-        return [
-            "cast",
-            "send",
-            wager_address,
-            "retract()",
-            "--rpc-url",
-            rpc_url,
-            "--private-key",
-            private_key,
-        ]
-    raise ValueError(f"unsupported decision action: {action}")
+    if action not in ("resolve", "retract"):
+        raise ValueError(f"unsupported decision action: {action}")
+    pv = (protocol_version or "enumerated").strip().lower()
+    if action == "resolve" and pv != "freeform" and resolve_uint256 is None:
+        raise ValueError("enumerated resolve requires outcomeIndex or winningMask")
+    if action == "resolve" and pv == "freeform" and not winning_answer:
+        raise ValueError("freeform resolve requires decision.winningAnswer (exact UTF-8 string)")
+    return build_wager_action_command(
+        wager=wager_address,
+        action=action,
+        rpc_url=rpc_url,
+        private_key=private_key,
+        winning_mask=resolve_uint256,
+        protocol_version=pv,
+        winning_answer=winning_answer,
+    ).command
 
 
 def evaluate_candidates(
@@ -253,6 +237,7 @@ def evaluate_candidates(
             "resolution_window": row.get("resolution_window"),
             "resolution_window_closed": row.get("resolution_window_closed"),
             "decision": decision,
+            "decision_present": decision is not None,
             "actionable": reason is None and decision is not None,
             "reason": reason,
         }
@@ -265,6 +250,13 @@ def evaluate_candidates(
                 candidate["decision_winning_answer"] = decision.get("winningAnswer")
         out.append(candidate)
     return out
+
+
+def _without_decision_contents(candidate: dict) -> dict:
+    """What an unauthenticated caller may see: that a decision exists, not what it says."""
+    public = {k: v for k, v in candidate.items() if not k.startswith("decision_") or k == "decision_present"}
+    public["decision"] = None
+    return public
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -282,6 +274,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+    def _authorized(self) -> bool:
+        return token_authorized(
+            expected_token=self.auth_token,
+            auth_header=self.headers.get("Authorization"),
+            x_token=self.headers.get("X-Token"),
+        )
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
@@ -314,8 +313,16 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/candidates":
-            limit = int(qs.get("limit", ["300"])[0])
-            open_wagers = _load_open_wagers(self.indexer_base_url, limit=max(1, min(1000, limit)))
+            try:
+                limit = int(qs.get("limit", ["300"])[0])
+            except ValueError:
+                _json_response(self, 400, {"error": "invalid limit"})
+                return
+            try:
+                open_wagers = _load_open_wagers(self.indexer_base_url, limit=max(1, min(1000, limit)))
+            except Exception as exc:
+                _json_response(self, 502, {"error": f"indexer unavailable: {exc}"})
+                return
             decisions = _read_decisions(self.decisions_path)
             candidates = evaluate_candidates(
                 open_wagers=open_wagers,
@@ -323,6 +330,8 @@ class Handler(BaseHTTPRequestHandler):
                 resolver_address=self.resolver_address,
                 now_ts=int(time.time()),
             )
+            if not self._authorized():
+                candidates = [_without_decision_contents(c) for c in candidates]
             _json_response(self, 200, {"candidates": candidates})
             return
 
@@ -333,18 +342,25 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path != "/run-once":
             _json_response(self, 404, {"error": "not found"})
             return
-        if not token_authorized(
-            expected_token=self.auth_token,
-            auth_header=self.headers.get("Authorization"),
-            x_token=self.headers.get("X-Token"),
-        ):
+        if not self._authorized():
             _json_response(self, 401, {"error": "unauthorized"})
             return
         raw = self.rfile.read(int(self.headers.get("Content-Length", "0")) or 0)
-        payload = json.loads(raw.decode() or "{}")
+        try:
+            payload = json.loads(raw.decode() or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            _json_response(self, 400, {"error": "request body is not valid JSON"})
+            return
+        if not isinstance(payload, dict):
+            _json_response(self, 400, {"error": "request body must be a JSON object"})
+            return
         execute = bool(payload.get("execute", False))
 
-        open_wagers = _load_open_wagers(self.indexer_base_url, limit=1000)
+        try:
+            open_wagers = _load_open_wagers(self.indexer_base_url, limit=None)
+        except Exception as exc:
+            _json_response(self, 502, {"error": f"indexer unavailable: {exc}"})
+            return
         decisions = _read_decisions(self.decisions_path)
         candidates = evaluate_candidates(
             open_wagers=open_wagers,
@@ -408,16 +424,16 @@ class Handler(BaseHTTPRequestHandler):
             if not execute:
                 succeeded += 1
                 results.append(
-                    {"wager": c["wager_address"], "ok": True, "dry_run": True, "command": _redact_command(cmd)}
+                    {"wager": c["wager_address"], "ok": True, "dry_run": True, "command": redact_argv(cmd)}
                 )
                 continue
-            proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
-            if proc.returncode == 0:
+            result = run_cast_send(cmd)
+            if result.ok:
                 succeeded += 1
-                results.append({"wager": c["wager_address"], "ok": True, "stdout": proc.stdout})
+                results.append({"wager": c["wager_address"], "ok": True, "tx_hash": result.tx_hash, "stdout": result.stdout})
             else:
                 failed += 1
-                results.append({"wager": c["wager_address"], "ok": False, "stderr": proc.stderr})
+                results.append({"wager": c["wager_address"], "ok": False, "tx_hash": result.tx_hash, "stderr": result.stderr})
 
         _json_response(
             self,

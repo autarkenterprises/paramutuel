@@ -3,21 +3,20 @@
 Bridges the operator-approved proposal records (managed in :mod:`service.proposition.db`)
 to a ``cast send`` invocation that creates the wager. Calldata building is delegated
 to :func:`service.control_panel.commands.build_create_wager_command` so the proposition
-and control-panel services agree on encoding rules; this module's job is purely the
-process-level fan-out (subprocess invocation, dry-run vs execute, JSON output capture).
+and control-panel services agree on encoding rules; this module's job is purely running
+it and reporting what happened on-chain.
 
-The dispatch path is deliberately single-shot per proposal: idempotency is enforced
-upstream by the operator UI marking each proposal as ``dispatched``. A re-dispatch
-of an already-dispatched record would create a second wager on-chain, which is why
-the gate sits in :mod:`db`, not here.
+The dispatch path is single-shot per proposal: a re-dispatch of an already-dispatched
+record would create a second wager on-chain. The gate lives in the HTTP handler
+(:mod:`service.proposition.server`), which holds a lock across the status check and
+this call so concurrent requests cannot both pass it.
 """
 from __future__ import annotations
 
 import json
-import subprocess
 from typing import Any
 
-from service.control_panel.commands import build_create_wager_command
+from service.control_panel.commands import build_create_wager_command, redact_argv, run_cast_send
 
 
 def dispatch_proposal(
@@ -55,11 +54,11 @@ def dispatch_proposal(
         private_key=private_key,
     ).command
     if dry_run:
-        return {"ok": True, "dry_run": True, "command": cmd}
-    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
-    if proc.returncode == 0:
-        return {"ok": True, "stdout": proc.stdout}
-    return {"ok": False, "stderr": proc.stderr, "stdout": proc.stdout}
+        return {"ok": True, "dry_run": True, "command": redact_argv(cmd)}
+    result = run_cast_send(cmd)
+    if result.ok:
+        return {"ok": True, "tx_hash": result.tx_hash, "stdout": result.stdout}
+    return {"ok": False, "tx_hash": result.tx_hash, "stderr": result.stderr, "stdout": result.stdout}
 
 
 def proposal_to_preview_dict(row: dict[str, Any]) -> dict[str, Any]:

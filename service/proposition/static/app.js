@@ -62,7 +62,13 @@ function renderProposal(p) {
   if (p.tx_hint) meta.push(`tx/log: ${p.tx_hint}`);
   if (p.dispatch_error) meta.push(`error: ${p.dispatch_error}`);
   const metaBlock = meta.length ? `<pre class="meta">${esc(meta.join("\n"))}</pre>` : "";
-  const refs = (p.source_refs || []).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.label)}</a>`).join(" · ");
+  // Feed links are untrusted. Rows stored before the server began dropping non-http(s) links still
+  // pass through here, so check the scheme again rather than rendering a clickable `javascript:` URL.
+  const refs = (p.source_refs || [])
+    .map((r) => (/^https?:\/\//i.test(String(r.url || "").trim())
+      ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.label)}</a>`
+      : esc(r.label)))
+    .join(" · ");
   const outs = JSON.stringify(p.outcomes || []);
   return `
     <div class="item" data-id="${p.id}">
@@ -86,6 +92,7 @@ function renderProposal(p) {
         <button type="button" class="approveBtn"${disApr}>Approve</button>
         <button type="button" class="danger rejectBtn"${disApr}>Reject</button>
         <button type="button" class="dispatchBtn"${disDispatch}>Dispatch</button>
+        <button type="button" class="secondary retryBtn"${p.status === "dispatch_failed" ? "" : " disabled"} title="Re-approve after checking the error above: a timed-out transaction may still have landed.">Retry failed dispatch</button>
       </div>
       <p class="err itemErr"></p>
     </div>
@@ -158,6 +165,15 @@ async function loadList() {
       try {
         const res = await api(`/api/proposals/${id}/dispatch`, { method: "POST", body: "{}" });
         err.textContent = JSON.stringify(res, null, 2);
+        await loadList();
+      } catch (e) {
+        showErr(e);
+      }
+    });
+    el.querySelector(".retryBtn").addEventListener("click", async () => {
+      err.textContent = "";
+      try {
+        await api(`/api/proposals/${id}/retry`, { method: "POST", body: "{}" });
         await loadList();
       } catch (e) {
         showErr(e);
