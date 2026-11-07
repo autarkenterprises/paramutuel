@@ -525,8 +525,7 @@ def apply_log(
         if enumerated:
             payload["payoffPolicy"] = payoff_policy
             payload["policyParam"] = policy_param
-        if not insert_event_log(conn, eid, wager, event_name, block_number, tx_hash, log_index, payload):
-            return
+        insert_event_log(conn, eid, wager, event_name, block_number, tx_hash, log_index, payload)
 
         conn.execute(
             """

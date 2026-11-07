@@ -381,5 +381,63 @@ class ControlPanelCommandTests(unittest.TestCase):
         self.assertIn("closeResolutionWindow (optional before expire)", steps)
 
 
+class BuilderValidationTests(unittest.TestCase):
+    """Each input the factory is certain to reject fails here with a clear message, before any gas."""
+
+    ZERO = "0x0000000000000000000000000000000000000000"
+    ONE = "0x1111111111111111111111111111111111111111"
+
+    def _create(self, **kw):
+        args = dict(
+            factory=self.ONE, collateral=self.ONE, proposition="Q?", outcomes=["A", "B"], betting_close_time=1,
+            resolution_window=1, resolver=self.ZERO, betting_closer=self.ZERO, resolution_closer=self.ZERO,
+            extra_recipients=[], extra_bps=[], rpc_url="http://r", private_key="0xabc",
+        )
+        args.update(kw)
+        return build_create_wager_command(**args)
+
+    def _freeform(self, **kw):
+        args = dict(
+            factory=self.ONE, collateral=self.ONE, proposition="Q?", betting_close_time=1, resolution_window=1,
+            resolver=self.ZERO, betting_closer=self.ZERO, resolution_closer=self.ZERO,
+            extra_recipients=[], extra_bps=[], rpc_url="http://r", private_key="0xabc",
+        )
+        args.update(kw)
+        return build_create_freeform_wager_command(**args)
+
+    def test_enumerated_rejections(self):
+        for kw, message in (
+            (dict(outcomes=["only one"]), "at least 2"),
+            (dict(extra_recipients=[self.ONE]), "extra_recipients"),
+            (dict(seed_outcome_indices=[0]), "seed_outcome_indices"),
+            (dict(seed_outcome_indices=[0], seed_amounts=[0]), "positive"),
+            (dict(payoff_policy=5), "payoff_policy"),
+            (dict(betting_close_time=0), "betting_closer"),
+            (dict(resolution_window=0), "resolution_closer"),
+        ):
+            with self.subTest(kw=kw), self.assertRaisesRegex(ValueError, message):
+                self._create(**kw)
+
+    def test_freeform_rejections(self):
+        for kw, message in (
+            (dict(extra_recipients=[self.ONE]), "extra_recipients"),
+            (dict(betting_close_time=0), "betting_closer"),
+            (dict(resolution_window=0), "resolution_closer"),
+        ):
+            with self.subTest(kw=kw), self.assertRaisesRegex(ValueError, message):
+                self._freeform(**kw)
+
+    def test_no_max_windows_are_allowed_when_a_closer_is_named(self):
+        self._create(betting_close_time=0, betting_closer=self.ONE)
+        self._freeform(resolution_window=0, resolution_closer=self.ONE)
+
+    def test_action_rejections(self):
+        common = dict(wager=self.ONE, rpc_url="http://r", private_key="0xabc")
+        with self.assertRaisesRegex(ValueError, "winning_answer"):
+            build_wager_action_command(action="resolve", protocol_version="freeform", **common)
+        with self.assertRaisesRegex(ValueError, "unsupported action"):
+            build_wager_action_command(action="self-destruct", **common)
+
+
 if __name__ == "__main__":
     unittest.main()

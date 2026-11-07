@@ -39,6 +39,11 @@ class RunCastSendTests(unittest.TestCase):
         self.assertFalse(r.ok)
         self.assertIn("BettingNotClosed", r.stderr)
 
+    def test_output_that_only_looks_like_json_is_not_success(self):
+        """No readable receipt means we cannot say the transaction landed, so it must not read as ok."""
+        r = self._run(FakeProc(stdout="{ not json"))
+        self.assertFalse(r.ok)
+
     def test_log_noise_after_the_receipt_does_not_hide_success(self):
         """Seen against a real node: cast's RPC poller can log to stdout after printing the receipt.
         Parsing the whole of stdout would report a mined transaction as failed."""

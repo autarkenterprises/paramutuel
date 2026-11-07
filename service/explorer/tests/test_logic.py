@@ -20,6 +20,12 @@ class ExplorerLogicTests(unittest.TestCase):
             "open",
         )
 
+    def test_can_expire_from_the_scheduled_close_when_never_closed_early(self):
+        row = {"resolution_window_closed": 0, "resolution_window": 10, "betting_closed_at": None, "betting_close_time": 100}
+        self.assertFalse(can_expire_candidate_row(row, 110), "the contract needs strictly past the end")
+        self.assertTrue(can_expire_candidate_row(row, 111))
+        self.assertFalse(can_expire_candidate_row({**row, "betting_close_time": 0}, 10**12), "no close time, no window start")
+
     def test_can_expire_for_closed_resolution_window(self):
         row = {"resolution_window_closed": 1, "resolution_window": 0}
         self.assertTrue(can_expire_candidate_row(row, 1))

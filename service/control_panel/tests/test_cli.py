@@ -8,6 +8,7 @@ from unittest import mock
 from eth_abi import decode as abi_decode
 
 from service.control_panel import cli
+from service.control_panel.commands import CastResult
 
 KEY = "0x" + "cd" * 32
 WAGER = "0x" + "33" * 20
@@ -70,6 +71,50 @@ class CliTests(unittest.TestCase):
         )
         self.assertEqual(rc, 0)
         self.assertIn("uint256)", out, "function line shows the minimum-stake overload")
+
+
+class CliRemainingTests(unittest.TestCase):
+    def test_missing_rpc_or_key_is_a_usage_error_not_a_traceback(self):
+        err = io.StringIO()
+        with (
+            mock.patch.dict(cli.os.environ, {}, clear=True),
+            mock.patch("sys.argv", ["cli", "wager-action", "--wager", WAGER, "--action", "retract"]),
+            contextlib.redirect_stderr(err),
+        ):
+            self.assertEqual(cli.main(), 2)
+        self.assertIn("required", err.getvalue())
+
+    def test_freeform_create_dry_run_encodes_exactly_what_was_given(self):
+        rc, out, _ = run_cli(
+            "create-freeform-wager",
+            "--factory", WAGER, "--collateral", WAGER, "--proposition=  Who wins?  ",
+            "--betting-close-time", "5", "--resolution-window", "6",
+            "--resolver", WAGER, "--betting-closer", WAGER, "--resolution-closer", WAGER,
+            "--min-new-ticket-stake", "9",
+        )
+        self.assertEqual(rc, 0)
+        calldata = out.split()[-1].strip("'")
+        decoded = abi_decode(
+            ["address", "string", "uint64", "uint64", "address", "address", "address", "address[]", "uint16[]", "uint256"],
+            bytes.fromhex(calldata[10:]),
+        )
+        self.assertEqual(decoded[1], "  Who wins?  ")
+        self.assertEqual(decoded[-1], 9)
+        self.assertNotIn("cd" * 32, out)
+
+    def test_execute_reports_success_and_failure_through_the_exit_code(self):
+        """Scripts rely on this: a mined revert must not read as success."""
+        ok = CastResult(ok=True, stdout="receipt", stderr="", tx_hash="0xbeef", returncode=0)
+        with mock.patch.object(cli, "run_cast_send", return_value=ok):
+            rc, out, _ = run_cli("--execute", "wager-action", "--wager", WAGER, "--action", "retract")
+        self.assertEqual(rc, 0)
+        self.assertIn("receipt", out)
+
+        bad = CastResult(ok=False, stdout="", stderr="reverted on-chain", tx_hash="0xfeed", returncode=0)
+        with mock.patch.object(cli, "run_cast_send", return_value=bad):
+            rc, _, err = run_cli("--execute", "wager-action", "--wager", WAGER, "--action", "retract")
+        self.assertEqual(rc, 1)
+        self.assertIn("reverted on-chain", err)
 
 
 if __name__ == "__main__":

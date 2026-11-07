@@ -95,6 +95,12 @@ def _http_get_json(url: str, timeout: int = 20) -> dict:
 
 
 def _read_decisions(path: str) -> dict:
+    """Load the operator's decision file, keyed by normalized wager address.
+
+    A missing file means no decisions. A file that exists but cannot be read raises (`OSError`, or
+    `ValueError` for bad JSON or encoding) rather than reading as empty, so a typo in a hand-edited
+    file is reported instead of looking like "nothing to do". See `_decisions_problem`.
+    """
     p = Path(path)
     if not p.exists():
         return {}
@@ -107,6 +113,14 @@ def _read_decisions(path: str) -> dict:
             continue
         out[normalize_address(k)] = v
     return out
+
+
+def _decisions_problem(exc: Exception) -> str:
+    """Describe an unreadable decision file. `/candidates` and `/health` need no token, and pending
+    decisions are insider information, so this reports where parsing failed and never the contents.
+    `json.JSONDecodeError`'s message holds only a position; an `OSError` message would hold the path."""
+    detail = exc.strerror if isinstance(exc, OSError) else str(exc)
+    return f"decisions file unreadable: {detail}"
 
 
 def _extract_resolver_address(explicit: str, private_key: str) -> str:
@@ -288,7 +302,12 @@ class Handler(BaseHTTPRequestHandler):
         qs = parse_qs(parsed.query)
 
         if path == "/health":
-            decisions = _read_decisions(self.decisions_path)
+            decisions_error = None
+            try:
+                decisions = _read_decisions(self.decisions_path)
+            except (OSError, ValueError) as exc:
+                decisions = {}
+                decisions_error = _decisions_problem(exc)
             try:
                 wagers = _load_open_wagers(self.indexer_base_url, limit=20)
                 ok = True
@@ -307,6 +326,8 @@ class Handler(BaseHTTPRequestHandler):
                     "indexer_error": err,
                     "resolver_address": self.resolver_address,
                     "open_wagers_sampled": len(wagers),
+                    "decisions_ok": decisions_error is None,
+                    "decisions_error": decisions_error,
                     "decision_entries": len(decisions),
                 },
             )
@@ -323,7 +344,11 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 _json_response(self, 502, {"error": f"indexer unavailable: {exc}"})
                 return
-            decisions = _read_decisions(self.decisions_path)
+            try:
+                decisions = _read_decisions(self.decisions_path)
+            except (OSError, ValueError) as exc:
+                _json_response(self, 500, {"error": _decisions_problem(exc)})
+                return
             candidates = evaluate_candidates(
                 open_wagers=open_wagers,
                 decisions=decisions,
@@ -361,7 +386,13 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             _json_response(self, 502, {"error": f"indexer unavailable: {exc}"})
             return
-        decisions = _read_decisions(self.decisions_path)
+        # Refuse the whole run: acting on part of a file the operator is mid-way through editing is
+        # worse than doing nothing, and every path here can wait for the file to be fixed.
+        try:
+            decisions = _read_decisions(self.decisions_path)
+        except (OSError, ValueError) as exc:
+            _json_response(self, 500, {"error": _decisions_problem(exc)})
+            return
         candidates = evaluate_candidates(
             open_wagers=open_wagers,
             decisions=decisions,
