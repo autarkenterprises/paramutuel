@@ -1,7 +1,7 @@
 # ADR-0018: Collateral curation as an opt-in overlay (no core change)
 
 Date: 2026-06-19
-Status: **Proposed** (design ADR; implementation gated on operator input).
+Status: **Implemented** (by ADR-0020, 2026-11-07). It needed no operator input after all: the allowlist uses only the tokens the dApp already offered.
 Builds on: [ADR-0001](ADR-0001-core-immutability-and-delegated-resolution.md) (immutable, collateral-agnostic core), [ADR-0006](ADR-0006-surface-separation-self-custody-vs-assisted-ux.md) (token-policy decision: protocol collateral-agnostic, site curates happy paths), [ADR-0016](ADR-0016-assisted-ux-funds-management.md) (Tier-1 / Tier-2 collateral split), [ADR-0017](ADR-0017-service-provider-concept.md) (service-provider catalog + manifest), [`AGENTS.md`](../../AGENTS.md) practices **#1**, **#2**, **#4**.
 
 ## Context
@@ -58,16 +58,23 @@ The honest boundary: an overlay protects participants who *use the overlay*. A p
 
 ## After Action Report
 
-**AAR date:** Pending
-**AAR status:** Pending
+**AAR date:** 2026-11-07
+**AAR status:** Initial. Revisit when ADR-0017's manifest exists and when the corrected factory is deployed.
 
 **Outcome vs success criteria:**
 
-- <criterion>: <Met | Partially met | Not met> — <evidence>
+- *Allowlist exists, is network-keyed, and its schema is documented:* **Met.** `config/collateral-allowlist.json`; schema in `docs/WEBSITE.md`; checked by `dapp/tests/collateral-allowlist.test.js`.
+- *Create defaults to the allowlist; an unlisted token needs an explicit, warned opt-in:* **Met.** Both create surfaces refuse an unlisted token until the box is ticked: `test_propose_page_creates_the_wager_it_describes_after_refusing_bad_input` and `test_dapp_runs_a_freeform_wager_to_payout_with_exact_bytes` (browser, then checked on chain).
+- *Bet surfaces show a trust badge sourced from the allowlist:* **Met.** A listed token shows its curated symbol and no warning; an unlisted one shows a warning and never its self-reported symbol: `test_bet_page_names_a_listed_token_and_does_not_warn`, and the `bet_enumerated` scenario.
+- *Two Forge tests pin the boundary:* **Met.** `test_ADR0018_noReturnToken_placeBetReverts_failsSafe` and `test_ADR0018_feeOnTransferToken_breaksSolvency_failsUnsafe`, in the fast suite.
+- *No surface claims an unqualified "any ERC-20":* **Met.** A repository-wide search outside historical records finds none.
+- *`agents/service-provider-manifest.json` references the allowlist:* **Not met.** That manifest belongs to ADR-0017, which is still a design. Carried to ADR-0017.
 
 **Outcome vs failure criteria:**
 
-- <criterion>: <Avoided | Triggered | Mitigated> — <evidence>
+- *Allowlist drifts from on-chain reality:* **Partly mitigated.** The schema test catches malformed, mistyped and duplicated entries and chain mismatches. Whether each address really is the named token needs an RPC call, so it is not in CI. Check it before adding a token.
+- *The overlay hardens into a gate:* **Avoided.** The opt-in path is exercised end to end in a real browser.
+- *Curation theater:* **Open.** Disclosure is in place; whether people heed it can only be judged from use.
 
 **Lessons:** Pending.
 

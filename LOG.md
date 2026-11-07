@@ -205,3 +205,13 @@ Headline: the happy-path arithmetic ADR-0019 verified is sound, but **Base's EIP
 Dead ends worth keeping: suspected fee-recipient griefing is **not** exploitable by ordinary transactions (creation hits the cap before the terminal path does); only an L1 deposit tx could reach it. Suspected mask-as-index winner mislabel in `resolvedSummary` was wrong: that code decodes masks correctly. `forge test` gas figures run warm inside one test tx and understated `resolve` by ~4M until measured with the `cool` cheatcode.
 
 Practices review (AGENTS.md #12, L-007): re-read all 15. Drift: the monthly review lapsed after 2026-05-07 with no entries for June through October, which is the silence L-007 exists to prevent; recorded here rather than backfilled.
+
+## 2026-11-07 (continued) — ADR-0020 closed: the layers between the layers
+
+Second half of the same pass. Python coverage was measured at 78%. Writing the missing tests took it to 99% and found two more connection resets (O12, O13). Then a real-browser layer was added (`test/integration/test_browser_e2e.py`: Chrome over the DevTools protocol, a minimal wallet forwarding to anvil, results checked on chain). Its first runs found the worst defect of either audit: since V3, **no browser could resolve a wager**, place a single dApp bet, or stake a freeform answer from the bet page. ethers v6 rejects calls to same-length overloads (`placeBet`, `resolve`), and every other layer encodes by signature, so only a browser could see it (W14). It also found a bet page that erased its own success message, pages that kept the old wallet account, and an explorer that only worked when embedded.
+
+CI, on its first clean runs, found what this machine hid: an unbounded `mcp` dependency that broke fresh installs (D9), dApp test dependencies never installed, and end-to-end tests finding contract artifacts by name. A stale artifact of a deleted test stood in for the real mock here, hiding that the mock had no `decimals()` (T2). An intermittent failure in the listings test was traced, then pinned deterministically: the home ticker said "No stakes yet" beside a 4-token pot while the indexer had not yet read the wager's labels, a remnant of X1 (W17).
+
+Dead end worth keeping: running Chrome with `TMPDIR` set to the session scratchpad fails with "Socket path too long". Unix sockets cap at 108 bytes, so browser tests use the system temp directory.
+
+Work paused overnight for the operator's usage window, then resumed at 07:30. Records: the ADR-0020 AAR, `docs/ADR-0020-IMPLEMENTATION.md`, the ADR-0019 AAR revision, the ADR-0018 AAR, and L-010 to L-016.

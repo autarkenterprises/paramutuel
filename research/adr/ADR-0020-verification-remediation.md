@@ -1,7 +1,7 @@
 # ADR-0020: Second verification pass — correct every verified error and deficiency
 
 Date: 2026-11-07
-Status: **Accepted** (implementation in progress on branch `adr-0020-verification-remediation`; see the AAR at the end)
+Status: **Implemented** (2026-11-07). The contract fixes are in source and take effect when the operator deploys the new factory; see the AAR.
 Builds on: ADR-0001, ADR-0005, ADR-0009, ADR-0010, ADR-0013, ADR-0018, ADR-0019, `AGENTS.md` #1 / #2 / #3 / #4 / #5 / #8 / #9
 
 ## Context
@@ -116,6 +116,18 @@ Severity reflects impact if the path is used, not current exposure (the deployed
 | R5 | The monthly practices review (L-007) lapsed after 2026-05-07 with no entry, the exact silence that lesson forbids. | Low |
 | R6 | ADR-0018 sat on an unmerged branch while master cited it. | Low |
 
+### Found during remediation
+
+Fixing the findings above turned up more defects, recorded with their evidence in [`docs/ADR-0020-IMPLEMENTATION.md`](../../docs/ADR-0020-IMPLEMENTATION.md#found-during-remediation). The worst was **W14 (critical): no browser could resolve a V3 wager, place a single dApp bet, or stake a freeform answer from the bet page.** ethers v6 rejects calls to overloads of the same length, and every layer that unit tests could reach encodes by signature, so only the browser layer could show it. The others are:
+
+- W12, W13, W15, W16, W17: client display, account-tracking and validation bugs. W17 is a remnant of X1.
+- O12, O13: two more connection resets (O11's class).
+- O14: `cast` log noise read as a failed transaction.
+- D9: an unbounded dependency that broke every fresh MCP install.
+- D10, D11: test and production running different ethers versions; a dead link and a broken script.
+- T1, T2: Python coverage at 78%, and artifact lookup that differed between machines.
+- R7: ADR-0018's drift check was never written.
+
 ## Decision
 
 1. **Fix every finding above in code, config or docs on this branch, under red → green TDD**, one logical unit per commit, except the operator-only items in decision 7.
@@ -176,19 +188,48 @@ Severity reflects impact if the path is used, not current exposure (the deployed
 
 ## After Action Report
 
-**AAR date:** Pending
-**AAR status:** Pending
+**AAR date:** 2026-11-07
+**AAR status:** Initial. Revisit after the operator cutover (new factory, indexer and resolution redeploys, live suites), and at the first external audit.
 
 **Outcome vs success criteria:**
 
-- Pending.
+- *Every finding fixed with a test that failed first, or recorded with rationale:* **Met.** The implementation notes give each finding's commit and its test. Three are dispositions, not code fixes, each with its reason:
+  - X6: confirmations instead of a reorg rewinder.
+  - W11: a warning, by decision 6.
+  - D2: key rotation, which is an operator step.
+
+  Characterization tests of existing code were shown to detect faults by mutation (contracts) or by corrupting their input (allowlist).
+- *`script/test-fast.sh` passes with the site, artifact, SRI and cold-gas checks:* **Met.** It passes locally and on CI. The fast-suite portion of CI run 42354585838 shows 169 Foundry tests, including `test_C1_coldResolve_*`, `site-artifact.test.js` and `abi-overloads.test.js`.
+- *The local end-to-end test proves indexer state equals chain state for all five policies and freeform:* **Met.** `test_single_winner_settles` through `test_weighted_overlap_settles` compare `total_winning_stake` with the contract's `payoutDenominator`, and `test_freeform_every_awkward_answer_settles_through_the_service` covers freeform.
+- *A reverted transaction is reported as a failure by every service:* **Met.** `test_mined_revert_is_reported_as_failure` shows real `cast` exiting 0 and `run_cast_send` reporting failure. Each service delegates to that verdict, pinned by its own test:
+  - resolution: `test_execute_reports_a_mined_revert_as_failed`
+  - proposition: `test_mined_revert_is_not_ok`
+  - sweeper: `test_sweeper.py`
+  - CLI: `test_execute_reports_success_and_failure_through_the_exit_code`
+- *`script/mutation-check.py` kills every listed mutation:* **Met.** 66 of 66, after the baseline run passes.
+- *`forge coverage` runs:* **Met.** Results and its false gaps are in `docs/COVERAGE-BASELINE.md`.
+- *After merge, the hosted propose scripts return 200:* recorded in the LOG entry for the merge.
 
 **Outcome vs failure criteria:**
 
-- Pending.
+- *Additivity breach against the deployed factory:* **Avoided.**
+  - Original creation signatures are kept and tested (`test_C3_originalOverloads_haveNoMinimum`).
+  - The indexer and clients treat a missing `minNewTicketStake()` as zero (`test_adr0020_state.py`; `assertMeetsMinimum` in `bet-page.js`).
+  - The read-only live suite passes against the deployed factory.
+- *Factory over EIP-170:* **Avoided.** 22,650 B runtime, 1,926 B under the limit.
+- *Another partial claim survives:* **Triggered three times, each caught before the merge:**
+  - X1's fix stopped at the API, while the pages could still claim "No stakes yet" (W17).
+  - A local stale artifact masked a missing `decimals()` (T2).
+  - An early count in the implementation notes was wrong.
 
-**Lessons:** Pending.
+  The browser and CI layers caught the first two, which is why they now exist. **The headline lesson is that ADR-0019 verified each layer against itself, and most of what this pass found lay between layers:**
+  - a page and its wallet library
+  - a service and `cast`
+  - the indexer and the pages that read it
+  - the repository and what actually ships
 
-**Follow-ups:** Pending.
+**Lessons:** L-010 to L-016 in `LESSONS.md`.
+
+**Follow-ups:** the operator steps in the implementation notes and `docs/TASKS.md`: key rotation, factory deploy, indexer and resolution redeploys, live suites, PyPI, a health alert, and the two open questions below.
 
 **Revision schedule:** after the operator cutover; again at the first external audit.

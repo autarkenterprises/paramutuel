@@ -67,3 +67,45 @@ See `AGENTS.md` practice #11 for the contract this file satisfies.
 **Why:** ADR-0010 correctly deleted the V1 / V2 contracts (L-002), and commit `b2a2f28` deleted `test/Paramutuel.t.sol` with them. The V2 suites were ported; the V1 suite was not — yet V1 was the only suite pinning the lifecycle / access-control / fee-cap / token-failure behavior that V3 inherited verbatim. For months 15 V3 custom errors and every string `require` had no test, invisible because `forge coverage` is blocked (ADR-0013). ADR-0019 restored 40 tests and proved them by mutation.
 
 **How to apply:** Before deleting a test file during a migration, list the behaviors it pins (one line per test) and map each to a surviving test or a new port; commit the map in the migration's implementation notes. A cheap backstop that needs no coverage tooling: every custom error / `require` string in `src/` must appear in at least one `expectRevert` in `test/`.
+
+## L-010: Assert at the outermost boundary you can reach
+
+**Why:** ADR-0019's byte-exact test asserted on the argument handed to `cast`, and `cast` then stripped trailing spaces and quotes on the way to the chain. The test passed while an operator could resolve the wrong pool (ADR-0020 O0). A test that stops at your own boundary proves only that you called the next layer the way you meant to.
+
+**How to apply:** For anything that crosses a process, a wire or a chain, assert on what arrives: decode the calldata, read the chain, read the page. When the last hop is a third-party tool, test that tool's behaviour too, as `test_mined_revert_is_reported_as_failure` does for `cast`'s exit code.
+
+## L-011: Each deliverable needs a test of the thing that ships
+
+**Why:** Unit tests were green while the hosted propose flow returned 404s (the deploy copied a hard-coded file list), while every fresh install of the MCP server failed (an unbounded dependency), and while no browser could resolve a wager (ethers rejected an overloaded call). Each was invisible to tests of the code alone (ADR-0020 D1, D9, W14).
+
+**How to apply:** Test the artifact as delivered: the assembled site, the built wheel installed outside the repo, the page in a real browser. Run these in CI on a clean checkout, which also catches what a developer machine has cached.
+
+## L-012: Measure gas the way the chain charges it, against the limits the chain has today
+
+**Why:** Foundry runs a test in one warm transaction and understated a griefed `resolve` by about 4M gas. Base's per-transaction cap (EIP-7825, 2^24) arrived after the gas profile was written. Together they hid a market that could never be resolved (ADR-0020 C1).
+
+**How to apply:** Bound worst cases with cold storage (the `cool` cheatcode) or a real receipt, and assert the bound in the fast suite against the current per-transaction cap. Re-check platform limits whenever the chain upgrades.
+
+## L-013: A guard needs a reason it protects something
+
+**Why:** The freeform answer cap was copied from enumerated mode, where `resolve` iterates the masks. Freeform `resolve` never iterates the answers, so the cap protected nothing, and it let anyone lock out the correct answer for about $1.30 (ADR-0020 C2).
+
+**How to apply:** Write the cost a limit bounds next to the limit, and test that cost. If nothing in the code pays the cost, remove the limit instead of tuning it.
+
+## L-014: An exit code is not an outcome
+
+**Why:** `cast send` exits 0 for a mined transaction that reverted. Three services recorded such failures as successes, one of them marking a wager as created when it did not exist (ADR-0020 O1).
+
+**How to apply:** Decide success from the result itself: the receipt's status, the response body, the state on chain. Treat a tool's exit code as "the tool ran".
+
+## L-015: "Fixed" means fixed at every call site and in every client
+
+**Why:** ADR-0019 fixed answer stripping in one service, but two other surfaces still stripped. It fixed staking after close in one function, and another function undid it (ADR-0020 O5, W4, W1).
+
+**How to apply:** Before recording a fix, search for every path that does the same thing: each service, CLI, page and agent. Name the test for each path in the AAR, or say which ones remain.
+
+## L-016: Find build artifacts by exact identity
+
+**Why:** The end-to-end tests looked contracts up by name across `out/`. On one machine that found a stale artifact of a deleted test, and on CI the real mock. The stale one happened to have `decimals()`, so the local run passed and hid that the mock lacked it (ADR-0020 T2).
+
+**How to apply:** Address artifacts by source path and contract name. When a test passes locally and fails on CI, suspect state that only one of them has.

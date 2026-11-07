@@ -149,3 +149,15 @@ already scoped by ADR-0018 and are not re-decided here.
 **Lessons:** L-008 (AAR claims need a named test), L-009 (port tests by behaviour when deleting superseded code). Also reconfirmed L-006: the sub-agent leads were valuable but one (answer trimming on bet surfaces) was a convention, not a bug — verify before acting.
 
 **Revision schedule:** after the resolution-service and indexer redeploys; again when the contract-mitigation ADR lands.
+
+**AAR revision — 2026-11-07 (ADR-0020).** A second pass re-tested this AAR's claims. Several did not hold, which is the failure L-008 describes:
+
+- *"12 fixed under red → green":* **three were partial.**
+  - Finding 8 (answers stripped) was fixed in the resolution service, but the control-panel CLI still stripped (ADR-0020 O5), and so did dApp resolve (W4).
+  - Finding 11 (staking after close) was undone in the normal flow, because connecting a wallet re-enabled the button (W1).
+  - The byte-exact regression test asserted on the argument passed to `cast`, which `cast` then altered on its way to the chain (O0).
+- *"28 / 28 mutations killed":* **not reproducible as recorded,** because the harness was never committed. ADR-0020 commits `script/mutation-check.py`; it includes these 28 among its 66, and all 66 are killed.
+- *"Contract economics correct":* **holds for the arithmetic of the happy path.** But Base's per-transaction gas cap of 16,777,216 (EIP-7825) turned finding 3 from "new answers locked out" into "the market cannot be resolved" (C1). And checked 256-bit math could lock funds permanently on high-supply tokens (C4).
+- *The extended suite as verification:* **its read-only mode skips 8 of 9 tests.** ADR-0020 added a local-chain end-to-end layer and a real-browser layer, and the browser layer found the most serious defect of either audit: no browser could resolve a V3 wager (ADR-0020 W14).
+- *Follow-ups:* the two contract follow-ups (answer-space mitigation, answer-text recovery) are **done in source** by ADR-0020 and take effect when the factory is redeployed. The operator redeploys listed in the implementation notes are still pending.
+
