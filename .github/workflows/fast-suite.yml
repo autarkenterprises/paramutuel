@@ -37,3 +37,11 @@ jobs:
 
       - name: Local-chain end-to-end
         run: ./script/test-local-e2e.sh
+
+      # This wheel could not be built at all until ADR-0020 and nothing noticed, so build and load it.
+      - name: MCP wheel builds and loads outside the repo
+        run: |
+          python3 -m pip install -q hatchling
+          (cd mcp_server && python3 -m hatchling build -t wheel -d "$RUNNER_TEMP/mcp-dist")
+          python3 -m pip install -q --no-deps "$RUNNER_TEMP"/mcp-dist/*.whl
+          cd "$RUNNER_TEMP" && python3 -c "import mcp_server.server as s; assert s.FACTORY_ADDRESS.startswith('0x'), s.FACTORY_ADDRESS; print(s.FACTORY_ADDRESS)"

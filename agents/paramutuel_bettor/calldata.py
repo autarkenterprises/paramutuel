@@ -1,66 +1,58 @@
 """ABI calldata encoders used by the planner to build tx-ready hints.
 
-The encoders shell out to Foundry's ``cast calldata`` rather than depend on
-a Python ABI library. This keeps the package's runtime requirements to the
-standard library (the same posture as ``indexer_client`` using ``urllib``);
-when ``cast`` is missing we return ``None`` and surface a note so the
-caller can either install Foundry or route the encode through the MCP
-server's encoders instead.
+Standard library only, so the package keeps zero runtime dependencies. These once shelled out to
+``cast calldata``, which made calldata depend on Foundry being installed and, worse, was not exact:
+``cast`` strips trailing whitespace and surrounding quotes from string arguments, so an agent could be
+handed calldata for a different freeform answer than the one it was told about (ADR-0020).
 
-The recommend / quote pipeline ends in ``build_quote_like_payload``: that
-function is the single source of truth for the JSON shape that downstream
-tools rely on, including the ``placeBet.calldata`` hex and the
-``approval_required`` block needed to pre-allow ERC-20 spend.
+The recommend / quote pipeline ends in ``build_quote_like_payload``: that function is the single source
+of truth for the JSON shape that downstream tools rely on, including the ``placeBet.calldata`` hex and
+the ``approval_required`` block needed to pre-allow ERC-20 spend.
 """
 
 from __future__ import annotations
 
-import shutil
-import subprocess
 from typing import Any
 
-
-def _cast_calldata(signature: str, *args: Any) -> str | None:
-    """Run ``cast calldata <sig> <args...>`` and return ``0x...`` on success.
-
-    Returning ``None`` (rather than raising) lets the planner degrade
-    gracefully when Foundry isn't installed: the JSON payload still
-    carries odds and approval metadata, just without ready-to-broadcast
-    placeBet calldata.
-    """
-    cast = shutil.which("cast")
-    if not cast:
-        return None
-    cmd = [cast, "calldata", signature, *[str(a) for a in args]]
-    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
-    if proc.returncode != 0:
-        return None
-    out = (proc.stdout or "").strip()
-    return out if out.startswith("0x") else None
+# keccak256(signature)[:4]. Python's standard library has no keccak, so these are pinned, and
+# `tests/test_adr0020.py` recomputes each one.
+SELECTORS: dict[str, str] = {
+    "placeBet(uint256,uint256)": "0x4afe62b5",
+    "placeBet(string,uint256)": "0xd76f2a1e",
+    "resolve(string)": "0x461a4478",
+    "approve(address,uint256)": "0x095ea7b3",
+}
 
 
-def encode_place_bet(outcome_index: int, amount: int) -> str | None:
-    """Enumerated mode: first argument is a pre-shifted ticket bitmask.
-
-    Callers pass the already-shifted ``1 << outcome_index`` value; the
-    planner does that shift in ``build_quote_like_payload`` so this helper
-    stays a thin pass-through to ``cast``.
-    """
-    return _cast_calldata("placeBet(uint256,uint256)", outcome_index, amount)
+def _word(value: int) -> str:
+    return f"{value:064x}"
 
 
-def encode_place_bet_freeform(answer: str, amount: int) -> str | None:
-    """ADR-0009: `placeBet(string,uint256)`; answer bytes must match `resolve(string)` exactly."""
-    return _cast_calldata("placeBet(string,uint256)", answer, amount)
+def _encode_string_tail(text: str) -> str:
+    """ABI tail of a dynamic string: its byte length, then its bytes padded to a 32-byte boundary."""
+    raw = text.encode("utf-8")
+    padded = raw.hex().ljust((len(raw) + 31) // 32 * 64, "0")
+    return _word(len(raw)) + padded
 
 
-def encode_resolve_freeform(winning_answer: str) -> str | None:
-    """ADR-0009: resolver `resolve(string)`; must match a backed answer's UTF-8 bytes."""
-    return _cast_calldata("resolve(string)", winning_answer)
+def encode_place_bet(ticket_mask: int, amount: int) -> str:
+    """Enumerated mode. The first argument is the ticket bitmask, so ``1 << i`` backs outcome ``i``."""
+    return SELECTORS["placeBet(uint256,uint256)"] + _word(ticket_mask) + _word(amount)
 
 
-def encode_approve(spender: str, amount: int) -> str | None:
-    return _cast_calldata("approve(address,uint256)", spender, amount)
+def encode_place_bet_freeform(answer: str, amount: int) -> str:
+    """ADR-0009: `placeBet(string,uint256)`. Sent byte for byte, since the answer matches exactly."""
+    head = _word(64) + _word(amount)  # offset of the string, past the two head words
+    return SELECTORS["placeBet(string,uint256)"] + head + _encode_string_tail(answer)
+
+
+def encode_resolve_freeform(winning_answer: str) -> str:
+    """ADR-0009: resolver `resolve(string)`; must match a backed answer's bytes exactly."""
+    return SELECTORS["resolve(string)"] + _word(32) + _encode_string_tail(winning_answer)
+
+
+def encode_approve(spender: str, amount: int) -> str:
+    return SELECTORS["approve(address,uint256)"] + _word(int(spender, 16)) + _word(amount)
 
 
 def build_quote_like_payload(
@@ -88,22 +80,18 @@ def build_quote_like_payload(
     # `freeform` (UTF-8 answer, `placeBet(string,uint256)`).
     pv = protocol_version.strip().lower()
     if pv == "freeform":
-        place_data = (
-            encode_place_bet_freeform(freeform_answer, amount)
-            if freeform_answer is not None and str(freeform_answer).strip() != ""
-            else None
-        )
+        place_data = encode_place_bet_freeform(freeform_answer, amount) if freeform_answer else None
         calldata_note = None
         if place_data is None:
             calldata_note = (
                 "Freeform wagers need the exact UTF-8 answer string (same bytes as on-chain). "
-                "Pass `freeform_answer` in JSON `quote` or use MCP `encode_place_bet_freeform` / `quote_place_bet`."
+                "Pass `freeform_answer` in JSON `quote`, or read `answer_text` from the indexer's `ticket_pools`."
             )
         first_u256 = int(outcome_index)
     else:
         first_u256 = int(1 << int(outcome_index))
         place_data = encode_place_bet(first_u256, amount)
-        calldata_note = None if place_data else "Install Foundry `cast` or use MCP `quote_place_bet` for calldata."
+        calldata_note = None
     approve_data = encode_approve(wager_address, amount) if collateral_token else None
     body: dict[str, Any] = {
         "wager_address": wager_address,
@@ -128,9 +116,7 @@ def build_quote_like_payload(
         },
     }
     if pv == "freeform":
-        body["freeform_answer_supplied"] = bool(
-            freeform_answer is not None and str(freeform_answer).strip() != ""
-        )
+        body["freeform_answer_supplied"] = bool(freeform_answer)
     else:
         body["ticket_mask"] = first_u256
     return body

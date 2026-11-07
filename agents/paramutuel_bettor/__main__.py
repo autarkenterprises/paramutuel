@@ -62,14 +62,13 @@ def _cmd_recommend(client: IndexerClient, args: argparse.Namespace) -> dict[str,
 
 
 def _cmd_quote(client: IndexerClient, args: argparse.Namespace) -> dict[str, Any]:
-    ff = getattr(args, "freeform_answer", None)
-    ff_s = str(ff).strip() if ff is not None else ""
+    # Byte-exact: answers match on-chain byte for byte, so whitespace here is part of the answer.
     q = quote_wager(
         client,
         wager_address=args.wager,
         outcome_index=args.outcome_index,
         bet_amount_raw=args.bet_amount_raw,
-        freeform_answer=ff_s if ff_s else None,
+        freeform_answer=getattr(args, "freeform_answer", None) or None,
     )
     return {"ok": True, **q}
 
@@ -113,7 +112,9 @@ def _dispatch_json(client: IndexerClient, payload: dict[str, Any]) -> dict[str, 
         return {"ok": True, **out}
     if op == "quote":
         wager = str(payload.get("wager_address") or payload.get("wager") or "").strip()
-        outcome_index = int(payload.get("outcome_index"))
+        if payload.get("outcome_index") is None:
+            raise ValueError("outcome_index required")
+        outcome_index = int(payload["outcome_index"])
         bet_amount_raw = int(payload.get("bet_amount_raw") or payload.get("bet_amount") or 0)
         if not wager or bet_amount_raw <= 0:
             raise ValueError("wager_address and bet_amount_raw required")
@@ -123,7 +124,7 @@ def _dispatch_json(client: IndexerClient, payload: dict[str, Any]) -> dict[str, 
             wager_address=wager,
             outcome_index=outcome_index,
             bet_amount_raw=bet_amount_raw,
-            freeform_answer=str(ffa).strip() if ffa is not None and str(ffa).strip() != "" else None,
+            freeform_answer=str(ffa) if ffa else None,
         )
         return {"ok": True, **q}
     raise ValueError(f"unknown op: {op}")
@@ -190,6 +191,6 @@ def main(argv: list[str] | None = None) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (RuntimeError, ValueError, json.JSONDecodeError, OSError) as e:
+    except (RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError, OSError) as e:
         print(json.dumps({"ok": False, "error": str(e)}, indent=2), file=sys.stderr)
         raise SystemExit(1)

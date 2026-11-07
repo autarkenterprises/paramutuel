@@ -6,7 +6,7 @@
     "name": "paramutuel",
     "repository": "https://github.com/autarkenterprises/paramutuel",
     "human_docs": "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT.md",
-    "agent_entrypoint_doc": "https://github.com/autarkenterprises/paramutuel/blob/master/AGENTS.md",
+    "agent_entrypoint_doc": "https://github.com/autarkenterprises/paramutuel/blob/master/docs/MACHINE.md",
     "distribution_guide": "https://github.com/autarkenterprises/paramutuel/blob/master/docs/BET-AGENT-DISTRIBUTION.md"
   },
   "subagents": [
@@ -57,6 +57,7 @@
       ],
       "distribution": {
         "pypi_package": "paramutuel-bettor-agent",
+        "pypi_status": "not yet published",
         "pypi_project_url": "https://pypi.org/project/paramutuel-bettor-agent/",
         "console_script": "paramutuel-bettor",
         "pip_install": ["pip", "install", "paramutuel-bettor-agent"],
@@ -67,6 +68,7 @@
         {
           "type": "mcp_server",
           "package": "paramutuel-mcp",
+          "pypi_status": "not yet published",
           "pypi": "https://pypi.org/project/paramutuel-mcp/",
           "note": "Use MCP quote_place_bet / encode_place_bet_freeform / encode_create_enumerated_wager before signing (indexer protocol_version: enumerated, freeform); see docs/AGENT-LOOP.md"
         }

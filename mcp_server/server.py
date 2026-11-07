@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +40,12 @@ _DEPLOYMENTS_PATH = _ROOT / "config" / "deployments.json"
 
 
 def _load_deployments() -> dict:
-    if _DEPLOYMENTS_PATH.exists():
-        return json.loads(_DEPLOYMENTS_PATH.read_text())
+    """The repo's live config when running from a clone, or the copy bundled in the wheel otherwise,
+    so an installed server talks to the real network rather than localhost with no factory."""
+    bundled = Path(__file__).resolve().parent / "deployments.json"
+    for path in (_DEPLOYMENTS_PATH, bundled):
+        if path.exists():
+            return json.loads(path.read_text())
     return {}
 
 
@@ -87,6 +92,78 @@ from eth_hash.auto import keccak as _keccak256  # noqa: E402
 _ZERO_ADDRESS = "0x" + "00" * 20
 
 _FREEFORM_V3_DOMAIN = bytes([0x03])
+
+# Mirror ParamutuelFactoryV3.MAX_EXTRA_FEE_RECIPIENTS and ParamutuelWagerV3.MAX_DISTINCT_TICKETS.
+_MAX_EXTRA_FEE_RECIPIENTS = 32
+_MAX_DISTINCT_TICKETS = 1024
+
+_ENUM_CREATE_BASE = (
+    "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
+    "address,address[],uint16[]"
+)
+_FREEFORM_CREATE_BASE = "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[]"
+_ENUM_SIG_PLAIN = _ENUM_CREATE_BASE + ")"
+_ENUM_SIG_SEEDED = _ENUM_CREATE_BASE + ",uint256[],uint256[])"
+_ENUM_SIG_MIN_STAKE = _ENUM_CREATE_BASE + ",uint256[],uint256[],uint256)"
+_FREEFORM_SIG_PLAIN = _FREEFORM_CREATE_BASE + ")"
+_FREEFORM_SIG_MIN_STAKE = _FREEFORM_CREATE_BASE + ",uint256)"
+CREATE_SIGNATURES = (_ENUM_SIG_PLAIN, _ENUM_SIG_SEEDED, _ENUM_SIG_MIN_STAKE, _FREEFORM_SIG_PLAIN, _FREEFORM_SIG_MIN_STAKE)
+
+
+def _require_address(value: str, name: str = "wager_address") -> str:
+    """Reject anything but a 20-byte hex address, before it reaches a URL path or calldata."""
+    if not re.fullmatch(r"0x[0-9a-fA-F]{40}", value or ""):
+        raise ValueError(f"{name} must be a 0x-prefixed 20-byte hex address, got {value!r}")
+    return value
+
+
+def _validate_create(
+    betting_close_time: int,
+    resolution_window: int,
+    betting_closer: str,
+    resolution_closer: str,
+    fee_recipients: list[str],
+    fee_bps: list[int],
+) -> None:
+    """Refuse calldata the factory is certain to reject, with a message an agent can act on."""
+    if betting_close_time == 0 and int(betting_closer, 16) == 0:
+        raise ValueError(
+            "betting_close_time=0 means no deadline, which requires a betting_closer. "
+            "Set a future betting_close_time, or name a closer."
+        )
+    if resolution_window == 0 and int(resolution_closer, 16) == 0:
+        raise ValueError(
+            "resolution_window=0 means no deadline, which requires a resolution_closer. "
+            "Set a resolution_window in seconds, or name a closer."
+        )
+    if len(fee_recipients) != len(fee_bps):
+        raise ValueError("extra_fee_recipients and extra_fee_bps length mismatch")
+    if len(fee_recipients) > _MAX_EXTRA_FEE_RECIPIENTS:
+        raise ValueError(f"at most {_MAX_EXTRA_FEE_RECIPIENTS} extra fee recipients")
+
+
+def _outcome_count(wager_row: dict[str, Any]) -> int:
+    try:
+        return len(json.loads(wager_row.get("outcomes_json") or "[]"))
+    except json.JSONDecodeError:
+        return 0
+
+
+def _require_outcome_in_range(index: int, wager_row: dict[str, Any]) -> None:
+    """An out-of-range index makes a mask the contract rejects, so do not hand it out as calldata."""
+    count = _outcome_count(wager_row)
+    if int(index) < 0 or (count and int(index) >= count):
+        raise ValueError(f"outcome_index {index} out of range: this wager has {count} outcomes (0-{count - 1})")
+
+
+def _apply_min_stake_gate(body: dict[str, Any], wager_row: dict[str, Any], pool_total: int, amount: int) -> None:
+    """A new ticket below the wager's minimum reverts, so say so before anyone signs."""
+    minimum = int(wager_row.get("min_new_ticket_stake") or 0)
+    if minimum and pool_total == 0 and amount < minimum:
+        body["execution_allowed"] = False
+        body["revert_hint"] = (
+            f"This would open a new ticket, which needs at least minNewTicketStake={minimum} raw units."
+        )
 
 
 def _freeform_answer_id_hex(answer: str) -> str:
@@ -281,6 +358,7 @@ async def get_wager(wager_address: str) -> str:
 
     `wager.protocol_version` is `enumerated` or `freeform` (wager mode in V3).
     """
+    _require_address(wager_address)
     data = await _indexer_get(f"/wagers/{wager_address}")
     return json.dumps(data, indent=2)
 
@@ -317,8 +395,9 @@ async def get_protocol_info() -> str:
                 "BPS_DENOMINATOR": 10_000,
                 "MAX_TOTAL_FEE_BPS": 10_000,
                 "MAX_OUTCOMES": 255,
+                "MAX_EXTRA_FEE_RECIPIENTS": _MAX_EXTRA_FEE_RECIPIENTS,
+                "MAX_DISTINCT_TICKETS": _MAX_DISTINCT_TICKETS,
                 "FREEFORM_MAX_ANSWER_BYTES": 1024,
-                "FREEFORM_MAX_DISTINCT_ANSWERS_CAP": 1024,
                 "FREEFORM_ANSWER_DOMAIN_BYTE": 3,
             },
             "wager_modes": {
@@ -367,15 +446,19 @@ async def quote_place_bet(
     """Quote odds + return placeBet calldata + approval instructions.
 
     For `enumerated` wagers, the single-outcome bet builds `ticketMask = 1 << outcome_index`.
-    For `freeform` wagers, pass the exact UTF-8 `answer` string (ticket pool is keyed by
-    domain-separated answerId).
+    For `freeform` wagers, pass the exact UTF-8 `answer`, which is sent byte for byte: whitespace
+    counts, and matching is exact. `get_wager` lists staked answers in `ticket_pools[].answer_text`.
+    `answer_has_edge_whitespace` flags a leading or trailing space in case it was unintended.
     """
     import time
 
     if amount <= 0:
         raise ValueError("amount must be > 0")
+    _require_address(wager_address)
 
-    data = await _indexer_get(f"/wagers/{wager_address}")
+    # The detail response keeps only the largest freeform pools, so look this one up directly.
+    query = f"?answer_id={_freeform_answer_id_hex(answer)}" if answer else ""
+    data = await _indexer_get(f"/wagers/{wager_address}{query}")
     wager = data.get("wager") or {}
     totals = data.get("totals") or {}
 
@@ -403,6 +486,7 @@ async def quote_place_bet(
     }
 
     if protocol_version == "enumerated":
+        _require_outcome_in_range(outcome_index, wager)
         ticket_mask = int(1) << int(outcome_index)
         ticket_pools = data.get("ticket_pools") or []
         outcome_total = 0
@@ -419,12 +503,13 @@ async def quote_place_bet(
         body["outcome_index"] = outcome_index
         body["ticket_mask"] = ticket_mask
     elif protocol_version == "freeform":
-        ans = answer.strip()
+        ans = answer
         if not ans:
             raise ValueError(
                 "freeform wagers require non-empty `answer` (same UTF-8 bytes as on-chain placeBet/resolve)."
             )
         aid = _freeform_answer_id_hex(ans)
+        body["answer_has_edge_whitespace"] = ans != ans.strip()
         ticket_pools = data.get("ticket_pools") or []
         outcome_total = 0
         key = aid.lower()
@@ -446,6 +531,7 @@ async def quote_place_bet(
         total_fee_bps=total_fee_bps,
         bet_amount=amount,
     )
+    _apply_min_stake_gate(body, wager, outcome_total, amount)
     body["odds"] = odds
     body["odds_model_exact"] = _odds_model_exact(wager)
     if not body["odds_model_exact"]:
@@ -483,6 +569,7 @@ async def quote_place_bets(
         raise ValueError("amounts must be non-empty")
     if any(a <= 0 for a in amounts):
         raise ValueError("all amounts must be > 0")
+    _require_address(wager_address)
 
     data = await _indexer_get(f"/wagers/{wager_address}")
     wager = data.get("wager") or {}
@@ -515,6 +602,8 @@ async def quote_place_bets(
                 return int(tp.get("pool_total", 0) or 0)
         return 0
 
+    for index in outcome_indices:
+        _require_outcome_in_range(index, wager)
     ticket_masks = [int(1) << int(i) for i in outcome_indices]
     outcome_totals = [_pool_for_mask(m) for m in ticket_masks]
     odds = _compute_batch_odds(
@@ -529,6 +618,9 @@ async def quote_place_bets(
         ["uint256[]", "uint256[]"],
         [ticket_masks, amounts],
     )
+    gate: dict[str, Any] = {"execution_allowed": betting_open, "revert_hint": revert_hint}
+    for total, amount in zip(outcome_totals, amounts):
+        _apply_min_stake_gate(gate, wager, total, amount)
     return json.dumps(
         {
             "wager_address": wager_address,
@@ -540,8 +632,7 @@ async def quote_place_bets(
             "odds_model_exact": _odds_model_exact(wager),
             **({} if _odds_model_exact(wager) else {"odds_note": _ODDS_MODEL_NOTE}),
             "betting_open": betting_open,
-            "execution_allowed": betting_open,
-            "revert_hint": revert_hint,
+            **gate,
             "odds": odds,
             "placeBets": {
                 "to": wager_address,
@@ -577,12 +668,18 @@ async def encode_create_enumerated_wager(
     extra_fee_bps: list[int] | None = None,
     seed_ticket_masks: list[int] | None = None,
     seed_amounts: list[int] | None = None,
+    min_new_ticket_stake: int = 0,
 ) -> str:
     """Encode `ParamutuelFactoryV3.createEnumeratedWager` (bitmask tickets + payoff policies).
 
     `payoff_policy` is the uint8 enum value from `ParamutuelWagerV3.PayoffPolicy`
     (0=SINGLE_WINNER, 1=ANY_OF, 2=EXACT_SET, 3=AT_LEAST_K, 4=WEIGHTED_OVERLAP).
     For AT_LEAST_K set `policy_param=k`. Seeds use ticket bitmasks (not outcome indices).
+
+    `betting_close_time` is a unix timestamp and `resolution_window` a duration in seconds. Zero means
+    no deadline and requires naming the matching closer. `min_new_ticket_stake` is the raw amount
+    needed to open a new ticket, which prices griefing with dust tickets; it needs a factory deployed
+    after ADR-0020.
     """
     if not FACTORY_ADDRESS:
         raise ValueError(
@@ -593,12 +690,10 @@ async def encode_create_enumerated_wager(
     fee_bps = extra_fee_bps or []
     masks = seed_ticket_masks or []
     samt = seed_amounts or []
+    _validate_create(betting_close_time, resolution_window, betting_closer, resolution_closer, fee_recipients, fee_bps)
 
-    if masks or samt:
-        sig = (
-            "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
-            "address,address[],uint16[],uint256[],uint256[])"
-        )
+    if masks or samt or min_new_ticket_stake:
+        sig = _ENUM_SIG_MIN_STAKE if min_new_ticket_stake else _ENUM_SIG_SEEDED
         types = [
             "address", "string", "string[]", "uint8", "uint256", "uint64", "uint64",
             "address", "address", "address", "address[]", "uint16[]", "uint256[]", "uint256[]",
@@ -609,11 +704,11 @@ async def encode_create_enumerated_wager(
             resolver, betting_closer, resolution_closer,
             fee_recipients, fee_bps, masks, samt,
         ]
+        if min_new_ticket_stake:
+            types.append("uint256")
+            values.append(min_new_ticket_stake)
     else:
-        sig = (
-            "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,"
-            "address,address[],uint16[])"
-        )
+        sig = _ENUM_SIG_PLAIN
         types = [
             "address", "string", "string[]", "uint8", "uint256", "uint64", "uint64",
             "address", "address", "address", "address[]", "uint16[]",
@@ -653,15 +748,21 @@ async def encode_create_freeform_wager(
     resolution_closer: str = _ZERO_ADDRESS,
     extra_fee_recipients: list[str] | None = None,
     extra_fee_bps: list[int] | None = None,
+    min_new_ticket_stake: int = 0,
 ) -> str:
-    """Encode `ParamutuelFactoryV3.createFreeformWager` (domain-separated answer ids)."""
+    """Encode `ParamutuelFactoryV3.createFreeformWager` (domain-separated answer ids).
+
+    Zero for `betting_close_time` or `resolution_window` means no deadline and requires naming the
+    matching closer. `min_new_ticket_stake` needs a factory deployed after ADR-0020.
+    """
     if not FACTORY_ADDRESS:
         raise ValueError(
             "FACTORY_ADDRESS is not configured (env or config/deployments.json factoryAddress)"
         )
     fee_recipients = extra_fee_recipients or []
     fee_bps = extra_fee_bps or []
-    sig = "createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])"
+    _validate_create(betting_close_time, resolution_window, betting_closer, resolution_closer, fee_recipients, fee_bps)
+    sig = _FREEFORM_SIG_MIN_STAKE if min_new_ticket_stake else _FREEFORM_SIG_PLAIN
     types = [
         "address", "string", "uint64", "uint64",
         "address", "address", "address", "address[]", "uint16[]",
@@ -672,6 +773,9 @@ async def encode_create_freeform_wager(
         resolver, betting_closer, resolution_closer,
         fee_recipients, fee_bps,
     ]
+    if min_new_ticket_stake:
+        types.append("uint256")
+        values.append(min_new_ticket_stake)
     calldata = _encode_call(sig, types, values)
     return json.dumps(
         {

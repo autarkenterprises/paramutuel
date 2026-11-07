@@ -9,14 +9,20 @@
 # changes functionality measured by the extended tests.
 #
 # Layers exercised, in order:
+#   0. Local-chain end-to-end        (script/test-local-e2e.sh), no secrets or network needed
 #   1. Live Base Sepolia integration (script/testnet/run_live_suite.sh)
 #   2. Multi-wager stress suite      (script/testnet/run_stress_suite.sh)
+#
+# The live suites skip almost everything in their default read-only mode, so layer 0 is where most of
+# the cross-layer verification happens. script/mutation-check.py is also on this path but runs on its
+# own, since it takes about an hour.
 #
 # Mode is forwarded to the live suite via TESTNET_MODE
 # (readonly | minimal-tx | funded-tx). Default: readonly, which needs
 # only RPC_URL_BASE_SEPOLIA and works without a private key.
 #
 # Environment:
+#   EXTENDED_SKIP_LOCAL=1     skip the local-chain end-to-end suite
 #   EXTENDED_SKIP_LIVE=1      skip the live integration suite
 #   EXTENDED_SKIP_STRESS=1    skip the stress suite
 #   TESTNET_MODE              forwarded to run_live_suite.sh
@@ -36,8 +42,8 @@ cd "$ROOT_DIR"
 # Sanity: refuse to run if neither layer is enabled. The intent of this
 # script is to gate functionality-changing commits on the extended
 # suite; running it with everything skipped is almost always a mistake.
-if [[ "${EXTENDED_SKIP_LIVE:-0}" == "1" && "${EXTENDED_SKIP_STRESS:-0}" == "1" ]]; then
-  echo "error: both EXTENDED_SKIP_LIVE and EXTENDED_SKIP_STRESS are set; nothing to run" >&2
+if [[ "${EXTENDED_SKIP_LOCAL:-0}" == "1" && "${EXTENDED_SKIP_LIVE:-0}" == "1" && "${EXTENDED_SKIP_STRESS:-0}" == "1" ]]; then
+  echo "error: every extended layer is skipped; nothing to run" >&2
   exit 2
 fi
 
@@ -54,6 +60,14 @@ run_layer() {
     exit 1
   fi
 }
+
+# 0. Local chain: real cast, real indexer, real services, no secrets.
+if [[ "${EXTENDED_SKIP_LOCAL:-0}" != "1" ]]; then
+  section "local-chain end-to-end"
+  run_layer "local e2e" script/test-local-e2e.sh
+else
+  echo "(skipped local e2e per EXTENDED_SKIP_LOCAL=1)"
+fi
 
 # 1. Live Base Sepolia integration suite. The wrapper validates
 #    FACTORY_ADDRESS / RPC_URL itself; we forward TESTNET_MODE through
