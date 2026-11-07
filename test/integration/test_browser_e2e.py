@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import socket
+import sqlite3
 import subprocess
 import tempfile
 import threading
@@ -43,6 +44,9 @@ ETHERS_FILE = ROOT / "dapp" / "node_modules" / "ethers" / "dist" / "ethers.umd.m
 ZERO = "0x" + "00" * 20
 TREASURY = "0x000000000000000000000000000000000000fee1"
 PROTOCOL_BPS = 100
+# Contracts whose source file is not named after them. Looked up by exact path: a search by name once
+# found a stale artifact of a deleted test on one machine and the real mock on another.
+ARTIFACT_SOURCES = {"MockERC20": "MockTokens"}
 ONE = 10**18
 
 # Anvil's standard development accounts. Public, and worthless outside a local chain.
@@ -187,7 +191,7 @@ class BrowserE2E(unittest.TestCase):
 
     @classmethod
     def _deploy(cls, name: str, ctor_hex: str = "") -> str:
-        artifact = json.loads(next((ROOT / "out").rglob(f"{name}.json")).read_text())
+        artifact = json.loads((ROOT / "out" / f"{ARTIFACT_SOURCES.get(name, name)}.sol" / f"{name}.json").read_text())
         proc = subprocess.run(
             ["cast", "send", "--json", "--rpc-url", cls.rpc, "--private-key", KEYS["deployer"], "--create", artifact["bytecode"]["object"] + ctor_hex],
             check=True, capture_output=True, text=True,
@@ -403,12 +407,29 @@ class BrowserE2E(unittest.TestCase):
         wager = self.create_enumerated(self.listed_token, proposition="A distinctive listing question?")
         self.stake_mask("bob", self.listed_token, wager, 1, 3 * ONE)
         self.stake_mask("carol", self.listed_token, wager, 2, ONE)
-        self.wait_indexed(wager, lambda body: body["totals"]["total_pot"] == str(4 * ONE))
+        self.wait_indexed(wager, lambda body: body["totals"]["total_pot"] == str(4 * ONE) and body["wager"]["metadata_complete"] == 1)
         out = self.drive("public_listings", proposition="A distinctive listing question?")
         for where in ("ticker", "search"):
             self.assertNotIn("A distinctive listing question?No stakes yet", out[where].replace("\n", ""))
             self.assertIn("Yes 75%", out[where], where)
             self.assertIn("No 25%", out[where], where)
+
+    def test_public_listings_never_claim_no_stakes_when_the_pot_has_some(self):
+        """Found by the test above, intermittently: until the indexer has read a new wager's outcome
+        labels, both pages said "No stakes yet" beside a pot of 4 tokens. Pinned here by putting the
+        indexer in that state on purpose."""
+        wager = self.create_enumerated(self.listed_token, proposition="Labels not read yet?")
+        self.stake_mask("bob", self.listed_token, wager, 1, 3 * ONE)
+        self.wait_indexed(wager, lambda body: body["totals"]["total_pot"] == str(3 * ONE) and body["wager"]["metadata_complete"] == 1)
+        db = sqlite3.connect(os.path.join(self.tmp, "indexer.db"), timeout=10)
+        with db:
+            db.execute("UPDATE wagers SET outcomes_json = '[]' WHERE wager_address = ?", (wager.lower(),))
+        db.close()
+        out = self.drive("public_listings", proposition="Labels not read yet?")
+        for where in ("ticker", "search"):
+            entry = out[where].split("Labels not read yet?", 1)[1][:120]
+            self.assertNotIn("No stakes", entry, where)
+        self.assertIn("Pot 3,000,000,000,000,000,000 (raw)", out["ticker"])
 
     def test_every_page_loads_with_its_references_and_a_verified_ethers(self):
         """D1 and D7: nothing a page references is missing, and ethers passes its integrity check."""

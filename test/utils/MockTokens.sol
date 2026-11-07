@@ -8,6 +8,9 @@ pragma solidity ^0.8.24;
 
 /// @dev Plain, well-behaved ERC-20: reverts on insufficient balance or allowance, returns true.
 contract MockERC20 {
+    /// @dev Real tokens report this, and the bet page will not stake until it can read it.
+    uint8 public constant decimals = 18;
+
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 

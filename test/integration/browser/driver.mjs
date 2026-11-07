@@ -559,6 +559,8 @@ const scenarios = {
   async public_listings(b, cfg) {
     const home = await b.page("index.html", cfg.accounts.alice);
     await home.waitForText("#tickerTrack", cfg.proposition);
+    // The ticker draws once without details, then again with them; this marks the second draw.
+    await home.waitForText("#tickerStatus", "click a card");
     const ticker = await home.text("#tickerTrack");
     const place = await b.page("place-a-bet.html", cfg.accounts.alice);
     await place.fill("#homeBetSearchInput", cfg.proposition);

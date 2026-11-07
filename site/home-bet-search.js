@@ -108,13 +108,27 @@
     chainId = typeof cid === "number" ? cid : Number(cid);
   }
 
-  function oddsLine(outcomesRows, labels) {
+  /**
+   * Only the pot can say a wager has no stakes. Detail that has not loaded, or outcome labels the
+   * indexer has not read yet, leave the outcome rows empty, and that must not read as "no stakes"
+   * beside a pot that has some (ADR-0020).
+   */
+  function potIsZero(raw) {
+    try {
+      return BigInt(String(raw || "0")) === 0n;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Leading outcomes by share of stake, "No stakes yet", or "" when the rows cannot tell. */
+  function oddsLine(outcomesRows, labels, potRaw) {
     const rows = (outcomesRows || []).map((o) => ({
       idx: Number(o.outcome_index),
       t: BigInt(String(o.outcome_total || "0")),
     }));
     const sum = rows.reduce((a, o) => a + o.t, 0n);
-    if (sum === 0n) return "No stakes yet";
+    if (sum === 0n) return potIsZero(potRaw) ? "No stakes yet" : "";
     const parts = rows
       .map((o) => {
         const label = labels[o.idx] != null ? String(labels[o.idx]) : `#${o.idx}`;
@@ -209,9 +223,10 @@
         if (pv === "freeform") {
           const pools = detailByAddr[key].ticket_pools || [];
           const n = pools.filter((p) => BigInt(String(p.pool_total || "0")) > 0n).length;
-          metaLine = n > 0 ? `${n} staked answer id(s)` : "No stakes in detail";
+          if (n > 0) metaLine = `${n} staked answer id(s)`;
+          else metaLine = potIsZero(w.total_pot) ? "No stakes yet" : `Pot ${formatPot(w.total_pot)} (raw)`;
         } else {
-          metaLine = oddsLine(detailByAddr[key].outcomes, labels);
+          metaLine = oddsLine(detailByAddr[key].outcomes, labels, w.total_pot) || `Pot ${formatPot(w.total_pot)} (raw)`;
         }
       } else {
         metaLine = resolvedSummary(w, labels);

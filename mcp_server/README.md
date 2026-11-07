@@ -100,7 +100,7 @@ When installed as a wheel, the server bundles its ABIs and a copy of the deploym
 
 Paramutuel is a permissionless, immutable parimutuel betting protocol on Base (Ethereum L2).
 
-- **Anyone** can create an **enumerated** wager with 2–255 outcomes + bitmask tickets / payoff policies, or a **freeform** (ADR-0009 / ADR-0010) UTF-8 text-answer wager using any ERC-20 as collateral — both modes share the unified `ParamutuelFactoryV3` / `ParamutuelWagerV3` protocol
+- **Anyone** can create an **enumerated** wager with 2–255 outcomes + bitmask tickets / payoff policies, or a **freeform** (ADR-0009 / ADR-0010) UTF-8 text-answer wager using any standard ERC-20 as collateral (no fee-on-transfer or rebasing tokens; see ADR-0018) — both modes share the unified `ParamutuelFactoryV3` / `ParamutuelWagerV3` protocol
 - **Bettors** deposit into outcome pools; winners split the net pot pro-rata
 - **Resolution** is modular: creator-resolved (MVP), upgradeable to oracle/DAO
 - **Fees** are configurable per wager (protocol fee + optional creator fee, capped at 100% for full-beneficiary/charity flows)
