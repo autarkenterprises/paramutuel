@@ -47,26 +47,21 @@ python3 --version >/dev/null
 node --version >/dev/null
 
 echo "==> Quality gates"
-forge test -q
-PYTHONPATH=. python3 -m unittest discover -s service/indexer/tests -p "test_*.py" -q
-PYTHONPATH=. python3 -m unittest discover -s service/explorer/tests -p "test_*.py" -q
-PYTHONPATH=. python3 -m unittest discover -s service/control_panel/tests -p "test_*.py" -q
-node --check dapp/app.js
-( cd dapp && npm ci --silent ) || ( cd dapp && npm install --silent )
-node --test dapp/tests/logic.test.js >/dev/null
+./script/test-fast.sh
 
 echo "==> Deploying factory to testnet"
-forge script script/DeployFactory.s.sol \
+forge script script/DeployFactoryV3.s.sol \
   --rpc-url "$RPC_URL" \
   --broadcast
 
-DEPLOYED_FACTORY="$(
+# Prints "<address> <deploy block>" from Foundry's broadcast record.
+DEPLOYED="$(
   python3 - <<'PY'
 import glob
 import json
 from pathlib import Path
 
-paths = glob.glob("broadcast/DeployFactory.s.sol/*/run-latest.json")
+paths = glob.glob("broadcast/DeployFactoryV3.s.sol/*/run-latest.json")
 if not paths:
     raise SystemExit(1)
 paths.sort(key=lambda p: Path(p).stat().st_mtime, reverse=True)
@@ -76,16 +71,20 @@ for path in paths:
     except Exception:
         continue
     for tx in reversed(data.get("transactions", [])):
-        if tx.get("contractName") == "ParamutuelFactory" and tx.get("contractAddress"):
-            print(tx["contractAddress"])
+        if tx.get("contractName") == "ParamutuelFactoryV3" and tx.get("contractAddress"):
+            receipt = next((r for r in data.get("receipts", []) if r.get("transactionHash") == tx.get("hash")), {})
+            block = receipt.get("blockNumber")
+            print(tx["contractAddress"], int(str(block), 0) if block is not None else "")
             raise SystemExit(0)
 raise SystemExit(1)
 PY
 )" || true
+DEPLOYED_FACTORY="${DEPLOYED%% *}"
+DEPLOY_BLOCK="${DEPLOYED#* }"
 
 if [[ -n "${DEPLOYED_FACTORY:-}" ]]; then
-  ./script/testnet/set_factory_address.sh "$DEPLOYED_FACTORY" base-sepolia >/dev/null
-  echo "==> Updated single source of truth: $DEPLOYMENTS_CONFIG_PATH (baseSepolia.factoryAddress=$DEPLOYED_FACTORY)"
+  ./script/testnet/set_factory_address.sh "$DEPLOYED_FACTORY" base-sepolia "$DEPLOY_BLOCK" >/dev/null
+  echo "==> Updated single source of truth: $DEPLOYMENTS_CONFIG_PATH (baseSepolia.factoryAddress=$DEPLOYED_FACTORY, indexerFromBlock=$DEPLOY_BLOCK)"
 fi
 
 FACTORY_FOR_NEXT="${DEPLOYED_FACTORY:-<FACTORY>}"
@@ -101,6 +100,6 @@ echo "     python3 -m service.indexer.api --db-path \"$INDEXER_DB_PATH\" --host 
 echo "  4) start explorer:"
 echo "     python3 -m service.explorer.server --indexer-base-url http://127.0.0.1:8090 --port 8091"
 echo "  5) start control panel:"
-echo "     python3 -m service.control_panel.web --rpc-url \"$RPC_URL\" --private-key \"\$PRIVATE_KEY\" --allow-execute --auth-token \"\$CONTROL_PANEL_TOKEN\" --port 8092"
+echo "     RPC_URL=\"$RPC_URL\" python3 -m service.control_panel.web --allow-execute --port 8092  # reads PRIVATE_KEY and CONTROL_PANEL_TOKEN from the environment"
 echo "  6) start sweeper:"
-echo "     python3 -m service.indexer.sweeper --db-path \"$INDEXER_DB_PATH\" --rpc-url \"$RPC_URL\" --private-key \"\$PRIVATE_KEY\" --execute --loop --interval-seconds 60"
+echo "     python3 -m service.indexer.sweeper --db-path \"$INDEXER_DB_PATH\" --rpc-url \"$RPC_URL\" --execute --loop --interval-seconds 60  # reads PRIVATE_KEY from the environment"

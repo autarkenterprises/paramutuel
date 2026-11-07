@@ -14,10 +14,11 @@ ENV INDEXER_DB_PATH=/tmp/indexer.db
 ENV INDEXER_POLL_INTERVAL_SECONDS=15
 # Initial window per getLogs; bisection splits further on HTTP 400 from strict RPCs.
 ENV INDEXER_CHUNK_SIZE=120
-# Zero-UI Cloud Run: public Base Sepolia RPC + factory deploy block (override in console if needed).
+# Zero-UI Cloud Run: public Base Sepolia RPC (override in console if needed).
 ENV RPC_URL_BASE_SEPOLIA=https://sepolia.base.org
-ENV INDEXER_FROM_BLOCK=40147601
-# FACTORY_ADDRESS is read from config/deployments.json (factoryAddress), or overridden via env.
+# The factory address and start block come from config/deployments.json (factoryAddress and
+# indexerFromBlock), so a factory cutover is one config change. FACTORY_ADDRESS and INDEXER_FROM_BLOCK
+# may be set in the console to override them.
 ENV PORT=8080
 
 EXPOSE 8080

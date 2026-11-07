@@ -16,13 +16,23 @@ REGION="${GCP_REGION:-europe-west1}"
 SERVICE="${GCP_SERVICE:-paramutuel-resolution}"
 IMAGE="gcr.io/${GCP_PROJECT_ID}/${SERVICE}:latest"
 
+# `gcloud builds submit --tag` only builds a file named Dockerfile, and the resolution service uses
+# another one, so a build config is needed to choose it.
+BUILD_CONFIG="$(mktemp)"
+trap 'rm -f "$BUILD_CONFIG"' EXIT
+cat > "$BUILD_CONFIG" <<YAML
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "Dockerfile.resolution", "-t", "$IMAGE", "."]
+images: ["$IMAGE"]
+YAML
+
 gcloud builds submit \
   --project="$GCP_PROJECT_ID" \
-  --tag="$IMAGE" \
-  --file=Dockerfile.resolution \
+  --config="$BUILD_CONFIG" \
   .
 
-exec gcloud run deploy "$SERVICE" \
+gcloud run deploy "$SERVICE" \
   --project="$GCP_PROJECT_ID" \
   --region="$REGION" \
   --image="$IMAGE" \

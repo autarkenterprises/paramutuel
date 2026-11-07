@@ -1,343 +1,238 @@
 # Machine / agent integration
 
-Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can interact without bespoke scraping—aligned with the protocol thesis: **permissionless** markets in **real on-chain collateral (ERC-20)**, **configurable** resolution and timing per wager, and **no centralized approval** of wagers or payouts. Machines read the same indexer and MCP surfaces as humans.
+Paramutuel is structured so **bots, indexers, and LLM-driven workflows** can interact without bespoke scraping, in line with the protocol thesis: **permissionless** markets in **standard ERC-20 collateral**, **configurable** resolution and timing per wager, and **no centralized approval** of wagers or payouts. Machines read the same indexer and MCP surfaces as humans.
 
-Contract upgrade/redeploy procedure: [`CONTRACT-UPGRADE-RUNBOOK.md`](CONTRACT-UPGRADE-RUNBOOK.md).
+Contract upgrade and redeploy procedure: [`CONTRACT-UPGRADE-RUNBOOK.md`](CONTRACT-UPGRADE-RUNBOOK.md). States and roles in depth: [`WAGER-LIFECYCLE.md`](WAGER-LIFECYCLE.md).
 
 ## ABIs
 
-Pre-extracted ABI-only JSON is committed under `dapp/abi/` for the unified V3 protocol (`ParamutuelFactoryV3.json`, `ParamutuelWagerV3.json`). Each file is `{"abi": [...]}`. Full Foundry artifacts are available under `out/` after `forge build`.
+ABI-only JSON is committed under `dapp/abi/` (`ParamutuelFactoryV3.json`, `ParamutuelWagerV3.json`), each as `{"abi": [...]}`. The MCP server bundles the same files under `mcp_server/abi/`. After contract changes, run `./script/sync-abi.sh`; `dapp/tests/abi-drift.test.js` fails if the committed ABI and the contracts disagree.
 
-The MCP server bundles the same ABIs under `mcp_server/abi/` (see `paramutuel-mcp` wheel `force-include`).
+## Factory: `ParamutuelFactoryV3`
 
-To re-sync after contract changes: `./script/sync-abi.sh`.
+### Constants and state
 
-### Indexer payload notes (V3)
-
-Hosted indexer `GET /wagers/{address}` includes `ticket_pools` (enumerated: per ticket-bitmask stake totals; freeform: per `answerId` hex keyed as `ticket_mask`) and wager fields `protocol_version` (`"enumerated"` or `"freeform"`), `payoff_policy`, `policy_param`. MCP `quote_place_bet` / `quote_place_bets` interpret `protocol_version === "enumerated"` and map a chosen **outcome index** to ticket mask `1 << index` for single-outcome legs. For **`protocol_version === "freeform"`**, use MCP **`encode_place_bet_freeform`** / **`encode_resolve_freeform`** (exact UTF-8 strings); `quote_place_bet` does not apply. Tooling: `encode_create_wager` and `encode_create_freeform_wager` both target the single unified `FACTORY_ADDRESS` / `factoryAddress` (V3).
-
-## Factory (`ParamutuelFactory`)
-
-### Constants
-
-| Name | Value | Description |
-|------|-------|-------------|
-| `BPS_DENOMINATOR` | `10_000` | Basis-point denominator |
-| `MAX_TOTAL_FEE_BPS` | `10_000` | 100% fee cap (protocol + extra combined) |
-| `MAX_OUTCOMES` | `255` | Maximum outcome count per wager |
-
-### Read-only state
-
-| Getter | Returns | Description |
-|--------|---------|-------------|
-| `treasury()` | `address` | Protocol fee recipient |
-| `protocolFeeBps()` | `uint16` | Default protocol fee in basis points |
+| Getter | Value / returns | Description |
+|---|---|---|
+| `BPS_DENOMINATOR()` | `10_000` | Basis-point denominator |
+| `MAX_TOTAL_FEE_BPS()` | `10_000` | Cap on protocol plus extra fees combined |
+| `MAX_OUTCOMES()` | `255` | Maximum outcomes per enumerated wager |
+| `MAX_EXTRA_FEE_RECIPIENTS()` | `32` | Maximum proposer-chosen fee recipients |
+| `treasury()` | `address` | Protocol fee recipient; fixed per factory |
+| `protocolFeeBps()` | `uint16` | Protocol fee; fixed per factory |
 | `minBettingWindow()` | `uint64` | Minimum seconds from creation to `bettingCloseTime` |
-| `minResolutionWindow()` | `uint64` | Minimum `resolutionWindow` duration in seconds |
-| `wagersCount()` | `uint256` | Number of wagers created |
-| `wagers(i)` | `address` | Wager address by index |
+| `minResolutionWindow()` | `uint64` | Minimum `resolutionWindow` in seconds |
+| `wagersCount()`, `wagers(i)` | `uint256`, `address` | On-chain registry of created wagers |
 
-### `createWager` (two overloads)
+### Creating wagers
 
 ```solidity
-// Without seeds
-function createWager(
-    address collateralToken,
-    string memory proposition,
-    string[] memory outcomes,
-    uint64  bettingCloseTime,
-    uint64  resolutionWindow,
-    address resolver,
-    address bettingCloser,
-    address resolutionCloser,
-    address[] memory extraFeeRecipients,
-    uint16[]  memory extraFeeBps
-) external returns (address wager);
+function createEnumeratedWager(
+    address collateralToken, string proposition, string[] outcomes,
+    PayoffPolicy payoffPolicy,  // uint8 on the wire: 0 SINGLE_WINNER, 1 ANY_OF, 2 EXACT_SET, 3 AT_LEAST_K, 4 WEIGHTED_OVERLAP
+    uint256 policyParam,        // k for AT_LEAST_K; must be 0 otherwise
+    uint64 bettingCloseTime, uint64 resolutionWindow,
+    address resolver, address bettingCloser, address resolutionCloser,
+    address[] extraFeeRecipients, uint16[] extraFeeBps
+    // optional: uint256[] seedTicketMasks, uint256[] seedAmounts
+    // optional, after the seeds: uint256 minNewTicketStake
+) returns (address wager);
 
-// With seeds
-function createWager(
-    address collateralToken,
-    string memory proposition,
-    string[] memory outcomes,
-    uint64  bettingCloseTime,
-    uint64  resolutionWindow,
-    address resolver,
-    address bettingCloser,
-    address resolutionCloser,
-    address[] memory extraFeeRecipients,
-    uint16[]  memory extraFeeBps,
-    uint256[] memory seedOutcomeIndices,
-    uint256[] memory seedAmounts
-) external returns (address wager);
+function createFreeformWager(
+    address collateralToken, string proposition,
+    uint64 bettingCloseTime, uint64 resolutionWindow,
+    address resolver, address bettingCloser, address resolutionCloser,
+    address[] extraFeeRecipients, uint16[] extraFeeBps
+    // optional: uint256 minNewTicketStake
+) returns (address wager);
 ```
 
-**Parameter semantics:**
-
-- `resolver = address(0)` → defaults to proposer (`msg.sender`).
-- `bettingCloser = address(0)` → disables authority `closeBetting()`.
-- `resolutionCloser = address(0)` → disables authority `closeResolutionWindow()`.
-- `bettingCloseTime = 0` → no time cap on betting (closer-managed). **Requires** non-zero `bettingCloser`.
-- `resolutionWindow = 0` → no time cap on resolution (closer-managed). **Requires** non-zero `resolutionCloser`.
-- `resolutionDeadline` is computed as `bettingCloseTime + resolutionWindow` (or `0` if either is `0`).
-- Seeded overload: proposer's tokens are `transferFrom`'d to the wager and recorded as bets at create-time. Seed arrays must be same length and contain positive amounts. Caller must have approved the factory for the total seed amount.
-
-**Validation / reverts:**
+- `resolver = address(0)` defaults to the proposer (`msg.sender`).
+- `bettingCloser = address(0)` or `resolutionCloser = address(0)` disables that role.
+- `bettingCloseTime = 0` or `resolutionWindow = 0` means no time limit, and **requires** the matching closer.
+- `resolutionDeadline` is `bettingCloseTime + resolutionWindow`, or `0` if either is `0`. It is for display only: an early `closeBetting()` re-anchors the real deadline earlier. Use `betting_closed_at` from the indexer, or `bettingClosedAtByAuthority()`, plus `resolutionWindow`.
+- Seeds pull the proposer's tokens in the creation transaction, so approve the **factory** for the total. Each seed is a ticket mask, not an outcome index.
+- `minNewTicketStake` is the minimum raw amount to open a new ticket or answer. Re-betting an existing one is never restricted. It prices griefing by dust tickets in units of the wager's own collateral; `0` means no minimum. Seeds count as opening tickets.
 
 | Error | Condition |
-|-------|-----------|
+|---|---|
 | `BadOutcomes` | `outcomes.length < 2` |
 | `TooManyOutcomes` | `outcomes.length > MAX_OUTCOMES` |
-| `WindowTooShort` | `bettingCloseTime != 0 && bettingCloseTime < block.timestamp + minBettingWindow` |
-| `WindowTooShort` | `resolutionWindow != 0 && resolutionWindow < minResolutionWindow` |
-| `InvalidLifecycleConfig` | `bettingCloseTime == 0 && bettingCloser == address(0)` |
-| `InvalidLifecycleConfig` | `resolutionWindow == 0 && resolutionCloser == address(0)` |
-| `BadFeeConfig` | Fee recipients/bps length mismatch, zero address, or zero bps |
-| `BadFeeConfig` | Total fee BPS > `MAX_TOTAL_FEE_BPS` |
-| `BadSeedConfig` | Seed indices/amounts length mismatch or zero amount |
+| `InvalidPolicyParam` | `policyParam` not valid for the policy |
+| `WindowTooShort` | `bettingCloseTime` or `resolutionWindow` below the factory minimum |
+| `InvalidLifecycleConfig` | A zero time with no matching closer |
+| `BadFeeConfig` | Length mismatch, zero address or bps, more than `MAX_EXTRA_FEE_RECIPIENTS`, or total above the cap |
+| `BadSeedConfig` | Seed length mismatch, zero amount, or a mask invalid for the policy or option range |
 
 ### Events
 
 ```solidity
-event WagerCreated(
-    address indexed wager,
-    address indexed proposer,
-    address indexed resolver,
-    address collateralToken,
-    uint64  bettingCloseTime,
-    uint64  resolutionWindow,
-    uint64  resolutionDeadline,
-    address bettingCloser,
-    address resolutionCloser
-);
+event WagerCreatedV3Enumerated(address indexed wager, address indexed proposer, address indexed resolver,
+    address collateralToken, uint8 payoffPolicy, uint256 policyParam, uint64 bettingCloseTime,
+    uint64 resolutionWindow, uint64 resolutionDeadline, address bettingCloser, address resolutionCloser);
+event WagerCreatedV3Freeform(address indexed wager, address indexed proposer, address indexed resolver,
+    address collateralToken, uint64 bettingCloseTime, uint64 resolutionWindow, uint64 resolutionDeadline,
+    address bettingCloser, address resolutionCloser);
 ```
 
-## Wager (`ParamutuelWager`)
+## Wager: `ParamutuelWagerV3`
 
-### State enum
-
-```solidity
-enum State { Open, Resolved, Retracted }
-```
-
-- **Open** — betting may be active; wager is not finalized.
-- **Resolved** — winning outcome selected; winners can claim.
-- **Retracted** — invalidated (by resolver retract or expiry); all bettors can claim refund minus fees.
-
-For roles, timers vs authority closers, and a full transition matrix, see [`docs/WAGER-LIFECYCLE.md`](WAGER-LIFECYCLE.md).
+`MODE()` returns `0` (enumerated) or `1` (freeform). Calling an entry point for the other mode reverts with `WrongMode`. `state()` returns `0` Open, `1` Resolved, or `2` Retracted; an expired wager is `Retracted`.
 
 ### Read-only state
 
-| Getter | Returns | Description |
-|--------|---------|-------------|
-| `factory()` | `address` | Factory that created this wager |
-| `proposer()` | `address` | Address that called `createWager` |
-| `resolver()` | `address` | Address authorized to resolve/retract |
-| `bettingCloser()` | `address` | Authority for `closeBetting()` (`address(0)` = disabled) |
-| `resolutionCloser()` | `address` | Authority for `closeResolutionWindow()` (`address(0)` = disabled) |
-| `collateralToken()` | `address` | ERC-20 token address used for bets |
-| `proposition()` | `string` | Wager proposition text |
-| `state()` | `State` | Current lifecycle state |
-| `bettingCloseTime()` | `uint64` | Scheduled betting close (0 = no time cap) |
-| `resolutionWindow()` | `uint64` | Duration after betting close for resolver to act (0 = no time cap) |
-| `resolutionDeadline()` | `uint64` | `bettingCloseTime + resolutionWindow` (0 if either is 0) |
-| `outcomesCount()` | `uint256` | Number of outcomes |
-| `outcomeText(i)` | `string` | Label for outcome at index `i` |
-| `outcomeTotals(i)` | `uint256` | Total wagered on outcome `i` (raw token units) |
-| `totalPot()` | `uint256` | Sum of all bets (raw token units) |
-| `bets(addr, i)` | `uint256` | Amount `addr` bet on outcome `i` |
-| `userTotalBet(addr)` | `uint256` | Total amount `addr` bet across all outcomes |
-| `winningOutcome()` | `uint256` | Winning outcome index (valid only if `state == Resolved`) |
-| `totalWinningStake()` | `uint256` | Total wagered on winning outcome |
-| `hasClaimed(addr)` | `bool` | Whether `addr` has claimed |
-| `feeRecipients(i)` | `address` | Fee recipient at index `i` |
-| `feeBps(i)` | `uint16` | Fee basis points for recipient `i` |
-| `totalFeeBps()` | `uint256` | Sum of all fee bps |
-| `feeBalances(addr)` | `uint256` | Accrued unclaimed fees for `addr` |
-| `feesCharged()` | `bool` | Whether fees have been deducted from the pot |
-| `bettingClosedByAuthority()` | `bool` | Whether betting was closed by `bettingCloser` |
-| `bettingClosedAtByAuthority()` | `uint64` | Timestamp when authority closed betting |
-| `resolutionWindowClosedByAuthority()` | `bool` | Whether resolution window was closed by `resolutionCloser` |
+| Getter | Mode | Description |
+|---|---|---|
+| `factory()`, `proposer()`, `resolver()`, `bettingCloser()`, `resolutionCloser()`, `collateralToken()` | both | Immutable roles and token |
+| `proposition()` | both | Question text |
+| `bettingCloseTime()`, `resolutionWindow()`, `resolutionDeadline()` | both | See the notes above |
+| `bettingClosedByAuthority()`, `bettingClosedAtByAuthority()`, `resolutionWindowClosedByAuthority()` | both | Authority closures |
+| `minNewTicketStake()` | both | Minimum to open a new ticket or answer |
+| `totalPot()`, `userTotalBet(addr)`, `hasClaimed(addr)` | both | Stake totals and claim status |
+| `feeRecipients(i)`, `feeBps(i)`, `totalFeeBps()`, `feeBalances(addr)` | both | Fees |
+| `outcomesCount()`, `numOptions()`, `outcomeText(i)` | enumerated | Outcomes |
+| `payoffPolicy()`, `policyParam()` | enumerated | Settlement rule |
+| `ticketPoolByMask(mask)`, `betsByMask(addr, mask)` | enumerated | Stakes |
+| `usedMasksCount()`, `usedMaskAt(i)`, `userMasksCount(addr)`, `userMaskAt(addr, i)` | enumerated | Enumerate tickets |
+| `winningMask()`, `payoutDenominator()` | enumerated | Resolution result and total winning units |
+| `ticketPoolByAnswerId(id)`, `betsByAnswer(addr, id)` | freeform | Stakes |
+| `usedAnswerIdsCount()`, `usedAnswerId(i)` | freeform | Enumerate answers |
+| `winningAnswerId()`, `payoutDenominator()` | freeform | Resolution result and winning pool |
 
-### Lifecycle functions
+**Answer ids:** `answerId = keccak256(abi.encodePacked(bytes1(0x03), bytes(answer)))`. Matching is byte-exact: no trimming, case folding, or Unicode normalization. Do not pass answers as `cast` arguments, which strip trailing whitespace and surrounding quotes; see [`WORKFLOWS.md`](WORKFLOWS.md).
 
-**Betting** (state must be `Open`, betting window must be open):
+### Functions
 
 ```solidity
-// Caller must first: collateralToken.approve(wager, amount)
-function placeBet(uint256 outcomeIndex, uint256 amount) external returns ();
-function placeBets(uint256[] calldata outcomeIndices, uint256[] calldata amounts) external returns ();
+// Betting: state Open and betting not closed. First approve(wager, amount) on the collateral.
+function placeBet(uint256 ticketMask, uint256 amount);                 // enumerated
+function placeBets(uint256[] ticketMasks, uint256[] amounts);          // enumerated, one transferFrom
+function placeBet(string answer, uint256 amount);                      // freeform, 1 to 1024 bytes
+
+// Authority closes. Silent no-ops if already closed.
+function closeBetting();            // bettingCloser only
+function closeResolutionWindow();   // resolutionCloser only, after betting has closed
+
+// Finalization by the resolver: betting closed and resolution window open.
+function resolve(uint256 winningMask);    // enumerated
+function resolve(string winningAnswer);   // freeform, byte-exact
+function retract();
+
+// Finalization by anyone: resolution window over.
+function expire();
+
+// After finalization.
+function claim() returns (uint256 paid);
+function withdrawFees() returns (uint256 amount);
 ```
 
-- `placeBets` transfers the sum of all amounts in one `transferFrom`, then records each leg.
-- Reverts: `NotOpen`, `BettingClosed`, `InvalidOutcome`, `ArrayLengthMismatch` (for `placeBets`).
+A **ticket mask** is a bitmask of outcomes: bit `i` is outcome `i`, so `1 << i` backs outcome `i` alone. `SINGLE_WINNER` only admits single-bit tickets and a single-bit winning mask. Other policies take any non-empty mask within range.
 
-**Authority close** (callable at any time by the designated closer):
+`resolve` reverts with `NoWinningStake` if nothing would win. The resolver must then `retract` or let the wager expire.
 
-```solidity
-function closeBetting() external;          // only bettingCloser; idempotent
-function closeResolutionWindow() external; // only resolutionCloser; only after betting is closed; idempotent
-```
-
-- Reverts: `NotBettingCloser` / `NotResolutionCloser`, `BettingNotClosed` (for `closeResolutionWindow`).
-
-**Finalization** (after betting is closed, while resolution window is open):
-
-```solidity
-function resolve(uint256 outcomeIndex) external; // only resolver
-function retract() external;                      // only resolver
-```
-
-- Both charge fees once at finalization.
-- Reverts: `NotResolver`, `AlreadyFinalized`, `BettingNotClosed`, `ResolutionWindowOver`, `InvalidOutcome` (for `resolve`).
-
-**Expiry** (after resolution window is over, by anyone):
-
-```solidity
-function expire() external;
-```
-
-- Moves state to `Retracted`. Charges fees. Enables refund claims.
-- Reverts: `AlreadyFinalized`, `BettingNotClosed`, `ResolutionWindowOver` (if window is still open).
-
-**Claims** (after finalization):
-
-```solidity
-function claim() external returns (uint256 paid);
-function withdrawFees() external returns (uint256 amount);
-```
-
-- Reverts: `NotOpen` (if still Open), `NothingToClaim`.
+**Capacity:** at most 1024 distinct tickets before new *multi-outcome* tickets revert with `TooManyDistinctTickets`. Single-outcome tickets are always accepted. This bound is what keeps `resolve` within the per-transaction gas cap; see [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md). Freeform wagers have no limit on distinct answers, because nothing on-chain iterates them.
 
 ### Payout math
 
-Full prose spec (v1 + v2): [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md).
+Full spec with worked examples: [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md). All products use full-precision math, so none can overflow.
 
-Fees are charged once at finalization:
+```text
+fees   = floor(totalPot * totalFeeBps / 10000)
+netPot = totalPot - fees
 
-```
-totalFees = (totalPot * totalFeeBps) / BPS_DENOMINATOR
-netPot    = totalPot - totalFees
-```
-
-Fee distribution: each recipient gets `(totalFees * feeBps[i]) / totalFeeBps`; the last recipient absorbs rounding dust.
-
-**Resolved** — winners split the net pot pro-rata by their winning-outcome stake:
-
-```
-payout = (userWinStake * netPot) / totalWinningStake
+Resolved:  paid = sum over the bettor's winning tickets of floor(weight * netPot / payoutDenominator)
+           weight = stake, or stake * |ticket ∩ winningMask| for WEIGHTED_OVERLAP
+Retracted: paid = floor(userTotalBet * netPot / totalPot)
 ```
 
-**Retracted / Expired** — all bettors get a pro-rata refund from the net pot:
-
-```
-refund = (userTotalBet * netPot) / totalPot
-```
+Each fee slice is floored and the last recipient takes the remainder. A claim that would pay 0 reverts with `NothingToClaim` and leaves `hasClaimed` false. Rounding dust stays in the wager.
 
 ### Events
 
 ```solidity
-event BetPlaced(address indexed bettor, uint256 indexed outcomeIndex, uint256 amount);
-event BettingClosedByAuthority(uint64 closedAt);
-event ResolutionWindowClosedByAuthority(uint64 closedAt);
-event Resolved(uint256 indexed outcomeIndex);
-event Retracted();
-event Expired();
-event Claimed(address indexed bettor, uint256 amount);
-event FeeAccrued(address indexed recipient, uint256 amount);
-event FeeWithdrawn(address indexed recipient, uint256 amount);
+event BetPlacedV3Enumerated(address indexed bettor, uint256 ticketMask, uint256 amount);
+event BetPlacedV3Freeform(address indexed bettor, bytes32 indexed answerId, uint256 amount);
+event FreeformAnswerRevealedV3(bytes32 indexed answerId, string answer);  // once per distinct answer, before its first bet event
+event BettingClosedByAuthorityV3(uint64 closedAt);
+event ResolutionWindowClosedByAuthorityV3(uint64 closedAt);
+event ResolvedV3Enumerated(uint256 winningMask);
+event ResolvedV3Freeform(bytes32 indexed winningAnswerId);
+event RetractedV3();
+event ExpiredV3();
+event ClaimedV3(address indexed bettor, uint256 amount);
+event FeeAccruedV3(address indexed recipient, uint256 amount);
+event FeeWithdrawnV3(address indexed recipient, uint256 amount);
 ```
 
-### ParamutuelWagerV3 (ADR-0010)
-
-In `src/` on **`master`**: the unified `ParamutuelWagerV3` selects its shape at construction via an immutable `WagerMode` (Enumerated / Freeform). Enumerated mode carries bitmask **tickets**, `resolve(uint256 winningMask)`, and **`PayoffPolicy`** (`SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, `WEIGHTED_OVERLAP`) — the same semantics the deleted `ParamutuelWagerV2` used to provide. Freeform mode carries `placeBet(string,uint256)` / `resolve(string)` (exact UTF-8 bytes; `answerId = keccak256(abi.encodePacked(0x03, bytes(answer)))` — domain-separated per ADR-0010). Colloquial **“any of” / “all of”** ↔ policy mapping: [`PAYOUT-CALCULATION.md`](PAYOUT-CALCULATION.md) Part B glossary. Spec: [`ADR-0010-IMPLEMENTATION.md`](ADR-0010-IMPLEMENTATION.md). Gas: [`PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md). Templates: [`ADR-0008-TEMPLATES.md`](ADR-0008-TEMPLATES.md).
+`FreeformAnswerRevealedV3` is the only on-chain record of an answer's text. Wagers from factories deployed before ADR-0020 do not emit it; their answers are known only by hash.
 
 ### Error reference
 
 | Error | Thrown by |
-|-------|----------|
-| `InvalidOutcome` | `placeBet`, `placeBets`, `resolve` — outcome index out of range |
-| `NotOpen` | `placeBet`, `placeBets`, `claim` — wrong state |
-| `BettingClosed` | `placeBet`, `placeBets` — betting window has ended |
-| `BettingNotClosed` | `resolve`, `retract`, `expire`, `closeResolutionWindow` — betting still open |
-| `ResolutionWindowOver` | `resolve`, `retract` — window expired; `expire` — window still open |
-| `NotResolver` | `resolve`, `retract` — caller is not the resolver |
-| `NotBettingCloser` | `closeBetting` — caller is not the betting closer |
-| `NotResolutionCloser` | `closeResolutionWindow` — caller is not the resolution closer |
-| `AlreadyFinalized` | `resolve`, `retract`, `expire` — wager already resolved/retracted |
-| `NothingToClaim` | `claim` — no stake, no winning stake, or already claimed; `withdrawFees` — zero balance |
-| `ArrayLengthMismatch` | `placeBets`, `seedInitialBetsFromFactory` — indices/amounts length mismatch |
-| `NotFactory` | `seedInitialBetsFromFactory` — caller is not the factory |
-| `FeeConfigMismatch` | constructor — `feeRecipients` and `feeBps` length mismatch |
-| `FeeTooHigh` | constructor — total fee BPS exceeds `BPS_DENOMINATOR` |
+|---|---|
+| `WrongMode` | Any mode-specific entry point called on the other mode |
+| `InvalidTicketMask` | Bets with a zero or out-of-range mask, or multi-bit under `SINGLE_WINNER` |
+| `InvalidWinningMask` | `resolve` with a zero or out-of-range mask, or multi-bit under `SINGLE_WINNER` |
+| `NewTicketStakeTooLow` | A bet or seed opening a new ticket below `minNewTicketStake` |
+| `TooManyDistinctTickets` | A new multi-outcome ticket when the wager already has 1024 |
+| `EmptyAnswer`, `AnswerTooLong` | Freeform bets and `resolve`: answer must be 1 to 1024 bytes |
+| `NotOpen` | Bets after finalization; `claim` before it |
+| `BettingClosed` | Bets once betting has closed |
+| `BettingNotClosed` | `resolve`, `retract`, `expire`, `closeResolutionWindow` while betting is open |
+| `ResolutionWindowOver` | `resolve` and `retract` after the window; `expire` before it |
+| `NotResolver`, `NotBettingCloser`, `NotResolutionCloser` | Wrong caller |
+| `AlreadyFinalized` | `resolve`, `retract`, `expire` after finalization |
+| `NoWinningStake` | `resolve` where nothing would win |
+| `NothingToClaim` | `claim` with no stake, a zero payout, or a repeat claim; `withdrawFees` with no balance |
+| `ArrayLengthMismatch` | Empty or misaligned bet arrays |
+| `NotFactory` | `seedInitialBetsFromFactory` from anyone but the factory |
 
-**Note:** `seedInitialBetsFromFactory(address bettor, uint256[] outcomeIndices, uint256[] amounts)` is callable only by the factory during wager creation. External callers cannot invoke it. `FeeConfigMismatch` and `FeeTooHigh` are constructor-level checks (the factory validates first, so these are defensive guards).
+## HTTP indexer API
 
-## HTTP indexer API (JSON)
+Production entrypoint: `python3 -m service.indexer.live_api` (sync loop plus API). `python3 -m service.indexer.api` serves an existing database. All responses are JSON with CORS `*`. Every path also works with an `/api` prefix.
 
-Run `python -m service.indexer.api` (see module for flags). All responses are `application/json`. CORS is enabled (`Access-Control-Allow-Origin: *`).
+| Path | Description |
+|---|---|
+| `GET /health` | `ok`, `ts`, `wager_count`, `last_indexed_block`, `chain_head`, `sync_lag_blocks`, `last_sync_error`, `skipped_log_count`, `last_skipped_log`, `factory_address` |
+| `GET /wagers` | Paginated list. Params: `state` (`OPEN`, `RESOLVED`, `RETRACTED`), `q` (search all fields), `limit` (1 to 1000, default 100), `offset`, `order` (`asc` or `desc`, default `desc`) |
+| `GET /wagers/{address}` | Detail bundle, below. Params: `pool_limit`, `events_limit`, `answer_id` |
+| `GET /sweeper/expire-candidates` | Still-`OPEN` wagers where `expire()` is valid. Param: `now` (unix seconds) |
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | `{ "ok": true, "ts": <unix> }` |
-| GET | `/wagers?state=OPEN&limit=100` | List wagers (optional `state`, `limit` 1–1000). |
-| GET | `/wagers/:address` | Single wager, totals, outcome rows, event history (`payload_json` parsed). |
-| GET | `/sweeper/expire-candidates?now=<unix>` | Wagers still `OPEN` where `expire()` is valid: timed-out resolution window (from effective betting close + `resolution_window`) or `resolution_window_closed` set by indexer from `ResolutionWindowClosedByAuthority`. |
+Detail bundle fields:
 
-### Environment / ops
+- **`wager`:** all indexed columns, including `protocol_version` (`enumerated` or `freeform`), `payoff_policy`, `policy_param`, `outcomes_json`, `betting_close_time`, `betting_closed_at`, `resolution_window`, `resolution_deadline`, `min_new_ticket_stake`, `state`.
+- **`totals`:** `total_pot`, `total_fee_bps`, `winning_outcome` (a mask or answer id), `total_winning_stake` (equals on-chain `payoutDenominator`; weighted units under `WEIGHTED_OVERLAP`).
+- **`outcomes`:** enumerated only. `{outcome_index, outcome_total}`, where a multi-outcome ticket counts toward each outcome it includes, so under those policies the totals overlap.
+- **`ticket_pools`:** `{ticket_mask, pool_total}`. Enumerated rows are sorted by mask and never truncated. Freeform rows use the answer id as `ticket_mask`, add `answer_text` and `answer_hex`, sort by stake, and are limited by `pool_limit` (default 500, with the full count in `ticket_pools_total`). Use `answer_id` to fetch one directly. `answer_text` is `null` when the bytes are not valid UTF-8; `answer_hex` is always exact.
+- **`events`:** newest `events_limit` events (default 1000) in chain order, with the full count in `events_total`.
 
-- **`RPC_URL`**: use your node when running the indexer CLI (`service.indexer.indexer`).
-- **`--db-path`**: SQLite file for the indexer (schema in `service/indexer/schema.sql`).
-- **`--factory-address`**: factory contract to filter `WagerCreated` logs.
+All uint256 values are decimal strings, because JavaScript JSON parsers round numbers above 2^53.
+
+`state` stays `OPEN` after betting closes, because V3 has no separate state for it. To tell whether a wager accepts bets, also check `betting_closed_by_authority` and `betting_close_time`.
 
 ## Configuration
 
-`config/deployments.json` stores runtime defaults (factory address, network selection, optional indexer URL). The dApp and website read this at load time.
-
-## dApp
-
-Static `dapp/` UI loads ABIs from `dapp/abi/` (committed), with a fallback to `../out/` (Foundry build output) for local development. The hosted site is deployed to GitHub Pages via CI.
-
-## Service operations
-
-- Explorer server: `python3 -m service.explorer.server --indexer-base-url http://127.0.0.1:8090`
-- Control panel CLI: `python3 -m service.control_panel.cli ...`
-- Control panel web: `python3 -m service.control_panel.web --rpc-url ... --private-key ...`
-
-Operator transaction workflows are documented in `docs/WORKFLOWS.md`.
+`config/deployments.json` holds per-network runtime defaults: `factoryAddress`, `indexerFromBlock`, `chainId`, `explorerApiBase`. `config/collateral-allowlist.json` lists tokens surfaces present as vetted (ADR-0018). The dApp and website read both at load time.
 
 ## MCP server
 
-A ready-to-use MCP (Model Context Protocol) server is available at `mcp_server/`. It exposes 17 tools across three categories:
+`mcp_server/` exposes 21 tools:
 
 - **Discovery:** `get_protocol_info`, `list_wagers`, `get_wager`, `get_expire_candidates`, `get_indexer_health`
 - **Analysis:** `calculate_odds`, `quote_place_bet`, `quote_place_bets`
-- **Transaction encoding:** `encode_create_wager`, `encode_create_wager_v2`, `encode_place_bet`, `encode_place_bets`, `encode_resolve`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
-
-Run with:
+- **Transaction encoding:** `encode_create_enumerated_wager`, `encode_create_freeform_wager`, `encode_place_bet`, `encode_place_bet_freeform`, `encode_place_bets`, `encode_resolve`, `encode_resolve_freeform`, `encode_retract`, `encode_expire`, `encode_close_betting`, `encode_close_resolution_window`, `encode_claim`, `encode_withdraw_fees`
 
 ```bash
 pip install mcp httpx eth-abi "eth-hash[pycryptodome]"
 python -m mcp_server
 ```
 
-Or via the entry point after `pip install -e mcp_server/`:
+The server reads the factory address and chain ID from `config/deployments.json`, or from `FACTORY_ADDRESS`, `CHAIN_ID`, and `INDEXER_URL`. Write tools return calldata plus approval instructions for the caller to sign. `paramutuel-mcp` is packaged for PyPI but **not yet published**; install from this repository. Agent loop guide: [`AGENT-LOOP.md`](AGENT-LOOP.md).
 
-```bash
-paramutuel-mcp
-```
+## Bet scout agent
 
-The server reads the unified V3 factory address and chain ID from `config/deployments.json` (overridable via `FACTORY_ADDRESS` and `CHAIN_ID` env vars). Discovery tools query the indexer API; transaction-encoding tools return raw calldata and approval instructions for the caller's signer.
-
-Tests: `python -m pytest mcp_server/tests/test_server.py` (or `python -m unittest mcp_server/tests/test_server.py`).
-
-Agent loop integration guide: [`docs/AGENT-LOOP.md`](AGENT-LOOP.md).
-
-## Bet scout agent (adoption)
-
-A minimal **stdlib** process for indexer-backed discovery and ranked bet ideas is published as **`paramutuel-bettor-agent`** on PyPI (CLI `paramutuel-bettor`) and lives in-repo under `agents/paramutuel_bettor/`. It is meant for **frontier-model subagents** and scripted delegation; pair it with the MCP server for authoritative `quote_place_bet` calldata before signing. See [`AGENTS.md`](../AGENTS.md), [`docs/BET-AGENT.md`](BET-AGENT.md), [`docs/BET-AGENT-DISTRIBUTION.md`](BET-AGENT-DISTRIBUTION.md), [`agents/subagent-manifest.json`](../agents/subagent-manifest.json), and the Cursor skill `.cursor/skills/paramutuel-bettor/SKILL.md`.
+A stdlib-only process at `agents/paramutuel_bettor/` for indexer-backed discovery and ranked bet ideas, meant for subagent delegation. It is packaged as `paramutuel-bettor-agent` but **not yet published**. See [`BET-AGENT.md`](BET-AGENT.md), [`BET-AGENT-DISTRIBUTION.md`](BET-AGENT-DISTRIBUTION.md), and [`agents/subagent-manifest.json`](../agents/subagent-manifest.json).
 
 ## Versioning
 
-Changing `createWager` or event layouts is an **ABI break**. Bump deployed factory version or document migration when upgrading.
-
-Upgrading the indexer from a pre–window-delegation build: **recreate the SQLite DB** (or migrate with `ALTER TABLE`) so `wagers` includes `betting_closer`, `resolution_closer`, `resolution_window`, `betting_closed_by_authority`, `betting_closed_at`, `resolution_window_closed`, and `resolution_window_closed_at`; `WagerCreated` and closure-event topics changed.
+Existing event signatures and creation signatures are an ABI commitment: indexers and clients key on them. Add new overloads and events rather than changing existing ones, as ADR-0020 did. A contract change means a new factory address, which is one change to `config/deployments.json`. New columns are added to existing indexer databases automatically by `init_db`.

@@ -11,7 +11,8 @@
 #   2. MCP server unit tests       (mcp_server/tests)
 #   3. Bet scout agent unit tests  (agents/paramutuel_bettor/tests)
 #   4. Service unit tests          (service/{indexer,proposition,explorer,resolution,control_panel}/tests)
-#   5. dApp pure-helper tests      (dapp/tests via node --test)
+#   5. Operational script checks   (script/tests)
+#   6. dApp, site and artifact     (dapp/tests, site/tests via node --test)
 #
 # Anything that hits a network, requires PRIVATE_KEY, or talks to a live
 # indexer belongs in script/test-extended.sh.
@@ -99,11 +100,15 @@ for service_dir in service/indexer service/proposition service/explorer service/
     python3 -m unittest discover "${PY_VERBOSITY[@]}" -s "${service_dir}/tests" -p "test_*.py"
 done
 
-# 5. dApp pure-helper tests. node --test is invoked from the dapp/ working
-#    directory because logic.test.js uses relative requires; the current
-#    shell of this subprocess is restored on exit by `(...)`.
-section "dapp pure-helper tests"
-( cd dapp && run_layer "dapp" node --test tests/logic.test.js tests/abi-drift.test.js tests/site-bet-logic.test.js )
+# 5. Operational scripts: these rot silently because nothing runs them until a real deployment does.
+section "operational script checks"
+run_layer "script checks" python3 -m unittest discover "${PY_VERBOSITY[@]}" -s script/tests -p "test_*.py" -t .
+
+# 6. dApp pure helpers, site logic, and the assembled site artifact. node --test is invoked from the
+#    dapp/ working directory because logic.test.js uses relative requires; the current shell of this
+#    subprocess is restored on exit by `(...)`.
+section "dapp and site tests"
+( cd dapp && run_layer "dapp" node --test tests/*.test.js ../site/tests/*.test.cjs )
 
 echo
 echo "=== fast suite OK ==="

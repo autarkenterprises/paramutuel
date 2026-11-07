@@ -1,454 +1,186 @@
 # Paramutuel
 
-Paramutuel provides permissionless, real crypto, blockchain-powered prop betting. Anyone can propose any wager, in any ERC-20 token, with configurable resolution criteria. Proposers, bettors, and resolvers interact on-chain, through a fully distributed protocol, without relying on centralized platforms to approve wagers, or authorize payouts. Paramutuel is designed for agents, whether human or artificial: all aspects of the wager lifecycle are fully configurable, enabling a wide variety of uses—friendly bets, forecasting current events, sports betting, and more.
+Paramutuel provides permissionless, real crypto, blockchain-powered prop betting. Anyone can propose any wager, in any standard ERC-20 token, with configurable resolution criteria. Proposers, bettors, and resolvers interact on-chain, through a fully distributed protocol, without relying on centralized platforms to approve wagers or authorize payouts. Paramutuel is designed for agents, whether human or artificial: all aspects of the wager lifecycle are fully configurable, enabling a wide variety of uses: friendly bets, forecasting current events, sports betting, and more.
 
-This repository is the reference implementation: smart contracts, dApp, indexer, MCP server, bet-scout agent, and operator services. The **value proposition** is permissionless creation and settlement in the bettors’ chosen collateral, with no gatekeeper for markets or payouts—while each wager’s resolver, windows, and fee split remain **explicitly configurable** at deploy time.
+"Standard" has a precise meaning here. The contracts are solvent for ordinary ERC-20 collateral. Tokens that return no value from `transfer` (USDT-style) fail safely: bets cannot be placed. Fee-on-transfer and rebasing tokens are **not** supported: the wager credits the requested amount while custody receives less, so the last claimant cannot be paid. Curated surfaces flag tokens outside [`config/collateral-allowlist.json`](config/collateral-allowlist.json); see [ADR-0018](research/adr/ADR-0018-collateral-curation-overlay.md).
 
----
+This repository is the reference implementation: smart contracts, dApp, website, indexer, MCP server, bet-scout agent, and operator services.
 
-## Paramutuel (MVP)
+**Tagline:** "Augur for prop bets". Each wager's resolver, windows, and fee split are chosen at creation, so trust is explicit and per-wager rather than protocol-wide, with room to plug in more decentralized resolution later.
 
-Tagline: **“Augur for prop bets”** — the MVP ships a concrete on-chain lifecycle (create → bet → resolve / retract / expire → claim) so that thesis is usable today, with room to plug in more decentralized resolution later.
+## Where to look
 
-**Wager research & thesis:** see [`research/market-viability.md`](research/market-viability.md) and [`research/README.md`](research/README.md).
-**Chain/fee decision memo:** see [`research/chain-and-fee-review.md`](research/chain-and-fee-review.md) (Base primary, Arbitrum secondary).
-**Operator workflows (CLI/API):** see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md).
-**Testnet rehearsal plan:** see [`docs/TESTNET-REHEARSAL.md`](docs/TESTNET-REHEARSAL.md).
-**Live testnet integration suite:** see [`docs/TESTNET-LIVE-SUITE.md`](docs/TESTNET-LIVE-SUITE.md).
-**Testnet stress suite (multi-wager / multi-actor):** see [`docs/TESTNET-STRESS-SUITE.md`](docs/TESTNET-STRESS-SUITE.md).
-**Live indexer hosting (Cloud Run):** see [`docs/INDEXER-HOSTING.md`](docs/INDEXER-HOSTING.md) and [`docs/CLOUD-RUN-HOSTING.md`](docs/CLOUD-RUN-HOSTING.md).
-**Resolution Service (delegated resolver ops):** see [`docs/RESOLUTION-SERVICE.md`](docs/RESOLUTION-SERVICE.md).
-**Backlog / task list:** see [`docs/TASKS.md`](docs/TASKS.md).
-**Payout math (v1 + v2):** see [`docs/PAYOUT-CALCULATION.md`](docs/PAYOUT-CALCULATION.md).
-**Protocol shapes (contracts):** **v1** enumerated outcomes, **v2** bitmask tickets and payoff policies (ADR-0008 — [`docs/ADR-0008-IMPLEMENTATION.md`](docs/ADR-0008-IMPLEMENTATION.md)), **freeform** UTF-8 answers (ADR-0009 — [`docs/ADR-0009-IMPLEMENTATION.md`](docs/ADR-0009-IMPLEMENTATION.md)), and **V3** enumerated + freeform under one factory (current default in `config/deployments.json` and the hosted dApp). The indexer, MCP, bet scout, and operator tooling understand `protocol_version` from the indexer.
-**Service layer modules:** see [`service/README.md`](service/README.md).
-**Hosted dApp & website:** see [GitHub Pages deployment](#hosted-dapp--protocol-website).
+| To… | See |
+|---|---|
+| Understand states, roles, and timers | [`docs/WAGER-LIFECYCLE.md`](docs/WAGER-LIFECYCLE.md) |
+| Understand payouts, with worked examples | [`docs/PAYOUT-CALCULATION.md`](docs/PAYOUT-CALCULATION.md) |
+| Integrate a bot or LLM (HTTP API, ABI, MCP) | [`docs/MACHINE.md`](docs/MACHINE.md) |
+| Operate services | [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md), [`service/README.md`](service/README.md) |
+| Host the indexer | [`docs/INDEXER-HOSTING.md`](docs/INDEXER-HOSTING.md), [`docs/CLOUD-RUN-HOSTING.md`](docs/CLOUD-RUN-HOSTING.md) |
+| Run delegated resolution | [`docs/RESOLUTION-SERVICE.md`](docs/RESOLUTION-SERVICE.md) |
+| See gas costs and limits | [`docs/PARAMUTUEL-V3-GAS.md`](docs/PARAMUTUEL-V3-GAS.md) |
+| Read design decisions | [`research/adr/README.md`](research/adr/README.md) |
+| See open work | [`docs/TASKS.md`](docs/TASKS.md) |
+| Contribute | [`AGENTS.md`](AGENTS.md) (mandatory practices), [`LOG.md`](LOG.md), [`LESSONS.md`](LESSONS.md) |
 
-## Clone and Use on Base Sepolia (dApp + CLI)
+## The protocol
 
-This section is for an arbitrary user who clones the repo and wants to interact end-to-end in pre-production.
+One contract pair, `ParamutuelFactoryV3` and `ParamutuelWagerV3` (ADR-0010). Each wager is one of two immutable modes:
 
-### 1) Prerequisites
+- **Enumerated:** 2 to 255 outcomes fixed at creation. A ticket is a bitmask of outcomes, so **mask 1 is outcome 0, mask 2 is outcome 1, and mask 3 is both**. The wager's payoff policy decides which tickets win: `SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, or `WEIGHTED_OVERLAP`.
+- **Freeform:** no outcome list. Bettors stake on any text answer, and the resolver names the winning text. Matching is **byte-exact**: `Paris`, `paris`, and `Paris ` are three different pools.
 
-- `forge` + `cast` installed (Foundry)
-- `python3` and `node`
-- MetaMask (or other EVM wallet)
-- Base Sepolia test ETH
-- Base Sepolia test USDC (for funded bet flows)
+### Roles
 
-**Wallets (browser UIs):** The static dApp (`dapp/`) and the wallet staking page (`site/bet.html`, linked from **Place a Bet**) connect through **EIP-1193**: they use `ethers.BrowserProvider` with an injected provider (`window.ethereum`). Any wallet that exposes a compliant provider works (for example MetaMask, Rabby, Coinbase Wallet, Brave Wallet, Frame). If several extensions register under `ethereum.providers[]`, the app prefers the first entry that implements `request`. **WalletConnect** and other non-injected flows are not included in the default static build; add a connector library if you need those. At the protocol level, anything that can sign transactions against the deployed contracts (Foundry `cast`, multisigs, automated services) is supported.
+Each is an immutable address chosen at creation.
 
-### 2) Clone and build
+| Role | Can | If `address(0)` at creation |
+|---|---|---|
+| **Proposer** | Creates the wager. No powers afterwards. | n/a |
+| **Resolver** | `resolve` or `retract`, once betting has closed and while the resolution window is open. | Defaults to the proposer |
+| **Betting closer** | `closeBetting()` to end betting early. | Role disabled: time-based close only |
+| **Resolution closer** | `closeResolutionWindow()` to end the resolver's window early, once betting has closed. | Role disabled: time-based only |
+| **Fee recipients** | `withdrawFees()`. The protocol treasury plus up to 32 proposer-chosen recipients; total at most 100%. | n/a |
+
+### Lifecycle
+
+1. **Create.** `bettingCloseTime` is an absolute timestamp; `resolutionWindow` is a duration measured from when betting actually closes. Either may be `0` for "no time limit", which requires the matching closer, because otherwise the wager could never advance.
+2. **Bet.** Until `bettingCloseTime`, or until the betting closer ends betting.
+3. **Finalize.** While the resolution window is open the resolver may `resolve` or `retract`. Once it is over, anyone may `expire()`.
+4. **Claim.** After a resolve, winners split the net pot. After a retract or expire, bettors get their stake back minus fees. Fee recipients withdraw separately.
+
+Fees are charged once, at finalization, including on refunds.
+
+**Know before you bet on a wager with no time limit.** If `bettingCloseTime` or `resolutionWindow` is `0`, that closer's key is the only way forward. If a no-time-limit betting closer loses its key, stakes are locked: neither `retract` nor `expire` can run while betting is open. Surfaces warn about this.
+
+## Try it on Base Sepolia
+
+You need [Foundry](https://getfoundry.sh), `python3`, `node`, an EVM wallet, and test funds: [USDC](https://faucet.circle.com/) and [ETH](https://www.alchemy.com/faucets/base-sepolia).
 
 ```bash
-git clone https://github.com/autarkenterprises/paramutuel.git
+git clone --recurse-submodules https://github.com/autarkenterprises/paramutuel.git
 cd paramutuel
 forge build
+./script/test-fast.sh   # contracts, services, clients; no keys or network needed
 ```
 
-`forge build` is optional for local development — the dApp ships committed ABI files in `dapp/abi/` and falls back to `out/` when available. Run `forge build` (or `./script/sync-abi.sh`) after contract changes to update the committed ABIs.
+Base Sepolia wallet settings: RPC `https://sepolia.base.org`, chain ID `84532`, currency `ETH`, explorer `https://sepolia.basescan.org`. The public RPC is rate limited, so use your own provider for anything heavy.
 
-### 3) Configure wallet/network
-
-In MetaMask, use **Base Sepolia**:
-
-- RPC URL: `https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU` (or your own provider)
-- Chain ID: `84532`
-- Currency: `ETH`
-- Explorer: `https://sepolia.basescan.org`
-
-### 3.1) Get test funds (Base Sepolia)
-
-- **USDC (Base Sepolia):** [Circle faucet](https://faucet.circle.com/)  
-  Select `Base Sepolia`, token `USDC`, and request to your wallet.
-- **ETH gas (Base Sepolia):**
-  - [Alchemy Base Sepolia faucet](https://www.alchemy.com/faucets/base-sepolia)
-  - [Chainlink faucet](https://faucets.chain.link/base-sepolia)
-
-### 4) Start the dApp locally
+### From a browser
 
 ```bash
-./script/dapp/launch_dapp.sh
+./script/dapp/launch_dapp.sh   # then open http://localhost:8080/dapp/
 ```
 
-Open:
+Any wallet that injects an EIP-1193 provider works (MetaMask, Rabby, Coinbase Wallet, Frame, and others). WalletConnect is not bundled. The factory address fills in from `config/deployments.json`.
 
-- `http://localhost:8080/dapp/`
+The hosted site is at `https://autarkenterprises.github.io/paramutuel/`; see [`docs/WEBSITE.md`](docs/WEBSITE.md).
 
-Alternative manual server command:
-
-```bash
-python3 -m http.server 8080
-```
-
-In the dApp UI:
-
-- connect wallet
-- factory address auto-fills from `config/deployments.json` (or can be overridden manually)
-- create/load wagers and run lifecycle actions
-
-Time semantics (important):
-
-- In the dApp, `Bet close` can be entered as either a relative offset or an absolute local date/time. At click-time, both are converted to an absolute unix timestamp and sent as `bettingCloseTime`.
-- The contract enforces closure against on-chain `block.timestamp`, not local browser time.
-- Because transaction inclusion takes time, effective remaining window may be shorter than the offset entered at click-time; with tight windows, delayed inclusion can cause create-wager reverts against factory minimum window constraints.
-
-### 5) CLI interaction (cast)
-
-Export required env vars:
+### From the command line
 
 ```bash
-export RPC_URL_BASE_SEPOLIA="https://base-sepolia.g.alchemy.com/v2/2aW1C2BWaTdcvRNjgLwVU"
+export RPC_URL_BASE_SEPOLIA="https://sepolia.base.org"
 export PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
 source ./script/lib/deployments.sh
 ensure_factory_address "base-sepolia" "./config/deployments.json"
+export TOKEN=0x036CbD53842c5426634e7929541eC2318f3dCF7e   # Base Sepolia USDC, 6 decimals
 ```
 
-#### Create wager (`createWager`)
+Create a yes/no wager. Arguments: collateral, proposition, outcomes, payoff policy (`0` = `SINGLE_WINNER`), policy parameter, betting close timestamp, resolution window in seconds, resolver, betting closer, resolution closer, extra fee recipients, extra fee bps. Zero addresses here mean "I resolve" and "no closers".
 
 ```bash
 cast send "$FACTORY_ADDRESS" \
-  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
-  "0xCOLLATERAL_TOKEN" \
-  "Will X happen?" \
-  "[\"YES\",\"NO\"]" \
-  0 \
-  0 \
+  "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[])" \
+  "$TOKEN" "Will X happen?" '["YES","NO"]' 0 0 \
+  "$(( $(date +%s) + 7200 ))" 7200 \
   0x0000000000000000000000000000000000000000 \
-  0xBETTING_CLOSER_ADDRESS \
-  0xRESOLUTION_CLOSER_ADDRESS \
-  "[]" \
-  "[]" \
-  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
-  --private-key "$PRIVATE_KEY"
-```
-
-Optional seeded-liquidity overload (multi-outcome seed in one create tx):
-
-```bash
-cast send "$FACTORY_ADDRESS" \
-  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
-  "0xCOLLATERAL_TOKEN" \
-  "Will X happen?" \
-  "[\"YES\",\"NO\",\"MAYBE\"]" \
-  "$BETTING_CLOSE_TS" \
-  "$RESOLUTION_WINDOW_SECS" \
-  "0x0000000000000000000000000000000000000000" \
-  "0xBETTING_CLOSER_ADDRESS" \
-  "0xRESOLUTION_CLOSER_ADDRESS" \
-  "[]" \
-  "[]" \
-  "[0,2]" \
-  "[1000000,2500000]" \
-  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
-  --private-key "$PRIVATE_KEY"
-```
-
-Notes:
-
-- `bettingCloseTime = 0` and `resolutionWindow = 0` create no-max (closer-managed) windows.
-- `resolver = address(0)` defaults resolver to proposer.
-- `bettingCloser = address(0)` disables authority `closeBetting()`.
-- `resolutionCloser = address(0)` disables authority `closeResolutionWindow()`.
-- Protocol guardrail: `no-max + no closer` is rejected at wager creation.
-
-#### Place bet
-
-```bash
-cast send "0xTOKEN" "approve(address,uint256)" "0xWAGER" 1000000000000000000 \
-  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-
-cast send "0xWAGER" "placeBet(uint256,uint256)" 0 1000000000000000000 \
+  0x0000000000000000000000000000000000000000 \
+  0x0000000000000000000000000000000000000000 \
+  "[]" "[]" \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
-Batch bet (multiple outcomes in one tx):
+The wager address is in the `WagerCreatedV3Enumerated` event, the first topic after the signature. Then bet. Tickets are masks, so `1` backs outcome 0 ("YES") and `2` backs outcome 1:
 
 ```bash
-cast send "0xTOKEN" "approve(address,uint256)" "0xWAGER" 3000000000000000000 \
-  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xWAGER" "placeBets(uint256[],uint256[])" "[0,2]" "[1000000000000000000,2000000000000000000]" \
-  --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "$TOKEN" "approve(address,uint256)" "$WAGER" 3000000 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "placeBet(uint256,uint256)" 1 1000000 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+# Several tickets in one transaction:
+cast send "$WAGER" "placeBets(uint256[],uint256[])" "[1,2]" "[1000000,1000000]" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
-#### Lifecycle actions
+After betting closes, finalize and claim. `resolve` takes a winning **mask**, so outcome 0 is `1`:
 
 ```bash
-cast send "0xWAGER" "closeBetting()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xWAGER" "resolve(uint256)" 0 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-# or retract / expire
-cast send "0xWAGER" "retract()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xWAGER" "expire()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "resolve(uint256)" 1 --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+# or, instead of resolving:
+cast send "$WAGER" "retract()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+# or, once the window is over, from any address:
+cast send "$WAGER" "expire()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+
+cast send "$WAGER" "claim()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "withdrawFees()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
-#### Claim and fee withdrawal
+Other creation forms, each extending the one before:
 
-```bash
-cast send "0xWAGER" "claim()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
-cast send "0xWAGER" "withdrawFees()" --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
+```text
+createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])
+    adds seedTicketMasks[] and seedAmounts[]: seed bets in the creation tx. Approve the FACTORY for the total.
+createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[],uint256)
+    adds minNewTicketStake: minimum raw amount to open a new ticket, which prices griefing by dust tickets.
+createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])
+createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[],uint256)
+    adds minNewTicketStake.
 ```
 
-### 6) Optional: full local service stack (explorer + control panel + sweeper)
-
-Create `config/service.env` from template and run:
+**Freeform answers and `cast`:** do not pass answer strings through `cast` arguments. `cast` strips trailing whitespace and surrounding quotes, and parses a leading `--` as a flag, so what it sends may not be what you typed, and answers match byte-exactly. Use the control panel CLI, which encodes them exactly:
 
 ```bash
-cp config/service.env.example config/service.env
+python3 -m service.control_panel.cli wager-action --wager "$WAGER" --action resolve \
+  --protocol-version freeform --winning-answer "Paris"              # add --execute to send
+```
+
+`placeBet(string,uint256)` has the same constraint; use the dApp, the site, or the MCP server's `encode_place_bet_freeform`.
+
+### Run the stack locally
+
+```bash
+cp config/service.env.example config/service.env   # then edit
 source script/lib/load_service_env.sh
 ./script/testnet/launch_testnet.sh
 ```
 
-`launch_testnet.sh` writes the latest deployment to `config/deployments.json` (`baseSepolia.factoryAddress`), which is used as the shared default by the dApp and testnet suites. For manual updates:
+This deploys a factory with [`script/DeployFactoryV3.s.sol`](script/DeployFactoryV3.s.sol) and records its address and deploy block in `config/deployments.json`, the shared default for every surface. It then prints the commands to start the indexer API (`:8090`), explorer (`:8091`), control panel (`:8092`), and sweeper.
+
+To deploy only the factory:
 
 ```bash
-./script/testnet/set_factory_address.sh 0x...
+export TREASURY_ADDRESS=0x...        # receives protocol fees
+export PROTOCOL_FEE_BPS=100          # optional, default 100 (1%)
+export MIN_BETTING_WINDOW=3600       # optional, seconds
+export MIN_RESOLUTION_WINDOW=3600    # optional, seconds
+forge script script/DeployFactoryV3.s.sol --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY" --broadcast
 ```
 
-Then use:
+After contract changes, run `./script/sync-abi.sh` and commit the updated ABIs: the dApp and MCP server ship them, and a test fails if they drift.
 
-- indexer API: `http://127.0.0.1:8090`
-- explorer: `http://127.0.0.1:8091`
-- control panel: `http://127.0.0.1:8092`
+## For agents
 
-### Recorded long-term design considerations
+- **HTTP and ABI reference:** [`docs/MACHINE.md`](docs/MACHINE.md).
+- **MCP server:** 21 tools at `mcp_server/`; run `python -m mcp_server`. Write tools return calldata for the caller to sign.
+- **Bet scout:** a stdlib subagent at `agents/paramutuel_bettor/`; run `python3 -m agents.paramutuel_bettor`. See [`docs/BET-AGENT.md`](docs/BET-AGENT.md).
 
-Smart contracts cannot observe real-world truth directly. A fully decentralized version of this protocol ultimately requires an oracle / resolution mechanism such as:
+Both are packaged for PyPI (`paramutuel-mcp`, `paramutuel-bettor-agent`), but **neither is published yet**, so install them from this repository; see `docs/TASKS.md`.
 
-- **Dispute-driven bonded reporting (Augur-style)**: anyone can report, anyone can dispute with escalating bonds, eventual finalization, bond redistribution to honest participants, and an explicit **INVALID/AMBIGUOUS** path.
-- **Optimistic oracle**: a proposed answer finalizes unless challenged; disputes are adjudicated by a decentralized mechanism.
-- **Crypto-native outcomes only**: restrict wagers to on-chain observable facts (prices, contract state) to avoid external truth dependencies.
+## Testing
 
-Key hard problems to plan for (later): invalid/ambiguous wagers, liveness (no one reports), spam resistance, sybil resistance, and outcome representation for numeric / non-binary answers.
+- `script/test-fast.sh`: everything that needs no key or network, and what CI runs.
+- `script/test-local-e2e.sh`: every layer against a real local chain, with no secrets needed.
+- `script/test-extended.sh`: the above plus the live Base Sepolia suites.
+- `script/mutation-check.py`: proves the contract tests fail when guards are weakened.
+- `forge coverage --ir-minimum --no-match-test 'C1_coldResolve|test_C2_freeform|test_C6_' --no-match-path 'test/ParamutuelV3Invariant.t.sol'`: contract coverage; see [`docs/COVERAGE-BASELINE.md`](docs/COVERAGE-BASELINE.md).
 
-### MVP scope (current milestone)
+## Long-term design considerations
 
-This MVP intentionally centralizes resolution **per-wager** (not per-protocol):
-
-- The **proposer** creates a wager with a set of **text outcome strings**.
-- The **proposer is also the resolver** and finalizes the wager by selecting exactly one outcome index.
-- The proposer may alternatively **retract** the wager, which invalidates it and returns wagers **minus fees**.
-- A protocol **treasury** receives a default fee; additional fee recipients and percentages may be specified at wager creation.
-
-The purpose of this MVP is to clarify **actors**, their **permissions**, and the **accounting model**, while keeping the contract modular so resolution can be swapped later.
-
-**Agents & automation:** see [`AGENTS.md`](AGENTS.md) (entry for AI agents and subagents), [`docs/MACHINE.md`](docs/MACHINE.md) for JSON HTTP API shapes, ABI locations, MCP server, and a concise on-chain state machine for bots.
-
-**MCP server:** A 16-tool MCP server for LLM agent integration is available at `mcp_server/`. Run with `python -m mcp_server`. See [`docs/MACHINE.md`](docs/MACHINE.md) for details. A small **bet scout agent** for subagent-style workflows is on PyPI as **`paramutuel-bettor-agent`** (CLI `paramutuel-bettor`) and in-repo under `agents/paramutuel_bettor/` ([`docs/BET-AGENT.md`](docs/BET-AGENT.md), [`docs/BET-AGENT-DISTRIBUTION.md`](docs/BET-AGENT-DISTRIBUTION.md)).
-
-### Actors and relationships (MVP)
-
-- **Protocol (Factory)**:
-  - Maintains the protocol **treasury address** and the **default protocol fee** (basis points).
-  - Enforces global constraints (min windows, caps on outcomes/fees).
-  - Deploys new wagers.
-
-- **Proposer (per-wager)**:
-  - The address that calls `createWager` on the factory; stored on-chain as `proposer` for transparency.
-
-- **Resolver (per-wager)**:
-  - Address authorized to **resolve** (choose winning outcome) or **retract** (invalidate).
-  - Defaults to the proposer when `resolver == address(0)` is passed at creation; may be set to any other address (oracle, sponsored resolver, multisig, etc.).
-
-- **Betting closer (per-wager)**:
-  - May call **`closeBetting()`** to stop new bets.
-  - `bettingCloseTime = 0` enables **no max betting window**, so only `bettingCloser` can end betting.
-  - `bettingCloser == address(0)` disables authority close (time-only mode for finite windows).
-
-- **Resolution closer (per-wager)**:
-  - After betting has ended, may call **`closeResolutionWindow()`** to end the resolver window.
-  - `resolutionWindow = 0` enables **no max resolution window**, so only `resolutionCloser` can end it.
-  - `resolutionCloser == address(0)` disables authority close (time-only mode for finite windows).
-
-- **Bettors (per-wager)**:
-  - Deposit collateral during the betting window and allocate it to exactly one outcome per bet.
-  - After resolve: winners can claim pro-rata payouts.
-  - After retract/expire: bettors can claim refunds minus fees.
-
-- **Beneficiaries (fees)**:
-  - The protocol treasury is always a beneficiary (unless protocol fee is set to 0).
-  - Wager creation can specify additional recipients with fee BPS.
-  - Fees are taken once, at wager finalization (resolve/retract/expire).
-
-### Lifecycle (MVP)
-
-**Technical reference (states, roles, timer vs authority):** [`docs/WAGER-LIFECYCLE.md`](docs/WAGER-LIFECYCLE.md).
-
-1. **Create wager**
-   - Proposer supplies:
-     - `collateralToken` (ERC20)
-     - `outcomes[]` (strings)
-    - `bettingCloseTime` (absolute time, or `0` for no max betting window)
-    - `resolutionWindow` (duration after effective betting close, or `0` for no max resolution window)
-     - `resolver` (`address(0)` → proposer)
-     - `bettingCloser` (`address(0)` disables authority close)
-     - `resolutionCloser` (`address(0)` disables authority close)
-     - `feeRecipients[]`, `feeBps[]` (optional)
-     - optional `seedOutcomeIndices[]`, `seedAmounts[]` for multi-option seeded liquidity at creation
-   - Factory enforces sane constraints (min windows, caps, and rejects no-max windows without a matching closer).
-
-2. **Betting**
-   - Any address deposits collateral and chooses one or more outcome indices.
-   - `placeBet` places one leg; `placeBets` places multiple legs in one transaction.
-  - Bets stop when **`bettingCloseTime`** is reached **or** **`closeBetting()`** is called by `bettingCloser`.
-  - If `bettingCloseTime = 0`, betting remains open until `closeBetting()`.
-
-3. **Finalization**
-  - After betting has closed and while the resolution window is open (not timed out and **`closeResolutionWindow()`** not yet called):
-     - Resolver may **resolve(outcomeIndex)**.
-     - Resolver may **retract()**.
-  - After the resolution window ends by **timestamp** (if configured) or **authority** (if not resolved/retracted):
-     - Anyone may **expire()**, which invalidates and enables refunds (minus fees) to avoid stuck funds.
-
-4. **Claims**
-   - If resolved: winners claim pro-rata from the net pot.
-   - If retracted/expired: bettors claim refund minus fees.
-   - Fee recipients withdraw their accrued fee balances.
-
-### Notes on “distributed” roadmap (later)
-
-This MVP isolates resolution logic to per-wager functions so it can later be extended/replaced with:
-
-- bonded reporting + dispute game
-- oracle adapters
-- validity/ambiguity resolution paths
-
-### Deploying the MVP with Foundry
-
-- **Prerequisites**:
-  - `forge` installed and configured.
-  - Deployer EOA with gas funds on your target network.
-  - RPC URL for the target network (for MVP recommendation: **Base Sepolia** testnet first).
-
-- **1. Configure environment**
-  - Prefer the shared template **`config/service.env`** (gitignored via `*.env`); copy from `config/service.env.example` and `source script/lib/load_service_env.sh` before `forge` / scripts. A legacy repo-root **`.env`** is still supported by the loader if `config/service.env` is missing.
-
-    ```bash
-    cp config/service.env.example config/service.env
-    # edit config/service.env
-    source script/lib/load_service_env.sh
-    ```
-
-    Minimum variables for deploy scripts:
-
-    ```bash
-    RPC_URL_BASE_SEPOLIA="https://sepolia.base.org"
-    PRIVATE_KEY="0x..."              # deployer private key
-    ETHERSCAN_API_KEY="..."          # optional, for verification
-    ```
-
-  - Optionally, add RPC endpoints to `foundry.toml`:
-
-    ```toml
-    [rpc_endpoints]
-    base_sepolia = "${RPC_URL_BASE_SEPOLIA}"
-    ```
-
-- **2. Deploy `ParamutuelFactory`**
-
-  - Constructor parameters:
-    - `treasury_`: address to receive protocol fees (e.g. DAO multisig).
-    - `protocolFeeBps_`: protocol fee in basis points (e.g. `100` = 1%; default in `DeployFactory.s.sol` / `launch_testnet.sh`).
-    - `minBettingWindow_`: minimum seconds between creation and `bettingCloseTime`.
-    - `minResolutionWindow_`: minimum resolution window length in seconds.
-
-  - Using the provided script:
-
-    ```bash
-    forge script script/DeployFactory.s.sol \
-      --rpc-url $RPC_URL_BASE_SEPOLIA \
-      --private-key $PRIVATE_KEY \
-      --broadcast
-    ```
-
-  - The script logs the deployed `ParamutuelFactory` address; record this as the protocol entrypoint.
-
-- **3. Creating wagers**
-
-  Once the factory is deployed, wagers are created via `createWager`:
-
-  - Inputs:
-    - `collateralToken`: ERC20 address used for bets (e.g. USDC).
-    - `proposition`: human-readable wager proposition.
-    - `outcomes[]`: text labels for possible outcomes.
-    - `bettingCloseTime`: unix timestamp \(>\) `block.timestamp + minBettingWindow`.
-    - `resolutionWindow`: seconds \(>= minResolutionWindow\).
-    - `resolver`: `address(0)` to use the proposer; otherwise the delegated resolver address.
-    - `bettingCloser`: authority address for early `closeBetting()`; use `address(0)` for time-only close on finite windows.
-    - `resolutionCloser`: authority address for early `closeResolutionWindow()`; use `address(0)` for time-only close on finite windows.
-    - Guardrail: if `bettingCloseTime == 0`, `bettingCloser` must be non-zero; if `resolutionWindow == 0`, `resolutionCloser` must be non-zero.
-    - `extraFeeRecipients[]`, `extraFeeBps[]`: optional, additional beneficiaries.
-    - optional `seedOutcomeIndices[]`, `seedAmounts[]` to seed multiple outcomes at creation.
-
-  - You can call `createWager`:
-    - From a frontend using ethers.js / viem.
-    - From a Foundry script (to be added later).
-
-- **4. Using a deployed wager**
-
-  - **Bettors**:
-    - `IERC20(collateralToken).approve(wager, amount)`
-    - `ParamutuelWager(wager).placeBet(outcomeIndex, amount)`
-    - or `ParamutuelWager(wager).placeBets(outcomeIndices[], amounts[])` for multi-option entry in one tx.
-  - **Resolver** (often the proposer):
-    - After `bettingCloseTime` and before `resolutionDeadline`:
-      - `resolve(winningOutcomeIndex)` or `retract()`.
-  - **Anyone**:
-    - After `resolutionDeadline` if still open: `expire()` to unlock refunds.
-  - **Claims**:
-    - Bettors call `claim()` after finalization.
-    - Fee recipients call `withdrawFees()` to pull accrued fees.
-
-### Minimal dApp
-
-A minimal no-build dApp is available in `dapp/`. It can:
-- create wagers through the deployed `ParamutuelFactory`
-- seed wagers at creation and place bets via `placeBet` / `placeBets`
-- resolve / retract / expire
-- claim payouts and withdraw fees
-
-Run an HTTP server from the repo root (do not use `file://`):
-
-```bash
-python3 -m http.server 8080
-```
-
-Then open:
-
-`http://localhost:8080/dapp/`
-
-See `dapp/README.md` for UI details and deployment assumptions.
-
-### Hosted dApp & protocol website
-
-The dApp and a protocol website are deployed to GitHub Pages via CI. On every push to `master` that touches `src/`, `dapp/`, `service/indexer/`, `service/explorer/static/`, `site/`, or `config/deployments.json`, a GitHub Actions workflow builds the contracts, extracts ABIs, and assembles the site.
-
-**Live URL:** `https://autarkenterprises.github.io/paramutuel/`
-
-The website (`site/`) is a navigation shell that embeds the dApp and explorer as iframes — no code duplication. When component files change, the website automatically stays current.
-
-Pages:
-- `/` — Landing: propose/bet CTAs, live ticker, wager lifecycle, then protocol/network orientation
-- `/propose-a-wager.html` — Create path (links into full app for factory deploy)
-- `/place-a-bet.html` — Find markets (indexer search) and open wallet staking (`bet.html`)
-- `/app.html` — Full dApp (embedded iframe; dApp remains a separate static bundle under `/dapp/`)
-- `/bet.html` — Wallet `placeBets` flow (same betting path; direct URL for shares / paste address)
-- `/explorer.html` — Wager explorer with configurable indexer URL
-- `/operator.html` — Operator hub (indexer links, embedded explorer, optional service URLs)
-- `/dapp/` — Standalone dApp (also accessible directly)
-
-Details: [`docs/WEBSITE.md`](docs/WEBSITE.md). Product/engineering gap review: [`docs/PROJECT-REVIEW.md`](docs/PROJECT-REVIEW.md).
-
-Runtime defaults for these surfaces are read from `config/deployments.json`:
-- `defaultNetwork` selects which network config to use by default
-- `<network>.factoryAddress` feeds dApp/website factory defaults
-- `<network>.explorerApiBase` feeds website explorer API default (optional)
-
-**Setup requirement:** In the GitHub repo settings, set Pages source to **"GitHub Actions"**.
-
-#### Syncing ABIs after contract changes
-
-```bash
-./script/sync-abi.sh
-```
-
-This runs `forge build` and extracts ABI-only JSON into `dapp/abi/`. Commit the updated files so the hosted dApp stays in sync with contract changes.
+Smart contracts cannot observe real-world truth directly. A fully decentralized version of this protocol ultimately requires an oracle or resolution mechanism such as dispute-driven bonded reporting (Augur-style), an optimistic oracle, or restricting wagers to on-chain observable facts. The hard problems to plan for are invalid or ambiguous wagers, liveness when no one reports, spam and sybil resistance, and outcome representation. Because the resolver is just an address chosen per wager, any of these can be adopted later without changing deployed wagers (ADR-0001).

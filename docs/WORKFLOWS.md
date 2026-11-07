@@ -12,12 +12,15 @@ Assumptions:
 
 ### Finite windows (time bounded)
 
+Payoff policy is `0` `SINGLE_WINNER`, `1` `ANY_OF`, `2` `EXACT_SET`, `3` `AT_LEAST_K`, or `4` `WEIGHTED_OVERLAP`. The next argument is `k` for `AT_LEAST_K` and `0` otherwise.
+
 ```bash
 cast send "$FACTORY" \
-  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[])" \
+  "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[])" \
   "$COLLATERAL" \
   "Will X happen?" \
-  "[YES,NO]" \
+  '["YES","NO"]' \
+  0 0 \
   "$BETTING_CLOSE_TS" \
   "$RESOLUTION_WINDOW_SECS" \
   "$RESOLVER_OR_ZERO" \
@@ -29,14 +32,30 @@ cast send "$FACTORY" \
   --private-key "$PRIVATE_KEY"
 ```
 
-### Finite windows + optional seeded liquidity
+`cast` mangles some strings (see the warning in section 4), so for propositions or outcome labels containing quotes, backslashes or non-ASCII text, use the control panel CLI, which encodes them exactly:
 
 ```bash
+python3 -m service.control_panel.cli create-wager \
+  --factory "$FACTORY" --collateral "$COLLATERAL" \
+  --proposition "Will the café reopen?" --outcomes "Yes,No" \
+  --betting-close-time "$BETTING_CLOSE_TS" --resolution-window "$RESOLUTION_WINDOW_SECS"
+# Prints the command for review. Add --execute (before the subcommand) to send it.
+```
+
+### Finite windows + seeded liquidity
+
+Approve the **factory** for the total first. Seeds are ticket masks: mask `1` is outcome 0, mask `4` is outcome 2.
+
+```bash
+cast send "$COLLATERAL" "approve(address,uint256)" "$FACTORY" "$SEED_TOTAL" \
+  --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+
 cast send "$FACTORY" \
-  "createWager(address,string,string[],uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
+  "createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[])" \
   "$COLLATERAL" \
   "Will X happen?" \
-  "[YES,NO,MAYBE]" \
+  '["YES","NO","MAYBE"]' \
+  0 0 \
   "$BETTING_CLOSE_TS" \
   "$RESOLUTION_WINDOW_SECS" \
   "$RESOLVER_OR_ZERO" \
@@ -44,10 +63,22 @@ cast send "$FACTORY" \
   "$RESOLUTION_CLOSER_OR_ZERO" \
   "[$EXTRA_RECIPIENTS]" \
   "[$EXTRA_BPS]" \
-  "[0,2]" \
+  "[1,4]" \
   "[$SEED_AMOUNT_0,$SEED_AMOUNT_2]" \
   --rpc-url "$RPC_URL" \
   --private-key "$PRIVATE_KEY"
+```
+
+Add a final `uint256` to the signature and arguments to set `minNewTicketStake`, the minimum raw amount needed to open a new ticket. It makes griefing with dust tickets cost real collateral.
+
+### Freeform
+
+```bash
+python3 -m service.control_panel.cli create-freeform-wager \
+  --factory "$FACTORY" --collateral "$COLLATERAL" \
+  --proposition "Who wins?" \
+  --betting-close-time "$BETTING_CLOSE_TS" --resolution-window "$RESOLUTION_WINDOW_SECS" \
+  --min-new-ticket-stake 1000000
 ```
 
 Role input semantics:
@@ -68,22 +99,26 @@ Protocol guardrail: these modes require non-zero closer addresses (`bettingClose
 
 ## 2) Place bet
 
+A ticket is a **bitmask**: `1 << i` backs outcome `i` alone, so mask `1` is outcome 0, mask `2` is outcome 1, and mask `3` is both (multi-outcome policies only).
+
 ```bash
 # approve collateral
 cast send "$TOKEN" "approve(address,uint256)" "$WAGER" "$AMOUNT" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 
 # place bet
-cast send "$WAGER" "placeBet(uint256,uint256)" "$OUTCOME_INDEX" "$AMOUNT" \
+cast send "$WAGER" "placeBet(uint256,uint256)" "$TICKET_MASK" "$AMOUNT" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
-Batch bet (multiple outcomes in one tx):
+Batch bet (several tickets in one tx):
 
 ```bash
-cast send "$WAGER" "placeBets(uint256[],uint256[])" "[0,2,3]" "[$A0,$A2,$A3]" \
+cast send "$WAGER" "placeBets(uint256[],uint256[])" "[1,4,8]" "[$A0,$A2,$A3]" \
   --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
+
+For freeform wagers use the dApp, the site, or the MCP server's `encode_place_bet_freeform`, for the reason in section 4.
 
 ## 3) Close betting window
 
@@ -97,23 +132,26 @@ cast send "$WAGER" "closeBetting()" --rpc-url "$RPC_URL" --private-key "$PRIVATE
 
 Only `resolver` may call:
 
-**Enumerated wagers (v1 / v2):**
+**Enumerated wagers.** The argument is the winning **bitmask**: outcome 0 alone is `1`, outcome 1 alone is `2`.
 
 ```bash
-cast send "$WAGER" "resolve(uint256)" "$WINNING_INDEX" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+cast send "$WAGER" "resolve(uint256)" "$WINNING_MASK" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
 
-**Freeform wagers** ([ADR-0009 implementation](ADR-0009-IMPLEMENTATION.md)) use a string answer:
+**Freeform wagers** match the answer byte for byte. **Do not pass an answer as a `cast` argument:** `cast` strips trailing whitespace and surrounding quotes and treats a leading `--` as a flag, so it can send a different answer than the one you typed, and resolve the wrong pool. Use the control panel CLI, which sends exactly what you pass. Review the printed command, then repeat with `--execute`:
 
 ```bash
-cast send "$WAGER" "resolve(string)" "$WINNING_ANSWER" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
+python3 -m service.control_panel.cli wager-action --wager "$WAGER" --action resolve \
+  --protocol-version freeform --winning-answer "$WINNING_ANSWER"
 ```
 
-**Retract** (same for all protocol versions):
+**Retract** (both modes):
 
 ```bash
 cast send "$WAGER" "retract()" --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY"
 ```
+
+`cast send` exits 0 even when a transaction is mined and reverts. In scripts, check the receipt: `--json` and `.status == "0x1"`. The services in this repository all do.
 
 ## 5) Close resolution window
 
@@ -153,13 +191,17 @@ For finite windows, you may set `bettingCloser = address(0)` and/or `resolutionC
 
 ### A) Control panel web (preview only)
 
+The response shows the function and decoded arguments alongside the command. The command carries raw calldata, with the key redacted.
+
 ```bash
 curl -sS -X POST "http://127.0.0.1:8092/api/preview/action" \
   -H "content-type: application/json" \
-  -d '{"wager":"'"$WAGER"'","action":"close-betting"}'
+  -d '{"wager":"'"$WAGER"'","action":"resolve","winningMask":"1"}'
 ```
 
 ### B) Control panel web (execute, token protected)
+
+Requires `--allow-execute` on the server. Check `ok` in the response: it means mined with status 1.
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:8092/api/preview/action" \
@@ -170,11 +212,12 @@ curl -sS -X POST "http://127.0.0.1:8092/api/preview/action" \
 
 ### C) Sweeper loop for unresolved candidates
 
+Reads `PRIVATE_KEY` from the environment. Dry-run unless `--execute` is given.
+
 ```bash
 python3 -m service.indexer.sweeper \
   --db-path service/indexer/indexer.db \
   --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY" \
   --execute \
   --loop \
   --interval-seconds 60

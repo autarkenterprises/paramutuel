@@ -2,6 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# `cast` signs and broadcasts transactions. Pinned by version and checksum: this image holds a key.
+RUN python3 -c "import urllib.request as u; u.urlretrieve('https://github.com/foundry-rs/foundry/releases/download/v1.5.1/foundry_v1.5.1_linux_amd64.tar.gz', '/tmp/foundry.tar.gz')" \
+ && echo "73640b01bd9ed29fdb4965085099371f8cf0dbbec3e2086cf54564efc4dcfe88  /tmp/foundry.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/foundry.tar.gz -C /usr/local/bin cast \
+ && rm /tmp/foundry.tar.gz
+
 COPY service /app/service
 COPY config /app/config
 

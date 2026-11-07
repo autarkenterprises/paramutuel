@@ -11,6 +11,8 @@ on:
       - 'site/**'
       - 'config/deployments.json'
       - 'config/operator-hub.json'
+      - 'config/collateral-allowlist.json'
+      - 'script/assemble-site.sh'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
@@ -24,45 +26,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A deploy must not publish code the fast suite rejects (ADR-0020 D6).
+  test:
+    uses: ./.github/workflows/fast-suite.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Build contracts
-        run: forge build --sizes 2>&1 | tail -1
 
       - name: Assemble site
-        run: |
-          mkdir -p _site/dapp/abi _site/explorer _site/config
-
-          # Extract ABIs from build output
-          python3 -c "
-          import json
-          for name in [
-              'ParamutuelFactoryV3',
-              'ParamutuelWagerV3',
-          ]:
-              data = json.load(open(f'out/{name}.sol/{name}.json'))
-              with open(f'_site/dapp/abi/{name}.json', 'w') as f:
-                  json.dump({'abi': data['abi']}, f, indent=2)
-                  f.write('\n')
-          "
-
-          # Copy website shell
-          cp site/index.html site/about.html site/app.html site/explorer.html site/bet.html site/operator.html site/propose-a-wager.html site/place-a-bet.html site/resonance.html site/resonance-bet.html site/resonance-explorer.html site/resonance-place.html site/resonance-propose.html site/style.css site/home-ticker.js site/home-bet-search.js site/bet-logic.js site/bet-page.js site/network-context.js site/network-banner.js site/operator-hub.js _site/
-          cp config/deployments.json config/operator-hub.json _site/config/
-
-          # Copy dApp files
-          cp dapp/index.html dapp/app.js dapp/logic.js dapp/style.css _site/dapp/
-
-          # Copy explorer static files
-          cp service/explorer/static/index.html service/explorer/static/app.js service/explorer/static/style.css _site/explorer/
+        run: ./script/assemble-site.sh _site
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
