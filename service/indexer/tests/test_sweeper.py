@@ -8,7 +8,8 @@ import unittest
 from unittest import mock
 
 from service.indexer.indexer import init_db
-from service.indexer.sweeper import parse_args, sweep_once
+from service.indexer import sweeper
+from service.indexer.sweeper import SweepResult, parse_args, sweep_once
 
 
 class SweeperTests(unittest.TestCase):
@@ -114,6 +115,50 @@ class SweeperTests(unittest.TestCase):
         self.assertEqual(result.attempted, 1)
         self.assertEqual(result.succeeded, 0)
         self.assertEqual(result.failed, 1)
+
+
+class SweeperMainTests(unittest.TestCase):
+    """The daemon wrapper, which decides whether expire transactions go out and how often."""
+
+    def _main(self, *argv, env=None, sweep=None, sleep=None):
+        out = io.StringIO()
+        sweep = sweep or mock.Mock(return_value=SweepResult(attempted=2, succeeded=1, failed=1))
+        with (
+            mock.patch.dict(os.environ, env if env is not None else {"RPC_URL": "http://r", "PRIVATE_KEY": "0xabc"}, clear=True),
+            mock.patch("sys.argv", ["sweeper", *argv]),
+            mock.patch.object(sweeper, "sweep_once", sweep),
+            mock.patch.object(sweeper.time, "sleep", sleep or mock.Mock()),
+            contextlib.redirect_stdout(out),
+        ):
+            sweeper.main()
+        return sweep, out.getvalue()
+
+    def test_refuses_to_run_without_rpc_or_key(self):
+        for env in ({}, {"RPC_URL": "http://r"}, {"PRIVATE_KEY": "0xabc"}):
+            with self.subTest(env=sorted(env)), self.assertRaisesRegex(SystemExit, "required"):
+                self._main(env=env)
+
+    def test_one_pass_is_a_dry_run_unless_told_otherwise(self):
+        """Expiring a wager is irreversible, so sending must take an explicit flag."""
+        sweep, out = self._main()
+        self.assertEqual(sweep.call_count, 1)
+        self.assertIs(sweep.call_args.kwargs["execute"], False)
+        self.assertEqual(sweep.call_args.kwargs["rpc_url"], "http://r")
+        self.assertIn("attempted=2 succeeded=1 failed=1", out)
+        self.assertNotIn("0xabc", out)
+
+    def test_execute_flag_reaches_the_sweep(self):
+        sweep, _ = self._main("--execute")
+        self.assertIs(sweep.call_args.kwargs["execute"], True)
+
+    def test_loop_sleeps_between_passes_and_never_spins(self):
+        class Stop(Exception):
+            pass
+
+        sleep = mock.Mock(side_effect=[None, Stop()])
+        with self.assertRaises(Stop):
+            self._main("--loop", "--interval-seconds", "0", sleep=sleep)
+        self.assertEqual([c.args[0] for c in sleep.call_args_list], [1, 1], "a zero interval floors at one second")
 
 
 if __name__ == "__main__":

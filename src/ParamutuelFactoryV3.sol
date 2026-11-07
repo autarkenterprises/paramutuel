@@ -460,7 +460,7 @@ contract ParamutuelFactoryV3 {
     /// @dev Composes the wager's immutable fee-recipient list. The protocol's own
     ///      `(treasury, protocolFeeBps)` is prepended at slot 0 when `protocolFeeBps`
     ///      is non-zero; proposer-supplied extras follow. Order matters at finalisation:
-    ///      `_chargeFeesOnce` floors each slice in declared order and gives the last slice
+    ///      `_chargeFees` floors each slice in declared order and gives the last slice
     ///      the rounding remainder.
     function _buildFeeConfig(address[] memory extraRecipients, uint16[] memory extraBps)
         internal

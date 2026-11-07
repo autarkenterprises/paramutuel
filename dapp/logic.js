@@ -231,8 +231,8 @@
    */
   function outcomeIndicesToTicketMask(indices, numOptions) {
     const n = Number(numOptions);
-    if (!Number.isInteger(n) || n < 2 || n > 256) {
-      throw new Error("numOptions must be an integer from 2 to 256.");
+    if (!Number.isInteger(n) || n < 2 || n > 255) {
+      throw new Error("numOptions must be an integer from 2 to 255.");
     }
     if (!indices || indices.length === 0) {
       throw new Error("Select at least one outcome index for the ticket.");
@@ -277,7 +277,7 @@
   }
 
   /**
-   * v1-style seed lines: each outcome index becomes a single-bit v2 seed ticket.
+   * Seed lines: each outcome index becomes a single-outcome seed ticket.
    * @param {number[]} outcomeIndices
    * @returns {bigint[]}
    */

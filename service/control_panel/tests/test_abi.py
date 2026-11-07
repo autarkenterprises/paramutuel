@@ -119,5 +119,15 @@ class RejectionTests(unittest.TestCase):
             abi.encode(["bytes32"], [b"x"])
 
 
+class EncoderMisuseTests(unittest.TestCase):
+    def test_array_type_needs_a_list(self):
+        with self.assertRaisesRegex(ValueError, "must be a list"):
+            abi.encode(["uint256[]"], [5])
+
+    def test_types_and_values_must_align(self):
+        with self.assertRaisesRegex(ValueError, "length mismatch"):
+            abi.encode(["uint256", "uint256"], [1])
+
+
 if __name__ == "__main__":
     unittest.main()

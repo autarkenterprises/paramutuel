@@ -173,8 +173,10 @@ class Handler(BaseHTTPRequestHandler):
             raw = self.rfile.read(int(self.headers.get("Content-Length", "0")) or 0)
             try:
                 payload = json.loads(raw.decode() or "{}")
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 return _json_response(self, 400, {"error": "invalid json"})
+            if not isinstance(payload, dict):
+                return _json_response(self, 400, {"error": "request body must be a JSON object"})
             prop = str(payload.get("proposition") or "").strip()
             outs = payload.get("outcomes")
             if not prop or not isinstance(outs, list) or len(outs) < 2:

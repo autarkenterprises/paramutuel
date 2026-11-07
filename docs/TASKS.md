@@ -100,9 +100,21 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 
 ---
 
+## Operator follow-ups from ADR-0020
+
+Exact commands are in [`ADR-0020-IMPLEMENTATION.md`](ADR-0020-IMPLEMENTATION.md).
+
+- [ ] Rotate the Alchemy key that was committed to `README.md`. It is gone from the tree but stays in git history.
+- [ ] Deploy the corrected factory and point `config/deployments.json` at it. The live factory has no wagers, so this strands nobody, but the contract fixes do nothing until it happens.
+- [ ] Redeploy the hosted indexer, on persistent storage. It currently returns 500/503.
+- [ ] Redeploy the resolution service with `RESOLUTION_SERVICE_TOKEN` set.
+- [ ] Complete PyPI Trusted Publishing, then tag. Neither package is on PyPI yet.
+- [ ] Decide the ADR-0020 open questions: a lifetime backstop for no-max wagers, and cutover timing against the Resonance launch and ADR-0015.
+- [ ] Set up an uptime alert on the indexer's `/health`. It was down with nobody notified.
+
 ## Mainnet
 
-- [ ] (ADR-0019 follow-up) Contract mitigation for freeform / multi-bit answer-space exhaustion (min stake to open a new answer id / mask, or proposer-chosen `maxDistinctAnswers`) — ship with the next factory deployment.
-- [ ] (ADR-0019 follow-up) Recover freeform answer **text** in the indexer (decode `placeBet(string,uint256)` calldata) so the site / explorer / bet scout can show and join existing answers (ADR-0009 "observed answers" intent).
-- [ ] (ADR-0019 follow-up) Rename control-panel `outcomeIndex` / `--outcome-index` (a bitmask) to `winningMask` to remove the clash with the resolution service's index semantics.
+- [x] (ADR-0019 follow-up; done in ADR-0020, source only until the factory is redeployed) Contract mitigation for freeform / multi-bit answer-space exhaustion (min stake to open a new answer id / mask, or proposer-chosen `maxDistinctAnswers`) — ship with the next factory deployment.
+- [x] (ADR-0019 follow-up; done in ADR-0020 through the `FreeformAnswerRevealedV3` event, which needs the new factory) Recover freeform answer **text** in the indexer (decode `placeBet(string,uint256)` calldata) so the site / explorer / bet scout can show and join existing answers (ADR-0009 "observed answers" intent).
+- [x] (ADR-0019 follow-up; done in ADR-0020) Rename control-panel `outcomeIndex` / `--outcome-index` (a bitmask) to `winningMask` to remove the clash with the resolution service's index semantics.
 - [ ] Gas/safety audit pass and formal limits sign-off before deploying Paramutuel factories to mainnet (applies to whatever protocol version is live—v1, v2, freeform, V3, or successor). **V3 gas profile (Foundry, reproducible):** [`docs/PARAMUTUEL-V3-GAS.md`](PARAMUTUEL-V3-GAS.md).

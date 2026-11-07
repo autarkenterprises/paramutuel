@@ -61,7 +61,7 @@ python3 -m service.control_panel.cli \
   --action close-betting
 ```
 
-`create-wager` and **`create-freeform-wager`** are supported in the CLI. For **`wager-action resolve`**, pass **`--protocol-version freeform`** and **`--winning-answer "..."`** for ADR-0009 wagers; v1/v2 use **`--outcome-index`** (v2: winning bitmask).
+`create-wager` and **`create-freeform-wager`** are supported in the CLI. For **`wager-action resolve`**, pass **`--protocol-version freeform`** and **`--winning-answer "..."`** for ADR-0009 wagers; enumerated wagers use **`--winning-mask`** (a bitmask: outcome 0 is `1`, outcome 1 is `2`, both are `3`).
 
 ## Control panel (web)
 

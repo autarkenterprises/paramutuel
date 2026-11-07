@@ -55,13 +55,27 @@
     return t.slice(0, max - 1) + "…";
   }
 
-  function oddsLine(outcomesRows, labels) {
+  /**
+   * Only the pot can say a wager has no stakes. Detail that has not loaded, or outcome labels the
+   * indexer has not read yet, leave the outcome rows empty, and that must not read as "no stakes"
+   * beside a pot that has some (ADR-0020).
+   */
+  function potIsZero(raw) {
+    try {
+      return BigInt(String(raw || "0")) === 0n;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Leading outcomes by share of stake, "No stakes yet", or "" when the rows cannot tell. */
+  function oddsLine(outcomesRows, labels, potRaw) {
     const rows = (outcomesRows || []).map((o) => ({
       idx: Number(o.outcome_index),
       t: BigInt(String(o.outcome_total || "0")),
     }));
     const sum = rows.reduce((a, o) => a + o.t, 0n);
-    if (sum === 0n) return "No stakes yet";
+    if (sum === 0n) return potIsZero(potRaw) ? "No stakes yet" : "";
     const parts = rows
       .map((o) => {
         const label = labels[o.idx] != null ? String(labels[o.idx]) : `#${o.idx}`;
@@ -84,13 +98,12 @@
       const d = detailByAddr[addr];
       if (pv === "freeform") {
         const n = (d && d.ticket_pools && d.ticket_pools.length) || 0;
-        const sub =
-          n > 0 ? `${n} pooled answer id(s)` : "no stakes in indexer detail";
-        return `Pot ${pot} (raw) · ${sub}`;
+        if (n > 0) return `Pot ${pot} (raw) · ${n} pooled answer id(s)`;
+        return potIsZero(w.total_pot) ? `Pot ${pot} (raw) · no stakes yet` : `Pot ${pot} (raw)`;
       }
       if (d && d.outcomes) {
-        const line = oddsLine(d.outcomes, labels);
-        return `Pot ${pot} (raw) · ${line}`;
+        const line = oddsLine(d.outcomes, labels, w.total_pot);
+        return line ? `Pot ${pot} (raw) · ${line}` : `Pot ${pot} (raw)`;
       }
       return `Pot ${pot} (raw)`;
     }

@@ -28,5 +28,7 @@ Commit and push `config/deployments.json` so GitHub Pages picks up the default.
 
 ## Notes
 
-- Ephemeral DB: on cold start the indexer replays logs from `indexerFromBlock` / `INDEXER_FROM_BLOCK`.
+- Ephemeral DB: on cold start the indexer replays logs from `indexerFromBlock` / `INDEXER_FROM_BLOCK`. This costs one `eth_getLogs` per chunk, so it grows with the factory's age (see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md)). Use persistent storage for anything long-lived.
+- **Reorgs:** derived state is insert-only, so a reorg that moves or drops a transaction could double-count a stake or leave a ghost one. The indexer stays `INDEXER_CONFIRMATIONS` blocks behind the head (default 5) to make this unlikely. After a reorg deeper than that, delete the database and let it resync.
+- **Health:** `GET /health` reports `sync_lag_blocks`, `last_sync_error` and `skipped_log_count`. A skipped log is lost until the database is rebuilt, so anything above zero needs a look.
 - After a **new factory** deploy, update `factoryAddress` and `indexerFromBlock` (`script/testnet/set_factory_address.sh` does both), then redeploy the hosted indexer.

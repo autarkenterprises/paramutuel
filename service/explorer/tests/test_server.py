@@ -1,10 +1,14 @@
 """ADR-0020: the explorer's indexer proxy must pass upstream status codes through."""
+import contextlib
+import io
 import json
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from unittest import mock
 from urllib import error, request
 
+from service.explorer import server as server_module
 from service.explorer.server import Handler
 
 
@@ -58,6 +62,51 @@ class ProxyTests(unittest.TestCase):
         code, body = self._get("/api/wagers")
         self.assertEqual(code, 502)
         self.assertIn("indexer", body["error"])
+
+
+class StaticRouteTests(ProxyTests):
+    def _static(self, path):
+        try:
+            with request.urlopen(self.base + path, timeout=10) as resp:
+                return resp.status, resp.headers["Content-Type"], resp.read()
+        except error.HTTPError as exc:
+            return exc.code, exc.headers["Content-Type"], exc.read()
+
+    def test_assets_are_served_with_their_types(self):
+        for path, ctype in (("/", "text/html"), ("/app.js", "application/javascript"), ("/style.css", "text/css")):
+            with self.subTest(path=path):
+                code, got, body = self._static(path)
+                self.assertEqual((code, got), (200, ctype))
+                self.assertGreater(len(body), 0)
+
+    def test_health(self):
+        code, _, body = self._static("/health")
+        self.assertEqual((code, json.loads(body)), (200, {"ok": True}))
+
+    def test_unknown_routes_and_missing_assets_are_not_found(self):
+        self.assertEqual(self._static("/nope")[0], 404)
+        with mock.patch.object(server_module, "STATIC_DIR", server_module.Path("/nonexistent")):
+            self.assertEqual(self._static("/")[0], 404)
+
+
+class StartupTests(unittest.TestCase):
+    def test_main_points_the_proxy_at_the_configured_indexer(self):
+        served = []
+
+        class FakeServer:
+            def __init__(self, address, handler):
+                self.address = address
+
+            def serve_forever(self):
+                served.append(self.address)
+
+        saved = Handler.indexer_base_url
+        self.addCleanup(setattr, Handler, "indexer_base_url", saved)
+        argv = ["server", "--port", "9", "--indexer-base-url", "http://indexer.example"]
+        with mock.patch("sys.argv", argv), mock.patch.object(server_module, "ThreadingHTTPServer", FakeServer), contextlib.redirect_stdout(io.StringIO()):
+            server_module.main()
+        self.assertEqual(Handler.indexer_base_url, "http://indexer.example")
+        self.assertEqual(served, [("127.0.0.1", 9)])
 
 
 if __name__ == "__main__":

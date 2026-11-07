@@ -1365,7 +1365,11 @@ async function placeBet() {
   await approveTx.wait();
 
   $("betStatus").textContent = "Placing bet...";
-  const tx = await wagerContract.placeBet(placeArg, amount);
+  // Named in full: ethers v6 cannot pick between same-length overloads by value, and a bare
+  // `wagerContract.placeBet(...)` throws "ambiguous function description" (ADR-0020).
+  const tx = await wagerContract[
+    activeWagerProtocol === "v3_freeform" ? "placeBet(string,uint256)" : "placeBet(uint256,uint256)"
+  ](placeArg, amount);
   await tx.wait();
   $("betStatus").textContent = "Bet placed.";
   await updateOddsPreview();
@@ -1426,7 +1430,9 @@ async function resolveWager() {
   }
 
   $("resolutionStatus").textContent = "Resolving...";
-  await runWagerAction("resolve", winningArg);
+  // Named in full, for the same reason as placeBet above.
+  const tx = await targetWager[activeWagerProtocol === "v3_freeform" ? "resolve(string)" : "resolve(uint256)"](winningArg);
+  await tx.wait();
   $("resolutionStatus").textContent = "Resolved.";
   await updateOddsPreview();
 }

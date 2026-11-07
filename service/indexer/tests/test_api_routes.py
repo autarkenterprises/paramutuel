@@ -1,12 +1,16 @@
+import contextlib
+import io
 import json
 import os
 import tempfile
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from unittest import mock
 from urllib.error import HTTPError
 from urllib import request
 
+from service.indexer import api as api_module
 from service.indexer.api import Handler
 from service.indexer.indexer import db_connect, init_db
 
@@ -265,6 +269,66 @@ class ApiRouteTests(unittest.TestCase):
         with self.assertRaises(HTTPError):
             self._get_json("/wagers?offset=nan")
 
+    def _status(self, path: str, method: str = "GET") -> tuple[int, dict, bytes]:
+        req = request.Request(self.base_url + path, method=method)
+        try:
+            with request.urlopen(req, timeout=10) as resp:
+                return resp.status, dict(resp.headers), resp.read()
+        except HTTPError as exc:
+            return exc.code, dict(exc.headers), exc.read()
+
+    def test_cors_preflight_allows_browsers_to_read_the_api(self) -> None:
+        """The public site reads this API from another origin, so a broken preflight blanks every page."""
+        status, headers, _ = self._status("/wagers", method="OPTIONS")
+        self.assertEqual(status, 204)
+        self.assertEqual(headers["Access-Control-Allow-Origin"], "*")
+        self.assertIn("GET", headers["Access-Control-Allow-Methods"])
+
+    def test_wagers_filter_by_state(self) -> None:
+        resolved = "0xabc1000000000000000000000000000000000002"
+        self.conn.execute("UPDATE wagers SET state = 'RESOLVED' WHERE wager_address = ?", (resolved,))
+        self.conn.commit()
+        _, body = self._get_json("/wagers?state=RESOLVED")
+        self.assertEqual([w["wager_address"] for w in body["wagers"]], [resolved])
+        _, body = self._get_json("/wagers?state=OPEN")
+        self.assertNotIn(resolved, [w["wager_address"] for w in body["wagers"]])
+        self.assertEqual(len(body["wagers"]), 2)
+
+    def test_invalid_limit_is_a_client_error(self) -> None:
+        status, _, body = self._status("/wagers?limit=abc")
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body), {"error": "invalid limit"})
+
+    def test_unknown_wager_is_not_found(self) -> None:
+        status, _, body = self._status("/wagers/0x" + "ef" * 20)
+        self.assertEqual(status, 404)
+        self.assertEqual(json.loads(body), {"error": "wager not found"})
+
+    def test_unparseable_outcomes_do_not_break_the_detail_route(self) -> None:
+        """Bad stored data must degrade one field, not take the whole wager page down."""
+        wager = "0xabc1000000000000000000000000000000000001"
+        self.conn.execute("UPDATE wagers SET outcomes_json = 'not json' WHERE wager_address = ?", (wager,))
+        self.conn.commit()
+        status, body = self._get_json(f"/wagers/{wager}")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["outcomes"], [])
+
+    def test_expire_candidates_lists_only_wagers_past_their_window(self) -> None:
+        """Seeded wagers close at 1000 with a 3600 window. The contract needs strictly past the end."""
+        _, body = self._get_json("/sweeper/expire-candidates?now=4600")
+        self.assertEqual(body, {"now": 4600, "candidates": []})
+        _, body = self._get_json("/sweeper/expire-candidates?now=4601")
+        self.assertEqual(len(body["candidates"]), 3)
+        row = body["candidates"][0]
+        self.assertEqual(row["resolution_window"], 3600)
+        self.assertIs(row["resolution_window_closed"], False)
+        self.assertEqual(row["resolver"], "0xabc3000000000000000000000000000000000003")
+
+    def test_expire_candidates_defaults_to_the_current_time(self) -> None:
+        _, body = self._get_json("/sweeper/expire-candidates")
+        self.assertGreater(body["now"], 1_700_000_000)
+        self.assertEqual(len(body["candidates"]), 3)
+
     def test_prefixed_health_route_works(self) -> None:
         status, body = self._get_json("/api/health")
         self.assertEqual(status, 200)
@@ -274,6 +338,33 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("chain_head", body)
         self.assertIn("last_sync_error", body)
         self.assertIn("factory_address", body)
+
+
+class ApiEntrypointTests(unittest.TestCase):
+    def test_main_serves_the_database_it_was_given(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, "i.db")
+            served = []
+
+            class FakeServer:
+                def __init__(self, address, handler) -> None:
+                    self.address, self.handler = address, handler
+
+                def serve_forever(self) -> None:
+                    served.append((self.address, self.handler.conn))
+
+            argv = ["api", "--db-path", db_path, "--host", "127.0.0.1", "--port", "9"]
+            with (
+                mock.patch("sys.argv", argv),
+                mock.patch.object(api_module, "ThreadingHTTPServer", FakeServer),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                api_module.main()
+            address, conn = served[0]
+            self.assertEqual(address, ("127.0.0.1", 9))
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM wagers").fetchone()[0], 0, "schema was created")
+            conn.close()
+            Handler.conn = None
 
 
 if __name__ == "__main__":

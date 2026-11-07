@@ -4,7 +4,7 @@ MCP server for the [Paramutuel](https://github.com/autarkenterprises/paramutuel)
 
 Exposes 21 tools that let LLM agents discover wagers, analyze odds, and prepare transactions — no private keys required on the server side.
 
-**Adoption complement:** the repo ships a **bet scout subagent** (`agents/paramutuel_bettor`, JSON stdin/stdout) with a **machine manifest** at `agents/subagent-manifest.json` and human index [`AGENTS.md`](../AGENTS.md). See [`docs/BET-AGENT.md`](../docs/BET-AGENT.md); use MCP for final `quote_place_bet` (enumerated) or `encode_place_bet_freeform` (freeform, ADR-0010) / calldata right before signing.
+**Adoption complement:** the repo ships a **bet scout subagent** (`agents/paramutuel_bettor`, JSON stdin/stdout) with a **machine manifest** at `agents/subagent-manifest.json` and reference [`docs/MACHINE.md`](../docs/MACHINE.md). See [`docs/BET-AGENT.md`](../docs/BET-AGENT.md); use MCP for final `quote_place_bet` (enumerated) or `encode_place_bet_freeform` (freeform, ADR-0010) / calldata right before signing.
 
 ## Quick start
 
@@ -100,7 +100,7 @@ When installed as a wheel, the server bundles its ABIs and a copy of the deploym
 
 Paramutuel is a permissionless, immutable parimutuel betting protocol on Base (Ethereum L2).
 
-- **Anyone** can create an **enumerated** wager with 2–255 outcomes + bitmask tickets / payoff policies, or a **freeform** (ADR-0009 / ADR-0010) UTF-8 text-answer wager using any ERC-20 as collateral — both modes share the unified `ParamutuelFactoryV3` / `ParamutuelWagerV3` protocol
+- **Anyone** can create an **enumerated** wager with 2–255 outcomes + bitmask tickets / payoff policies, or a **freeform** (ADR-0009 / ADR-0010) UTF-8 text-answer wager using any standard ERC-20 as collateral (no fee-on-transfer or rebasing tokens; see ADR-0018) — both modes share the unified `ParamutuelFactoryV3` / `ParamutuelWagerV3` protocol
 - **Bettors** deposit into outcome pools; winners split the net pot pro-rata
 - **Resolution** is modular: creator-resolved (MVP), upgradeable to oracle/DAO
 - **Fees** are configurable per wager (protocol fee + optional creator fee, capped at 100% for full-beneficiary/charity flows)

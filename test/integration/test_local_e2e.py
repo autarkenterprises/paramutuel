@@ -76,8 +76,14 @@ def address_of(key: str) -> str:
     return out.stdout.strip()
 
 
+# Contracts whose source file is not named after them.
+ARTIFACT_SOURCES = {"MockERC20": "MockTokens", "NoReturnToken": "MockTokens", "FeeOnTransferToken": "MockTokens"}
+
+
 def artifact(name: str) -> dict:
-    path = next((ROOT / "out").rglob(f"{name}.json"))
+    """Build output for `name`, read from its exact source file. Searching `out/` by name alone could
+    return a stale artifact of a deleted file, and which one it found differed between machines."""
+    path = ROOT / "out" / f"{ARTIFACT_SOURCES.get(name, name)}.sol" / f"{name}.json"
     return json.loads(path.read_text())
 
 

@@ -1,4 +1,6 @@
 """ADR-0020: the web control panel, over real HTTP."""
+import contextlib
+import io
 import json
 import threading
 import unittest
@@ -104,6 +106,83 @@ class ConfigTests(unittest.TestCase):
         with mock.patch.dict("os.environ", env), mock.patch("sys.argv", ["web"]):
             args = web.parse_args()
         self.assertEqual((args.auth_token, args.private_key, args.rpc_url), ("t", "k", "http://r"))
+
+
+class WebRouteTests(WebTests):
+    """Serving the panel itself, the freeform path, and startup."""
+
+    def _get(self, path):
+        try:
+            with request.urlopen(self.base + path, timeout=10) as resp:
+                return resp.status, resp.headers.get("Content-Type"), resp.read()
+        except error.HTTPError as exc:
+            return exc.code, exc.headers.get("Content-Type"), exc.read()
+
+    def test_serves_the_panel_and_its_script(self):
+        code, ctype, body = self._get("/")
+        self.assertEqual((code, ctype), (200, "text/html"))
+        self.assertIn(b"<html", body.lower())
+        code, ctype, _ = self._get("/app.js")
+        self.assertEqual((code, ctype), (200, "application/javascript"))
+
+    def test_health_needs_no_token_and_reveals_nothing(self):
+        code, _, body = self._get("/health")
+        self.assertEqual((code, json.loads(body)), (200, {"ok": True}))
+
+    def test_unknown_routes_are_not_found(self):
+        self.assertEqual(self._get("/nope")[0], 404)
+        self.assertEqual(self._post("/api/nope", {})[0], 404)
+
+    def test_a_missing_asset_is_not_found(self):
+        with mock.patch.object(web, "STATIC_DIR", web.Path("/nonexistent")):
+            self.assertEqual(self._get("/")[0], 404)
+
+    def test_freeform_create_preview_encodes_exactly_what_was_given(self):
+        body = {
+            "factory": ADDR, "collateral": ADDR, "proposition": ' "Quoted" question ',
+            "bettingCloseTime": 5, "resolutionWindow": 6, "minNewTicketStake": 9,
+        }
+        code, out = self._post("/api/preview/create-freeform-wager", body)
+        self.assertEqual(code, 200)
+        self.assertTrue(out["function"].startswith("createFreeformWager("))
+        decoded = abi_decode(
+            ["address", "string", "uint64", "uint64", "address", "address", "address", "address[]", "uint16[]", "uint256"],
+            bytes.fromhex(out["command"][-1][10:]),
+        )
+        self.assertEqual(decoded[1], ' "Quoted" question ')
+        self.assertEqual((decoded[2], decoded[3], decoded[-1]), (5, 6, 9))
+
+
+class WebStartupTests(unittest.TestCase):
+    class FakeServer:
+        served = []
+
+        def __init__(self, address, handler):
+            self.address = address
+
+        def serve_forever(self):
+            type(self).served.append(self.address)
+
+    def _main(self, *argv, env=None):
+        with (
+            mock.patch.dict(web.os.environ, env or {}, clear=True),
+            mock.patch("sys.argv", ["web", *argv]),
+            mock.patch.object(web, "ThreadingHTTPServer", self.FakeServer),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            web.main()
+
+    def test_refuses_to_start_without_rpc_and_key(self):
+        for env in ({}, {"RPC_URL": "http://r"}, {"PRIVATE_KEY": KEY}):
+            with self.subTest(env=sorted(env)), self.assertRaisesRegex(SystemExit, "required"):
+                self._main(env=env)
+
+    def test_settings_reach_the_handler_and_execution_stays_off_by_default(self):
+        self._main("--port", "9", env={"RPC_URL": "http://r", "PRIVATE_KEY": KEY, "CONTROL_PANEL_TOKEN": "tok"})
+        H = web.Handler
+        self.assertEqual((H.rpc_url, H.private_key, H.auth_token), ("http://r", KEY, "tok"))
+        self.assertIs(H.allow_execute, False)
+        self.assertEqual(self.FakeServer.served[-1], ("127.0.0.1", 9), "binds to loopback unless told otherwise")
 
 
 if __name__ == "__main__":

@@ -176,7 +176,7 @@ Both are packaged for PyPI (`paramutuel-mcp`, `paramutuel-bettor-agent`), but **
 ## Testing
 
 - `script/test-fast.sh`: everything that needs no key or network, and what CI runs.
-- `script/test-local-e2e.sh`: every layer against a real local chain, with no secrets needed.
+- `script/test-local-e2e.sh`: every layer against a real local chain, including the public pages driven in real Chrome. It needs Foundry, Node 22, Chrome and `npm ci --prefix dapp`, but no secrets or network. CI runs it on every push.
 - `script/test-extended.sh`: the above plus the live Base Sepolia suites.
 - `script/mutation-check.py`: proves the contract tests fail when guards are weakened.
 - `forge coverage --ir-minimum --no-match-test 'C1_coldResolve|test_C2_freeform|test_C6_' --no-match-path 'test/ParamutuelV3Invariant.t.sol'`: contract coverage; see [`docs/COVERAGE-BASELINE.md`](docs/COVERAGE-BASELINE.md).
