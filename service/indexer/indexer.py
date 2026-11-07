@@ -31,21 +31,24 @@ emitted them and require the corresponding ``wagers`` row to exist.
 Sync loop
 ---------
 ``sync_logs`` walks ``[from_block, to_block]`` in ``chunk_size`` slices,
-bisecting on RPC error so a single hot range cannot stall progress. The
-``meta`` table tracks the cursor (``last_indexed_block``), the chain head
-(``chain_head``), and the most recent transient error (``last_sync_error``)
-for the ``/health`` endpoint.
+bisecting on RPC error so a single hot range cannot stall progress. Each chunk
+makes two kinds of address-filtered query: factory logs first, then logs from
+the wagers that factory created. Filtering by address matters because anyone
+can deploy a contract that emits our topics; an unfiltered scan would pull that
+spam into every response. The ``meta`` table tracks the cursor
+(``last_indexed_block``), the chain head (``chain_head``), the most recent
+transient error (``last_sync_error``), and logs that could not be applied
+(``skipped_log_count``, ``last_skipped_log``) for the ``/health`` endpoint.
 
 Reorg handling
 --------------
-The on-chain protocol does not produce in-place state edits, so the
-indexer relies on its insert-only event log and the ``INSERT OR IGNORE``
-guards rather than a separate reorg-rewinder. A finalised event id never
-changes; a non-finalised event id that is later re-emitted at a different
-log index would be ingested as a new row, and the operator is expected to
-tail ``last_sync_error`` and reconcile manually if the underlying chain
-forks past finality. This is documented as an accepted limitation in the
-upgrade runbook.
+Derived state is insert-only: there is no rewinder. A reorg that moves a log to
+a new position would be ingested as a new event, and one that drops a transaction
+leaves a ghost, so stakes could be double-counted or overstated until the database
+is rebuilt from chain. ``sync_logs`` therefore stays ``confirmations`` blocks
+behind the head (``INDEXER_CONFIRMATIONS``, default 5 in ``live_api``), which
+removes the practical risk on Base without making the UI noticeably stale. A reorg
+deeper than that requires a rebuild; see ``docs/INDEXER-HOSTING.md``.
 """
 import argparse
 import json
@@ -62,6 +65,7 @@ TOPICS = {
     # Wager (ParamutuelWagerV3)
     "BetPlacedV3Enumerated": "0xd49e0d995d5bc2e9cc268a6a482b0d8ec9ed18ddeae89fc67001c2efa6fee5b0",
     "BetPlacedV3Freeform": "0xecda6e726cfee6e62f696fb6fc02e680aa5742138f2635d615d7b8bca3db15c4",
+    "FreeformAnswerRevealedV3": "0xc592882ab1e5cbea3e2ffcba0e57150521e332df9ffb0d024f58b4ee738b6906",
     "ResolvedV3Enumerated": "0x0a2e969cad318ad34168d32c8cbce850c7903442301e6e8d824116385833f290",
     "ResolvedV3Freeform": "0xfeae22eca71fbae658ba63b5add1f9f5371e7fd5bf7597f8b97cdaf24a29a922",
     "BettingClosedByAuthorityV3": "0x309f6e1169f98c711fa766027cd3ca7a3faa5d73827678a743758b5e0a19593f",
@@ -77,6 +81,16 @@ TOPICS = {
 MAX_WAGER_OUTCOMES = 255
 
 TOPIC_TO_EVENT = {v: k for k, v in TOPICS.items()}
+# Chunk queries are split by who can emit what: the factory emits creation events, wagers emit the
+# rest. See "Sync loop" above for why each query is address-filtered.
+FACTORY_TOPIC_FILTER = [[v for k, v in TOPICS.items() if k.startswith("WagerCreated")]]
+WAGER_TOPIC_FILTER = [[v for k, v in TOPICS.items() if not k.startswith("WagerCreated")]]
+# eth_getLogs takes an address list, but providers limit its length, so known wagers are queried in
+# batches of this size.
+WAGER_ADDRESS_BATCH = 200
+# `uint64` timestamps above this do not fit SQLite's signed 64-bit INTEGER. Such values mean
+# "effectively never", so clamping preserves their meaning, and the exact value stays in the event log.
+SQLITE_INT_MAX = 2**63 - 1
 WAGER_PROPOSITION_SELECTOR = "0xba002c61"  # proposition()
 WAGER_OUTCOMES_COUNT_SELECTOR = "0x7deb9776"  # outcomesCount()
 WAGER_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
@@ -84,6 +98,9 @@ WAGER_OUTCOME_TEXT_SELECTOR = "0x811a3a4d"  # outcomeText(uint256)
 # absent from the V3 creation events, so it must be read via eth_call
 # (ADR-0019). Stored in `wager_totals.total_fee_bps` for fee-aware previews.
 WAGER_TOTAL_FEE_BPS_SELECTOR = "0xc56f84cf"
+# minNewTicketStake(): absent on wagers from factories deployed before ADR-0020, where the call
+# reverts; that reads as "no minimum".
+WAGER_MIN_NEW_TICKET_STAKE_SELECTOR = "0x314a4939"
 
 
 def db_connect(path: str) -> sqlite3.Connection:
@@ -103,12 +120,22 @@ def db_connect(path: str) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     """Apply ``schema.sql`` and ensure derived indices.
 
-    Idempotent — every statement in the schema and the secondary index
-    uses ``IF NOT EXISTS``, so this is safe to call on every process
-    boot, both from the read API and from the sync loop.
+    Idempotent, so this is safe to call on every process boot, both from
+    the read API and from the sync loop. ``CREATE TABLE IF NOT EXISTS`` does
+    not add columns to an existing table, so columns added since a database
+    was created are applied here. The dropped ``wager_outcomes`` table was
+    never written; per-outcome totals are now derived on read.
     """
     schema = Path(__file__).with_name("schema.sql").read_text()
     conn.executescript(schema)
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(wagers)")}
+    for column, definition in (
+        ("min_new_ticket_stake", "TEXT NOT NULL DEFAULT '0'"),
+        ("metadata_complete", "INTEGER NOT NULL DEFAULT 1"),
+    ):
+        if column not in existing:
+            conn.execute(f"ALTER TABLE wagers ADD COLUMN {column} {definition}")
+    conn.execute("DROP TABLE IF EXISTS wager_outcomes")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wagers_proposition ON wagers(proposition)")
     conn.commit()
 
@@ -149,6 +176,18 @@ def _decode_u256_word(data_hex: str) -> int:
     return int(payload[:64], 16)
 
 
+def _decode_abi_bytes(data_hex: str) -> bytes:
+    """Decode a single ABI-encoded dynamic ``string``/``bytes`` to its exact raw bytes."""
+    payload = data_hex[2:] if data_hex.startswith("0x") else data_hex
+    offset = int(payload[:64], 16) * 2
+    length = int(payload[offset : offset + 64], 16)
+    start = offset + 64
+    raw = bytes.fromhex(payload[start : start + length * 2])
+    if len(raw) != length:
+        raise ValueError("truncated dynamic bytes")
+    return raw
+
+
 def _decode_abi_string(data_hex: str) -> str:
     """Decode a single ABI-encoded ``string`` returned by ``eth_call``.
 
@@ -182,30 +221,39 @@ def _eth_call_hex(rpc_url: str, to_addr: str, data_hex: str) -> str:
 
 
 def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
-    """Read ``proposition``, ``outcomeText[]`` and ``totalFeeBps`` via ``eth_call``.
+    """Read a wager's proposition, outcome labels, fee and minimum stake via ``eth_call``.
 
     The proposition string and outcome labels live in storage, not in
     events, because they are too large to emit cheaply on every
     creation. The factory creation event tells the indexer the wager
     address; this helper enriches the row with human-readable text the
-    explorer / agent can render. Errors are swallowed: a partial / RPC
-    failure must not block the core idempotent log application.
-
-    ``total_fee_bps`` is fetched in its own ``try`` so a failure in the
-    (longer) outcome-label loop cannot lose the fee, and vice versa. On
-    failure it is ``None`` and the caller keeps the schema default ``'0'``
-    — a known under-statement of fees until the next replay (the hosted DB
-    is rebuilt from chain on every cold start, see INDEXER-HOSTING.md).
+    explorer / agent can render. Errors are swallowed so an RPC failure
+    cannot block log application, but they are reported as
+    ``complete: False`` so :func:`backfill_incomplete_metadata` can retry.
+    Otherwise one hiccup would blank the wager and zero its fee for good.
+    Each read has its own ``try`` so a failure in one cannot lose another.
     """
     proposition = ""
     outcomes: List[str] = []
     total_fee_bps: Optional[int] = None
+    min_new_ticket_stake = 0
+    complete = True
     try:
         total_fee_bps = _decode_u256_word(
             _eth_call_hex(rpc_url, wager_address, WAGER_TOTAL_FEE_BPS_SELECTOR)
         )
     except Exception:
         total_fee_bps = None
+        complete = False
+    try:
+        min_new_ticket_stake = _decode_u256_word(
+            _eth_call_hex(rpc_url, wager_address, WAGER_MIN_NEW_TICKET_STAKE_SELECTOR)
+        )
+    except Exception as exc:
+        # A revert is a definite answer: this wager predates the getter, so it has no minimum.
+        # Anything else (timeout, connection reset) means we do not know yet.
+        if "revert" not in str(exc).lower():
+            complete = False
     try:
         proposition_hex = _eth_call_hex(rpc_url, wager_address, WAGER_PROPOSITION_SELECTOR)
         proposition = _decode_abi_string(proposition_hex)
@@ -218,8 +266,83 @@ def fetch_wager_metadata(rpc_url: str, wager_address: str) -> Dict[str, Any]:
             outcomes.append(_decode_abi_string(out_hex))
     except Exception:
         # Metadata enrichment is best-effort and must not block core indexing.
-        pass
-    return {"proposition": proposition, "outcomes": outcomes, "total_fee_bps": total_fee_bps}
+        complete = False
+    return {
+        "proposition": proposition,
+        "outcomes": outcomes,
+        "total_fee_bps": total_fee_bps,
+        "min_new_ticket_stake": min_new_ticket_stake,
+        "complete": complete,
+    }
+
+
+# Defaults when there is no RPC to read from (`rpc_url=None`, used by unit tests driving synthetic
+# logs). Marked complete because a retry could not do any better.
+_NO_METADATA: Dict[str, Any] = {
+    "proposition": "",
+    "outcomes": [],
+    "total_fee_bps": None,
+    "min_new_ticket_stake": 0,
+    "complete": True,
+}
+
+
+def backfill_incomplete_metadata(conn: sqlite3.Connection, rpc_url: str, limit: int = 25) -> int:
+    """Retry enrichment for wagers whose creation-time reads failed; returns how many were repaired.
+
+    Called on every sync pass, bounded by ``limit`` so a long outage cannot turn each pass into
+    thousands of calls. Rows stay untouched until a complete read succeeds, so a partial read never
+    overwrites anything.
+    """
+    rows = conn.execute(
+        "SELECT wager_address FROM wagers WHERE metadata_complete = 0 ORDER BY created_block LIMIT ?",
+        (limit,),
+    ).fetchall()
+    repaired = 0
+    for row in rows:
+        wager = row["wager_address"]
+        metadata = fetch_wager_metadata(rpc_url, wager)
+        if not metadata["complete"]:
+            continue
+        conn.execute(
+            """
+            UPDATE wagers
+            SET proposition = ?, outcomes_json = ?, min_new_ticket_stake = ?, metadata_complete = 1
+            WHERE wager_address = ?
+            """,
+            (metadata["proposition"], json.dumps(metadata["outcomes"]), str(metadata["min_new_ticket_stake"]), wager),
+        )
+        conn.execute(
+            "UPDATE wager_totals SET total_fee_bps = ? WHERE wager_address = ?",
+            (str(metadata["total_fee_bps"] or 0), wager),
+        )
+        repaired += 1
+    conn.commit()
+    return repaired
+
+
+def compute_winning_units(policy: int, policy_param: int, winning_mask: int, pools: Dict[int, int]) -> int:
+    """Port of ``ParamutuelWagerV3._accumulateWinningUnits``: the on-chain ``payoutDenominator``.
+
+    Clients need this to turn a stake into a payout (``stake * netPot / units``). ``policy`` is the
+    ``PayoffPolicy`` ordinal. The local end-to-end suite compares this with the contract's own value
+    for every policy, so the two cannot drift silently.
+    """
+    units = 0
+    for mask, pool in pools.items():
+        overlap = mask & winning_mask
+        if overlap == 0:
+            continue
+        overlap_size = bin(overlap).count("1")
+        if policy in (0, 2):  # SINGLE_WINNER, EXACT_SET
+            wins = mask == winning_mask
+        elif policy == 3:  # AT_LEAST_K
+            wins = overlap_size >= policy_param
+        else:  # ANY_OF, WEIGHTED_OVERLAP
+            wins = True
+        if wins:
+            units += pool * overlap_size if policy == 4 else pool
+    return units
 
 
 def to_int(hex_value: str) -> int:
@@ -366,47 +489,43 @@ def apply_log(
     log_index = to_int(log["logIndex"])
     eid = event_id(tx_hash, log["logIndex"])
 
-    if event_name == "WagerCreatedV3Enumerated":
+    if event_name in ("WagerCreatedV3Enumerated", "WagerCreatedV3Freeform"):
         if not factory or address != factory:
             return
+        # Replays must not repeat the (many) metadata RPC calls below.
+        if conn.execute("SELECT 1 FROM events_log WHERE event_id = ?", (eid,)).fetchone():
+            return
+        enumerated = event_name == "WagerCreatedV3Enumerated"
         wager = topic_to_address(topics[1])
         proposer = topic_to_address(topics[2])
         resolver = topic_to_address(topics[3])
         collateral_token = topic_to_address(data_word(log["data"], 0))
-        payoff_policy = to_int(data_word(log["data"], 1))
-        policy_param = to_int(data_word(log["data"], 2))
-        betting_close_time = to_int(data_word(log["data"], 3))
-        resolution_window = to_int(data_word(log["data"], 4))
-        resolution_deadline = to_int(data_word(log["data"], 5))
-        betting_closer = topic_to_address(data_word(log["data"], 6))
-        resolution_closer = topic_to_address(data_word(log["data"], 7))
-        metadata: Dict[str, Any] = {"proposition": "", "outcomes": [], "total_fee_bps": None}
-        if rpc_url:
-            metadata = fetch_wager_metadata(rpc_url, wager)
+        # The enumerated event carries two extra leading words (payoffPolicy, policyParam).
+        payoff_policy = to_int(data_word(log["data"], 1)) if enumerated else None
+        policy_param = to_int(data_word(log["data"], 2)) if enumerated else None
+        first = 3 if enumerated else 1
+        betting_close_time = to_int(data_word(log["data"], first))
+        resolution_window = to_int(data_word(log["data"], first + 1))
+        resolution_deadline = to_int(data_word(log["data"], first + 2))
+        betting_closer = topic_to_address(data_word(log["data"], first + 3))
+        resolution_closer = topic_to_address(data_word(log["data"], first + 4))
+        metadata = fetch_wager_metadata(rpc_url, wager) if rpc_url else _NO_METADATA
 
-        inserted = insert_event_log(
-            conn,
-            eid,
-            wager,
-            event_name,
-            block_number,
-            tx_hash,
-            log_index,
-            {
-                "wager": wager,
-                "proposer": proposer,
-                "resolver": resolver,
-                "collateralToken": collateral_token,
-                "payoffPolicy": payoff_policy,
-                "policyParam": policy_param,
-                "bettingCloseTime": betting_close_time,
-                "resolutionWindow": resolution_window,
-                "resolutionDeadline": resolution_deadline,
-                "bettingCloser": betting_closer,
-                "resolutionCloser": resolution_closer,
-            },
-        )
-        if not inserted:
+        payload: Dict[str, Any] = {
+            "wager": wager,
+            "proposer": proposer,
+            "resolver": resolver,
+            "collateralToken": collateral_token,
+            "bettingCloseTime": betting_close_time,
+            "resolutionWindow": resolution_window,
+            "resolutionDeadline": resolution_deadline,
+            "bettingCloser": betting_closer,
+            "resolutionCloser": resolution_closer,
+        }
+        if enumerated:
+            payload["payoffPolicy"] = payoff_policy
+            payload["policyParam"] = policy_param
+        if not insert_event_log(conn, eid, wager, event_name, block_number, tx_hash, log_index, payload):
             return
 
         conn.execute(
@@ -414,9 +533,10 @@ def apply_log(
             INSERT OR IGNORE INTO wagers(
               wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
               collateral_token, proposition, outcomes_json, betting_close_time, resolution_window, resolution_deadline,
-              protocol_version, payoff_policy, policy_param, state, created_block, created_tx_hash
+              protocol_version, payoff_policy, policy_param, min_new_ticket_stake, metadata_complete,
+              state, created_block, created_tx_hash
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enumerated', ?, ?, 'OPEN', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
             """,
             (
                 wager,
@@ -428,82 +548,14 @@ def apply_log(
                 collateral_token,
                 metadata["proposition"],
                 json.dumps(metadata["outcomes"]),
-                betting_close_time,
-                resolution_window,
-                resolution_deadline,
+                min(betting_close_time, SQLITE_INT_MAX),
+                min(resolution_window, SQLITE_INT_MAX),
+                min(resolution_deadline, SQLITE_INT_MAX),
+                "enumerated" if enumerated else "freeform",
                 payoff_policy,
-                str(policy_param),
-                block_number,
-                tx_hash.lower(),
-            ),
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO wager_totals(wager_address, total_pot, total_fee_bps) VALUES (?, '0', ?)",
-            (wager, str(metadata["total_fee_bps"] or 0)),
-        )
-        return
-
-    if event_name == "WagerCreatedV3Freeform":
-        if not factory or address != factory:
-            return
-        wager = topic_to_address(topics[1])
-        proposer = topic_to_address(topics[2])
-        resolver = topic_to_address(topics[3])
-        collateral_token = topic_to_address(data_word(log["data"], 0))
-        betting_close_time = to_int(data_word(log["data"], 1))
-        resolution_window = to_int(data_word(log["data"], 2))
-        resolution_deadline = to_int(data_word(log["data"], 3))
-        betting_closer = topic_to_address(data_word(log["data"], 4))
-        resolution_closer = topic_to_address(data_word(log["data"], 5))
-        metadata: Dict[str, Any] = {"proposition": "", "outcomes": [], "total_fee_bps": None}
-        if rpc_url:
-            metadata = fetch_wager_metadata(rpc_url, wager)
-
-        inserted = insert_event_log(
-            conn,
-            eid,
-            wager,
-            event_name,
-            block_number,
-            tx_hash,
-            log_index,
-            {
-                "wager": wager,
-                "proposer": proposer,
-                "resolver": resolver,
-                "collateralToken": collateral_token,
-                "bettingCloseTime": betting_close_time,
-                "resolutionWindow": resolution_window,
-                "resolutionDeadline": resolution_deadline,
-                "bettingCloser": betting_closer,
-                "resolutionCloser": resolution_closer,
-            },
-        )
-        if not inserted:
-            return
-
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO wagers(
-              wager_address, factory_address, proposer, resolver, betting_closer, resolution_closer,
-              collateral_token, proposition, outcomes_json, betting_close_time, resolution_window, resolution_deadline,
-              protocol_version, state, created_block, created_tx_hash
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'freeform', 'OPEN', ?, ?)
-            """,
-            (
-                wager,
-                factory,
-                proposer,
-                resolver,
-                betting_closer,
-                resolution_closer,
-                collateral_token,
-                metadata["proposition"],
-                json.dumps(metadata["outcomes"]),
-                betting_close_time,
-                resolution_window,
-                resolution_deadline,
+                str(policy_param) if enumerated else None,
+                str(metadata["min_new_ticket_stake"]),
+                1 if metadata["complete"] else 0,
                 block_number,
                 tx_hash.lower(),
             ),
@@ -546,12 +598,34 @@ def apply_log(
         )
         return
 
+    if event_name == "FreeformAnswerRevealedV3":
+        answer_id = topics[1].lower()
+        raw = _decode_abi_bytes(log["data"])
+        # `string` on-chain can hold any bytes. Lossy decoding would produce text that hashes to a
+        # different answer id, so invalid UTF-8 keeps only the exact hex.
+        try:
+            answer_text: Optional[str] = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            answer_text = None
+        answer_hex = "0x" + raw.hex()
+        inserted = insert_event_log(
+            conn, eid, wager, event_name, block_number, tx_hash, log_index,
+            {"answerId": answer_id, "answer": answer_text, "answerHex": answer_hex},
+        )
+        if not inserted:
+            return
+        conn.execute(
+            "INSERT OR IGNORE INTO wager_answers(wager_address, answer_id, answer_text, answer_hex) VALUES (?, ?, ?, ?)",
+            (wager, answer_id, answer_text, answer_hex),
+        )
+        return
+
     if event_name == "BetPlacedV3Enumerated":
         bettor = topic_to_address(topics[1])
         ticket_mask = to_int(data_word(log["data"], 0))
         amount = to_int(data_word(log["data"], 1))
         mask_key = str(ticket_mask)
-        payload: Dict[str, Any] = {"bettor": bettor, "ticketMask": ticket_mask, "amount": amount}
+        payload = {"bettor": bettor, "ticketMask": ticket_mask, "amount": amount}
         inserted = insert_event_log(
             conn, eid, wager, event_name, block_number, tx_hash, log_index, payload
         )
@@ -608,9 +682,21 @@ def apply_log(
         if not inserted:
             return
         conn.execute("UPDATE wagers SET state = 'RESOLVED' WHERE wager_address = ?", (wager,))
+        policy_row = conn.execute(
+            "SELECT payoff_policy, policy_param FROM wagers WHERE wager_address = ?", (wager,)
+        ).fetchone()
+        pools = {
+            int(row["ticket_mask"]): int(row["pool_total"])
+            for row in conn.execute(
+                "SELECT ticket_mask, pool_total FROM wager_ticket_pools WHERE wager_address = ?", (wager,)
+            )
+        }
+        units = compute_winning_units(
+            int(policy_row["payoff_policy"] or 0), int(policy_row["policy_param"] or 0), winning_val, pools
+        )
         conn.execute(
-            "UPDATE wager_totals SET winning_outcome = ? WHERE wager_address = ?",
-            (str(winning_val), wager),
+            "UPDATE wager_totals SET winning_outcome = ?, total_winning_stake = ? WHERE wager_address = ?",
+            (str(winning_val), str(units), wager),
         )
         return
 
@@ -623,9 +709,13 @@ def apply_log(
         if not inserted:
             return
         conn.execute("UPDATE wagers SET state = 'RESOLVED' WHERE wager_address = ?", (wager,))
+        pool_row = conn.execute(
+            "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ? AND ticket_mask = ?",
+            (wager, winning_key),
+        ).fetchone()
         conn.execute(
-            "UPDATE wager_totals SET winning_outcome = ? WHERE wager_address = ?",
-            (winning_key, wager),
+            "UPDATE wager_totals SET winning_outcome = ?, total_winning_stake = ? WHERE wager_address = ?",
+            (winning_key, str(pool_row["pool_total"]) if pool_row else "0", wager),
         )
         return
 
@@ -682,7 +772,7 @@ def get_expire_candidates(conn: sqlite3.Connection, now_ts: Optional[int] = None
 
     Two paths qualify a wager as a candidate:
 
-    * The resolver explicitly closed the window
+    * The resolution closer explicitly closed the window
       (``resolution_window_closed = 1``); the on-chain expire check then
       only verifies the marker, regardless of clock.
     * The wall-clock has passed ``betting_close_at + resolution_window``
@@ -722,6 +812,7 @@ def _eth_get_logs_bisect(
     end: int,
     topic_filter: List[List[str]],
     min_span: int = 1,
+    address: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Return logs for ``[start, end]``, halving on RPC failure.
 
@@ -736,16 +827,44 @@ def _eth_get_logs_bisect(
     if start > end:
         return []
     span = end - start + 1
-    params = [{"fromBlock": hex(start), "toBlock": hex(end), "topics": topic_filter}]
+    log_filter: Dict[str, Any] = {"fromBlock": hex(start), "toBlock": hex(end), "topics": topic_filter}
+    if address is not None:
+        log_filter["address"] = address
     try:
-        return rpc_call(rpc_url, "eth_getLogs", params)
+        return rpc_call(rpc_url, "eth_getLogs", [log_filter])
     except Exception:
         if span <= min_span:
             raise
         mid = start + (span // 2) - 1
-        left = _eth_get_logs_bisect(rpc_url, start, mid, topic_filter, min_span)
-        right = _eth_get_logs_bisect(rpc_url, mid + 1, end, topic_filter, min_span)
+        left = _eth_get_logs_bisect(rpc_url, start, mid, topic_filter, min_span, address)
+        right = _eth_get_logs_bisect(rpc_url, mid + 1, end, topic_filter, min_span, address)
         return left + right
+
+
+def _apply_logs(conn: sqlite3.Connection, factory_address: str, logs: List[Dict[str, Any]], rpc_url: str) -> int:
+    """Apply logs in chain order, each atomically, and return how many landed.
+
+    Each log gets its own SAVEPOINT so a failure part way through ``apply_log`` rolls back *all* of
+    that log's writes instead of committing a torn state with the chunk. One malformed log must not
+    stop the sync, but it is lost once the cursor moves past it, so it is counted and described for
+    ``/health`` instead of vanishing.
+    """
+    applied = 0
+    logs = sorted(logs, key=lambda l: (to_int(l["blockNumber"]), to_int(l["logIndex"])))
+    for log in logs:
+        conn.execute("SAVEPOINT apply_one_log")
+        try:
+            apply_log(conn, factory_address, log, rpc_url=rpc_url)
+            conn.execute("RELEASE SAVEPOINT apply_one_log")
+            applied += 1
+        except Exception as exc:
+            conn.execute("ROLLBACK TO SAVEPOINT apply_one_log")
+            conn.execute("RELEASE SAVEPOINT apply_one_log")
+            where = f"{log.get('transactionHash', '?')}:{log.get('logIndex', '?')}"
+            print(f"[indexer-sync] skip log {where}: {exc}")
+            set_meta_int(conn, "skipped_log_count", (get_meta_int(conn, "skipped_log_count") or 0) + 1)
+            set_meta_str(conn, "last_skipped_log", f"{where}: {exc}"[:800])
+    return applied
 
 
 def sync_logs(
@@ -757,6 +876,7 @@ def sync_logs(
     chunk_size: int,
     *,
     allow_genesis_start: bool = False,
+    confirmations: int = 0,
 ) -> int:
     """Pull and apply factory + wager logs for the requested block range.
 
@@ -769,14 +889,16 @@ def sync_logs(
       because starting a long-running sync at block 0 against Base
       mainnet would burn RPC quota; it requires an explicit
       ``INDEXER_FROM_BLOCK`` / ``indexerFromBlock`` instead.
-    * ``to_block`` defaults to the current chain head, capped to it.
+    * ``to_block`` defaults to the chain head minus ``confirmations``, and
+      is capped to it (see "Reorg handling" in the module docstring).
 
-    Each chunk uses the bisecting fetch, applies logs in
-    ``(blockNumber, logIndex)`` order, and commits the cursor / clears
-    ``last_sync_error`` after the chunk lands. A per-log exception is
-    logged and skipped — one malformed log must not stop the sync.
-    Returns the number of logs successfully applied (useful for the
-    live daemon's heartbeat output).
+    Each chunk fetches factory logs and applies them first, because they
+    create the wagers that scope the second query; a wager's seed bets land
+    in the same transaction as its creation. It then commits the cursor and
+    clears ``last_sync_error``. A failure while fetching commits what was
+    applied and re-raises; the next pass replays the chunk, which is safe
+    because application is idempotent. Returns the number of logs
+    successfully applied (useful for the live daemon's heartbeat output).
     """
     factory_address = normalize_address(factory_address) if factory_address else ""
 
@@ -785,9 +907,12 @@ def sync_logs(
     set_meta_str(conn, "last_sync_error", "")
     conn.commit()
 
+    backfill_incomplete_metadata(conn, rpc_url)
+
+    safe_head = max(0, latest - confirmations)
     if to_block is None:
-        to_block = latest
-    to_block = min(to_block, latest)
+        to_block = safe_head
+    to_block = min(to_block, safe_head)
 
     if from_block is None:
         last_indexed = get_meta_int(conn, "last_indexed_block")
@@ -802,22 +927,35 @@ def sync_logs(
             )
 
     if from_block > to_block:
-        set_meta_str(
-            conn,
-            "last_sync_error",
-            f"from_block {from_block} is ahead of chain head {to_block} (check INDEXER_FROM_BLOCK / indexerFromBlock)",
-        )
+        # Being caught up (cursor one past the safe head) is the normal idle state. A cursor past
+        # the actual head means the configured start block or network is wrong.
+        if from_block > latest + 1:
+            set_meta_str(
+                conn,
+                "last_sync_error",
+                f"from_block {from_block} is ahead of chain head {latest} (check INDEXER_FROM_BLOCK / indexerFromBlock)",
+            )
         conn.commit()
         return 0
 
-    topic_filter = [list(TOPICS.values())]
     processed = 0
 
     start = from_block
     while start <= to_block:
         end = min(start + chunk_size - 1, to_block)
         try:
-            logs = _eth_get_logs_bisect(rpc_url, start, end, topic_filter, min_span=1)
+            factory_logs = (
+                _eth_get_logs_bisect(rpc_url, start, end, FACTORY_TOPIC_FILTER, min_span=1, address=[factory_address])
+                if factory_address
+                else []
+            )
+            processed += _apply_logs(conn, factory_address, factory_logs, rpc_url)
+            known = [row[0] for row in conn.execute("SELECT wager_address FROM wagers ORDER BY wager_address")]
+            for i in range(0, len(known), WAGER_ADDRESS_BATCH):
+                wager_logs = _eth_get_logs_bisect(
+                    rpc_url, start, end, WAGER_TOPIC_FILTER, min_span=1, address=known[i : i + WAGER_ADDRESS_BATCH]
+                )
+                processed += _apply_logs(conn, factory_address, wager_logs, rpc_url)
         except Exception as exc:
             set_meta_str(
                 conn,
@@ -826,23 +964,6 @@ def sync_logs(
             )
             conn.commit()
             raise
-        logs.sort(key=lambda l: (to_int(l["blockNumber"]), to_int(l["logIndex"])))
-        for log in logs:
-            # Each log is applied inside its own SAVEPOINT so a failure part
-            # way through `apply_log` (after e.g. the event row was inserted)
-            # rolls back *all* of that log's writes instead of committing a
-            # torn state with the chunk (ADR-0019).
-            conn.execute("SAVEPOINT apply_one_log")
-            try:
-                apply_log(conn, factory_address, log, rpc_url=rpc_url)
-                conn.execute("RELEASE SAVEPOINT apply_one_log")
-                processed += 1
-            except Exception as exc:
-                conn.execute("ROLLBACK TO SAVEPOINT apply_one_log")
-                conn.execute("RELEASE SAVEPOINT apply_one_log")
-                tx = log.get("transactionHash", "?")
-                li = log.get("logIndex", "?")
-                print(f"[indexer-sync] skip log {tx}:{li}: {exc}")
 
         set_meta_int(conn, "last_indexed_block", end)
         set_meta_str(conn, "last_sync_error", "")
@@ -864,6 +985,7 @@ def main() -> None:
     parser.add_argument("--from-block", type=int, default=None)
     parser.add_argument("--to-block", type=int, default=None)
     parser.add_argument("--chunk-size", type=int, default=2_000)
+    parser.add_argument("--confirmations", type=int, default=5, help="Stay this many blocks behind the head (reorg safety).")
     args = parser.parse_args()
 
     conn = db_connect(args.db_path)
@@ -876,6 +998,7 @@ def main() -> None:
         to_block=args.to_block,
         chunk_size=args.chunk_size,
         allow_genesis_start=True,
+        confirmations=args.confirmations,
     )
     print(f"Processed logs: {count}")
 

@@ -138,6 +138,7 @@ def _sync_loop(
     poll_interval_seconds: int,
     chunk_size: int,
     initial_from_block: int,
+    confirmations: int = 0,
 ) -> None:
     """Background poller that drives ``sync_logs`` on a fixed interval.
 
@@ -163,6 +164,7 @@ def _sync_loop(
                 from_block=effective_from,
                 to_block=None,
                 chunk_size=chunk_size,
+                confirmations=confirmations,
             )
             if processed:
                 print(f"[indexer-sync] processed logs: {processed}")
@@ -184,6 +186,12 @@ def main() -> None:
     parser.add_argument("--poll-interval-seconds", type=int, default=_resolve_int_env("INDEXER_POLL_INTERVAL_SECONDS", 15))
     parser.add_argument("--chunk-size", type=int, default=_resolve_int_env("INDEXER_CHUNK_SIZE", 2_000))
     parser.add_argument("--from-block", type=int, default=_resolve_optional_int_env("INDEXER_FROM_BLOCK"))
+    parser.add_argument(
+        "--confirmations",
+        type=int,
+        default=_resolve_int_env("INDEXER_CONFIRMATIONS", 5),
+        help="Stay this many blocks behind the head so short reorgs cannot corrupt derived state.",
+    )
     args = parser.parse_args()
 
     rpc_url = _resolve_rpc_url(args.rpc_url)
@@ -227,6 +235,7 @@ def main() -> None:
             args.poll_interval_seconds,
             args.chunk_size,
             initial_from_block,
+            args.confirmations,
         ),
         daemon=True,
     )

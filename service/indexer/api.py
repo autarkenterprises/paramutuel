@@ -16,7 +16,11 @@ Surface
     needs a single-box global search.
 ``/wagers/{address}``
     Single wager detail bundle: metadata, totals, per-outcome stake,
-    per-ticket-mask pool, and the ordered event log.
+    per-ticket pools, and the ordered event log. Freeform answer lists are
+    unbounded on-chain, so ``pool_limit`` keeps the largest stakes (with the
+    full count in ``ticket_pools_total``) and ``answer_id`` looks one up
+    directly. ``events_limit`` keeps the newest events. Enumerated pools are
+    never truncated: there are at most 1279, and clients look them up by mask.
 ``/sweeper/expire-candidates``
     Operator preview for the sweeper. Accepts an optional ``now``
     override so tests can drive deterministic clocks.
@@ -47,8 +51,40 @@ from urllib.parse import parse_qs, urlparse
 from .indexer import db_connect, get_expire_candidates, get_meta_int, get_meta_str, init_db
 
 
+DEFAULT_POOL_LIMIT = 500
+DEFAULT_EVENTS_LIMIT = 1000
+MAX_DETAIL_LIMIT = 5000
+# Payload fields holding uint256 values. They are strings on the wire because JavaScript clients parse
+# JSON numbers as doubles, which silently round anything above 2^53.
+_UINT256_PAYLOAD_KEYS = ("amount", "ticketMask", "winningMask", "policyParam")
+
+
 def row_to_dict(row: sqlite3.Row) -> dict:
     return {k: row[k] for k in row.keys()}
+
+
+def _derive_outcome_totals(outcomes_json: str, pools: list[sqlite3.Row]) -> list[dict]:
+    """Stake touching each outcome, derived from ticket masks.
+
+    Each mask counts toward every outcome it includes, so under multi-outcome policies these
+    totals overlap and sum to more than the pot. They express interest per outcome, not a payout.
+    """
+    try:
+        count = len(json.loads(outcomes_json or "[]"))
+    except json.JSONDecodeError:
+        count = 0
+    totals = [0] * count
+    for pool in pools:
+        mask = int(pool["ticket_mask"])
+        amount = int(pool["pool_total"])
+        for i in range(count):
+            if mask >> i & 1:
+                totals[i] += amount
+    return [{"outcome_index": i, "outcome_total": str(total)} for i, total in enumerate(totals)]
+
+
+def _stringify_uints(payload: dict) -> dict:
+    return {k: str(v) if k in _UINT256_PAYLOAD_KEYS and v is not None else v for k, v in payload.items()}
 
 
 def list_wagers(
@@ -129,43 +165,79 @@ def list_wagers(
     return [row_to_dict(r) for r in rows]
 
 
-def get_wager(conn: sqlite3.Connection, wager_address: str) -> dict | None:
+def get_wager(
+    conn: sqlite3.Connection,
+    wager_address: str,
+    *,
+    pool_limit: int = DEFAULT_POOL_LIMIT,
+    events_limit: int = DEFAULT_EVENTS_LIMIT,
+    answer_id: str | None = None,
+) -> dict | None:
     """Return the full wager bundle the explorer detail view needs.
 
-    Combines the wager row, totals, per-outcome stake, per-ticket-mask
-    pool, and the ordered event log in one round trip. ``payload_json``
-    fields are decoded from text to JSON so callers do not have to
-    re-parse them; the wager address is lower-cased to match the
-    canonicalisation enforced by ``normalize_address``.
+    Combines the wager row, totals, per-outcome stake, per-ticket pools, and the ordered event log
+    in one round trip. ``payload_json`` fields are decoded from text to JSON so callers do not have
+    to re-parse them; the wager address is lower-cased to match the canonicalisation enforced by
+    ``normalize_address``.
     """
-    m = conn.execute("SELECT * FROM wagers WHERE wager_address = ?", (wager_address.lower(),)).fetchone()
+    address = wager_address.lower()
+    m = conn.execute("SELECT * FROM wagers WHERE wager_address = ?", (address,)).fetchone()
     if not m:
         return None
-    totals = conn.execute("SELECT * FROM wager_totals WHERE wager_address = ?", (wager_address.lower(),)).fetchone()
-    outcomes = conn.execute(
-        "SELECT outcome_index, outcome_total FROM wager_outcomes WHERE wager_address = ? ORDER BY outcome_index ASC",
-        (wager_address.lower(),),
-    ).fetchall()
-    ticket_pools = conn.execute(
-        "SELECT ticket_mask, pool_total FROM wager_ticket_pools WHERE wager_address = ? ORDER BY ticket_mask ASC",
-        (wager_address.lower(),),
-    ).fetchall()
+    totals = conn.execute("SELECT * FROM wager_totals WHERE wager_address = ?", (address,)).fetchone()
+    freeform = m["protocol_version"] == "freeform"
+
+    if freeform:
+        pool_rows = conn.execute(
+            """
+            SELECT p.ticket_mask, p.pool_total, a.answer_text, a.answer_hex
+            FROM wager_ticket_pools p
+            LEFT JOIN wager_answers a ON a.wager_address = p.wager_address AND a.answer_id = p.ticket_mask
+            WHERE p.wager_address = ?
+            """,
+            (address,),
+        ).fetchall()
+        pools_total = len(pool_rows)
+        if answer_id:
+            wanted = answer_id.lower()
+            pool_rows = [r for r in pool_rows if r["ticket_mask"] == wanted]
+        else:
+            # Stakes are decimal text, so order numerically here rather than in SQL.
+            pool_rows = sorted(pool_rows, key=lambda r: -int(r["pool_total"]))[:pool_limit]
+        outcomes: list[dict] = []
+    else:
+        pool_rows = conn.execute(
+            "SELECT ticket_mask, pool_total FROM wager_ticket_pools WHERE wager_address = ?",
+            (address,),
+        ).fetchall()
+        pool_rows = sorted(pool_rows, key=lambda r: int(r["ticket_mask"]))
+        pools_total = len(pool_rows)
+        outcomes = _derive_outcome_totals(m["outcomes_json"], pool_rows)
+
+    events_total = conn.execute(
+        "SELECT COUNT(*) AS n FROM events_log WHERE wager_address = ?", (address,)
+    ).fetchone()["n"]
     events = conn.execute(
-        "SELECT event_name, block_number, tx_hash, log_index, payload_json FROM events_log WHERE wager_address = ? ORDER BY block_number ASC, log_index ASC",
-        (wager_address.lower(),),
+        """
+        SELECT event_name, block_number, tx_hash, log_index, payload_json FROM events_log
+        WHERE wager_address = ? ORDER BY block_number DESC, log_index DESC LIMIT ?
+        """,
+        (address, events_limit),
     ).fetchall()
     return {
         "wager": row_to_dict(m),
         "totals": row_to_dict(totals) if totals else None,
-        "outcomes": [row_to_dict(o) for o in outcomes],
-        "ticket_pools": [row_to_dict(tp) for tp in ticket_pools],
+        "outcomes": outcomes,
+        "ticket_pools": [row_to_dict(tp) for tp in pool_rows],
+        "ticket_pools_total": pools_total,
         "events": [
             {
                 **row_to_dict(e),
-                "payload_json": json.loads(e["payload_json"]),
+                "payload_json": _stringify_uints(json.loads(e["payload_json"])),
             }
-            for e in events
+            for e in reversed(events)
         ],
+        "events_total": events_total,
     }
 
 
@@ -199,6 +271,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        # Without this an unexpected error resets the connection, which clients see as a network
+        # failure rather than a server error. The detail goes to the log, not the response.
+        try:
+            self._route_get()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[indexer-api] {self.path}: {exc}")
+            self._send_json(500, {"error": "internal error"})
+
+    def _route_get(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)
@@ -218,7 +299,8 @@ class Handler(BaseHTTPRequestHandler):
                         "/wagers?limit=20&offset=0&order=desc",
                         "/wagers?limit=20&offset=0&order=asc&q=<text>",
                         "/wagers?q=<searches all indexed wager fields>",
-                        "/wagers/{wager_address}",
+                        "/wagers/{wager_address}?pool_limit=500&events_limit=1000",
+                        "/wagers/{wager_address}?answer_id=0x<answer id>",
                         "/sweeper/expire-candidates",
                     ],
                 },
@@ -231,15 +313,20 @@ class Handler(BaseHTTPRequestHandler):
             )
             err = get_meta_str(self.conn, "last_sync_error")
             fac = getattr(self.__class__, "indexer_factory_address", None)
+            indexed = get_meta_int(self.conn, "last_indexed_block")
+            head = get_meta_int(self.conn, "chain_head")
             self._send_json(
                 200,
                 {
                     "ok": True,
                     "ts": int(time.time()),
                     "wager_count": wager_count,
-                    "last_indexed_block": get_meta_int(self.conn, "last_indexed_block"),
-                    "chain_head": get_meta_int(self.conn, "chain_head"),
+                    "last_indexed_block": indexed,
+                    "chain_head": head,
+                    "sync_lag_blocks": head - indexed if head is not None and indexed is not None else None,
                     "last_sync_error": err if err else None,
+                    "skipped_log_count": get_meta_int(self.conn, "skipped_log_count") or 0,
+                    "last_skipped_log": get_meta_str(self.conn, "last_skipped_log"),
                     "factory_address": fac,
                 },
             )
@@ -281,7 +368,19 @@ class Handler(BaseHTTPRequestHandler):
 
         if path.startswith("/wagers/"):
             addr = path.split("/wagers/", 1)[1].lower()
-            item = get_wager(self.conn, addr)
+            try:
+                pool_limit = max(1, min(MAX_DETAIL_LIMIT, int(qs.get("pool_limit", [DEFAULT_POOL_LIMIT])[0])))
+                events_limit = max(0, min(MAX_DETAIL_LIMIT, int(qs.get("events_limit", [DEFAULT_EVENTS_LIMIT])[0])))
+            except ValueError:
+                self._send_json(400, {"error": "invalid pool_limit or events_limit"})
+                return
+            item = get_wager(
+                self.conn,
+                addr,
+                pool_limit=pool_limit,
+                events_limit=events_limit,
+                answer_id=qs.get("answer_id", [None])[0],
+            )
             if not item:
                 self._send_json(404, {"error": "wager not found"})
                 return
@@ -290,7 +389,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/sweeper/expire-candidates":
             now_raw = qs.get("now", [None])[0]
-            now_ts = int(now_raw) if now_raw is not None else int(time.time())
+            try:
+                now_ts = int(now_raw) if now_raw is not None else int(time.time())
+            except ValueError:
+                self._send_json(400, {"error": "invalid now"})
+                return
             candidates = get_expire_candidates(self.conn, now_ts=now_ts)
             self._send_json(
                 200,

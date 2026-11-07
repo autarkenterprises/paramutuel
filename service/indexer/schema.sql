@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS wagers (
   resolution_window_closed_at INTEGER,
   state TEXT NOT NULL CHECK(state IN ('OPEN','RESOLVED','RETRACTED')),
   created_block INTEGER NOT NULL,
-  created_tx_hash TEXT NOT NULL
+  created_tx_hash TEXT NOT NULL,
+  -- Stake needed to open a new ticket or answer (decimal text; uint256).
+  min_new_ticket_stake TEXT NOT NULL DEFAULT '0',
+  -- 0 = creation-time eth_calls failed; backfill_incomplete_metadata retries the row.
+  metadata_complete INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS wager_totals (
@@ -35,15 +39,19 @@ CREATE TABLE IF NOT EXISTS wager_totals (
   total_pot TEXT NOT NULL DEFAULT '0',
   total_fee_bps TEXT NOT NULL DEFAULT '0',
   winning_outcome TEXT,
+  -- The contract's payoutDenominator: a winning stake total, or weighted units for WEIGHTED_OVERLAP.
   total_winning_stake TEXT,
   FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
 );
 
-CREATE TABLE IF NOT EXISTS wager_outcomes (
+-- Text of each freeform answer, from FreeformAnswerRevealedV3. answer_text is NULL when the bytes are
+-- not valid UTF-8; answer_hex is always the exact bytes that hash to answer_id.
+CREATE TABLE IF NOT EXISTS wager_answers (
   wager_address TEXT NOT NULL,
-  outcome_index INTEGER NOT NULL,
-  outcome_total TEXT NOT NULL DEFAULT '0',
-  PRIMARY KEY (wager_address, outcome_index),
+  answer_id TEXT NOT NULL,
+  answer_text TEXT,
+  answer_hex TEXT NOT NULL,
+  PRIMARY KEY (wager_address, answer_id),
   FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
 );
 
