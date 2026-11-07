@@ -195,3 +195,13 @@ Headline: the contract economics are sound, but the *surroundings* had drifted. 
 Dead end: `forge coverage --ir-minimum` still fails ("Cannot swap Slot RET … too deep by 1 slot") on the 17-argument wager constructor decoder. Substituted a structural check (`script/check-revert-coverage.py`) plus a 28-mutation run in a scratch copy.
 
 Details, finding table, mutation results and operator follow-ups (resolution-service redeploy with a token + possible key rotation; indexer redeploy; decision-file audit): [`docs/ADR-0019-IMPLEMENTATION.md`](docs/ADR-0019-IMPLEMENTATION.md). New lessons L-008 (AAR claims need a named test), L-009 (port tests by behaviour when deleting superseded code).
+
+## 2026-11-07 — ADR-0020: second verification pass (document and correct everything)
+
+Operator asked again for verification against intent, then "document and correct all errors and deficiencies". This pass re-tested ADR-0019's claims rather than trusting them. The Cursor `agent` CLI was unauthenticated in this session (`agent login` required), so the lead agent did all review directly.
+
+Headline: the happy-path arithmetic ADR-0019 verified is sound, but **Base's EIP-7825 2^24 per-tx gas cap** turned a griefing shape ADR-0019 rated "medium" into an unresolvable market; the freeform answer cap turned out to protect nothing; and the hosted propose flow has been 404ing because the deploy workflow's hard-coded copy list omits two scripts. Full table in `research/adr/ADR-0020-verification-remediation.md`.
+
+Dead ends worth keeping: suspected fee-recipient griefing is **not** exploitable by ordinary transactions (creation hits the cap before the terminal path does); only an L1 deposit tx could reach it. Suspected mask-as-index winner mislabel in `resolvedSummary` was wrong: that code decodes masks correctly. `forge test` gas figures run warm inside one test tx and understated `resolve` by ~4M until measured with the `cool` cheatcode.
+
+Practices review (AGENTS.md #12, L-007): re-read all 15. Drift: the monthly review lapsed after 2026-05-07 with no entries for June through October, which is the silence L-007 exists to prevent; recorded here rather than backfilled.
