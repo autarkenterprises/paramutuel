@@ -32,6 +32,10 @@ jobs:
       - name: Install Python test dependencies
         run: python3 -m pip install -q "mcp>=1.0.0,<2" "httpx>=0.25.0" "eth-abi>=5.0.0" "eth-hash[pycryptodome]"
 
+      # The dApp's node tests import ethers; `dapp/node_modules` is not committed.
+      - name: Install dApp test dependencies
+        run: npm ci --prefix dapp
+
       - name: Fast suite
         run: ./script/test-fast.sh
 
