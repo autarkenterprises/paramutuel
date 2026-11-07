@@ -17,12 +17,19 @@ Usage:
     python3 script/mutation-check.py --only fee # ids containing a substring
     python3 script/mutation-check.py --list
 
+A baseline run with no mutation happens first, because a suite that already fails would make every
+mutation look killed.
+
+Runs with the optimizer off, which compiles about five times faster and does not change whether a
+guard holds. The one test excluded is a tight gas bound that only holds when optimized.
+
 Exit 0 when every mutation is killed; 1 if any survived or went stale.
-Belongs on the extended path (AGENTS.md #13): roughly 1-2 minutes per mutation.
+Belongs on the extended path (AGENTS.md #13): roughly one minute per mutation.
 """
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -115,6 +122,12 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
 # Gas snapshots and the slow stateful suite are left out: neither is needed to detect a weakened guard
 # and both would multiply run time. Invariants are exercised by the fast suite.
 TEST_FILES_EXCLUDED = ("ParamutuelV3Gas.t.sol", "ParamutuelV3Invariant.t.sol")
+TEST_COMMAND = ["forge", "test", "--no-match-test", "test_C6_"]
+TEST_ENV = {**os.environ, "FOUNDRY_OPTIMIZER": "false"}
+
+
+def run_tests(workdir: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(TEST_COMMAND, cwd=workdir, capture_output=True, text=True, env=TEST_ENV)
 
 
 def run_mutation(workdir: Path, rel_path: str, old: str, new: str) -> tuple[str, str]:
@@ -126,7 +139,7 @@ def run_mutation(workdir: Path, rel_path: str, old: str, new: str) -> tuple[str,
         return "STALE", f"pattern occurs {count} times"
     path.write_text(original.replace(old, new), encoding="utf-8")
     try:
-        proc = subprocess.run(["forge", "test"], cwd=workdir, capture_output=True, text=True)
+        proc = run_tests(workdir)
     finally:
         path.write_text(original, encoding="utf-8")
     out = proc.stdout + proc.stderr
@@ -158,6 +171,12 @@ def main(argv: list[str] | None = None) -> int:
         for name in ("foundry.toml", "foundry.lock"):
             shutil.copy(ROOT / name, work / name)
         start = time.time()
+        baseline = run_tests(work)
+        if baseline.returncode != 0:
+            print("Baseline suite fails without any mutation; results would be meaningless:", file=sys.stderr)
+            print((baseline.stdout + baseline.stderr)[-2000:], file=sys.stderr)
+            return 1
+        print(f"baseline passes ({int(time.time() - start)}s)", flush=True)
         for i, (mid, rel, old, new) in enumerate(selected, 1):
             outcome, detail = run_mutation(work, rel, old, new)
             elapsed = int(time.time() - start)

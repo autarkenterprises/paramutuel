@@ -64,6 +64,7 @@ Severity reflects impact if the path is used, not current exposure (the deployed
 
 | # | Finding | Severity |
 |---|---|---|
+| O0 | **`cast` alters strings, so "byte-exact" `resolve(string)` was false.** `cast` strips trailing whitespace and surrounding quotes: `Paris␠` is encoded as `Paris`, and `"Paris"` (with its quotes) as `Paris`. The resolution service, control panel and bet scout all routed answers through it, so an operator could resolve a **different pool** from the one in their decision, and a bettor could choose an answer to exploit that. ADR-0019's regression test asserted the argv token rather than the bytes on-chain, so it passed while the bug was live. | **High** |
 | O1 | **Reverted transactions recorded as success** by the resolution service, sweeper, and proposition dispatch (see the `cast send` fact above). A failed create is marked `dispatched`; a failed resolve reports `ok: true`. | **High** |
 | O2 | **Private key printed in clear** by the control-panel CLI dry-run and the sweeper dry-run — dry-run being the default. | **High** |
 | O3 | **Outcome labels corrupted on-chain.** `_json_arg` uses `json.dumps` escapes, which `cast` stores verbatim: `café` becomes `café`, `a\b` becomes `a\\b`, and any `"` fails outright. | Medium |
@@ -143,7 +144,7 @@ Severity reflects impact if the path is used, not current exposure (the deployed
 - **Single-bit exemption instead of reserved capacity:** needs no extra counter. `_usedMasks.length` is bounded by `1024 + numOptions ≤ 1279`, which is what the gas assertion tests.
 - **Same contract names (`…V3`), new address:** L-001 warns against new parallel surfaces, and no live state exists to distinguish.
 - **Bet-side trimming in human UIs stays** (ADR-0009 §5 allows a UI convention). **Resolve paths and machine surfaces are byte-exact**: a resolver or agent must get exactly the bytes it passed.
-- **`cast` remains the transaction transport.** Quoting is fixed (`--` separator; `"` or `'` chosen per item; values unrepresentable in `cast`'s grammar are rejected with an explanation). Receipt status is checked via `--json`. `cast` has no environment or stdin path for a raw key, so argv exposure remains; deployment guidance isolates it in a single-purpose container.
+- **`cast` remains the signer but no longer parses anything user-supplied.** A small stdlib ABI encoder (`service/control_panel/abi.py`, checked against `eth_abi`) produces raw calldata, which fixes O0, O3 and O4 with one mechanism. Previews show the function and decoded arguments so operators still review readable values. Receipt status is checked via `--json`. `cast` has no environment or stdin path for a raw key, so argv exposure remains; deployment guidance isolates it in a single-purpose container.
 
 ## Success criteria
 
@@ -165,7 +166,7 @@ Severity reflects impact if the path is used, not current exposure (the deployed
 - **Exempt nothing and lower `MAX_DISTINCT_TICKETS`.** Treats the symptom; popcount is the actual cost driver, and lower caps make lockout griefing cheaper.
 - **Per-outcome accumulators for `WEIGHTED_OVERLAP`.** O(numOptions) resolve, but up to 255 extra SSTOREs per bet, charging honest bettors for a griefing defence.
 - **Allow `retract` while betting is open / add a lifetime backstop.** See decision 6.
-- **Stdlib ABI encoder and raw calldata instead of `cast` arguments.** More robust but makes dry-run previews unreadable, and the `--` plus quoting fix covers the verified failures.
+- **Keep `cast` arguments, adding a `--` separator and careful quoting.** Tried first: it fixes flag injection, but `cast` still strips trailing whitespace and surrounding quotes from plain string arguments, so it cannot be byte-exact.
 - **Rewrite git history to purge the API key.** Destructive, breaks every clone, and does not un-leak a public key. Rotation is the real remedy.
 
 ## Open questions (operator)
