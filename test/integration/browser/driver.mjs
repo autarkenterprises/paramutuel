@@ -567,7 +567,11 @@ const scenarios = {
     await home.waitForText("#tickerStatus", "click a card");
     const ticker = await home.text("#tickerTrack");
     const place = await b.page("place-a-bet.html", cfg.accounts.alice);
+    // The page lists recent wagers first, with details for only some of them, and only then listens for
+    // typing. Reading too early sees that list instead of the search, so wait for each stage.
+    await place.waitForText("#homeBetSearchStatus", "recent");
     await place.fill("#homeBetSearchInput", cfg.proposition);
+    await place.waitForText("#homeBetSearchStatus", "match");
     await place.waitForText("#homeBetSearchResults", cfg.proposition);
     return { ticker, search: await place.text("#homeBetSearchResults") };
   },
