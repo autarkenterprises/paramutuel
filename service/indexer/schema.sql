@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS wagers (
   -- Stake needed to open a new ticket or answer (decimal text; uint256).
   min_new_ticket_stake TEXT NOT NULL DEFAULT '0',
   -- 0 = creation-time eth_calls failed; backfill_incomplete_metadata retries the row.
-  metadata_complete INTEGER NOT NULL DEFAULT 1
+  metadata_complete INTEGER NOT NULL DEFAULT 1,
+  -- Failed retries so far, and the unix time before which the row is not retried (ADR-0021 U2):
+  -- the wait doubles from 15 s up to an hour, so a row that keeps failing cannot starve the others.
+  metadata_attempts INTEGER NOT NULL DEFAULT 0,
+  metadata_retry_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS wager_totals (
@@ -39,8 +43,11 @@ CREATE TABLE IF NOT EXISTS wager_totals (
   total_pot TEXT NOT NULL DEFAULT '0',
   total_fee_bps TEXT NOT NULL DEFAULT '0',
   winning_outcome TEXT,
-  -- The contract's payoutDenominator: a winning stake total, or weighted units for WEIGHTED_OVERLAP.
+  -- Plain stake on the winning tickets, in token units.
   total_winning_stake TEXT,
+  -- The contract's payoutDenominator, which payouts divide by. Equals total_winning_stake except
+  -- under WEIGHTED_OVERLAP, where each winning ticket counts once per overlapping outcome (ADR-0021 U3).
+  payout_denominator TEXT,
   FOREIGN KEY(wager_address) REFERENCES wagers(wager_address)
 );
 
@@ -74,6 +81,8 @@ CREATE TABLE IF NOT EXISTS events_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wagers_state ON wagers(state);
+-- Serves /wagers?resolver=...&state=OPEN, which the resolution service pages through (ADR-0021 U5).
+CREATE INDEX IF NOT EXISTS idx_wagers_resolver_state ON wagers(resolver, state);
 CREATE INDEX IF NOT EXISTS idx_wagers_deadline ON wagers(resolution_deadline);
 CREATE INDEX IF NOT EXISTS idx_events_wager ON events_log(wager_address, block_number, log_index);
 

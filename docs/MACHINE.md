@@ -194,14 +194,14 @@ Production entrypoint: `python3 -m service.indexer.live_api` (sync loop plus API
 | Path | Description |
 |---|---|
 | `GET /health` | `ok`, `ts`, `wager_count`, `last_indexed_block`, `chain_head`, `sync_lag_blocks`, `last_sync_error`, `skipped_log_count`, `last_skipped_log`, `factory_address` |
-| `GET /wagers` | Paginated list. Params: `state` (`OPEN`, `RESOLVED`, `RETRACTED`), `q` (search all fields), `limit` (1 to 1000, default 100), `offset`, `order` (`asc` or `desc`, default `desc`) |
+| `GET /wagers` | Paginated list. Params: `state` (`OPEN`, `RESOLVED`, `RETRACTED`), `q` (search all fields), `limit` (1 to 1000, default 100), `offset`, `order` (`asc` or `desc`, default `desc`), `resolver` (exact address: only that resolver's wagers) |
 | `GET /wagers/{address}` | Detail bundle, below. Params: `pool_limit`, `events_limit`, `answer_id` |
 | `GET /sweeper/expire-candidates` | Still-`OPEN` wagers where `expire()` is valid. Param: `now` (unix seconds) |
 
 Detail bundle fields:
 
 - **`wager`:** all indexed columns, including `protocol_version` (`enumerated` or `freeform`), `payoff_policy`, `policy_param`, `outcomes_json`, `betting_close_time`, `betting_closed_at`, `resolution_window`, `resolution_deadline`, `min_new_ticket_stake`, `state`.
-- **`totals`:** `total_pot`, `total_fee_bps`, `winning_outcome` (a mask or answer id), `total_winning_stake` (equals on-chain `payoutDenominator`; weighted units under `WEIGHTED_OVERLAP`).
+- **`totals`:** `total_pot`, `total_fee_bps`, `winning_outcome` (a mask or answer id), `total_winning_stake` (tokens staked on winning tickets), `payout_denominator` (on-chain `payoutDenominator`, which a payout divides by; it differs from `total_winning_stake` only under `WEIGHTED_OVERLAP`, where a ticket counts once per overlapping outcome).
 - **`outcomes`:** enumerated only. `{outcome_index, outcome_total}`, where a multi-outcome ticket counts toward each outcome it includes, so under those policies the totals overlap.
 - **`ticket_pools`:** `{ticket_mask, pool_total}`. Enumerated rows are sorted by mask and never truncated. Freeform rows use the answer id as `ticket_mask`, add `answer_text` and `answer_hex`, sort by stake, and are limited by `pool_limit` (default 500, with the full count in `ticket_pools_total`). Use `answer_id` to fetch one directly. `answer_text` is `null` when the bytes are not valid UTF-8; `answer_hex` is always exact.
 - **`events`:** newest `events_limit` events (default 1000) in chain order, with the full count in `events_total`.

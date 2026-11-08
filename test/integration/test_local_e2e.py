@@ -342,7 +342,11 @@ class LocalChainE2E(unittest.TestCase):
         detail = self._api(f"/wagers/{wager}")
         self.assertEqual(detail["wager"]["state"], "RESOLVED")
         self.assertEqual(int(detail["totals"]["winning_outcome"]), winning_mask)
-        self.assertEqual(int(detail["totals"]["total_winning_stake"]), denominator, "indexer vs chain")
+        self.assertEqual(int(detail["totals"]["payout_denominator"]), denominator, "indexer vs chain")
+        # The stake is tokens on winning tickets, whatever the policy weighs them by (ADR-0021 U3).
+        winning_stake = sum(a for m, a in flat if expected_units(policy, k, winning_mask, [(m, 1)]))
+        self.assertEqual(int(detail["totals"]["total_winning_stake"]), winning_stake)
+        self.assertLessEqual(winning_stake, pot)
 
         # Every claim pays exactly the documented amount, and custody ends as dust only.
         fees = pot * TOTAL_BPS // 10_000

@@ -87,6 +87,11 @@ def _stringify_uints(payload: dict) -> dict:
     return {k: str(v) if k in _UINT256_PAYLOAD_KEYS and v is not None else v for k, v in payload.items()}
 
 
+def _is_address(value: str) -> bool:
+    """True for a lower-case ``0x`` + 40 hex digit address."""
+    return len(value) == 42 and value.startswith("0x") and all(c in "0123456789abcdef" for c in value[2:])
+
+
 def list_wagers(
     conn: sqlite3.Connection,
     state: str | None,
@@ -94,8 +99,14 @@ def list_wagers(
     query_text: str | None,
     order: str,
     offset: int,
+    resolver: str | None = None,
 ) -> list[dict]:
     """Paginated wager list joined to totals; powers the explorer feed.
+
+    ``resolver`` (a lower-case address) keeps only that resolver's wagers. The resolution service
+    pages through its own OPEN wagers with it; without it, every other resolver's wagers on the
+    permissionless factory filled its pages first, and its own newest wagers fell past the page cap
+    (ADR-0021 U5).
 
     The free-text search expands a single ``q`` parameter into a
     case-insensitive ``LIKE`` against every operator-meaningful column
@@ -111,7 +122,8 @@ def list_wagers(
             COALESCE(t.total_pot, '0') AS total_pot,
             COALESCE(t.total_fee_bps, '0') AS total_fee_bps,
             t.winning_outcome,
-            t.total_winning_stake
+            t.total_winning_stake,
+            t.payout_denominator
         FROM wagers m
         LEFT JOIN wager_totals t ON t.wager_address = m.wager_address
     """
@@ -120,6 +132,10 @@ def list_wagers(
     if state:
         clauses.append("m.state = ?")
         params.append(state)
+    if resolver:
+        # Addresses are stored lower-case (indexer.normalize_address), so this can use the index.
+        clauses.append("m.resolver = ?")
+        params.append(resolver)
     if query_text and query_text.strip():
         needle = f"%{query_text.strip().lower()}%"
         clauses.append(
@@ -299,6 +315,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/wagers?limit=20&offset=0&order=desc",
                         "/wagers?limit=20&offset=0&order=asc&q=<text>",
                         "/wagers?q=<searches all indexed wager fields>",
+                        "/wagers?state=OPEN&resolver=0x<resolver address>",
                         "/wagers/{wager_address}?pool_limit=500&events_limit=1000",
                         "/wagers/{wager_address}?answer_id=0x<answer id>",
                         "/sweeper/expire-candidates",
@@ -338,6 +355,12 @@ class Handler(BaseHTTPRequestHandler):
             limit_raw = qs.get("limit", ["100"])[0]
             offset_raw = qs.get("offset", ["0"])[0]
             order = qs.get("order", ["desc"])[0].lower()
+            resolver = qs.get("resolver", [None])[0]
+            if resolver is not None:
+                resolver = resolver.strip().lower()
+                if not _is_address(resolver):
+                    self._send_json(400, {"error": "invalid resolver: expected a 0x-prefixed 20-byte hex address"})
+                    return
             try:
                 limit = max(1, min(1000, int(limit_raw)))
             except ValueError:
@@ -361,6 +384,7 @@ class Handler(BaseHTTPRequestHandler):
                         query_text,
                         order,
                         offset,
+                        resolver,
                     )
                 },
             )

@@ -156,9 +156,11 @@ class WinningUnitsTests(unittest.TestCase):
 
 class ResolvedStakeTests(Base):
     def test_enumerated_resolve_records_total_winning_stake(self):
+        # WEIGHTED_OVERLAP: the stake is tokens; the denominator weighs {A,B} twice (ADR-0021 U3).
         self._apply(self._created_enum(policy=4), self._bet_enum(0b01, 100), self._bet_enum(0b11, 40), self._bet_enum(0b10, 7))
         self._apply(self._resolved_enum(0b11))
-        self.assertEqual(self._totals()["total_winning_stake"], str(100 + 80 + 7))
+        self.assertEqual(self._totals()["total_winning_stake"], str(100 + 40 + 7))
+        self.assertEqual(self._totals()["payout_denominator"], str(100 + 80 + 7))
 
     def test_freeform_resolve_records_winning_pool(self):
         self._apply(self._created_free(), self._bet_free(ANSWER_ID, 5), self._bet_free(ANSWER_ID, 6))
@@ -358,9 +360,9 @@ class SyncTests(Base):
         self.conn.commit()
         rpc = FakeRpc()
         self._sync(rpc)
-        wager_filters = rpc.filters[1:]
-        self.assertEqual(len(wager_filters), 2)
-        self.assertEqual(sum(len(f["address"]) for f in wager_filters), ix.WAGER_ADDRESS_BATCH + 1)
+        # The factory shares the first batch with the wagers (ADR-0021 U4): 202 addresses, 2 queries.
+        self.assertEqual(len(rpc.filters), 2)
+        self.assertEqual(sum(len(f["address"]) for f in rpc.filters), ix.WAGER_ADDRESS_BATCH + 2)
 
     def test_confirmations_hold_back_the_unsafe_head(self):
         rpc = FakeRpc(head=100)

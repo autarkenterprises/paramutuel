@@ -60,7 +60,7 @@ Finding IDs are the ADR's. "Evidence" names the test that failed before the fix 
 
 | # | Disposition | Evidence |
 |---|---|---|
-| X1, X2 | **Fixed.** Outcome totals derived from ticket pools; `total_winning_stake` written using the policy's own math. | `test_adr0020_state.py`; the five `test_*_settles` end-to-end tests compare it to the contract's `payoutDenominator` |
+| X1, X2 | **Fixed.** Outcome totals derived from ticket pools; `total_winning_stake` written using the policy's own math. (ADR-0021 U3 later split it: the contract's value is now `payout_denominator`, and `total_winning_stake` is plain stake.) | `test_adr0020_state.py`; the five `test_*_settles` end-to-end tests compare it to the contract's `payoutDenominator` |
 | X3 | **Fixed.** Incomplete metadata is flagged and backfilled. | `test_adr0020_state.py` |
 | X4 | **Fixed.** A skipped log is counted, described in `/health`, and rolled back cleanly by a SAVEPOINT. Timestamps are clamped. | `test_skipped_log_is_counted_and_described` |
 | X5 | **Fixed.** Address-filtered `eth_getLogs`. | `test_indexer_ignores_a_contract_spoofing_our_topics` |

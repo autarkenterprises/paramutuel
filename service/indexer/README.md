@@ -33,12 +33,14 @@ python3 service/indexer/api.py \
 ### API endpoints
 
 - `GET /health`
-- `GET /wagers?state=OPEN|RESOLVED|RETRACTED&limit=100`
-- `GET /wagers/<wager_address>`
+- `GET /wagers?state=OPEN|RESOLVED|RETRACTED&limit=100&offset=0&order=asc|desc&q=<text>&resolver=<address>`
+- `GET /wagers/<wager_address>?pool_limit=500&events_limit=1000&answer_id=<freeform answer id>`
 - `GET /sweeper/expire-candidates`
+
+Every field and parameter is documented in [`docs/MACHINE.md`](../../docs/MACHINE.md).
 
 ### Notes
 
-- Current v1 keeps `total_fee_bps` at default `0` in indexed totals until extended with on-chain reads.
-- Indexer is designed to be extended with richer wager metadata once resolver/service layers are integrated.
+- Fees (`total_fee_bps`), the proposition and outcome labels are read from the wager by `eth_call` at creation. A failed read leaves the row incomplete, and it is retried with backoff (15 seconds doubling to an hour) until it succeeds.
+- `total_winning_stake` is tokens on winning tickets; `payout_denominator` is the contract's divisor for payouts. They differ only under `WEIGHTED_OVERLAP`.
 

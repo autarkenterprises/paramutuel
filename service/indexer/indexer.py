@@ -32,10 +32,11 @@ Sync loop
 ---------
 ``sync_logs`` walks ``[from_block, to_block]`` in ``chunk_size`` slices,
 bisecting on RPC error so a single hot range cannot stall progress. Each chunk
-makes two kinds of address-filtered query: factory logs first, then logs from
-the wagers that factory created. Filtering by address matters because anyone
-can deploy a contract that emits our topics; an unfiltered scan would pull that
-spam into every response. The ``meta`` table tracks the cursor
+is one address-filtered query over the factory and every wager it created
+(batched, since providers cap the address list), plus a follow-up only for
+wagers created inside that chunk (ADR-0021 U4). Filtering by address matters
+because anyone can deploy a contract that emits our topics; an unfiltered scan
+would pull that spam into every response. The ``meta`` table tracks the cursor
 (``last_indexed_block``), the chain head (``chain_head``), the most recent
 transient error (``last_sync_error``), and logs that could not be applied
 (``skipped_log_count``, ``last_skipped_log``) for the ``/health`` endpoint.
@@ -81,10 +82,13 @@ TOPICS = {
 MAX_WAGER_OUTCOMES = 255
 
 TOPIC_TO_EVENT = {v: k for k, v in TOPICS.items()}
-# Chunk queries are split by who can emit what: the factory emits creation events, wagers emit the
-# rest. See "Sync loop" above for why each query is address-filtered.
+# Who can emit what: the factory emits creation events, wagers emit the rest. A chunk's main query
+# covers both under ALL_TOPIC_FILTER; ``apply_log`` still accepts a creation only from the factory.
+# See "Sync loop" above for why each query is address-filtered.
 FACTORY_TOPIC_FILTER = [[v for k, v in TOPICS.items() if k.startswith("WagerCreated")]]
 WAGER_TOPIC_FILTER = [[v for k, v in TOPICS.items() if not k.startswith("WagerCreated")]]
+ALL_TOPIC_FILTER = [FACTORY_TOPIC_FILTER[0] + WAGER_TOPIC_FILTER[0]]
+CREATION_TOPICS = frozenset(FACTORY_TOPIC_FILTER[0])
 # eth_getLogs takes an address list, but providers limit its length, so known wagers are queried in
 # batches of this size.
 WAGER_ADDRESS_BATCH = 200
@@ -132,9 +136,16 @@ def init_db(conn: sqlite3.Connection) -> None:
     for column, definition in (
         ("min_new_ticket_stake", "TEXT NOT NULL DEFAULT '0'"),
         ("metadata_complete", "INTEGER NOT NULL DEFAULT 1"),
+        ("metadata_attempts", "INTEGER NOT NULL DEFAULT 0"),
+        ("metadata_retry_at", "INTEGER NOT NULL DEFAULT 0"),
     ):
         if column not in existing:
             conn.execute(f"ALTER TABLE wagers ADD COLUMN {column} {definition}")
+    totals_columns = {row[1] for row in conn.execute("PRAGMA table_info(wager_totals)")}
+    if "payout_denominator" not in totals_columns:
+        # Before ADR-0021 total_winning_stake held the weighted denominator; split it exactly once.
+        conn.execute("ALTER TABLE wager_totals ADD COLUMN payout_denominator TEXT")
+        _recompute_resolved_totals(conn)
     conn.execute("DROP TABLE IF EXISTS wager_outcomes")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wagers_proposition ON wagers(proposition)")
     conn.commit()
@@ -287,27 +298,53 @@ _NO_METADATA: Dict[str, Any] = {
 }
 
 
-def backfill_incomplete_metadata(conn: sqlite3.Connection, rpc_url: str, limit: int = 25) -> int:
+# Retry schedule for incomplete metadata (ADR-0021 U2): 15 s, doubling, capped at an hour. Never
+# abandoned, because an RPC outage ends and a dropped row would blank its wager for good.
+METADATA_RETRY_BASE_SECONDS = 15
+METADATA_RETRY_MAX_SECONDS = 3_600
+
+
+def metadata_retry_delay(attempts: int) -> int:
+    """Seconds to wait after the ``attempts``-th consecutive failure (1-based)."""
+    return min(METADATA_RETRY_BASE_SECONDS << min(max(attempts - 1, 0), 20), METADATA_RETRY_MAX_SECONDS)
+
+
+def backfill_incomplete_metadata(
+    conn: sqlite3.Connection, rpc_url: str, limit: int = 25, now: Optional[int] = None
+) -> int:
     """Retry enrichment for wagers whose creation-time reads failed; returns how many were repaired.
 
     Called on every sync pass, bounded by ``limit`` so a long outage cannot turn each pass into
     thousands of calls. Rows stay untouched until a complete read succeeds, so a partial read never
-    overwrites anything.
+    overwrites anything. A failed retry pushes the row's ``metadata_retry_at`` back, and rows are
+    taken in that order, so rows that keep failing move behind the rest instead of being re-read in
+    full on every pass while newer rows wait forever.
     """
+    now = int(time.time()) if now is None else now
     rows = conn.execute(
-        "SELECT wager_address FROM wagers WHERE metadata_complete = 0 ORDER BY created_block LIMIT ?",
-        (limit,),
+        """
+        SELECT wager_address, metadata_attempts FROM wagers
+        WHERE metadata_complete = 0 AND metadata_retry_at <= ?
+        ORDER BY metadata_retry_at, created_block LIMIT ?
+        """,
+        (now, limit),
     ).fetchall()
     repaired = 0
     for row in rows:
         wager = row["wager_address"]
         metadata = fetch_wager_metadata(rpc_url, wager)
         if not metadata["complete"]:
+            attempts = int(row["metadata_attempts"]) + 1
+            conn.execute(
+                "UPDATE wagers SET metadata_attempts = ?, metadata_retry_at = ? WHERE wager_address = ?",
+                (attempts, now + metadata_retry_delay(attempts), wager),
+            )
             continue
         conn.execute(
             """
             UPDATE wagers
-            SET proposition = ?, outcomes_json = ?, min_new_ticket_stake = ?, metadata_complete = 1
+            SET proposition = ?, outcomes_json = ?, min_new_ticket_stake = ?, metadata_complete = 1,
+                metadata_attempts = 0, metadata_retry_at = 0
             WHERE wager_address = ?
             """,
             (metadata["proposition"], json.dumps(metadata["outcomes"]), str(metadata["min_new_ticket_stake"]), wager),
@@ -321,14 +358,12 @@ def backfill_incomplete_metadata(conn: sqlite3.Connection, rpc_url: str, limit: 
     return repaired
 
 
-def compute_winning_units(policy: int, policy_param: int, winning_mask: int, pools: Dict[int, int]) -> int:
-    """Port of ``ParamutuelWagerV3._accumulateWinningUnits``: the on-chain ``payoutDenominator``.
+def _winning_pools(policy: int, policy_param: int, winning_mask: int, pools: Dict[int, int]):
+    """Yield ``(pool, overlap_size)`` for every ticket that wins under ``policy``.
 
-    Clients need this to turn a stake into a payout (``stake * netPot / units``). ``policy`` is the
-    ``PayoffPolicy`` ordinal. The local end-to-end suite compares this with the contract's own value
-    for every policy, so the two cannot drift silently.
+    The one place the win rule lives, so the stake and the denominator below cannot disagree about
+    which tickets won. ``policy`` is the ``PayoffPolicy`` ordinal.
     """
-    units = 0
     for mask, pool in pools.items():
         overlap = mask & winning_mask
         if overlap == 0:
@@ -341,8 +376,68 @@ def compute_winning_units(policy: int, policy_param: int, winning_mask: int, poo
         else:  # ANY_OF, WEIGHTED_OVERLAP
             wins = True
         if wins:
-            units += pool * overlap_size if policy == 4 else pool
-    return units
+            yield pool, overlap_size
+
+
+def compute_winning_units(policy: int, policy_param: int, winning_mask: int, pools: Dict[int, int]) -> int:
+    """Port of ``ParamutuelWagerV3._accumulateWinningUnits``: the on-chain ``payoutDenominator``.
+
+    Clients need this to turn a stake into a payout (``stake * netPot / units``). Under
+    WEIGHTED_OVERLAP (4) a ticket counts once per overlapping outcome, so this is units, not tokens.
+    The local end-to-end suite compares this with the contract's own value for every policy, so the
+    two cannot drift silently.
+    """
+    return sum(pool * overlap_size if policy == 4 else pool for pool, overlap_size in _winning_pools(policy, policy_param, winning_mask, pools))
+
+
+def compute_winning_stake(policy: int, policy_param: int, winning_mask: int, pools: Dict[int, int]) -> int:
+    """Tokens staked on winning tickets: what ``total_winning_stake`` means to every reader.
+
+    Equal to :func:`compute_winning_units` except under WEIGHTED_OVERLAP, where the site once printed
+    the weighted units as a token amount larger than the pot (ADR-0021 U3).
+    """
+    return sum(pool for pool, _ in _winning_pools(policy, policy_param, winning_mask, pools))
+
+
+def _ticket_pools(conn: sqlite3.Connection, wager: str) -> Dict[int, int]:
+    return {
+        int(row["ticket_mask"]): int(row["pool_total"])
+        for row in conn.execute("SELECT ticket_mask, pool_total FROM wager_ticket_pools WHERE wager_address = ?", (wager,))
+    }
+
+
+def _recompute_resolved_totals(conn: sqlite3.Connection) -> None:
+    """Rewrite the winning stake and denominator of every resolved wager from its stored pools.
+
+    Run once, when ``payout_denominator`` is added to a database written before ADR-0021. Pools are
+    final once a wager resolves, so this gives exactly what a fresh index would. A freeform wager's
+    denominator is its winning pool, which ``total_winning_stake`` already holds.
+    """
+    resolved = conn.execute(
+        """
+        SELECT w.wager_address, w.protocol_version, w.payoff_policy, w.policy_param, t.winning_outcome,
+               t.total_winning_stake
+        FROM wagers w JOIN wager_totals t ON t.wager_address = w.wager_address
+        WHERE w.state = 'RESOLVED' AND t.winning_outcome IS NOT NULL
+        """
+    ).fetchall()
+    for row in resolved:
+        wager = row["wager_address"]
+        if row["protocol_version"] == "freeform":
+            conn.execute(
+                "UPDATE wager_totals SET payout_denominator = total_winning_stake WHERE wager_address = ?", (wager,)
+            )
+            continue
+        policy, param = int(row["payoff_policy"] or 0), int(row["policy_param"] or 0)
+        mask, pools = int(row["winning_outcome"]), _ticket_pools(conn, wager)
+        conn.execute(
+            "UPDATE wager_totals SET total_winning_stake = ?, payout_denominator = ? WHERE wager_address = ?",
+            (
+                str(compute_winning_stake(policy, param, mask, pools)),
+                str(compute_winning_units(policy, param, mask, pools)),
+                wager,
+            ),
+        )
 
 
 def to_int(hex_value: str) -> int:
@@ -684,18 +779,19 @@ def apply_log(
         policy_row = conn.execute(
             "SELECT payoff_policy, policy_param FROM wagers WHERE wager_address = ?", (wager,)
         ).fetchone()
-        pools = {
-            int(row["ticket_mask"]): int(row["pool_total"])
-            for row in conn.execute(
-                "SELECT ticket_mask, pool_total FROM wager_ticket_pools WHERE wager_address = ?", (wager,)
-            )
-        }
-        units = compute_winning_units(
-            int(policy_row["payoff_policy"] or 0), int(policy_row["policy_param"] or 0), winning_val, pools
-        )
+        policy, param = int(policy_row["payoff_policy"] or 0), int(policy_row["policy_param"] or 0)
+        pools = _ticket_pools(conn, wager)
         conn.execute(
-            "UPDATE wager_totals SET winning_outcome = ?, total_winning_stake = ? WHERE wager_address = ?",
-            (str(winning_val), str(units), wager),
+            """
+            UPDATE wager_totals SET winning_outcome = ?, total_winning_stake = ?, payout_denominator = ?
+            WHERE wager_address = ?
+            """,
+            (
+                str(winning_val),
+                str(compute_winning_stake(policy, param, winning_val, pools)),
+                str(compute_winning_units(policy, param, winning_val, pools)),
+                wager,
+            ),
         )
         return
 
@@ -712,9 +808,13 @@ def apply_log(
             "SELECT pool_total FROM wager_ticket_pools WHERE wager_address = ? AND ticket_mask = ?",
             (wager, winning_key),
         ).fetchone()
+        winning_pool = str(pool_row["pool_total"]) if pool_row else "0"
         conn.execute(
-            "UPDATE wager_totals SET winning_outcome = ?, total_winning_stake = ? WHERE wager_address = ?",
-            (winning_key, str(pool_row["pool_total"]) if pool_row else "0", wager),
+            """
+            UPDATE wager_totals SET winning_outcome = ?, total_winning_stake = ?, payout_denominator = ?
+            WHERE wager_address = ?
+            """,
+            (winning_key, winning_pool, winning_pool, wager),
         )
         return
 
@@ -866,6 +966,18 @@ def _apply_logs(conn: sqlite3.Connection, factory_address: str, logs: List[Dict[
     return applied
 
 
+def _is_creation(log: Any) -> bool:
+    """True when a raw log carries a wager-creation topic. Tolerates malformed logs, which
+    ``_apply_logs`` counts as skipped rather than letting them stop the sync."""
+    topics = log.get("topics") if isinstance(log, dict) else None
+    return bool(topics) and str(topics[0]).lower() in CREATION_TOPICS
+
+
+def _known_wagers(conn: sqlite3.Connection) -> List[str]:
+    """Every indexed wager address, in a stable order so batches are deterministic."""
+    return [row[0] for row in conn.execute("SELECT wager_address FROM wagers ORDER BY wager_address")]
+
+
 def sync_logs(
     rpc_url: str,
     conn: sqlite3.Connection,
@@ -891,9 +1003,12 @@ def sync_logs(
     * ``to_block`` defaults to the chain head minus ``confirmations``, and
       is capped to it (see "Reorg handling" in the module docstring).
 
-    Each chunk fetches factory logs and applies them first, because they
-    create the wagers that scope the second query; a wager's seed bets land
-    in the same transaction as its creation. It then commits the cursor and
+    Each chunk makes one query over the factory and the known wagers
+    (``ceil((wagers + 1) / WAGER_ADDRESS_BATCH)`` once there are many), then
+    a follow-up only for wagers that chunk created, because a wager's seed
+    bets land in its creation transaction and it was not yet in the address
+    list. Most chunks create nothing, so most cost one call (ADR-0021 U4;
+    before, every chunk cost at least two). It then commits the cursor and
     clears ``last_sync_error``. A failure while fetching commits what was
     applied and re-raises; the next pass replays the chunk, which is safe
     because application is idempotent. Returns the number of logs
@@ -938,23 +1053,31 @@ def sync_logs(
         return 0
 
     processed = 0
+    # Only this loop adds wagers, so the list is read once and extended as chunks create wagers,
+    # rather than re-read on each of what can be ~100k chunks in a cold-start replay.
+    known = _known_wagers(conn)
 
     start = from_block
     while start <= to_block:
         end = min(start + chunk_size - 1, to_block)
         try:
-            factory_logs = (
-                _eth_get_logs_bisect(rpc_url, start, end, FACTORY_TOPIC_FILTER, min_span=1, address=[factory_address])
-                if factory_address
-                else []
-            )
-            processed += _apply_logs(conn, factory_address, factory_logs, rpc_url)
-            known = [row[0] for row in conn.execute("SELECT wager_address FROM wagers ORDER BY wager_address")]
-            for i in range(0, len(known), WAGER_ADDRESS_BATCH):
-                wager_logs = _eth_get_logs_bisect(
-                    rpc_url, start, end, WAGER_TOPIC_FILTER, min_span=1, address=known[i : i + WAGER_ADDRESS_BATCH]
+            addresses = ([factory_address] if factory_address else []) + known
+            saw_creation = False
+            for i in range(0, len(addresses), WAGER_ADDRESS_BATCH):
+                logs = _eth_get_logs_bisect(
+                    rpc_url, start, end, ALL_TOPIC_FILTER, min_span=1, address=addresses[i : i + WAGER_ADDRESS_BATCH]
                 )
-                processed += _apply_logs(conn, factory_address, wager_logs, rpc_url)
+                saw_creation = saw_creation or any(_is_creation(log) for log in logs)
+                processed += _apply_logs(conn, factory_address, logs, rpc_url)
+            if saw_creation:
+                already_known = set(known)
+                created = [w for w in _known_wagers(conn) if w not in already_known]
+                for i in range(0, len(created), WAGER_ADDRESS_BATCH):
+                    logs = _eth_get_logs_bisect(
+                        rpc_url, start, end, WAGER_TOPIC_FILTER, min_span=1, address=created[i : i + WAGER_ADDRESS_BATCH]
+                    )
+                    processed += _apply_logs(conn, factory_address, logs, rpc_url)
+                known = known + created
         except Exception as exc:
             set_meta_str(
                 conn,

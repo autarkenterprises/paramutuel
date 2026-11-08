@@ -28,7 +28,7 @@ Commit and push `config/deployments.json` so GitHub Pages picks up the default.
 
 ## Notes
 
-- Ephemeral DB: on cold start the indexer replays logs from `indexerFromBlock` / `INDEXER_FROM_BLOCK`. This costs one `eth_getLogs` per chunk, so it grows with the factory's age (see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md)). Use persistent storage for anything long-lived.
+- Ephemeral DB: on cold start the indexer replays logs from `indexerFromBlock` / `INDEXER_FROM_BLOCK`. This costs one `eth_getLogs` per chunk (one more for a chunk that creates wagers, and one per further 200 wagers once there are many), so it grows with the factory's age (see [`CLOUD-RUN-HOSTING.md`](CLOUD-RUN-HOSTING.md)). Use persistent storage for anything long-lived.
 - **Reorgs:** derived state is insert-only, so a reorg that moves or drops a transaction could double-count a stake or leave a ghost one. The indexer stays `INDEXER_CONFIRMATIONS` blocks behind the head (default 5) to make this unlikely. After a reorg deeper than that, delete the database and let it resync.
-- **Health:** `GET /health` reports `sync_lag_blocks`, `last_sync_error` and `skipped_log_count`. A skipped log is lost until the database is rebuilt, so anything above zero needs a look.
+- **Health:** `GET /health` reports `sync_lag_blocks`, `last_sync_error` and `skipped_log_count`. A skipped log is lost until the database is rebuilt, so anything above zero needs a look. A wager whose text could not be read at creation shows a blank proposition until a retry succeeds; retries back off from 15 seconds to at most an hour per wager, so a stubborn one never crowds out the rest.
 - After a **new factory** deploy, update `factoryAddress` and `indexerFromBlock` (`script/testnet/set_factory_address.sh` does both), then redeploy the hosted indexer.
