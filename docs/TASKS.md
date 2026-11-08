@@ -111,6 +111,8 @@ Exact commands are in [`ADR-0020-IMPLEMENTATION.md`](ADR-0020-IMPLEMENTATION.md)
 - [ ] Complete PyPI Trusted Publishing, then tag. Neither package is on PyPI yet.
 - [ ] Decide the ADR-0020 open questions: a lifetime backstop for no-max wagers, and cutover timing against the Resonance launch and ADR-0015.
 - [ ] Set up an uptime alert on the indexer's `/health`. It was down with nobody notified.
+- [ ] Early January 2027: revisit the ADR-0022 AAR with the December bill (target under $5; was the VM's external IPv4 address billed?).
+- [ ] When the factory gets its first wager, check the hosted `/wagers` against the factory's `wagersCount()`.
 
 ## Mainnet
 

@@ -1,7 +1,7 @@
 # ADR-0022: Host the indexer on an Always Free VM behind its existing Cloud Run URL
 
 Date: 2026-11-08
-Status: **Accepted**
+Status: **Implemented** (AAR below; revisit after the first full month's bill)
 Builds on: ADR-0020 (operator step 3: redeploy the hosted indexer), ADR-0021, `docs/INDEXER-HOSTING.md`, `AGENTS.md` #1 / #4 / #5 / #15
 
 ## Context
@@ -73,4 +73,46 @@ The web clients still need HTTPS. The explorer and dApp are served over HTTPS fr
 
 ## After Action Report
 
-Pending.
+2026-11-08. Deployed from commit `8070ba5`. Measured through the public URL and over SSH.
+
+**Success criteria**
+
+- **Served by the VM, caught up: met.** The replay reached the chain head at 22:06 UTC:
+  - `sync_lag_blocks` was 5, `skipped_log_count` 0 and `last_sync_error` null.
+  - `/`, `/wagers`, `/api/wagers` and `/sweeper/expire-candidates` all return 200 through the proxy, with `access-control-allow-origin: *`.
+- **Survives restart and reboot: met.**
+  - A restart through the deploy script's update path resumed from the stored cursor (40,337,400, then 40,387,400 shortly after).
+  - So did a full VM reboot (40,444,200, then 40,481,400).
+  - The service has not restarted on its own since (`NRestarts=0`).
+- **One database: met.** Successive public `/health` responses never reported a lower `last_indexed_block`. With one VM and a one-instance proxy there is only one database by construction.
+- **Tests: met, with a caveat.** `script/tests/test_gce_indexer.py` has 18 tests.
+  - 12 of the first 15 failed before the files existed.
+  - The other 3 check that a script refuses (no ref, a non-hash ref, no static address). An absent script also "refuses", so they passed vacuously. They mean something only alongside the positive-path tests in the same classes.
+  - Of the 3 tests for the old redeploy script, 2 fail against its pre-ADR version. The third pins behaviour the change kept: a named service still deploys.
+  - Fast suite: 169 Foundry, 605 Python and 93 Node tests, all passing.
+- **First full month's bill under $5: pending** until the December 2026 bill. The open question is whether the free tier covers the VM's external IPv4 address.
+
+**Failure criteria:** none triggered.
+- The replay took about 2 h 15 min against a 24 h limit.
+- No request through the proxy failed while the VM was healthy.
+
+**Measurements**
+
+- **Replay:**
+  - 16,120,886 blocks (40,147,601 to 56,268,487), about 80,600 `eth_getLogs` calls on the public RPC.
+  - It took about 2 h 15 min, from the first start (19:51:25 UTC) to the first check that found the lag under 100 (22:06:08). That time includes the restart and reboot tests, about a minute and a half of downtime.
+  - That is about 2,000 blocks a second, limited by RPC round trips, not by the VM.
+- **Load:**
+  - The process averaged 6% of a CPU over its lifetime (the replay included) and holds 27 MB resident.
+  - Once the index caught up, the load average was 0.02, with 284 of 953 MB of memory in use.
+  - The database is 4.1 MB. The e2-micro is far from its limits.
+
+**Findings**
+
+- **`wager_count` is 0, and that is correct.** The live factory's `wagersCount()` returns 0, and its account nonce is 1, so it has created no contract.
+  - The replay therefore tested log scanning over the whole range, but not wager decoding on live data. That is covered by the fast suite and `script/test-local-e2e.sh`.
+  - When the first wager lands, compare `/wagers` against `wagersCount()`.
+- **Every boot restarts the service once more.** The startup script re-applies the pinned release at every boot, so the service starts with the system and is restarted a few seconds later (19:54:48, then 19:54:56). This is harmless: the sync resumes from its cursor.
+- **The old host's outage was a hosting defect, not only billing.** The billing outage hid three defects in the Cloud Run setup (see Context): a throttled CPU, a database in `/tmp`, and up to three databases. Recorded as LESSONS.md L-018.
+
+**Revisit:** after the first full month's bill, record the project's cost and whether the external IPv4 address was billed. If it was, and the total is near $5, consider the cheaper options under Failure criteria.

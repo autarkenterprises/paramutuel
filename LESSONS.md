@@ -115,3 +115,21 @@ See `AGENTS.md` practice #11 for the contract this file satisfies.
 **Why:** Two tests asserted exactly what the code returned, and so locked its defects in. One expected the answer id `0xaa` for a quote of "hello"; `0xaa` was the id of whatever row sat at the index, not of "hello". The other expected `total_winning_stake` to hold weighted units, which every reader displays as tokens. An outside review found both (ADR-0021 U1, U3).
 
 **How to apply:** Derive each expected value from what the result means: compute the answer's id from the answer, or ask what the field's readers do with it. When a test needs a literal, say in a comment where the number comes from.
+
+---
+
+## L-018: A host that starts the container can still break the service
+
+**Why:** The hosted indexer ran on Cloud Run for months, and its container started and answered `/health`. But three things in how it was hosted contradicted how the indexer works (ADR-0022):
+- Request-based billing throttled the CPU between requests, so the background sync thread advanced only while somebody was waiting on a request.
+- The SQLite file sat in `/tmp`, which was lost whenever the service scaled to zero.
+- `maxScale` 3 allowed three instances, each with its own database.
+
+None of this showed until a billing outage forced a close look at the live configuration.
+
+**How to apply:** For any service with a background loop or local state, write down what the process assumes about its host:
+- that it gets CPU between requests;
+- that its files survive a restart;
+- that only one instance runs.
+
+Check each assumption against the host's actual settings, not only that the deploy succeeded. Pin them in the deploy files and test them, as `script/tests/test_gce_indexer.py` does for the database path.

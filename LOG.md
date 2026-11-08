@@ -262,3 +262,9 @@ Dead ends worth keeping:
 - Let's Encrypt over an `sslip.io` name shares one rate limit with every user of that domain.
 - IP-address certificates (generally available January 2026) are still reported broken in Caddy.
 - That is why TLS stays with Cloud Run.
+
+Replay result, 22:06 UTC:
+- The VM reached the chain head about 2 h 15 min after its first start: 16.1 million blocks, at a lag of 5 blocks, with nothing skipped.
+- The data endpoints answer through the proxy.
+- `wager_count` is 0. That is right: the factory's `wagersCount()` is 0 on chain, so live wager decoding is still unexercised.
+- The ADR is now Implemented; its AAR waits on the first full month's bill. Lesson L-018: check what a service assumes about its host, not only that the deploy succeeded.
