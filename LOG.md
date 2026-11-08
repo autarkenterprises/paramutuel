@@ -232,3 +232,7 @@ The review of part 1 returned five findings. Each was rechecked against `master`
 Dead ends worth keeping:
 - `python3 -m unittest test.integration...` imports the standard library's `test` package. Run the end-to-end suites with `discover -s test/integration`.
 - SQLite's `DROP COLUMN` rewrites the stored `CREATE TABLE` text and fails on a schema whose comments contain commas, so a test simulates an old database by building the table from today's columns instead.
+
+## 2026-11-08 — the hosted indexer's outage is billing, and there is no resolution service
+
+Asked to redeploy the indexer and resolution service, checked the Cloud Run project first (`paratest-491920`; the CLI's default project, `rttmdao-indexer`, belongs to something else). The indexer's 500/503, attributed in ADR-0020 to the code and an ephemeral database, is **billing**: it is disabled on the project, whose only billing account is closed. Every logged request fails with "billing is disabled for this project", and Cloud Build has not run since 7 May, so the service still runs `5b44e6b` and its push trigger looked broken when it was only unfunded. No resolution service is deployed in any visible project, so "redeploy" is a first deployment needing a key secret and token. Neither is done; restoring billing is the operator's. `docs/ADR-0020-IMPLEMENTATION.md` steps 3 and 4 are corrected. Review-only pull request #2 closed after its review.
