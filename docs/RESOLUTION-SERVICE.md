@@ -45,19 +45,22 @@ are actionable for `resolve/retract`.
 
 ## Local run
 
+This is how the project runs it (ADR-0022). The service acts only when the operator writes a decision, so it does not need to stay up, and the resolver key never leaves the operator's machine. Keep the key and token in `config/service.env`, which is gitignored, rather than on the command line, where other local users can see process arguments.
+
 ```bash
+cp config/service.env.example config/service.env   # once: fill PRIVATE_KEY, RESOLUTION_SERVICE_TOKEN, RPC_URL_BASE_SEPOLIA
+set -a; . config/service.env; set +a
 PYTHONPATH=. python3 -m service.resolution.service \
-  --indexer-base-url "http://127.0.0.1:8090" \
-  --rpc-url "$RPC_URL_BASE_SEPOLIA" \
-  --private-key "$PRIVATE_KEY" \
-  --resolver-address "0xYourResolverAddress" \
-  --decisions-path "config/resolution-decisions.base-sepolia.json" \
-  --port 8093
+  --host 127.0.0.1 --port 8093 \
+  --indexer-base-url "https://paramutuel-git-406244230167.europe-west1.run.app" \
+  --decisions-path "config/resolution-decisions.base-sepolia.json"
 ```
+
+Then `curl -H "Authorization: Bearer $RESOLUTION_SERVICE_TOKEN" -d '{"execute": false}' http://127.0.0.1:8093/run-once` previews the cycle, and `{"execute": true}` sends it. Use `--indexer-base-url http://127.0.0.1:8090` against a local indexer.
 
 ## Cloud Run
 
-Use `Dockerfile.resolution`, which includes a pinned `cast` for signing and broadcasting. `cast` accepts a raw key only as a process argument, so run this service alone in its container, or on a host with no other local users.
+Not used by the project (see Local run). For a hosted deployment of your own, use `Dockerfile.resolution`, which includes a pinned `cast` for signing and broadcasting. `cast` accepts a raw key only as a process argument, so run this service alone in its container, or on a host with no other local users.
 
 Required env for execution:
 

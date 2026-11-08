@@ -328,5 +328,37 @@ class ProxyScriptTests(unittest.TestCase):
         self.assertFalse([c for c in stub.calls() if "run deploy" in c])
 
 
+class OldRedeployScriptTests(unittest.TestCase):
+    """`redeploy_cloud_run_indexer.sh` defaulted to `paramutuel-git`, which is now the proxy. Following
+    the old runbook would have replaced it with the in-memory indexer the VM exists to avoid."""
+
+    def run_old(self, **env_overrides):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(tmp)])
+        stub = GcloudStub(tmp)
+        env = {**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}", "GCP_PROJECT_ID": "proj"}
+        env.pop("GCP_SERVICE", None)
+        env.update(env_overrides)
+        script = ROOT / "script" / "deploy" / "redeploy_cloud_run_indexer.sh"
+        return subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, cwd=ROOT), stub
+
+    def test_no_default_service(self):
+        result, stub = self.run_old()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("gce_indexer.sh", result.stderr)
+        self.assertEqual(stub.calls(), [])
+
+    def test_the_public_proxy_is_refused(self):
+        result, stub = self.run_old(GCP_SERVICE="paramutuel-git")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ADR-0022", result.stderr)
+        self.assertEqual(stub.calls(), [])
+
+    def test_a_named_standalone_service_still_deploys(self):
+        result, stub = self.run_old(GCP_SERVICE="my-indexer")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any(c.startswith("run deploy my-indexer") and "--source=." in c for c in stub.calls()), stub.calls())
+
+
 if __name__ == "__main__":
     unittest.main()

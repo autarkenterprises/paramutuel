@@ -1,6 +1,8 @@
 # Cloud Run Hosting (Indexer)
 
-This runbook sets up the hosted indexer on Google Cloud Run from this repository.
+This runbook runs the indexer container on a Cloud Run service of your own.
+
+> **The project's hosted indexer no longer runs this way (ADR-0022).** It runs on a Compute Engine VM with a persistent database, and the Cloud Run service `paramutuel-git` is only an HTTPS proxy to it; see [`INDEXER-HOSTING.md`](INDEXER-HOSTING.md#hosted-deployment-adr-0022). `redeploy_cloud_run_indexer.sh` therefore needs `GCP_SERVICE` set, and refuses `paramutuel-git`.
 
 ## Service details
 
@@ -89,10 +91,11 @@ Cloud Run does **not** automatically pick up new Git commits unless your project
 
 ```bash
 export GCP_PROJECT_ID="your-gcp-project-id"
+export GCP_SERVICE="your-indexer"
 ./script/deploy/redeploy_cloud_run_indexer.sh
 ```
 
-(Adjust `GCP_REGION` / `GCP_SERVICE` if your service name or region differs.)
+(Set `GCP_REGION` if your region is not europe-west1.)
 
 **How to tell the running image is stale:** `GET /health` shows `wager_count: 0` and `last_indexed_block` well above the factory deploy block, but Base Sepolia has `WagerCreated` logs for that factory. The running indexer likely predates the on-chain ABI (rebuild from latest `master`).
 
