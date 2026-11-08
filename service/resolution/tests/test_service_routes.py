@@ -104,7 +104,7 @@ class RouteBase(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "decisions.json"
         self.path.write_text(self.decisions_text)
-        patcher = mock.patch.object(svc, "_load_open_wagers", side_effect=lambda *a, **k: [dict(w) for w in self.wagers])
+        patcher = mock.patch.object(svc, "_load_open_wagers", side_effect=lambda *a, **k: ([dict(w) for w in self.wagers], False))
         patcher.start()
         self.addCleanup(patcher.stop)
         svc.Handler.indexer_base_url = "http://indexer.invalid"

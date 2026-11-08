@@ -81,7 +81,7 @@ class TestRunOnceEndpoint(unittest.TestCase):
 
     def setUp(self) -> None:
         self._patches = [
-            mock.patch.object(svc, "_load_open_wagers", return_value=[dict(self.OPEN_WAGER)]),
+            mock.patch.object(svc, "_load_open_wagers", return_value=([dict(self.OPEN_WAGER)], False)),
             mock.patch.object(svc, "_read_decisions", return_value={WAGER: {"action": "resolve", "outcomeIndex": 1}}),
             mock.patch.object(svc.subprocess, "run", side_effect=AssertionError("must not execute")),
         ]

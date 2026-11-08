@@ -50,22 +50,24 @@ class PaginationTests(unittest.TestCase):
             return {"wagers": pages.get(offset, [])}
 
         with mock.patch.object(svc, "_http_get_json", fake_get):
-            rows = svc._load_open_wagers("http://indexer", limit=None)
+            rows, truncated = svc._load_open_wagers("http://indexer", limit=None)
+        self.assertFalse(truncated)
         self.assertEqual(len(rows), 1001)
         self.assertEqual(rows[-1]["wager_address"], "0xlast")
         self.assertEqual(len(urls), 2)
 
     def test_explicit_limit_stops_early(self):
         with mock.patch.object(svc, "_http_get_json", return_value={"wagers": [{"a": 1}] * 20}) as g:
-            self.assertEqual(len(svc._load_open_wagers("http://indexer", limit=20)), 20)
-        self.assertEqual(g.call_count, 1)
+            self.assertEqual(len(svc._load_open_wagers("http://indexer", limit=20)[0]), 20)
+        # One page, then a one-row probe to learn whether more exist (ADR-0021 U5); never a walk.
+        self.assertEqual(g.call_count, 2)
 
 
 class HttpTests(unittest.TestCase):
     def setUp(self):
         self.decision = {WAGER: {"action": "resolve", "winningAnswer": "the answer"}}
         self._patches = [
-            mock.patch.object(svc, "_load_open_wagers", return_value=[dict(OPEN_WAGER)]),
+            mock.patch.object(svc, "_load_open_wagers", return_value=([dict(OPEN_WAGER)], False)),
             mock.patch.object(svc, "_read_decisions", side_effect=lambda path: self.decision),
         ]
         for p in self._patches:

@@ -70,7 +70,8 @@ from .logic import actionability_reason, normalize_address
 MAX_OUTCOME_INDEX = 254
 # The indexer caps one /wagers page at this size.
 INDEXER_PAGE_SIZE = 1000
-# Stops a misbehaving indexer from looping forever; 50,000 open wagers is far beyond current scale.
+# Stops a misbehaving indexer from looping forever. The pages hold only this resolver's own OPEN
+# wagers, and reaching the cap is reported as `truncated`, never silent (ADR-0021 U5).
 MAX_INDEXER_PAGES = 50
 
 
@@ -176,23 +177,37 @@ def resolve_uint256_from_decision(decision: dict) -> int | None:
     return 1 << idx
 
 
-def _load_open_wagers(indexer_base_url: str, limit: int | None = 300) -> list[dict]:
-    """Fetch open wagers, oldest first; `limit=None` walks every page.
+def _load_open_wagers(
+    indexer_base_url: str, limit: int | None = 300, resolver: str = ""
+) -> tuple[list[dict], bool]:
+    """Fetch open wagers, oldest first; returns ``(rows, truncated)``.
 
     Actionable wagers are the oldest: betting has closed and the window is running. Reading only the
     newest page would starve exactly those once more than one page of wagers was open.
+
+    ``resolver`` scopes the query to that resolver's wagers. Every other wager is rejected by
+    ``actionability_reason`` anyway, and on a permissionless factory they would otherwise fill the
+    pages first. ``limit=None`` reads up to ``MAX_INDEXER_PAGES`` pages. ``truncated`` is true when
+    more OPEN wagers exist past what was read; a full last page proves nothing, so one more row is
+    asked for to find out. An indexer too old to know the filter ignores it and returns a superset,
+    which the per-row resolver check still handles.
     """
     base = indexer_base_url.rstrip("/")
+    scope = f"&resolver={resolver}" if resolver else ""
+
+    def page(size: int, offset: int) -> list[dict]:
+        body = _http_get_json(f"{base}/wagers?state=OPEN&limit={size}&offset={offset}&order=asc{scope}")
+        return list(body.get("wagers") or [])
+
+    cap = MAX_INDEXER_PAGES * INDEXER_PAGE_SIZE if limit is None else limit
     rows: list[dict] = []
-    for page in range(MAX_INDEXER_PAGES):
-        size = INDEXER_PAGE_SIZE if limit is None else min(INDEXER_PAGE_SIZE, limit - len(rows))
-        offset = len(rows)
-        body = _http_get_json(f"{base}/wagers?state=OPEN&limit={size}&offset={offset}&order=asc")
-        batch = list(body.get("wagers") or [])
+    while len(rows) < cap:
+        size = min(INDEXER_PAGE_SIZE, cap - len(rows))
+        batch = page(size, len(rows))
         rows.extend(batch)
-        if len(batch) < size or (limit is not None and len(rows) >= limit):
-            break
-    return rows
+        if len(batch) < size:
+            return rows, False
+    return rows, bool(page(1, len(rows)))
 
 
 def _action_command(
@@ -309,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
                 decisions = {}
                 decisions_error = _decisions_problem(exc)
             try:
-                wagers = _load_open_wagers(self.indexer_base_url, limit=20)
+                wagers, _ = _load_open_wagers(self.indexer_base_url, limit=20, resolver=self.resolver_address)
                 ok = True
                 err = None
             except Exception as exc:
@@ -340,7 +355,9 @@ class Handler(BaseHTTPRequestHandler):
                 _json_response(self, 400, {"error": "invalid limit"})
                 return
             try:
-                open_wagers = _load_open_wagers(self.indexer_base_url, limit=max(1, min(1000, limit)))
+                open_wagers, truncated = _load_open_wagers(
+                    self.indexer_base_url, limit=max(1, min(1000, limit)), resolver=self.resolver_address
+                )
             except Exception as exc:
                 _json_response(self, 502, {"error": f"indexer unavailable: {exc}"})
                 return
@@ -357,7 +374,7 @@ class Handler(BaseHTTPRequestHandler):
             )
             if not self._authorized():
                 candidates = [_without_decision_contents(c) for c in candidates]
-            _json_response(self, 200, {"candidates": candidates})
+            _json_response(self, 200, {"candidates": candidates, "truncated": truncated})
             return
 
         _json_response(self, 404, {"error": "not found"})
@@ -382,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
         execute = bool(payload.get("execute", False))
 
         try:
-            open_wagers = _load_open_wagers(self.indexer_base_url, limit=None)
+            open_wagers, truncated = _load_open_wagers(self.indexer_base_url, limit=None, resolver=self.resolver_address)
         except Exception as exc:
             _json_response(self, 502, {"error": f"indexer unavailable: {exc}"})
             return
@@ -475,6 +492,9 @@ class Handler(BaseHTTPRequestHandler):
                 "failed": failed,
                 "execute": execute,
                 "results": results,
+                # More of this resolver's OPEN wagers exist than one run reads; run again after
+                # these are acted on, or raise MAX_INDEXER_PAGES.
+                "truncated": truncated,
             },
         )
 
