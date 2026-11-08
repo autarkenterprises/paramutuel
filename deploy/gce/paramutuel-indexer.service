@@ -1,0 +1,43 @@
+# The Paramutuel indexer on its Compute Engine VM (ADR-0022): one process that syncs Base Sepolia logs
+# into SQLite and serves the read-only HTTP API on port 8080. The Cloud Run service `paramutuel-git`
+# proxies the public HTTPS URL to that port.
+#
+# `deploy/gce/startup.sh` installs this file from the pinned checkout in /opt/paramutuel, so the unit
+# and the code always come from the same commit.
+#
+# The command is the container image's CMD (`Dockerfile`); `script/tests/test_gce_indexer.py` keeps the
+# two from drifting. Differences from the image, and why:
+#   - INDEXER_DB_PATH is in the StateDirectory below (/var/lib/paramutuel), on the boot disk. The image
+#     keeps it in /tmp, which on Cloud Run is lost whenever the instance scales to zero.
+#   - INDEXER_CHUNK_SIZE is 200, the most the public RPC accepts ("eth_getLogs is limited to a 200
+#     range"). The image's 120 only adds calls: a replay from indexerFromBlock is 16 million blocks.
+#   - The RPC is the public endpoint, so the VM holds no secret.
+[Unit]
+Description=Paramutuel indexer (Base Sepolia log sync + read-only HTTP API)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+# A transient unprivileged user. It still owns the StateDirectory across restarts and reboots.
+# DynamicUser also implies ProtectSystem=strict, ProtectHome=read-only, PrivateTmp and NoNewPrivileges.
+DynamicUser=yes
+StateDirectory=paramutuel
+StateDirectoryMode=0750
+WorkingDirectory=/opt/paramutuel
+Environment=PYTHONPATH=/opt/paramutuel
+Environment=PYTHONUNBUFFERED=1
+# The checkout is root-owned and read-only to the service; do not try to write .pyc files into it.
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=INDEXER_DB_PATH=/var/lib/paramutuel/indexer.db
+Environment=INDEXER_CHUNK_SIZE=200
+Environment=INDEXER_POLL_INTERVAL_SECONDS=15
+Environment=RPC_URL_BASE_SEPOLIA=https://sepolia.base.org
+ExecStart=/usr/bin/python3 -m service.indexer.live_api --host 0.0.0.0 --port 8080 --network base-sepolia --deployments-config-path config/deployments.json
+Restart=always
+RestartSec=5
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target
