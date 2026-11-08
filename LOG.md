@@ -222,3 +222,13 @@ Merged to `master` (fast-forward to `96b3bf7`). The Pages deploy succeeded, and 
 
 Both were fixed on the branch (`ad9cd36`), and that workflow now runs on every branch.
 
+
+## 2026-11-07 (evening) — ADR-0021: an outside review of ADR-0020
+
+The operator ran Claude Code's ultrareview (a multi-agent cloud review) over ADR-0020's diff. At 15,718 changed lines it exceeded the reviewer's 8,000-line cap, so the diff became three stacked review-only pull requests at real commit boundaries (#2 `d4e2998..4e3d8c7`, #3 `..f8129d2`, #4 `..579b192`; #1, the whole diff, was closed). Nothing is merged through them; the work was already on `master`.
+
+The review of part 1 returned five findings. Each was rechecked against `master` first, since later parts touch the same code. The MCP half of U1 had already been fixed in part 2. The bet scout half was worse than reported: a freeform quote took its odds from the row at `outcome_index` and its calldata from the answer text, so it could quote one answer and bet on another. The test that should have caught it asserted the wrong id, copied from the code's own output, and an ADR-0020 test had done the same with weighted units (L-017). Fixed on branch `adr-0021-ultrareview-findings`, test-first. The bet scout gained a pure-Python Keccak-256, checked against `eth-hash` at every length across the padding boundary, so it stays dependency-free.
+
+Dead ends worth keeping:
+- `python3 -m unittest test.integration...` imports the standard library's `test` package. Run the end-to-end suites with `discover -s test/integration`.
+- SQLite's `DROP COLUMN` rewrites the stored `CREATE TABLE` text and fails on a schema whose comments contain commas, so a test simulates an old database by building the table from today's columns instead.

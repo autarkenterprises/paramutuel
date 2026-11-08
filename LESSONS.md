@@ -109,3 +109,9 @@ See `AGENTS.md` practice #11 for the contract this file satisfies.
 **Why:** The end-to-end tests looked contracts up by name across `out/`. On one machine that found a stale artifact of a deleted test, and on CI the real mock. The stale one happened to have `decimals()`, so the local run passed and hid that the mock lacked it (ADR-0020 T2).
 
 **How to apply:** Address artifacts by source path and contract name. When a test passes locally and fails on CI, suspect state that only one of them has.
+
+## L-017: An expected value copied from the code's output pins the bug
+
+**Why:** Two tests asserted exactly what the code returned, and so locked its defects in. One expected the answer id `0xaa` for a quote of "hello"; `0xaa` was the id of whatever row sat at the index, not of "hello". The other expected `total_winning_stake` to hold weighted units, which every reader displays as tokens. An outside review found both (ADR-0021 U1, U3).
+
+**How to apply:** Derive each expected value from what the result means: compute the answer's id from the answer, or ask what the field's readers do with it. When a test needs a literal, say in a comment where the number comes from.

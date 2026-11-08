@@ -25,3 +25,4 @@ See `AGENTS.md` practice #11 for the contract this file satisfies. For history u
 - `src/` on `master` is **ahead of the deployed factory** (ADR-0020). Its fixes do nothing until the operator redeploys: `docs/ADR-0020-IMPLEMENTATION.md`.
 - **Never trust `cast` with user text.** It alters strings and exits 0 on a mined revert. Encode with `service/control_panel/abi.py`, send raw calldata, check the receipt with `run_cast_send`.
 - **ethers v6 cannot pick between same-length overloads.** Call `placeBet` and `resolve` by full signature, as in `contract["resolve(string)"](x)`.
+- Pull requests #2–#4 on GitHub are **review-only** (stacked parts of ADR-0020 for ultrareview, which caps a review at 8,000 changed lines). Never merge them; close each once reviewed. Findings go to ADR-0021.
