@@ -106,8 +106,8 @@ Exact commands are in [`ADR-0020-IMPLEMENTATION.md`](ADR-0020-IMPLEMENTATION.md)
 
 - [ ] Rotate the Alchemy key that was committed to `README.md`. It is gone from the tree but stays in git history.
 - [ ] Deploy the corrected factory and point `config/deployments.json` at it. The live factory has no wagers, so this strands nobody, but the contract fixes do nothing until it happens.
-- [ ] Redeploy the hosted indexer, on persistent storage. It currently returns 500/503.
-- [ ] Redeploy the resolution service with `RESOLUTION_SERVICE_TOKEN` set.
+- [x] Redeploy the hosted indexer, on persistent storage. Done 2026-11-08 (ADR-0022): a Compute Engine VM behind the same URL.
+- [ ] Run the resolution service locally (ADR-0022): put the resolver key and `RESOLUTION_SERVICE_TOKEN` in the gitignored `config/service.env` (`docs/RESOLUTION-SERVICE.md#local-run`).
 - [ ] Complete PyPI Trusted Publishing, then tag. Neither package is on PyPI yet.
 - [ ] Decide the ADR-0020 open questions: a lifetime backstop for no-max wagers, and cutover timing against the Resonance launch and ADR-0015.
 - [ ] Set up an uptime alert on the indexer's `/health`. It was down with nobody notified.

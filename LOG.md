@@ -236,3 +236,29 @@ Dead ends worth keeping:
 ## 2026-11-08 — the hosted indexer's outage is billing, and there is no resolution service
 
 Asked to redeploy the indexer and resolution service, checked the Cloud Run project first (`paratest-491920`; the CLI's default project, `rttmdao-indexer`, belongs to something else). The indexer's 500/503, attributed in ADR-0020 to the code and an ephemeral database, is **billing**: it is disabled on the project, whose only billing account is closed. Every logged request fails with "billing is disabled for this project", and Cloud Build has not run since 7 May, so the service still runs `5b44e6b` and its push trigger looked broken when it was only unfunded. No resolution service is deployed in any visible project, so "redeploy" is a first deployment needing a key secret and token. Neither is done; restoring billing is the operator's. `docs/ADR-0020-IMPLEMENTATION.md` steps 3 and 4 are corrected. Review-only pull request #2 closed after its review.
+
+## 2026-11-08 (evening) — ADR-0022: the indexer moves to an Always Free VM behind its old URL
+
+The operator attached a paid billing account and asked for the indexer to be set up again. Its Cloud Run configuration explained more than the outage:
+- **CPU throttled between requests:** request-based billing, so the sync thread advanced only while someone waited on a request.
+- **Database in `/tmp`:** lost at every scale-to-zero.
+- **`maxScale` 3:** up to three instances with three different databases.
+
+Right after billing returned, the public `/health` showed exactly that: an empty index starting over. Keeping CPU always on would cost about $45 a month and fix neither of the other two.
+
+Now the indexer runs on an e2-micro in us-central1 (Always Free) as a systemd service with its database in a `StateDirectory`. The code is a checkout of a pinned commit (instance metadata `indexer-ref`) that `deploy/gce/startup.sh` fetches at every boot, refusing branch names and unknown commits. The Cloud Run service `paramutuel-git` keeps its URL, so no client changed. It is now a single-instance Caddy `reverse-proxy` with its environment cleared, which also removed the leaked provider RPC URL. Other changes:
+- The push-to-`master` Cloud Build trigger is disabled, because it would have replaced the proxy.
+- The old redeploy script refuses `paramutuel-git`.
+- A $5 monthly budget alert covers the project.
+- The resolution service stays off the cloud: it runs locally when the operator has a decision, so the key never leaves the operator's machine.
+
+Measured on the way:
+- `sepolia.base.org` returns 403 to Python's default User-Agent (the indexer sends its own).
+- It answers HTTP 413, `eth_getLogs is limited to a 200 range`, above 200 blocks. A replay from `indexerFromBlock` is therefore 80,000 calls for 16 million blocks.
+- The VM replays at about 2,000 blocks a second.
+- A service restart through the deploy script and a full VM reboot both resumed from the stored cursor.
+
+Dead ends worth keeping:
+- Let's Encrypt over an `sslip.io` name shares one rate limit with every user of that domain.
+- IP-address certificates (generally available January 2026) are still reported broken in Caddy.
+- That is why TLS stays with Cloud Run.
