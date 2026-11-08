@@ -50,7 +50,7 @@ Operations:
 | `health` | — | Indexer `/health` |
 | `scan` | `state?`, `limit?`, `order?`, `q?` | Wager list summaries |
 | `recommend` | `bet_amount_raw`, `strategy?`, `scan_limit?`, `min_total_pot_raw?`, `proposition_contains?`, `top?` | Ranked suggestions. Freeform ideas carry calldata when the answer text is known |
-| `quote` | `wager_address`, `outcome_index`, `bet_amount_raw`, `freeform_answer?` | Quote, with `odds_model_exact` (false means the multiple is not a payout estimate for this policy). **Freeform** uses `outcome_index` as index into sorted `ticket_pools`; pass `freeform_answer` for `placeBet` calldata, sent byte-exact |
+| `quote` | `wager_address`, `outcome_index`, `bet_amount_raw`, `freeform_answer?` | Quote, with `odds_model_exact` (false means the multiple is not a payout estimate for this policy). **Freeform:** pass `freeform_answer` (sent byte-exact). The scout then asks the indexer for that answer's own pool by id, so the odds and the calldata describe the same answer, even one outside the listed pools. Without it, `outcome_index` picks a row of the listed `ticket_pools` (sorted by answer id) for an informational quote with no calldata |
 
 Example:
 

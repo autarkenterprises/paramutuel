@@ -57,7 +57,13 @@ class IndexerClient:
         rows = data.get("wagers")
         return [dict(r) for r in rows] if isinstance(rows, list) else []
 
-    def get_wager(self, wager_address: str) -> dict[str, Any]:
+    def get_wager(self, wager_address: str, answer_id: str | None = None) -> dict[str, Any]:
+        """Wager detail. With ``answer_id`` (freeform), ``ticket_pools`` holds just that answer's pool.
+
+        Without it, a freeform wager lists only its largest pools, so an answer outside them would
+        look unstaked; see ADR-0021 U1.
+        """
         w = wager_address.strip().lower()
-        data = self._get(f"/wagers/{w}")
+        query = f"?answer_id={answer_id}" if answer_id else ""
+        data = self._get(f"/wagers/{w}{query}")
         return data if isinstance(data, dict) else {}

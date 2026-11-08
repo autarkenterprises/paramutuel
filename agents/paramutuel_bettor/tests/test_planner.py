@@ -1,6 +1,6 @@
 import unittest
 
-from agents.paramutuel_bettor import planner
+from agents.paramutuel_bettor import calldata, planner
 
 
 class _FakeIndexer:
@@ -9,7 +9,11 @@ class _FakeIndexer:
     def __init__(self, detail: dict) -> None:
         self._detail = detail
 
-    def get_wager(self, wager_address: str) -> dict:
+    def get_wager(self, wager_address: str, answer_id: str | None = None) -> dict:
+        # Like the indexer: `answer_id` narrows a freeform wager's pools to that one answer.
+        if answer_id and (self._detail.get("wager") or {}).get("protocol_version") == "freeform":
+            pools = [p for p in self._detail.get("ticket_pools") or [] if p.get("ticket_mask") == answer_id]
+            return {**self._detail, "ticket_pools": pools}
         return self._detail
 
 
@@ -120,7 +124,10 @@ class TestPlannerQuoteV3(unittest.TestCase):
             bet_amount_raw=10,
             freeform_answer="hello",
         )
-        self.assertEqual(out["answer_id_hex"], "0xaa")
+        # The id of "hello" itself. This once reported "0xaa", the id of whatever row sat at
+        # outcome_index 0, beside calldata for "hello" (ADR-0021 U1). "hello" has no pool here.
+        self.assertEqual(out["answer_id_hex"], calldata.freeform_answer_id_hex("hello"))
+        self.assertEqual(out["outcome_total_raw"], 0)
         self.assertTrue(out["quote"]["freeform_answer_supplied"])
 
     def test_quote_wager_freeform_rejects_out_of_range_index(self) -> None:

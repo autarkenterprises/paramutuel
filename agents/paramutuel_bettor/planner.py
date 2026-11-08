@@ -121,7 +121,12 @@ def quote_wager(
     bet_amount_raw: int,
     freeform_answer: str | None = None,
 ) -> dict[str, Any]:
-    detail = client.get_wager(wager_address)
+    # With the answer text, ask for that answer's pool by id. The listing holds only the largest
+    # pools, and `outcome_index` is a position in it that shifts as answers arrive, so taking the odds
+    # from it described a different answer than the calldata (ADR-0021 U1). The indexer ignores
+    # `answer_id` for enumerated wagers, so this is safe before the protocol is known.
+    answer_id_hex: str | None = calldata_mod.freeform_answer_id_hex(freeform_answer) if freeform_answer else None
+    detail = client.get_wager(wager_address, answer_id=answer_id_hex) if answer_id_hex else client.get_wager(wager_address)
     wager = detail.get("wager") or {}
     totals_meta = detail.get("totals") or {}
     # V3 indexer tags every wager as `enumerated` or `freeform`; default to
@@ -140,8 +145,14 @@ def quote_wager(
             raise ValueError(f"outcome_index {outcome_index} out of range: this wager has {len(labels)} outcomes")
 
     otot: int | None = None
-    answer_id_hex: str | None = None
-    if protocol_version == "freeform":
+    if protocol_version == "freeform" and answer_id_hex:
+        otot = 0
+        for tp in detail.get("ticket_pools") or []:
+            if isinstance(tp, dict) and str(tp.get("ticket_mask") or "").strip().lower() == answer_id_hex:
+                otot = int(tp.get("pool_total", 0) or 0)
+                break
+    elif protocol_version == "freeform":
+        # No answer text: no calldata either, so this only reports the listed row at the index.
         pools = [p for p in (detail.get("ticket_pools") or []) if isinstance(p, dict)]
         pools.sort(key=lambda p: str(p.get("ticket_mask") or "").lower())
         oi = int(outcome_index)
@@ -154,6 +165,7 @@ def quote_wager(
         otot = int(row.get("pool_total", 0) or 0)
         answer_id_hex = str(row.get("ticket_mask") or "").strip().lower()
     else:
+        answer_id_hex = None  # an answer passed for an enumerated wager has no id to report
         mask = int(1) << int(outcome_index)
         key = str(mask)
         for tp in detail.get("ticket_pools") or []:

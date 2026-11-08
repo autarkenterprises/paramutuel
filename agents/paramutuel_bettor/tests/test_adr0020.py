@@ -62,7 +62,7 @@ class FakeClient:
         self.detail = detail
         self.rows = rows or []
 
-    def get_wager(self, wager_address):
+    def get_wager(self, wager_address, answer_id=None):
         return self.detail
 
     def list_wagers(self, **kw):

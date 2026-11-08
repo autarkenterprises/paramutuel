@@ -14,6 +14,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from .keccak import keccak256
+
+# `ParamutuelWagerV3._answerId` hashes a domain byte before the answer, so a freeform answer id can
+# never collide with an enumerated ticket mask.
+FREEFORM_ANSWER_DOMAIN = b"\x03"
+
 # keccak256(signature)[:4]. Python's standard library has no keccak, so these are pinned, and
 # `tests/test_adr0020.py` recomputes each one.
 SELECTORS: dict[str, str] = {
@@ -22,6 +28,15 @@ SELECTORS: dict[str, str] = {
     "resolve(string)": "0x461a4478",
     "approve(address,uint256)": "0x095ea7b3",
 }
+
+
+def freeform_answer_id_hex(answer: str) -> str:
+    """``keccak256(0x03 || utf8(answer))``: the id the contract and the indexer key this answer by.
+
+    The scout asks the indexer for this id directly (``/wagers/{addr}?answer_id=``), because the
+    wager listing holds only the largest pools (ADR-0021 U1).
+    """
+    return "0x" + keccak256(FREEFORM_ANSWER_DOMAIN + answer.encode("utf-8")).hex()
 
 
 def _word(value: int) -> str:
