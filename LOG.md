@@ -288,3 +288,9 @@ Every claim in `README.md` was checked against `src/`, the scripts, CI, the live
 - Added that `cast send` exits 0 on a revert (L-014).
 
 Left alone: the ABI drift test's narrow scope is now documented rather than widened.
+
+README follow-up, the same day, after the operator asked how the resolver "moves the wager on" and what going short means:
+- **No resolution deadline:** the README now names the mechanism. The resolver ends the wager with `resolve` or `retract`. Otherwise the resolution closer calls `closeResolutionWindow()`, after which only `expire()` remains.
+- **Fee-on-transfer:** the README now says the wager is short by the token's fee on everything bet. Withdrawals pay in full or revert, first come, first served, so the last to withdraw get nothing, not a partial payment, until the balance is topped back up; a top-up is itself skimmed. Every payout also loses the token's fee on the way out.
+- **Rebasing:** shrinking has the same effect; growth leaves an excess that the wager cannot pay out.
+- **New test:** `test_ADR0018_feeOnTransferToken_lastWinnerUnpaid_untilToppedUp` pins the winner-last case and the recovery. It pins existing behaviour, so it was never red. It does fail when the top-up only equals the gap, which shows the skim matters.

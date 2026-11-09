@@ -2,7 +2,15 @@
 
 Paramutuel provides permissionless, real crypto, blockchain-powered prop betting. Anyone can propose any wager, in any standard ERC-20 token, with configurable resolution criteria. Proposers, bettors, and resolvers interact on-chain, through a fully distributed protocol, without relying on centralized platforms to approve wagers or authorize payouts. Paramutuel is designed for agents, whether human or artificial: all aspects of the wager lifecycle are fully configurable, enabling a wide variety of uses: friendly bets, forecasting current events, sports betting, and more.
 
-"Standard" has a precise meaning here. The contracts are solvent for ordinary ERC-20 collateral. Tokens that return no value from `transfer` (USDT-style) fail safely: bets cannot be placed. Fee-on-transfer and rebasing tokens are **not** supported: the wager records the amounts bettors sent, but its token balance ends up different (a fee-on-transfer token delivers less), so whoever withdraws last, a winner or a fee recipient, may not be paid in full. Curated surfaces flag tokens outside [`config/collateral-allowlist.json`](config/collateral-allowlist.json); see [ADR-0018](research/adr/ADR-0018-collateral-curation-overlay.md).
+"Standard" has a precise meaning here. The contracts are solvent for ordinary ERC-20 collateral. Other kinds of token:
+- **No return value from `transfer` (USDT-style):** fails safely. Bets cannot be placed.
+- **Fee-on-transfer: not supported.**
+  - The wager records each bet at the amount the bettor sent, but the token delivers that amount minus its fee. The wager therefore holds less than it owes its winners and fee recipients; with a 1% fee, it is short by 1% of everything bet.
+  - Withdrawals are first come, first served, and each one pays the full amount owed or reverts. So the last to withdraw, whether winners or fee recipients, get nothing until someone tops the wager's balance back up.
+  - Every payout also arrives reduced by the token's fee.
+- **Rebasing: not supported.** If the wager's balance shrinks after the bets, the shortfall is the same. If it grows, the extra stays in the wager, which has no function to pay it out.
+
+Curated surfaces flag tokens outside [`config/collateral-allowlist.json`](config/collateral-allowlist.json); see [ADR-0018](research/adr/ADR-0018-collateral-curation-overlay.md).
 
 This repository is the reference implementation: smart contracts, dApp, website, indexer, MCP server, bet-scout agent, and operator services.
 
@@ -53,7 +61,11 @@ Fees are charged once, at finalization, including on refunds.
 
 **Know before you bet on a wager with no time limit.**
 - If `bettingCloseTime` is `0`, only the betting closer can end betting. If that key is lost, stakes are locked: neither `retract` nor `expire` can run while betting is open.
-- If `resolutionWindow` is `0`, only the resolver (by resolving or retracting) or the resolution closer (by closing the window so anyone can `expire`) can move the wager on. If both keys are lost, stakes are locked.
+- If `resolutionWindow` is `0`, the resolution window never times out, so `expire()` cannot be reached by waiting. After betting closes, the wager ends in one of two ways:
+  - The resolver calls `resolve`, which pays the winners and needs a stake on a winning ticket, or `retract`, which refunds everyone.
+  - The resolution closer calls `closeResolutionWindow()`. The resolver can then no longer act, and anyone can call `expire()` to refund everyone.
+
+  If both keys are lost, stakes are locked.
 
 The dApp and the bet page warn about both.
 

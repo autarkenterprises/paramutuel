@@ -707,7 +707,8 @@ contract ParamutuelV3HardeningTest is Test {
     }
 
     /// @dev Fails UNSAFE, by documented design: `totalPot` counts the requested amount while custody
-    ///      holds 1% less, so the last claimant cannot be paid. This is why README and surfaces say
+    ///      holds 1% less, so whoever withdraws last cannot be paid (here the fee recipient; the next
+    ///      test makes it a winner). This is why README and surfaces say
     ///      "standard ERC-20" and why curated surfaces warn. If this test ever stops failing the
     ///      second claim, update ADR-0018's scope statement.
     function test_ADR0018_feeOnTransferToken_breaksSolvency_failsUnsafe() public {
@@ -742,5 +743,53 @@ contract ParamutuelV3HardeningTest is Test {
         vm.prank(treasury);
         vm.expectRevert();
         w.withdrawFees();
+    }
+
+    /// @dev Pins the README's fee-on-transfer description from the other side. The shortfall falls
+    ///      on whoever withdraws last, so a winner can be the one left unpaid, and gets nothing
+    ///      rather than a partial payment. Topping the balance back up lets the same claim through.
+    ///      Every figure comes from the token's 1% skim on each transfer and the factory's 100 bps.
+    function test_ADR0018_feeOnTransferToken_lastWinnerUnpaid_untilToppedUp() public {
+        FeeOnTransferToken fot = new FeeOnTransferToken();
+        fot.mint(alice, 1e18);
+        fot.mint(bob, 1e18);
+        ParamutuelWagerV3 w = ParamutuelWagerV3(
+            factory.createFreeformWager(
+                address(fot), "Q?", CLOSE, WINDOW, resolverAddr, closer, closer, new address[](0), new uint16[](0)
+            )
+        );
+        vm.startPrank(alice);
+        fot.approve(address(w), 1e18);
+        w.placeBet("yes", 1e18);
+        vm.stopPrank();
+        vm.startPrank(bob);
+        fot.approve(address(w), 1e18);
+        w.placeBet("no", 1e18);
+        vm.stopPrank();
+
+        vm.warp(CLOSE);
+        vm.prank(resolverAddr);
+        w.resolve("yes");
+
+        // Credited pot 2e18, custody 1.98e18. The treasury is owed 1% of 2e18 and withdraws first.
+        vm.prank(treasury);
+        assertEq(w.withdrawFees(), 0.02e18);
+        assertEq(fot.balanceOf(address(w)), 1.96e18);
+
+        // Alice alone won and is owed the 1.98e18 net pot. The wager holds 1.96e18, so the claim
+        // reverts whole: she receives nothing, not the 1.96e18 that is there.
+        vm.prank(alice);
+        vm.expectRevert();
+        w.claim();
+        assertEq(fot.balanceOf(alice), 0, "no partial payment");
+
+        // Bob tops the wager up by 0.03e18, of which the token delivers 0.0297e18, which covers the
+        // 0.02e18 gap. Alice's claim now goes through, and she receives it less the token's 1%.
+        fot.mint(bob, 0.03e18);
+        vm.prank(bob);
+        fot.transfer(address(w), 0.03e18);
+        vm.prank(alice);
+        assertEq(w.claim(), 1.98e18, "paid in full by the wager's records");
+        assertEq(fot.balanceOf(alice), 1.9602e18, "less the token's own fee on the way out");
     }
 }
