@@ -2,7 +2,7 @@
 
 Paramutuel provides permissionless, real crypto, blockchain-powered prop betting. Anyone can propose any wager, in any standard ERC-20 token, with configurable resolution criteria. Proposers, bettors, and resolvers interact on-chain, through a fully distributed protocol, without relying on centralized platforms to approve wagers or authorize payouts. Paramutuel is designed for agents, whether human or artificial: all aspects of the wager lifecycle are fully configurable, enabling a wide variety of uses: friendly bets, forecasting current events, sports betting, and more.
 
-"Standard" has a precise meaning here. The contracts are solvent for ordinary ERC-20 collateral. Tokens that return no value from `transfer` (USDT-style) fail safely: bets cannot be placed. Fee-on-transfer and rebasing tokens are **not** supported: the wager credits the requested amount while custody receives less, so the last claimant cannot be paid. Curated surfaces flag tokens outside [`config/collateral-allowlist.json`](config/collateral-allowlist.json); see [ADR-0018](research/adr/ADR-0018-collateral-curation-overlay.md).
+"Standard" has a precise meaning here. The contracts are solvent for ordinary ERC-20 collateral. Tokens that return no value from `transfer` (USDT-style) fail safely: bets cannot be placed. Fee-on-transfer and rebasing tokens are **not** supported: the wager records the amounts bettors sent, but its token balance ends up different (a fee-on-transfer token delivers less), so whoever withdraws last, a winner or a fee recipient, may not be paid in full. Curated surfaces flag tokens outside [`config/collateral-allowlist.json`](config/collateral-allowlist.json); see [ADR-0018](research/adr/ADR-0018-collateral-curation-overlay.md).
 
 This repository is the reference implementation: smart contracts, dApp, website, indexer, MCP server, bet-scout agent, and operator services.
 
@@ -28,7 +28,7 @@ This repository is the reference implementation: smart contracts, dApp, website,
 One contract pair, `ParamutuelFactoryV3` and `ParamutuelWagerV3` (ADR-0010). Each wager is one of two immutable modes:
 
 - **Enumerated:** 2 to 255 outcomes fixed at creation. A ticket is a bitmask of outcomes, so **mask 1 is outcome 0, mask 2 is outcome 1, and mask 3 is both**. The wager's payoff policy decides which tickets win: `SINGLE_WINNER`, `ANY_OF`, `EXACT_SET`, `AT_LEAST_K`, or `WEIGHTED_OVERLAP`.
-- **Freeform:** no outcome list. Bettors stake on any text answer, and the resolver names the winning text. Matching is **byte-exact**: `Paris`, `paris`, and `Paris ` are three different pools.
+- **Freeform:** no outcome list. Bettors stake on any text answer of 1 to 1,024 bytes, and the resolver names the winning text. Matching is **byte-exact**: `Paris`, `paris`, and `Paris ` are three different pools.
 
 ### Roles
 
@@ -46,12 +46,16 @@ Each is an immutable address chosen at creation.
 
 1. **Create.** `bettingCloseTime` is an absolute timestamp; `resolutionWindow` is a duration measured from when betting actually closes. Either may be `0` for "no time limit", which requires the matching closer, because otherwise the wager could never advance.
 2. **Bet.** Until `bettingCloseTime`, or until the betting closer ends betting.
-3. **Finalize.** While the resolution window is open the resolver may `resolve` or `retract`. Once it is over, anyone may `expire()`.
+3. **Finalize.** While the resolution window is open the resolver may `resolve` or `retract`. `resolve` reverts if nobody staked on a winning ticket, so in that case the resolver retracts. Once the window is over, anyone may `expire()`.
 4. **Claim.** After a resolve, winners split the net pot. After a retract or expire, bettors get their stake back minus fees. Fee recipients withdraw separately.
 
 Fees are charged once, at finalization, including on refunds.
 
-**Know before you bet on a wager with no time limit.** If `bettingCloseTime` or `resolutionWindow` is `0`, that closer's key is the only way forward. If a no-time-limit betting closer loses its key, stakes are locked: neither `retract` nor `expire` can run while betting is open. Surfaces warn about this.
+**Know before you bet on a wager with no time limit.**
+- If `bettingCloseTime` is `0`, only the betting closer can end betting. If that key is lost, stakes are locked: neither `retract` nor `expire` can run while betting is open.
+- If `resolutionWindow` is `0`, only the resolver (by resolving or retracting) or the resolution closer (by closing the window so anyone can `expire`) can move the wager on. If both keys are lost, stakes are locked.
+
+The dApp and the bet page warn about both.
 
 ## Try it on Base Sepolia
 
@@ -61,10 +65,18 @@ You need [Foundry](https://getfoundry.sh), `python3`, `node`, an EVM wallet, and
 git clone --recurse-submodules https://github.com/autarkenterprises/paramutuel.git
 cd paramutuel
 forge build
+npm ci --prefix dapp    # the dApp and site tests load ethers from here
+python3 -m pip install "mcp>=1.0.0,<2" httpx "eth-abi>=5.0.0" "eth-hash[pycryptodome]"   # the MCP server's dependencies
 ./script/test-fast.sh   # contracts, services, clients; no keys or network needed
 ```
 
 Base Sepolia wallet settings: RPC `https://sepolia.base.org`, chain ID `84532`, currency `ETH`, explorer `https://sepolia.basescan.org`. The public RPC is rate limited, so use your own provider for anything heavy.
+
+**The live Base Sepolia factory is older than `src/`.** It predates the ADR-0020 contract fixes, which are waiting on a redeploy ([`docs/ADR-0020-IMPLEMENTATION.md`](docs/ADR-0020-IMPLEMENTATION.md)). Until then, on the live factory:
+- the two `minNewTicketStake` creation forms below do not exist;
+- a freeform wager accepts at most 1,024 distinct answers;
+- wagers do not publish answer text (`FreeformAnswerRevealedV3`), so the indexer and site cannot show the text of answers already staked;
+- the number of extra fee recipients is not capped at 32.
 
 ### From a browser
 
@@ -100,6 +112,8 @@ cast send "$FACTORY_ADDRESS" \
   --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY"
 ```
 
+`cast send` exits 0 even when the transaction reverts, so check that each receipt it prints says `status 1 (success)`.
+
 The wager address is in the `WagerCreatedV3Enumerated` event, the first topic after the signature. Then bet. Tickets are masks, so `1` backs outcome 0 ("YES") and `2` backs outcome 1:
 
 ```bash
@@ -129,21 +143,26 @@ createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,addres
     adds seedTicketMasks[] and seedAmounts[]: seed bets in the creation tx. Approve the FACTORY for the total.
 createEnumeratedWager(address,string,string[],uint8,uint256,uint64,uint64,address,address,address,address[],uint16[],uint256[],uint256[],uint256)
     adds minNewTicketStake: minimum raw amount to open a new ticket, which prices griefing by dust tickets.
+    Not on the live factory yet (see above).
 createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[])
 createFreeformWager(address,string,uint64,uint64,address,address,address,address[],uint16[],uint256)
-    adds minNewTicketStake.
+    adds minNewTicketStake. Not on the live factory yet.
 ```
 
 **Freeform answers and `cast`:** do not pass answer strings through `cast` arguments. `cast` strips trailing whitespace and surrounding quotes, and parses a leading `--` as a flag, so what it sends may not be what you typed, and answers match byte-exactly. Use the control panel CLI, which encodes them exactly:
 
 ```bash
-python3 -m service.control_panel.cli wager-action --wager "$WAGER" --action resolve \
-  --protocol-version freeform --winning-answer "Paris"              # add --execute to send
+python3 -m service.control_panel.cli --rpc-url "$RPC_URL_BASE_SEPOLIA" \
+  wager-action --wager "$WAGER" --action resolve \
+  --protocol-version freeform --winning-answer "Paris"
+# This prints the transaction. To send it, put --execute before wager-action.
 ```
+
+The CLI reads `PRIVATE_KEY` from the environment. It reads the RPC from `RPC_URL`, not `RPC_URL_BASE_SEPOLIA`, hence `--rpc-url`.
 
 `placeBet(string,uint256)` has the same constraint; use the dApp, the site, or the MCP server's `encode_place_bet_freeform`.
 
-### Run the stack locally
+### Deploy your own factory and run the services
 
 ```bash
 cp config/service.env.example config/service.env   # then edit
@@ -151,19 +170,19 @@ source script/lib/load_service_env.sh
 ./script/testnet/launch_testnet.sh
 ```
 
-This deploys a factory with [`script/DeployFactoryV3.s.sol`](script/DeployFactoryV3.s.sol) and records its address and deploy block in `config/deployments.json`, the shared default for every surface. It then prints the commands to start the indexer API (`:8090`), explorer (`:8091`), control panel (`:8092`), and sweeper.
+This deploys a new factory **to Base Sepolia** with [`script/DeployFactoryV3.s.sol`](script/DeployFactoryV3.s.sol). It needs `PRIVATE_KEY` (a funded account), `TREASURY_ADDRESS` and `RPC_URL_BASE_SEPOLIA`. It records the new address and deploy block in `config/deployments.json`, the shared default for every surface, so don't commit that change unless you mean to move the project to your factory. It then prints the commands to start the indexer API (`:8090`), explorer (`:8091`), control panel (`:8092`) and sweeper on your machine. For a fully local chain, see `script/test-local-e2e.sh` under Testing.
 
 To deploy only the factory:
 
 ```bash
 export TREASURY_ADDRESS=0x...        # receives protocol fees
 export PROTOCOL_FEE_BPS=100          # optional, default 100 (1%)
-export MIN_BETTING_WINDOW=3600       # optional, seconds
-export MIN_RESOLUTION_WINDOW=3600    # optional, seconds
+export MIN_BETTING_WINDOW=3600       # optional, seconds, default 3600
+export MIN_RESOLUTION_WINDOW=3600    # optional, seconds, default 3600
 forge script script/DeployFactoryV3.s.sol --rpc-url "$RPC_URL_BASE_SEPOLIA" --private-key "$PRIVATE_KEY" --broadcast
 ```
 
-After contract changes, run `./script/sync-abi.sh` and commit the updated ABIs: the dApp and MCP server ship them, and a test fails if they drift.
+After contract changes, run `./script/sync-abi.sh` and commit the updated ABIs in `dapp/abi/` and `mcp_server/abi/`, which those components ship. A test catches only part of this drift: it fails when the dApp's copy and the build differ in function names. It does not compare signatures or events, or check the MCP server's copy.
 
 ## For agents
 
@@ -177,7 +196,7 @@ Both are packaged for PyPI (`paramutuel-mcp`, `paramutuel-bettor-agent`), but **
 
 - `script/test-fast.sh`: everything that needs no key or network, and what CI runs.
 - `script/test-local-e2e.sh`: every layer against a real local chain, including the public pages driven in real Chrome. It needs Foundry, Node 22, Chrome and `npm ci --prefix dapp`, but no secrets or network. CI runs it on every push.
-- `script/test-extended.sh`: the above plus the live Base Sepolia suites.
+- `script/test-extended.sh`: the local end-to-end test, then the live Base Sepolia integration and stress suites. It does not run the fast suite. The live suites default to read-only mode, which needs only an RPC URL; their transaction modes need keys and funds (`docs/TESTNET-LIVE-SUITE.md`, `docs/TESTNET-STRESS-SUITE.md`).
 - `script/mutation-check.py`: proves the contract tests fail when guards are weakened.
 - `forge coverage --ir-minimum --no-match-test 'C1_coldResolve|test_C2_freeform|test_C6_' --no-match-path 'test/ParamutuelV3Invariant.t.sol'`: contract coverage; see [`docs/COVERAGE-BASELINE.md`](docs/COVERAGE-BASELINE.md).
 

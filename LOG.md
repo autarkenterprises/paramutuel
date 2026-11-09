@@ -268,3 +268,23 @@ Replay result, 22:06 UTC:
 - The data endpoints answer through the proxy.
 - `wager_count` is 0. That is right: the factory's `wagersCount()` is 0 on chain, so live wager decoding is still unexercised.
 - The ADR is now Implemented; its AAR waits on the first full month's bill. Lesson L-018: check what a service assumes about its host, not only that the deploy succeeded.
+
+## 2026-11-09 — README audit
+
+Every claim in `README.md` was checked against `src/`, the scripts, CI, the live factory (`cast call` and its bytecode) and PyPI. Corrected:
+- **Two commands failed as written.**
+  - The control-panel CLI example: `--execute` is a top-level flag, so appending it is rejected. And without `--rpc-url` the CLI exits 2, because it reads `RPC_URL`, not `RPC_URL_BASE_SEPOLIA`.
+  - `./script/test-fast.sh` on a fresh clone: it needs `npm ci --prefix dapp` and the MCP server's pip dependencies, which the README didn't list.
+- **The live factory predates ADR-0020, and the README didn't say so.** Its bytecode lacks both `minNewTicketStake` creation overloads, `MAX_EXTRA_FEE_RECIPIENTS` and the `FreeformAnswerRevealedV3` event, and `WAGER_MAX_DISTINCT_ANSWERS` is 1,024. Its minimum windows are 6 s.
+- **Imprecise claims:**
+  - The no-time-limit warning: the resolver can also move a wager with no resolution deadline.
+  - The fee-on-transfer failure: the last withdrawal fails, which may be a fee.
+  - Freeform answers are limited to 1 to 1,024 bytes.
+  - `resolve` reverts with no winning stake.
+  - The ABI drift test compares only the dApp copy's function names.
+  - `test-extended.sh` does not run the fast suite.
+  - "Run the stack locally" deploys to Base Sepolia.
+  - The `MIN_*` defaults.
+- Added that `cast send` exits 0 on a revert (L-014).
+
+Left alone: the ABI drift test's narrow scope is now documented rather than widened.
