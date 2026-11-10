@@ -117,6 +117,9 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
     error EmptyAnswer();
     error AnswerTooLong();
     error NewTicketStakeTooLow();
+    /// @dev The wager's balance rose by less than the collateral pulled, as with a fee-on-transfer
+    ///      token. Recording the bet would leave the wager owing more than it holds (ADR-0023).
+    error CollateralShortfall();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     /// @dev Hard cap on the byte length of a freeform answer string. 1024 bytes is
@@ -457,6 +460,19 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         return keccak256(abi.encodePacked(FREEFORM_ANSWER_DOMAIN, bytes(answer)));
     }
 
+    /// @dev Pulls `amount` from the caller and checks that all of it arrived (ADR-0023). A
+    ///      fee-on-transfer token delivers less than it is asked to; recording `amount` anyway would
+    ///      leave the wager owing more than it holds, and the last to withdraw would get nothing.
+    ///      Only a shortfall reverts: a token that delivers more leaves an excess that is owed to
+    ///      nobody, which harms no participant. Both reads are of this wager's own balance, the only
+    ///      balance that payouts draw on. `nonReentrant` on every caller covers the external calls.
+    function _pullCollateral(uint256 amount) internal {
+        uint256 balanceBefore = collateralToken.balanceOf(address(this));
+        bool ok = collateralToken.transferFrom(msg.sender, address(this), amount);
+        require(ok, "TRANSFER_FROM");
+        if (collateralToken.balanceOf(address(this)) < balanceBefore + amount) revert CollateralShortfall();
+    }
+
     /// @notice Enumerated-mode single-ticket bet. Collateral is pulled before the bet is recorded,
     ///         so bookkeeping can never exceed custody for a standard token. That is the reverse of
     ///         checks-effects-interactions, so `nonReentrant` is what stops a hostile token from
@@ -469,8 +485,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         _policyAllowsTicket(payoffPolicy, ticketMask);
         require(amount > 0, "AMOUNT");
 
-        bool ok = collateralToken.transferFrom(msg.sender, address(this), amount);
-        require(ok, "TRANSFER_FROM");
+        _pullCollateral(amount);
 
         _recordBetMask(msg.sender, ticketMask, amount);
     }
@@ -493,8 +508,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
             totalAmount += amounts[i];
         }
 
-        bool ok = collateralToken.transferFrom(msg.sender, address(this), totalAmount);
-        require(ok, "TRANSFER_FROM");
+        _pullCollateral(totalAmount);
 
         // Second pass: record each bet. By this point the collateral is already in
         // the wager so the pool / total updates cannot be inconsistent with custody.
@@ -512,8 +526,7 @@ contract ParamutuelWagerV3 is ReentrancyGuard {
         _validateAnswer(answer);
         require(amount > 0, "AMOUNT");
 
-        bool ok = collateralToken.transferFrom(msg.sender, address(this), amount);
-        require(ok, "TRANSFER_FROM");
+        _pullCollateral(amount);
 
         _recordBetAnswer(msg.sender, answer, amount);
     }

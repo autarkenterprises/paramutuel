@@ -62,6 +62,9 @@ contract ParamutuelFactoryV3 {
     error InvalidLifecycleConfig();
     error BadSeedConfig();
     error InvalidPolicyParam();
+    /// @dev The new wager's balance rose by less than the seed total pulled into it (ADR-0023).
+    ///      Same name and selector as the wager's error, so clients decode both alike.
+    error CollateralShortfall();
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
     uint16 public constant MAX_TOTAL_FEE_BPS = 10_000;
@@ -313,10 +316,21 @@ contract ParamutuelFactoryV3 {
         // post-event so external observers see creation before the seed bets are
         // recorded; the seeder emits its own per-bet events from inside the wager.
         if (a.seedAmounts.length > 0) {
-            bool ok = IERC20(a.collateralToken).transferFrom(msg.sender, wager, seedTotal);
-            require(ok, "TRANSFER_FROM");
+            _pullSeed(IERC20(a.collateralToken), wager, seedTotal);
             ParamutuelWagerV3(wager).seedInitialBetsFromFactory(msg.sender, a.seedTicketMasks, a.seedAmounts);
         }
+    }
+
+    /// @dev Pulls the seed total from the proposer straight into the new wager and checks that all
+    ///      of it arrived (ADR-0023). The wager never sees this transfer, so the factory checks it,
+    ///      by the wager's balance before and after: that stays correct even if someone sent tokens
+    ///      to the wager's predictable address in advance. A separate function keeps
+    ///      `_createEnumerated` within the stack limit of the unoptimised coverage build.
+    function _pullSeed(IERC20 collateral, address wager, uint256 amount) internal {
+        uint256 balanceBefore = collateral.balanceOf(wager);
+        bool ok = collateral.transferFrom(msg.sender, wager, amount);
+        require(ok, "TRANSFER_FROM");
+        if (collateral.balanceOf(wager) < balanceBefore + amount) revert CollateralShortfall();
     }
 
     /// @notice Deploy a freeform-text wager (ADR-0009 lineage, hosted in V3 under

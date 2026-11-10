@@ -76,7 +76,11 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ("withdrawFees-zeroes-balance", WAGER, "feeBalances[msg.sender] = 0;", ""),
     ("fee-remainder-to-last", WAGER, "slice = feesTotal - paid;", "slice = FullMath.mulDiv(feesTotal, feeBps[i], totalFeeBps);"),
     ("fees-skip-charge-on-retract", WAGER, "_chargeFees();\n        state = State.Retracted;\n        emit RetractedV3();", "state = State.Retracted;\n        emit RetractedV3();"),
-    ("placeBet-transferFrom-check", WAGER, 'bool ok = collateralToken.transferFrom(msg.sender, address(this), amount);\n        require(ok, "TRANSFER_FROM");\n\n        _recordBetMask(msg.sender, ticketMask, amount);', 'collateralToken.transferFrom(msg.sender, address(this), amount);\n\n        _recordBetMask(msg.sender, ticketMask, amount);'),
+    ("placeBet-transferFrom-check", WAGER, 'bool ok = collateralToken.transferFrom(msg.sender, address(this), amount);\n        require(ok, "TRANSFER_FROM");\n        if (collateralToken.balanceOf', 'collateralToken.transferFrom(msg.sender, address(this), amount);\n        if (collateralToken.balanceOf'),
+    # --- ADR-0023: a pull that delivers less than it records reverts ---
+    ("pull-shortfall-check", WAGER, "if (collateralToken.balanceOf(address(this)) < balanceBefore + amount) revert CollateralShortfall();", ""),
+    ("pull-shortfall-strict", WAGER, "if (collateralToken.balanceOf(address(this)) < balanceBefore + amount) revert", "if (collateralToken.balanceOf(address(this)) != balanceBefore + amount) revert"),
+    ("seed-shortfall-check", FACTORY, "if (collateral.balanceOf(wager) < balanceBefore + amount) revert CollateralShortfall();", ""),
     ("placeBet-after-final", WAGER, "function placeBet(uint256 ticketMask, uint256 amount) external nonReentrant onlyEnumerated {\n        if (state != State.Open) revert NotOpen();", "function placeBet(uint256 ticketMask, uint256 amount) external nonReentrant onlyEnumerated {"),
     ("placeBets-after-final", WAGER, "function placeBets(uint256[] calldata ticketMasks, uint256[] calldata amounts) external nonReentrant onlyEnumerated {\n        if (state != State.Open) revert NotOpen();", "function placeBets(uint256[] calldata ticketMasks, uint256[] calldata amounts) external nonReentrant onlyEnumerated {"),
     ("freeform-bet-after-final", WAGER, "function placeBet(string calldata answer, uint256 amount) external nonReentrant onlyFreeform {\n        if (state != State.Open) revert NotOpen();", "function placeBet(string calldata answer, uint256 amount) external nonReentrant onlyFreeform {"),

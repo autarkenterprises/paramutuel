@@ -683,6 +683,11 @@
     },
     {
       "type": "error",
+      "name": "CollateralShortfall",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "InvalidLifecycleConfig",
       "inputs": []
     },

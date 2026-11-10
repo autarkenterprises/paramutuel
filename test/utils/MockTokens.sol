@@ -63,9 +63,9 @@ contract NoReturnToken {
     }
 }
 
-/// @dev Fee-on-transfer token: skims 1% of every transfer. The wager credits the requested
-///      amount while custody receives less, so this class fails UNSAFE: the last claimant
-///      cannot be paid. Pinned by test rather than defended in the core (ADR-0018).
+/// @dev Fee-on-transfer token: skims 1% of every transfer, so a recipient receives 99% of the
+///      amount sent. Before ADR-0023 the wager recorded the full amount and so owed more than it
+///      held; now every pull checks what arrived and the bet reverts `CollateralShortfall()`.
 contract FeeOnTransferToken {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -83,6 +83,45 @@ contract FeeOnTransferToken {
         uint256 skim = amount / 100;
         balanceOf[from] -= amount;
         balanceOf[to] += amount - skim;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _move(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        allowance[from][msg.sender] -= amount;
+        _move(from, to, amount);
+        return true;
+    }
+}
+
+/// @dev Token whose delivery the test can change at any time: a recipient receives
+///      `amount * deliveredBps / 10_000` while the sender loses `amount`. 10_000 is a standard token,
+///      9_900 a 1% fee switched on, 10_100 a token that delivers 1% more than asked. Used to show a
+///      fee switched on after the bets leaves the wager solvent, and that an excess is accepted.
+contract AdjustableTransferToken {
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    uint256 public deliveredBps = 10_000;
+
+    function setDeliveredBps(uint256 bps) external {
+        deliveredBps = bps;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function _move(address from, address to, uint256 amount) private {
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount * deliveredBps / 10_000;
     }
 
     function transfer(address to, uint256 amount) external returns (bool) {

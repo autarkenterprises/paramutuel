@@ -7,7 +7,7 @@ import {ParamutuelFactoryV3} from "../src/ParamutuelFactoryV3.sol";
 import {ParamutuelWagerV3} from "../src/ParamutuelWagerV3.sol";
 import {BitMath} from "../src/utils/BitMath.sol";
 import {FullMath} from "../src/utils/FullMath.sol";
-import {MockERC20, NoReturnToken, FeeOnTransferToken} from "./utils/MockTokens.sol";
+import {MockERC20, NoReturnToken, FeeOnTransferToken, AdjustableTransferToken} from "./utils/MockTokens.sol";
 
 /// @dev External wrappers so library behaviour, including reverts, can be asserted directly.
 contract MathHarness {
@@ -706,53 +706,71 @@ contract ParamutuelV3HardeningTest is Test {
         assertEq(usdtLike.balanceOf(alice), 1e18, "nothing moved");
     }
 
-    /// @dev Fails UNSAFE, by documented design: `totalPot` counts the requested amount while custody
-    ///      holds 1% less, so whoever withdraws last cannot be paid (here the fee recipient; the next
-    ///      test makes it a winner). This is why README and surfaces say
-    ///      "standard ERC-20" and why curated surfaces warn. If this test ever stops failing the
-    ///      second claim, update ADR-0018's scope statement.
-    function test_ADR0018_feeOnTransferToken_breaksSolvency_failsUnsafe() public {
-        FeeOnTransferToken fot = new FeeOnTransferToken();
-        fot.mint(alice, 1e18);
-        fot.mint(bob, 1e18);
-        ParamutuelWagerV3 w = ParamutuelWagerV3(
-            factory.createFreeformWager(
-                address(fot), "Q?", CLOSE, WINDOW, resolverAddr, closer, closer, new address[](0), new uint16[](0)
-            )
-        );
-        vm.startPrank(alice);
-        fot.approve(address(w), 1e18);
-        w.placeBet("x", 1e18);
-        vm.stopPrank();
-        vm.startPrank(bob);
-        fot.approve(address(w), 1e18);
-        w.placeBet("x", 1e18);
-        vm.stopPrank();
-        assertEq(w.totalPot(), 2e18);
-        assertEq(fot.balanceOf(address(w)), 1.98e18, "custody is short of the credited pot");
+    // ------------------------------------------------------------------
+    // ADR-0023: a pull that delivers less than it records reverts, so the
+    // fee-on-transfer class fails safe like the no-return class above.
+    // ------------------------------------------------------------------
 
-        vm.warp(CLOSE);
-        vm.prank(resolverAddr);
-        w.resolve("x");
-        vm.prank(alice);
-        w.claim();
-        // Each winner is owed 0.99e18 and custody started at 1.98e18, so the second claim only just
-        // clears; the 1% protocol fee is what cannot be paid.
-        vm.prank(bob);
-        w.claim();
-        vm.prank(treasury);
-        vm.expectRevert();
-        w.withdrawFees();
+    function _yesNo() internal pure returns (string[] memory outs) {
+        outs = new string[](2);
+        outs[0] = "yes";
+        outs[1] = "no";
     }
 
-    /// @dev Pins the README's fee-on-transfer description from the other side. The shortfall falls
-    ///      on whoever withdraws last, so a winner can be the one left unpaid, and gets nothing
-    ///      rather than a partial payment. Topping the balance back up lets the same claim through.
-    ///      Every figure comes from the token's 1% skim on each transfer and the factory's 100 bps.
-    function test_ADR0018_feeOnTransferToken_lastWinnerUnpaid_untilToppedUp() public {
+    function _enumerated(address collateral) internal returns (ParamutuelWagerV3) {
+        return ParamutuelWagerV3(
+            factory.createEnumeratedWager(
+                collateral,
+                "Q?",
+                _yesNo(),
+                ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER,
+                0,
+                CLOSE,
+                WINDOW,
+                resolverAddr,
+                closer,
+                closer,
+                new address[](0),
+                new uint16[](0)
+            )
+        );
+    }
+
+    function test_ADR0023_feeOnTransfer_enumeratedPlaceBet_revertsShortfall() public {
         FeeOnTransferToken fot = new FeeOnTransferToken();
         fot.mint(alice, 1e18);
-        fot.mint(bob, 1e18);
+        ParamutuelWagerV3 w = _enumerated(address(fot));
+        vm.startPrank(alice);
+        fot.approve(address(w), 1e18);
+        vm.expectRevert(ParamutuelWagerV3.CollateralShortfall.selector);
+        w.placeBet(uint256(1), 1e18);
+        vm.stopPrank();
+        assertEq(fot.balanceOf(alice), 1e18, "nothing moved");
+        assertEq(w.totalPot(), 0, "nothing recorded");
+    }
+
+    function test_ADR0023_feeOnTransfer_placeBets_revertsShortfall() public {
+        FeeOnTransferToken fot = new FeeOnTransferToken();
+        fot.mint(alice, 2e18);
+        ParamutuelWagerV3 w = _enumerated(address(fot));
+        uint256[] memory masks = new uint256[](2);
+        masks[0] = 1;
+        masks[1] = 2;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 1e18;
+        amounts[1] = 1e18;
+        vm.startPrank(alice);
+        fot.approve(address(w), 2e18);
+        vm.expectRevert(ParamutuelWagerV3.CollateralShortfall.selector);
+        w.placeBets(masks, amounts);
+        vm.stopPrank();
+        assertEq(fot.balanceOf(alice), 2e18, "nothing moved");
+        assertEq(w.totalPot(), 0, "nothing recorded");
+    }
+
+    function test_ADR0023_feeOnTransfer_freeformPlaceBet_revertsShortfall() public {
+        FeeOnTransferToken fot = new FeeOnTransferToken();
+        fot.mint(alice, 1e18);
         ParamutuelWagerV3 w = ParamutuelWagerV3(
             factory.createFreeformWager(
                 address(fot), "Q?", CLOSE, WINDOW, resolverAddr, closer, closer, new address[](0), new uint16[](0)
@@ -760,36 +778,108 @@ contract ParamutuelV3HardeningTest is Test {
         );
         vm.startPrank(alice);
         fot.approve(address(w), 1e18);
-        w.placeBet("yes", 1e18);
+        vm.expectRevert(ParamutuelWagerV3.CollateralShortfall.selector);
+        w.placeBet("x", 1e18);
+        vm.stopPrank();
+        assertEq(fot.balanceOf(alice), 1e18, "nothing moved");
+        assertEq(w.totalPot(), 0, "nothing recorded");
+    }
+
+    /// @dev The factory pulls the seed total straight into the new wager, so the factory is the one
+    ///      that must check it. The whole creation reverts: no wager, no stake, no tokens moved.
+    function test_ADR0023_feeOnTransfer_seededCreate_revertsShortfall() public {
+        FeeOnTransferToken fot = new FeeOnTransferToken();
+        fot.mint(alice, 1e18);
+        uint256[] memory masks = new uint256[](1);
+        masks[0] = 1;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1e18;
+        uint256 before = factory.wagersCount();
+        vm.startPrank(alice);
+        fot.approve(address(factory), 1e18);
+        vm.expectRevert(ParamutuelFactoryV3.CollateralShortfall.selector);
+        factory.createEnumeratedWager(
+            address(fot),
+            "Q?",
+            _yesNo(),
+            ParamutuelWagerV3.PayoffPolicy.SINGLE_WINNER,
+            0,
+            CLOSE,
+            WINDOW,
+            resolverAddr,
+            closer,
+            closer,
+            new address[](0),
+            new uint16[](0),
+            masks,
+            amounts
+        );
+        vm.stopPrank();
+        assertEq(fot.balanceOf(alice), 1e18, "nothing moved");
+        assertEq(factory.wagersCount(), before, "no wager created");
+    }
+
+    /// @dev A fee switched on after the bets refuses new bets, and the wager stays solvent: a fee
+    ///      on the way out lowers what each recipient receives, not what the wager holds against its
+    ///      records. Every withdrawal succeeds and the wager ends empty. Figures: pot 2e18, 1%
+    ///      protocol fee 0.02e18, so Alice (sole winner) is owed 1.98e18 and receives 99% of it.
+    function test_ADR0023_feeSwitchedOnAfterBets_refusesNewBets_existingWagerStaysSolvent() public {
+        AdjustableTransferToken tok = new AdjustableTransferToken();
+        tok.mint(alice, 1e18);
+        tok.mint(bob, 2e18);
+        ParamutuelWagerV3 w = _enumerated(address(tok));
+        vm.startPrank(alice);
+        tok.approve(address(w), 1e18);
+        w.placeBet(uint256(1), 1e18);
         vm.stopPrank();
         vm.startPrank(bob);
-        fot.approve(address(w), 1e18);
-        w.placeBet("no", 1e18);
+        tok.approve(address(w), 2e18);
+        w.placeBet(uint256(2), 1e18);
         vm.stopPrank();
+
+        tok.setDeliveredBps(9_900);
+        vm.prank(bob);
+        vm.expectRevert(ParamutuelWagerV3.CollateralShortfall.selector);
+        w.placeBet(uint256(2), 1e18);
 
         vm.warp(CLOSE);
         vm.prank(resolverAddr);
-        w.resolve("yes");
-
-        // Credited pot 2e18, custody 1.98e18. The treasury is owed 1% of 2e18 and withdraws first.
+        w.resolve(uint256(1));
+        vm.prank(alice);
+        assertEq(w.claim(), 1.98e18);
         vm.prank(treasury);
         assertEq(w.withdrawFees(), 0.02e18);
-        assertEq(fot.balanceOf(address(w)), 1.96e18);
+        assertEq(tok.balanceOf(address(w)), 0, "every obligation paid from what the wager held");
+        assertEq(tok.balanceOf(alice), 1.9602e18, "the token's fee comes out of the payout");
+    }
 
-        // Alice alone won and is owed the 1.98e18 net pot. The wager holds 1.96e18, so the claim
-        // reverts whole: she receives nothing, not the 1.96e18 that is there.
-        vm.prank(alice);
-        vm.expectRevert();
-        w.claim();
-        assertEq(fot.balanceOf(alice), 0, "no partial payment");
+    /// @dev Only a shortfall is refused (ADR-0023 decision point). A token that delivers 1% more is
+    ///      accepted, the bet is recorded at the requested amount, every withdrawal succeeds, and the
+    ///      excess stays in the wager, which never pays it out.
+    function test_ADR0023_tokenDeliveringMore_isAccepted_atRequestedAmount() public {
+        AdjustableTransferToken tok = new AdjustableTransferToken();
+        tok.setDeliveredBps(10_100);
+        tok.mint(alice, 1e18);
+        tok.mint(bob, 1e18);
+        ParamutuelWagerV3 w = _enumerated(address(tok));
+        vm.startPrank(alice);
+        tok.approve(address(w), 1e18);
+        w.placeBet(uint256(1), 1e18);
+        vm.stopPrank();
+        vm.startPrank(bob);
+        tok.approve(address(w), 1e18);
+        w.placeBet(uint256(2), 1e18);
+        vm.stopPrank();
+        assertEq(w.totalPot(), 2e18, "recorded at the requested amount");
+        assertEq(tok.balanceOf(address(w)), 2.02e18);
 
-        // Bob tops the wager up by 0.03e18, of which the token delivers 0.0297e18, which covers the
-        // 0.02e18 gap. Alice's claim now goes through, and she receives it less the token's 1%.
-        fot.mint(bob, 0.03e18);
-        vm.prank(bob);
-        fot.transfer(address(w), 0.03e18);
+        vm.warp(CLOSE);
+        vm.prank(resolverAddr);
+        w.resolve(uint256(1));
         vm.prank(alice);
-        assertEq(w.claim(), 1.98e18, "paid in full by the wager's records");
-        assertEq(fot.balanceOf(alice), 1.9602e18, "less the token's own fee on the way out");
+        assertEq(w.claim(), 1.98e18);
+        vm.prank(treasury);
+        assertEq(w.withdrawFees(), 0.02e18);
+        assertEq(tok.balanceOf(address(w)), 0.02e18, "the excess stays, owed to nobody");
     }
 }
