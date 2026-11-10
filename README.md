@@ -4,7 +4,10 @@ Paramutuel provides permissionless, real crypto, blockchain-powered prop betting
 
 "Standard" has a precise meaning here. The contracts are solvent for ordinary ERC-20 collateral. Other kinds of token:
 - **No return value from `transfer` (USDT-style):** fails safely. Bets cannot be placed.
-- **Fee-on-transfer: not supported.**
+- **Fee-on-transfer: fails safely in `src/`** ([ADR-0023](research/adr/ADR-0023-collateral-receipt-check.md)).
+  - Every bet checks that the wager received the full amount, and reverts `CollateralShortfall()` if it did not, so the bet cannot be placed.
+  - If an issuer switches a fee on after bets exist, new bets revert and the wager stays solvent, but every payout arrives reduced by the token's fee.
+- **Fee-on-transfer on the live factory, until it is redeployed: fails unsafely.**
   - The wager records each bet at the amount the bettor sent, but the token delivers that amount minus its fee. The wager therefore holds less than it owes its winners and fee recipients; with a 1% fee, it is short by 1% of everything bet.
   - Withdrawals are first come, first served, and each one pays the full amount owed or reverts. So the last to withdraw, whether winners or fee recipients, get nothing until someone tops the wager's balance back up.
   - Every payout also arrives reduced by the token's fee.
@@ -84,7 +87,8 @@ python3 -m pip install "mcp>=1.0.0,<2" httpx "eth-abi>=5.0.0" "eth-hash[pycrypto
 
 Base Sepolia wallet settings: RPC `https://sepolia.base.org`, chain ID `84532`, currency `ETH`, explorer `https://sepolia.basescan.org`. The public RPC is rate limited, so use your own provider for anything heavy.
 
-**The live Base Sepolia factory is older than `src/`.** It predates the ADR-0020 contract fixes, which are waiting on a redeploy ([`docs/ADR-0020-IMPLEMENTATION.md`](docs/ADR-0020-IMPLEMENTATION.md)). Until then, on the live factory:
+**The live Base Sepolia factory is older than `src/`.** It predates the ADR-0020 and ADR-0023 contract changes, which are waiting on a redeploy ([`docs/ADR-0020-IMPLEMENTATION.md`](docs/ADR-0020-IMPLEMENTATION.md)). Until then, on the live factory:
+- fee-on-transfer tokens are accepted and fail unsafely (see the top of this page);
 - the two `minNewTicketStake` creation forms below do not exist;
 - a freeform wager accepts at most 1,024 distinct answers;
 - wagers do not publish answer text (`FreeformAnswerRevealedV3`), so the indexer and site cannot show the text of answers already staked;

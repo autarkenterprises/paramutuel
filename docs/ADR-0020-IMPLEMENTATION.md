@@ -138,7 +138,7 @@ These are not in the ADR's original tables. Each was found by a test written dur
 Each step is outward-facing, so it is left to the operator, in this order.
 
 1. **Rotate the Alchemy key** that `README.md` carried. It stays in git history, and rewriting history would not un-leak it. Revoke it in the Alchemy dashboard and put the new one only in `config/service.env` and the Cloud Run secrets.
-2. **Deploy the corrected factory.** The live factory has `wagersCount() == 0`, so nobody is stranded. Fill in `config/service.env` (see `config/service.env.example`), then:
+2. **Deploy the corrected factory.** It also carries ADR-0023's collateral receipt check. The live factory has `wagersCount() == 0`, so nobody is stranded. Fill in `config/service.env` (see `config/service.env.example`), then:
    ```bash
    ./script/testnet/launch_testnet.sh     # runs script/DeployFactoryV3.s.sol, then set_factory_address.sh
    git add config/deployments.json && git commit -m "deploy: ADR-0020 factory" && git push origin master

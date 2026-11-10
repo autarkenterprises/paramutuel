@@ -81,3 +81,8 @@ The honest boundary: an overlay protects participants who *use the overlay*. A p
 **Follow-ups:** Optional on-chain collateral registry + curated-factory wrapper (deferred from Rejected alternatives) if curation theater proves material; revisit at the mainnet readiness gate.
 
 **Revision schedule:** at the mainnet readiness gate, or after the first ARG campaign observes real collateral diversity beyond the curated set.
+
+**Revision, 2026-11-09 (ADR-0023):** fee-on-transfer tokens no longer fail unsafe in `src/`. Every collateral pull now checks the wager's balance and reverts `CollateralShortfall()` on a shortfall. This uses neither of the on-chain options rejected above: it is not balance-delta accounting, and it is not an allowlist.
+- The "curation theater" risk therefore shrinks to rebasing tokens and misleading token names, once the corrected factory is deployed. Until then the live factory keeps the old behaviour.
+- `test_ADR0018_feeOnTransferToken_breaksSolvency_failsUnsafe` was retired with that change, and the `test_ADR0023_*` tests replaced it.
+- The overlay and its warnings stay. Rebasing tokens remain unsupported.

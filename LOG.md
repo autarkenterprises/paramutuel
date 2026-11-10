@@ -294,3 +294,23 @@ README follow-up, the same day, after the operator asked how the resolver "moves
 - **Fee-on-transfer:** the README now says the wager is short by the token's fee on everything bet. Withdrawals pay in full or revert, first come, first served, so the last to withdraw get nothing, not a partial payment, until the balance is topped back up; a top-up is itself skimmed. Every payout also loses the token's fee on the way out.
 - **Rebasing:** shrinking has the same effect; growth leaves an excess that the wager cannot pay out.
 - **New test:** `test_ADR0018_feeOnTransferToken_lastWinnerUnpaid_untilToppedUp` pins the winner-last case and the recovery. It pins existing behaviour, so it was never red. It does fail when the top-up only equals the gap, which shows the skim matters.
+
+## 2026-11-09 — ADR-0023: fee-on-transfer tokens fail safe
+
+Asked whether fee-on-transfer tokens were worth supporting, I recommended against full support:
+- the token's fee on every payout cannot be fixed by the protocol;
+- many fee tokens also redistribute fees to holders, which changes balances like a rebasing token;
+- no curated token charges a fee;
+- splitting a skim across batch and seed tickets is messy.
+
+Instead every collateral pull now refuses a shortfall. The operator said "make it so".
+- **The change:** the wager's three bet functions share `_pullCollateral`, and the factory's seed pull has `_pullSeed`. Both read the wager's balance before and after `transferFrom` and revert `CollateralShortfall()` when less arrived than was recorded. An excess is accepted, because it harms nobody; a test and the `!=` mutant pin that choice.
+- **Why now:** ADR-0018 had weighed only full support and a hard allowlist. With the ADR-0020 redeploy still pending, the check costs no extra migration.
+- **Results:**
+  - Red: 5 tests, then green.
+  - The two ADR-0018 fail-unsafe tests failed as their comment predicted and were retired.
+  - Mutants: 69/69 killed.
+  - Fast suite and local e2e (38 tests) pass.
+  - Gas: +1,800 per bet and −13,000 per creation, because the wager's bytecode shrank.
+  - The factory is 1,756 bytes under EIP-170.
+- **Live factory:** it keeps the old, unsafe behaviour until the operator redeploys. The README says so, and a task records the warning strings to update afterwards.

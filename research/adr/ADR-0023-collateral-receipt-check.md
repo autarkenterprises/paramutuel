@@ -1,7 +1,7 @@
 # ADR-0023: Refuse a bet when the wager receives less collateral than it records
 
 Date: 2026-11-09
-Status: **Accepted**
+Status: **Implemented in source** (2026-11-09). Live once the corrected factory is deployed (`docs/ADR-0020-IMPLEMENTATION.md` step 2).
 Builds on: ADR-0018 (collateral curation overlay), ADR-0020 (contract fixes awaiting a factory redeploy), `AGENTS.md` #1 / #2 / #4
 
 ## Context
@@ -70,4 +70,31 @@ Two things make this the time to act:
 
 ## After Action Report
 
-Pending.
+2026-11-09. Implementation notes: `docs/ADR-0023-IMPLEMENTATION.md`.
+
+**Success criteria**
+
+- **Fail-safe tests: met.** Five new tests failed against the unchanged contracts ("next call did not revert as expected") and pass now. They cover enumerated and freeform `placeBet`, `placeBets` and seeded creation. Each asserts `CollateralShortfall()`, no tokens moved and no stake recorded, and for creation, no wager.
+- **Fee switched on later: met.** New bets revert; the claim and the fee withdrawal both succeed; the wager ends empty.
+- **Excess accepted: met.** That test passed before and after the change. It pins behaviour the change had to keep, and it is what kills the `!=` mutant.
+- **Old tests replaced: met.** Both ADR-0018 fail-unsafe tests failed with `CollateralShortfall()` once the check existed, and were removed.
+- **Revert coverage: met.** 31 custom errors and 8 `require` strings asserted.
+- **Mutants: met.** All 69 killed, including the three new ones and the `placeBet-transferFrom-check` mutant, which was repointed at the shared helper. The run took 3.8 hours at lowest priority on a busy machine.
+- **Suites: met.**
+  - Fast suite: 174 Foundry, 93 Node, and every Python suite.
+  - `script/test-local-e2e.sh`: 38 tests in 337 seconds.
+- **Contract size: met.** The factory's runtime is 22,820 bytes, 1,756 under EIP-170.
+- **Docs: met.** README, `docs/MACHINE.md`, `docs/PARAMUTUEL-V3-GAS.md`, the ADR-0018 revision, `docs/TASKS.md` and `MEMORY.md` all say what the live factory does and what the redeployed one will do.
+
+**Failure criteria:** none triggered.
+- No standard token is refused; every existing test uses one.
+- Each bet costs about 1,800 gas more, a fixed amount per transaction, so no path approaches Base's cap.
+
+**Findings**
+
+- **Creation got cheaper.** Routing the wager's three pulls through one helper shrank its bytecode, so creating a wager costs about 13,000 gas less. That more than pays for the check over the first seven bets.
+- **The check also strengthened an existing mutant.** With its `require` removed, a token that returns `false` without moving funds is now caught by the balance check, with `CollateralShortfall()` instead of `TRANSFER_FROM`. The test that kills the mutant asserts the specific error, so it still dies.
+
+**Revisit:**
+- After the corrected factory is deployed: update the unlisted-token warnings (`docs/TASKS.md`), and confirm with the live suite that a standard token still bets.
+- If a curated token ever turns out to deliver short, record it here.

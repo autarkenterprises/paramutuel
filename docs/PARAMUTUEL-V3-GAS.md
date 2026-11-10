@@ -36,8 +36,8 @@ Reported cost is **approximate** (measured as `gasBefore - gasAfter` around the 
 
 | Step | Approx. gas | Notes |
 |------|-------------|--------|
-| `placeBet` (first **new** mask) | **~246k** | Pays for `usedMasks.push` + per-bettor mask bookkeeping + transfer. |
-| `placeBet` (same mask) | **~72k** | Hot path; no new global mask slot. |
+| `placeBet` (first **new** mask) | **~248k** | Pays for `usedMasks.push` + per-bettor mask bookkeeping + transfer. |
+| `placeBet` (same mask) | **~73k** | Hot path; no new global mask slot. Every bet includes about 1.8k for ADR-0023's two `balanceOf` reads around the pull. |
 | `resolve` (`ANY_OF`, **2** distinct global masks) | **~114k** | Linear in `_usedMasks.length`. |
 | `resolve` (`ANY_OF`, **16** distinct global masks) | **~178k** | ~**4–5k** gas per extra distinct mask in this scenario (same order of magnitude as v2 — see [`ADR-0008-GAS.md`](ADR-0008-GAS.md)). |
 | `claim` (bettor used **2** masks) | **~90k** | Scales with **number of distinct masks** the bettor touched. |
@@ -47,8 +47,8 @@ Reported cost is **approximate** (measured as `gasBefore - gasAfter` around the 
 
 | Step | Approx. gas | Notes |
 |------|-------------|--------|
-| `placeBet(string)` (first **new** `answerId`) | **~205k** | `keccak256` over domain-prefixed answer bytes, `usedAnswerIds.push`, and the once-per-answer `FreeformAnswerRevealedV3` event. |
-| `placeBet(string)` (same answer) | **~73k** | No new global answer slot. |
+| `placeBet(string)` (first **new** `answerId`) | **~207k** | `keccak256` over domain-prefixed answer bytes, `usedAnswerIds.push`, and the once-per-answer `FreeformAnswerRevealedV3` event. |
+| `placeBet(string)` (same answer) | **~75k** | No new global answer slot. |
 | `resolve(string)` | **~105k** | Dominated by validation + fee path; **not** linear in distinct answers (only winning pool read). |
 | `resolve` with **16** distinct answers in pool | **~101k** | Stays flat with pool size. `test_C2_freeform_answerSpaceCannotBeExhausted_resolveAndClaimStayFlat` pins this at 1,100 answers. |
 | `claim` (winner) | **~80k** | Single winning `answerId` leg for the bettor. |
@@ -57,8 +57,8 @@ Reported cost is **approximate** (measured as `gasBefore - gasAfter` around the 
 
 | Call | Approx. gas (`gasleft()`) | `--gas-report` median (reference) |
 |------|---------------------------|-------------------------------------|
-| `createEnumeratedWager` (3 outcomes, no seed) | **~2.62M** | ~2.60M |
-| `createFreeformWager` | **~2.52M** | ~2.51M |
+| `createEnumeratedWager` (3 outcomes, no seed) | **~2.60M** | ~2.59M |
+| `createFreeformWager` | **~2.50M** | ~2.50M |
 
 Per-wager bytecode carries **both** mode branches; there is still **one** factory address on the wire.
 
@@ -112,12 +112,12 @@ Gas figures match the **Snapshot — `gasleft()`** section above unless noted.
 
 | Operation | ~Gas | ~USD (Base) |
 |-----------|------|-------------|
-| `createEnumeratedWager` (3 outcomes, no seed) | ~2.62M | **~$0.033** |
-| `createFreeformWager` | ~2.52M | **~$0.032** |
-| `placeBet` enumerated (first **new** mask) | ~246k | **~$0.003** |
-| `placeBet` enumerated (same mask) | ~72k | **~$0.0009** |
-| `placeBet` freeform (first **new** answer) | ~205k | **~$0.003** |
-| `placeBet` freeform (same answer) | ~73k | **~$0.0009** |
+| `createEnumeratedWager` (3 outcomes, no seed) | ~2.60M | **~$0.033** |
+| `createFreeformWager` | ~2.50M | **~$0.031** |
+| `placeBet` enumerated (first **new** mask) | ~248k | **~$0.003** |
+| `placeBet` enumerated (same mask) | ~73k | **~$0.0009** |
+| `placeBet` freeform (first **new** answer) | ~207k | **~$0.003** |
+| `placeBet` freeform (same answer) | ~75k | **~$0.0009** |
 | `resolve` enumerated (`ANY_OF`, 2 distinct masks) | ~114k | **~$0.0014** |
 | `resolve` enumerated (16 distinct masks) | ~178k | **~$0.0022** |
 | `resolve` enumerated (`WEIGHTED_OVERLAP`, 2 masks) | ~110k | **~$0.0014** |
@@ -133,8 +133,8 @@ Gas figures match the **Snapshot — `gasleft()`** section above unless noted.
 
 | Operation | ~Gas | ~USD (L1 stress) |
 |-----------|------|------------------|
-| `createEnumeratedWager` (~2.61M) | ~2.61M | **~$65** |
-| `placeBet` (first new mask ~246k) | ~246k | **~$6.15** |
+| `createEnumeratedWager` (~2.60M) | ~2.60M | **~$65** |
+| `placeBet` (first new mask ~248k) | ~248k | **~$6.20** |
 | `resolve` (~114k) | ~114k | **~$2.85** |
 
 ### Quick read

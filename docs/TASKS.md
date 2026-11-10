@@ -105,7 +105,8 @@ Wagers created through the factory therefore see at most the factory cap (100% t
 Exact commands are in [`ADR-0020-IMPLEMENTATION.md`](ADR-0020-IMPLEMENTATION.md).
 
 - [ ] Rotate the Alchemy key that was committed to `README.md`. It is gone from the tree but stays in git history.
-- [ ] Deploy the corrected factory and point `config/deployments.json` at it. The live factory has no wagers, so this strands nobody, but the contract fixes do nothing until it happens.
+- [ ] Deploy the corrected factory and point `config/deployments.json` at it. The live factory has no wagers, so this strands nobody, but the contract fixes (ADR-0020, ADR-0023) do nothing until it happens.
+- [ ] After that deploy, drop "fee-on-transfer" from the unlisted-token warnings and from the README's live-factory notes. They will then hold only for rebasing tokens (`docs/ADR-0023-IMPLEMENTATION.md#operator-follow-ups`).
 - [x] Redeploy the hosted indexer, on persistent storage. Done 2026-11-08 (ADR-0022): a Compute Engine VM behind the same URL.
 - [ ] Run the resolution service locally (ADR-0022): put the resolver key and `RESOLUTION_SERVICE_TOKEN` in the gitignored `config/service.env` (`docs/RESOLUTION-SERVICE.md#local-run`).
 - [ ] Complete PyPI Trusted Publishing, then tag. Neither package is on PyPI yet.

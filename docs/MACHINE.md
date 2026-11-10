@@ -174,6 +174,7 @@ event FeeWithdrawnV3(address indexed recipient, uint256 amount);
 | `InvalidTicketMask` | Bets with a zero or out-of-range mask, or multi-bit under `SINGLE_WINNER` |
 | `InvalidWinningMask` | `resolve` with a zero or out-of-range mask, or multi-bit under `SINGLE_WINNER` |
 | `NewTicketStakeTooLow` | A bet or seed opening a new ticket below `minNewTicketStake` |
+| `CollateralShortfall` | A bet, or a factory seed pull, where the wager received less than the amount pulled, as with a fee-on-transfer token (ADR-0023). Same selector from the wager and the factory. Not on the live factory until it is redeployed. |
 | `TooManyDistinctTickets` | A new multi-outcome ticket when the wager already has 1024 |
 | `EmptyAnswer`, `AnswerTooLong` | Freeform bets and `resolve`: answer must be 1 to 1024 bytes |
 | `NotOpen` | Bets after finalization; `claim` before it |
